@@ -1,0 +1,92 @@
+---
+title: 命令速查
+description: 常用开发、质量、发布、updater 和文档站命令。
+---
+
+本页只列维护者高频命令。完整命令以根目录 `package.json` 为准。
+
+## 前端与桌面
+
+```bash
+pnpm install
+pnpm run dev
+pnpm run tauri dev
+pnpm run tauri build
+```
+
+## 文档站
+
+```bash
+pnpm run docs:web:dev
+pnpm run docs:web:check
+pnpm run docs:web:build
+pnpm run docs:web:start
+```
+
+## 基础质量检查
+
+```bash
+pnpm run check
+pnpm run format:check
+pnpm run license:check
+pnpm run release:platform:check
+```
+
+Rust 核心：
+
+```bash
+cargo +1.96.0 test -p imgconvert-core
+cargo +1.96.0 clippy -p imgconvert-core -- -D warnings
+```
+
+Tauri 后端：
+
+```bash
+cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
+cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+```
+
+## Linux 发布
+
+```bash
+pnpm run release:readiness:github:ready
+pnpm run release:linux
+pnpm run release:linux:verify
+pnpm run release:linux:checksums
+```
+
+Docker smoke：
+
+```bash
+pnpm run release:linux:smoke:docker
+pnpm run release:linux:smoke:deb:debian
+pnpm run release:linux:smoke:rpm:docker
+pnpm run release:linux:smoke:appimage:docker
+```
+
+## Tauri updater
+
+```bash
+pnpm run release:updater:prepare
+pnpm run release:updater:sign
+pnpm run release:updater:manifest
+pnpm run release:updater:verify
+```
+
+远端 GitHub Release smoke：
+
+```bash
+pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
+pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-aarch64 --no-run
+```
+
+## 平台后续
+
+```bash
+pnpm run release:macos:check
+pnpm run release:windows:check
+pnpm run release:flatpak:verify
+pnpm run release:flathub:pr
+```
+
+这些命令保留给后续真实平台、证书、账号和商店/Flathub 审核使用。第一期 GitHub-only 发布不要求跑完整商店链路。

@@ -1,0 +1,77 @@
+---
+title: 排障
+description: 常见安装、运行、HEIC、权限和 updater 问题。
+---
+
+这里记录第一期 GitHub Release 用户最可能遇到的问题。
+
+## AppImage 无法启动
+
+先确认文件有执行权限：
+
+```bash
+chmod +x ./ImgConvert_0.1.1_amd64.AppImage
+./ImgConvert_0.1.1_amd64.AppImage
+```
+
+如果报 FUSE 或挂载相关错误，用提取运行模式验证：
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
+```
+
+如果报缺少 WebKitGTK、GTK、libayatana-appindicator 或其他动态库，需要安装发行版对应运行时包。Debian/Ubuntu 的 `.deb` 包会比 AppImage 更容易通过包管理器解析系统依赖。
+
+## 点击选择文件后异常退出
+
+请先确认使用的是最新 GitHub Release。若仍复现，从终端启动应用并保留输出：
+
+```bash
+RUST_BACKTRACE=1 ./ImgConvert_0.1.1_amd64.AppImage
+```
+
+报告问题时请附上发行版版本、桌面环境、Wayland/X11、启动日志，以及触发步骤。
+
+## 不能写入输出目录
+
+常见原因：
+
+- 输出目录没有写权限。
+- 输出目录位于只读挂载点、外接盘或沙盒路径。
+- 文件名冲突或目标文件被其他程序占用。
+
+优先把输出目录切换到用户主目录下的新建文件夹，再重新转换。
+
+## HEIC 不能导入
+
+HEIC 是可选能力，不在主程序内置 codec 中。
+
+Linux 直发包可通过系统 helper 或显式插件提供 decode-only 导入。常见依赖包括 `libheif-examples` 和系统缩略图/像素格式支持包。Flatpak 路线会走独立 HEIC extension，不把 LGPL helper 放进主包。
+
+macOS 后续走系统 ImageIO，Windows 后续走 WIC 探测。系统缺少 HEIF/HEVC provider 时，应用只会给出引导，不承诺自动补齐。
+
+## updater 找不到更新
+
+第一期 updater 读取 GitHub Release 上的 `latest.json`。排查顺序：
+
+1. 当前版本是否低于 release 版本。
+2. 网络或代理是否能访问 GitHub Release 资产。
+3. Release 是否同时包含 AppImage、`.sig` 和 `latest.json`。
+4. 当前平台是否在 `latest.json` 中有对应条目。
+
+维护者可以用远端 smoke 检查 manifest：
+
+```bash
+pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
+```
+
+## 图片转换失败
+
+失败原因通常分为四类：
+
+- 输入损坏或不是声明的图片格式。
+- 当前格式能力不支持该输入或输出组合。
+- 图片尺寸过大，触发内存预算或系统 OOM。
+- 输出路径权限、磁盘空间或文件占用问题。
+
+先用少量文件复现，再切换输出目录。如果只有单张图片失败，保留原图作为 bug 样张，不要覆盖或二次压缩。

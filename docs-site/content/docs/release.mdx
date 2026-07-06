@@ -1,9 +1,11 @@
 ---
-title: 安装与发布
+title: 发布
 description: GitHub Releases 第一期发布范围、资产和发布前检查。
 ---
 
 第一期只在 GitHub Releases 发布，不提交 Flathub、Mac App Store 或 Microsoft Store。
+
+用户安装步骤见 [安装](./install)。本页主要面向维护者，记录 release 资产、发布前硬闸门和远端 smoke。
 
 ## v0.1.1 资产
 
@@ -21,6 +23,13 @@ GitHub Release:
 - `ImgConvert-0.1.1-1.aarch64.rpm`
 - `latest.json`
 - `SHA256SUMS`
+
+## 第一批边界
+
+- GitHub Release 是唯一正式分发渠道。
+- AppImage 是当前跨 Linux 桌面优先验证包。
+- `.deb` / `.rpm` 随 release 发布，但按当前资产架构覆盖，不承诺发行版仓库级更新。
+- 商店、Flathub、macOS 公证、Windows 代码签名和 MSIX 留到后续阶段。
 
 ## 发布前硬闸门
 

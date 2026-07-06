@@ -19,10 +19,12 @@ const highlights = [
 ];
 
 const entryPoints = [
-  ["快速开始", "/docs"],
-  ["安装与发布", "/docs/release"],
+  ["安装", "/docs/install"],
+  ["使用", "/docs/usage"],
+  ["排障", "/docs/troubleshooting"],
+  ["命令", "/docs/commands"],
+  ["发布", "/docs/release"],
   ["架构", "/docs/architecture"],
-  ["开发质量", "/docs/development"],
 ];
 
 export default function HomePage() {
@@ -39,7 +41,7 @@ export default function HomePage() {
                 ImgConvert 文档站
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-fd-muted-foreground">
-                面向发布、架构、格式能力和开发质量的项目文档。这里聚合当前 GitHub Release
+                面向安装、使用、排障、发布和开发维护的项目文档。这里聚合当前 GitHub Release
                 第一批交付状态，并为后续 Flathub、macOS、Windows 留出清晰入口。
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
@@ -87,7 +89,7 @@ export default function HomePage() {
         </section>
 
         <section className="mx-auto max-w-6xl px-6 py-14">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             {entryPoints.map(([label, href]) => (
               <Link
                 className="group border border-fd-border bg-fd-background p-5 transition hover:-translate-y-0.5 hover:border-fd-foreground"

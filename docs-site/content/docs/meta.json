@@ -2,7 +2,11 @@
   "title": "ImgConvert",
   "pages": [
     "index",
+    "install",
+    "usage",
     "release",
+    "troubleshooting",
+    "commands",
     "architecture",
     "formats",
     "heic",

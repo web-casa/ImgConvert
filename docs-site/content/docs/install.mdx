@@ -1,0 +1,89 @@
+---
+title: 安装
+description: 从 GitHub Releases 下载、校验并安装 ImgConvert。
+---
+
+ImgConvert 第一期只通过 GitHub Releases 分发。当前建议优先使用 AppImage 做桌面实测；`.deb` 和 `.rpm` 作为对应架构的系统包。
+
+## 下载
+
+当前版本：
+
+[v0.1.1 GitHub Release](https://github.com/yeagoo/imgconvert/releases/tag/v0.1.1)
+
+资产说明：
+
+| 文件 | 用途 |
+| --- | --- |
+| `ImgConvert_0.1.1_amd64.AppImage` | x86_64 Linux 桌面直运行包 |
+| `ImgConvert_0.1.1_aarch64.AppImage` | arm64/aarch64 Linux 桌面直运行包 |
+| `ImgConvert_0.1.1_arm64.deb` | Debian/Ubuntu arm64 系统包 |
+| `ImgConvert-0.1.1-1.aarch64.rpm` | Fedora/RHEL/openSUSE aarch64 系统包 |
+| `SHA256SUMS` | 人工下载后的 checksum 校验 |
+| `latest.json` | Tauri updater 使用的更新 manifest |
+| `*.AppImage.sig` | Tauri updater 签名，不是人工 GPG 签名 |
+
+## 校验
+
+把 release 资产放在同一个目录后执行：
+
+```bash
+sha256sum -c SHA256SUMS
+```
+
+`SHA256SUMS` 是人工下载校验入口。AppImage 旁边的 `.sig` 文件是 Tauri updater 校验 manifest 使用的签名文件，普通用户不需要手动使用。
+
+## AppImage
+
+```bash
+chmod +x ./ImgConvert_0.1.1_amd64.AppImage
+./ImgConvert_0.1.1_amd64.AppImage
+```
+
+arm64/aarch64 机器使用：
+
+```bash
+chmod +x ./ImgConvert_0.1.1_aarch64.AppImage
+./ImgConvert_0.1.1_aarch64.AppImage
+```
+
+如果系统没有 FUSE 或 AppImage 无法挂载，可以先用提取模式验证：
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
+```
+
+## Debian / Ubuntu
+
+当前 release 的 `.deb` 是 arm64 包：
+
+```bash
+sudo apt install ./ImgConvert_0.1.1_arm64.deb
+```
+
+如果依赖解析失败，先更新软件源：
+
+```bash
+sudo apt update
+sudo apt install ./ImgConvert_0.1.1_arm64.deb
+```
+
+## Fedora / RHEL / openSUSE
+
+当前 release 的 `.rpm` 是 aarch64 包：
+
+```bash
+sudo dnf install ./ImgConvert-0.1.1-1.aarch64.rpm
+```
+
+openSUSE 可使用：
+
+```bash
+sudo zypper install ./ImgConvert-0.1.1-1.aarch64.rpm
+```
+
+## 更新
+
+AppImage 版本已经带 Tauri updater 资产，应用内更新会读取 GitHub Release 上的 `latest.json`。
+
+系统包版本第一期仍建议按 GitHub Release 手动下载安装。后续如果进入发行版仓库、Flathub 或商店渠道，会单独记录渠道更新策略。
