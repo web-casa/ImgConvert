@@ -1,0 +1,37 @@
+---
+title: 开发质量
+description: 本地开发、检查、发布 guardrail 和长期质量项目。
+---
+
+## 前端与桌面开发
+
+```bash
+pnpm install
+pnpm run check
+pnpm run tauri dev
+```
+
+## Rust 核心
+
+```bash
+cargo +1.96.0 test -p imgconvert-core
+cargo +1.96.0 clippy -p imgconvert-core -- -D warnings
+```
+
+## 发布护栏
+
+```bash
+pnpm run release:platform:check
+pnpm run release:readiness:github:ready
+```
+
+`release:platform:check` 保持架构、许可、平台打包和商店边界不漂移。`release:readiness:github:ready` 是第一期 GitHub Release 的硬闸门。
+
+## 后续质量项目
+
+- Flathub 主包审核与 HEIC extension 审核。
+- macOS 签名、公证、MAS 实跑。
+- Windows 代码签名、timestamp、MSIX/Store。
+- Apple Silicon AVIF benchmark。
+- Windows benchmark。
+- 真实图片 corpus 长跑 fuzz/replay。

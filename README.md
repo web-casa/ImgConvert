@@ -51,6 +51,7 @@
 pnpm install           # 前端依赖
 pnpm run tauri dev     # 开发
 pnpm run tauri build   # 打 .app / .dmg
+pnpm run docs:web:dev  # Fumadocs 文档站预览
 pnpm run check         # 前端类型检查 + lint
 pnpm run release:readiness # GitHub-only 第一期只读发布状态报告,不构建/不联网/不触发 Actions
 pnpm run release:readiness:github:ready # GitHub Release 发布前硬校验,缺 artifact/签名会失败

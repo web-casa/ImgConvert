@@ -1,0 +1,56 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+:root {
+  --imgconvert-ink: #171717;
+  --imgconvert-paper: #fbfaf7;
+  --imgconvert-lime: #c4f042;
+  --imgconvert-cyan: #41d5ff;
+  --imgconvert-coral: #ff6f61;
+}
+
+body {
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--imgconvert-ink) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--imgconvert-ink) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--imgconvert-paper);
+  background-size: 32px 32px;
+  color: var(--imgconvert-ink);
+}
+
+.docs-hero {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in oklab, var(--imgconvert-ink) 14%, transparent);
+  background:
+    linear-gradient(135deg, rgba(196, 240, 66, 0.34), transparent 34%),
+    linear-gradient(225deg, rgba(65, 213, 255, 0.26), transparent 40%), var(--imgconvert-paper);
+}
+
+.docs-hero::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 10px;
+  content: "";
+  background: repeating-linear-gradient(
+    90deg,
+    var(--imgconvert-lime) 0 64px,
+    var(--imgconvert-cyan) 64px 128px,
+    var(--imgconvert-coral) 128px 192px,
+    #ffffff 192px 256px
+  );
+}
+
+.mono-label {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0;
+}

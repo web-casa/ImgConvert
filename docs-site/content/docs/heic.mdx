@@ -1,0 +1,25 @@
+---
+title: HEIC 策略
+description: HEIC 为什么不内置，以及 Linux/macOS/Windows 的后续路线。
+---
+
+HEIC 涉及专利、系统 codec、LGPL helper 和商店审核边界。ImgConvert 第一阶段不把 HEIC 编解码器放入主程序。
+
+## 产品策略
+
+- 主程序不输出 HEIC。
+- 主程序不链接 `libheif`。
+- HEIC 仅作为可选 decode-only 导入。
+- 商店/Flathub 构建默认禁用宿主外部 helper 自动发现。
+
+## Linux
+
+Linux 直发包可通过系统安装的 `libheif-examples` 或显式插件 helper 提供 HEIC 导入能力。Flatpak 路线保留独立 HEIC extension，不把 LGPL helper 放进主包。
+
+## macOS
+
+macOS 后续走系统 ImageIO 读取路线。真实发布仍需要 Developer ID 签名、公证或 MAS 沙盒验收。
+
+## Windows
+
+Windows 后续走 WIC 探测。用户系统缺少 HEIF/HEVC 扩展时，应用只给出明确引导，不承诺开箱即用。

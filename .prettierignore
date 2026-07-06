@@ -2,6 +2,9 @@ dist
 node_modules
 src-tauri/target
 target
+docs-site/.next
+docs-site/.source
+docs-site/node_modules
 test-results
 playwright-report
 THIRD_PARTY_LICENSES.md

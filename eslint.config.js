@@ -16,6 +16,7 @@ export default [
       "fuzz/artifacts/**",
       "src-tauri/target/**",
       "target/**",
+      "docs-site/**",
       "THIRD_PARTY_LICENSES.md",
     ],
   },
@@ -66,6 +67,7 @@ export default [
   {
     files: [
       "*.config.{js,ts}",
+      ".pnpmfile.cjs",
       "eslint.config.js",
       "scripts/**/*.mjs",
       "tests/**/*.ts",

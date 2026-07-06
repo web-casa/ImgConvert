@@ -1,0 +1,31 @@
+---
+title: 架构
+description: ImgConvert 的前端、Tauri 后端和 Rust 图像核心边界。
+---
+
+## 分层
+
+| 层 | 技术 | 责任 |
+| --- | --- | --- |
+| 前端 | Svelte 5 + Vite | 队列、格式选择、设置项、进度与错误展示 |
+| 桌面 | Tauri 2 | 文件授权、系统能力探测、批量转换命令、updater |
+| 核心 | Rust crate `imgconvert-core` | 编解码、metadata、色彩、质量策略 |
+| 发布 | GitHub Actions + 本地脚本 | Linux 包、checksums、updater manifest、平台 guardrail |
+
+## 核心原则
+
+- 主图像管线在进程内执行，不回退到 libvips CLI。
+- 主依赖树只接受宽松许可证。
+- HEIC 不进入主 codec 矩阵，只作为平台/插件增强。
+- 文件访问统一走用户显式授权路径，给后续 Flatpak portal 与 macOS security-scoped bookmark 留门。
+
+## 质量边界
+
+`imgconvert-core` 已覆盖 JPEG、PNG、WebP、AVIF。AVIF 真无损已对外启用，但仍保留质量测试和 guardrail，避免错误能力宣称。
+
+发布相关状态由以下命令汇总：
+
+```bash
+pnpm run release:readiness
+pnpm run release:readiness:all
+```

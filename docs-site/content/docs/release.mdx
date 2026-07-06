@@ -1,0 +1,40 @@
+---
+title: 安装与发布
+description: GitHub Releases 第一期发布范围、资产和发布前检查。
+---
+
+第一期只在 GitHub Releases 发布，不提交 Flathub、Mac App Store 或 Microsoft Store。
+
+## v0.1.1 资产
+
+GitHub Release:
+
+[https://github.com/yeagoo/imgconvert/releases/tag/v0.1.1](https://github.com/yeagoo/imgconvert/releases/tag/v0.1.1)
+
+已发布资产：
+
+- `ImgConvert_0.1.1_amd64.AppImage`
+- `ImgConvert_0.1.1_amd64.AppImage.sig`
+- `ImgConvert_0.1.1_aarch64.AppImage`
+- `ImgConvert_0.1.1_aarch64.AppImage.sig`
+- `ImgConvert_0.1.1_arm64.deb`
+- `ImgConvert-0.1.1-1.aarch64.rpm`
+- `latest.json`
+- `SHA256SUMS`
+
+## 发布前硬闸门
+
+```bash
+pnpm run release:readiness:github:ready
+```
+
+这个命令是本地只读检查。任何第一期范围内的 artifact、updater signature、`latest.json` 或前置条件缺失都会失败。
+
+## 远端 smoke
+
+```bash
+pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
+pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-aarch64 --no-run
+```
+
+`--no-run` 会下载远端 `latest.json`、AppImage 和 `.sig`，校验 manifest 签名一致性，但不在当前机器执行不同架构的 AppImage。

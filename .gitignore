@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 target
+docs-site/.next
+docs-site/.source
+docs-site/out
 fuzz/Cargo.lock
 fuzz/corpus/*
 !fuzz/corpus/.gitignore
@@ -21,6 +24,7 @@ fuzz/artifacts
 test-results
 playwright-report
 *.local
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
