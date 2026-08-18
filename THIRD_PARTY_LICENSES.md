@@ -12592,11 +12592,15 @@ still covered by `pnpm run license:npm` policy checks.
 - @eslint/plugin-kit@0.4.1 — Apache-2.0 — https://github.com/eslint/rewrite/tree/main/packages/plugin-kit#readme
 - @exodus/bytes@1.15.1 — MIT — https://github.com/ExodusOSS/bytes
 - @floating-ui/core@1.7.5 — MIT — https://floating-ui.com
+- @floating-ui/core@1.8.0 — MIT — https://floating-ui.com
 - @floating-ui/dom@1.7.6 — MIT — https://floating-ui.com
-- @floating-ui/react-dom@2.1.8 — MIT — https://floating-ui.com/docs/react-dom
+- @floating-ui/dom@1.8.0 — MIT — https://floating-ui.com
+- @floating-ui/react-dom@2.1.9 — MIT — https://floating-ui.com/docs/react-dom
 - @floating-ui/utils@0.2.11 — MIT — https://floating-ui.com
+- @floating-ui/utils@0.2.12 — MIT — https://floating-ui.com
 - @fuma-translate/react@1.0.2 — MIT — https://github.com/fuma-nama/fuma-translate#readme
-- @fumadocs/tailwind@0.0.5 — MIT — https://fumadocs.dev
+- @fumadocs/tailwind@0.1.1 — MIT — https://fumadocs.dev
+- @fumari/image-size@0.1.0 — MIT — https://fumadocs.dev
 - @humanfs/core@0.19.2 — Apache-2.0 — https://github.com/humanwhocodes/humanfs#readme
 - @humanfs/node@0.16.8 — Apache-2.0 — https://github.com/humanwhocodes/humanfs#readme
 - @humanfs/types@0.15.0 — Apache-2.0 — https://github.com/humanwhocodes/humanfs#readme
@@ -12610,57 +12614,56 @@ still covered by `pnpm run license:npm` policy checks.
 - @jridgewell/trace-mapping@0.3.31 — MIT — https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
 - @lucide/svelte@1.22.0 — ISC — https://lucide.dev
 - @mdx-js/mdx@3.1.1 — MIT — https://mdxjs.com
-- @next/env@16.2.10 — MIT — https://github.com/vercel/next.js#readme
-- @orama/orama@3.1.18 — Apache-2.0 — https://github.com/oramasearch/orama#readme
+- @next/env@16.3.1 — MIT — https://github.com/vercel/next.js#readme
 - @oxc-project/types@0.137.0 — MIT — https://oxc.rs
 - @playwright/test@1.61.1 — Apache-2.0 — https://playwright.dev
-- @radix-ui/number@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/primitive@1.1.4 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-accordion@1.2.15 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-arrow@1.1.11 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-collapsible@1.1.15 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-collection@1.1.11 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-compose-refs@1.1.3 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-context@1.1.4 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-dialog@1.1.18 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-direction@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-dismissable-layer@1.1.14 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-focus-guards@1.1.4 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-focus-scope@1.1.11 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-id@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-navigation-menu@1.2.17 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-popover@1.1.18 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-popper@1.3.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-portal@1.1.13 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-presence@1.1.6 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-primitive@2.1.7 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-roving-focus@1.1.14 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-scroll-area@1.2.13 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-slot@1.3.0 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-tabs@1.1.16 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-callback-ref@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-controllable-state@1.2.3 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-effect-event@0.0.3 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-layout-effect@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-previous@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-rect@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-use-size@1.1.2 — MIT — https://radix-ui.com/primitives
-- @radix-ui/react-visually-hidden@1.2.7 — MIT — https://radix-ui.com/primitives
-- @radix-ui/rect@1.1.2 — MIT — https://radix-ui.com/primitives
+- @radix-ui/number@1.1.3 — MIT — https://radix-ui.com/primitives
+- @radix-ui/primitive@1.1.7 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-accordion@1.2.20 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-arrow@1.1.15 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-collapsible@1.1.20 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-collection@1.1.15 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-compose-refs@1.1.5 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-context@1.2.2 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-dialog@1.1.23 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-direction@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-dismissable-layer@1.1.19 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-focus-guards@1.1.6 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-focus-scope@1.1.16 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-id@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-navigation-menu@1.2.22 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-popover@1.1.23 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-popper@1.3.7 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-portal@1.1.17 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-presence@1.1.10 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-primitive@2.1.10 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-roving-focus@1.1.19 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-scroll-area@1.2.18 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-slot@1.3.3 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-tabs@1.1.21 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-callback-ref@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-controllable-state@1.2.6 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-effect-event@0.0.5 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-is-hydrated@0.1.3 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-layout-effect@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-previous@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-rect@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-use-size@1.1.4 — MIT — https://radix-ui.com/primitives
+- @radix-ui/react-visually-hidden@1.2.11 — MIT — https://radix-ui.com/primitives
+- @radix-ui/rect@1.1.3 — MIT — https://radix-ui.com/primitives
 - @rolldown/pluginutils@1.0.1 — MIT — https://github.com/rolldown/plugins/tree/main/packages/pluginutils#readme
-- @shikijs/core@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/engine-javascript@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/engine-oniguruma@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/langs@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/primitive@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/themes@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
-- @shikijs/types@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/core@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/engine-javascript@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/engine-oniguruma@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/langs@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/primitive@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/themes@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
+- @shikijs/types@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
 - @shikijs/vscode-textmate@10.0.2 — MIT — https://github.com/shikijs/vscode-textmate#readme
 - @standard-schema/spec@1.1.0 — MIT — https://standardschema.dev
 - @sveltejs/acorn-typescript@1.0.10 — MIT — https://github.com/sveltejs/acorn-typescript#readme
 - @sveltejs/load-config@0.2.0 — MIT — https://github.com/sveltejs/language-tools#readme
 - @sveltejs/vite-plugin-svelte@7.1.2 — MIT — https://github.com/sveltejs/vite-plugin-svelte#readme
-- @swc/helpers@0.5.15 — Apache-2.0 — https://swc.rs
 - @swc/helpers@0.5.23 — Apache-2.0 — https://swc.rs
 - @tailwindcss/node@4.3.2 — MIT — https://tailwindcss.com
 - @tailwindcss/oxide@4.3.2 — MIT — https://github.com/tailwindlabs/tailwindcss#readme
@@ -12683,7 +12686,7 @@ still covered by `pnpm run license:npm` policy checks.
 - @types/deep-eql@4.0.2 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/deep-eql
 - @types/estree-jsx@1.0.5 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/estree-jsx
 - @types/estree@1.0.9 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/estree
-- @types/hast@3.0.4 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/hast
+- @types/hast@3.0.5 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/hast
 - @types/json-schema@7.0.15 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/json-schema
 - @types/mdast@4.0.4 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/mdast
 - @types/mdx@2.0.14 — MIT — https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/mdx
@@ -12705,7 +12708,7 @@ still covered by `pnpm run license:npm` policy checks.
 - @typescript-eslint/typescript-estree@8.62.0 — MIT — https://typescript-eslint.io/packages/typescript-estree
 - @typescript-eslint/utils@8.62.0 — MIT — https://typescript-eslint.io/packages/utils
 - @typescript-eslint/visitor-keys@8.62.0 — MIT — https://typescript-eslint.io
-- @ungap/structured-clone@1.3.2 — ISC — https://github.com/ungap/structured-clone#readme
+- @ungap/structured-clone@1.3.3 — ISC — https://github.com/ungap/structured-clone#readme
 - @vitest/expect@4.1.9 — MIT — https://vitest.dev/api/expect
 - @vitest/mocker@4.1.9 — MIT — https://github.com/vitest-dev/vitest/tree/main/packages/mocker
 - @vitest/pretty-format@4.1.9 — MIT — https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format
@@ -12713,8 +12716,10 @@ still covered by `pnpm run license:npm` policy checks.
 - @vitest/snapshot@4.1.9 — MIT — https://vitest.dev/guide/snapshot
 - @vitest/spy@4.1.9 — MIT — https://vitest.dev/api/mock
 - @vitest/utils@4.1.9 — MIT — https://github.com/vitest-dev/vitest/tree/main/packages/utils
+- @yuku-toolchain/types@0.8.7 — MIT — https://github.com/yuku-toolchain/yuku#readme
 - acorn-jsx@5.3.2 — MIT — https://github.com/acornjs/acorn-jsx
 - acorn@8.17.0 — MIT — https://github.com/acornjs/acorn
+- acorn@8.18.0 — MIT — https://github.com/acornjs/acorn
 - ajv@6.15.0 — MIT — https://github.com/ajv-validator/ajv
 - ansi-regex@5.0.1 — MIT — https://github.com/chalk/ansi-regex#readme
 - ansi-styles@4.3.0 — MIT — https://github.com/chalk/ansi-styles#readme
@@ -12729,13 +12734,13 @@ still covered by `pnpm run license:npm` policy checks.
 - bail@2.0.2 — MIT — https://github.com/wooorm/bail#readme
 - balanced-match@1.0.2 — MIT — https://github.com/juliangruber/balanced-match
 - balanced-match@4.0.4 — MIT — https://github.com/juliangruber/balanced-match#readme
-- baseline-browser-mapping@2.10.42 — Apache-2.0 — https://github.com/web-platform-dx/baseline-browser-mapping#readme
+- baseline-browser-mapping@2.11.15 — Apache-2.0 — https://github.com/web-platform-dx/baseline-browser-mapping#readme
 - bidi-js@1.0.3 — MIT — https://github.com/lojjic/bidi-js#readme
 - bits-ui@2.18.1 — MIT — https://github.com/huntabyte/bits-ui#readme
 - brace-expansion@1.1.15 — MIT — https://github.com/juliangruber/brace-expansion
 - brace-expansion@5.0.7 — MIT — https://github.com/juliangruber/brace-expansion#readme
 - callsites@3.1.0 — MIT — https://github.com/sindresorhus/callsites#readme
-- caniuse-lite@1.0.30001802 — CC-BY-4.0 — https://github.com/browserslist/caniuse-lite#readme
+- caniuse-lite@1.0.30001809 — CC-BY-4.0 — https://github.com/browserslist/caniuse-lite#readme
 - ccount@2.0.1 — MIT — https://github.com/wooorm/ccount#readme
 - chai@6.2.2 — MIT — http://chaijs.com
 - chalk@4.1.2 — MIT — https://github.com/chalk/chalk#readme
@@ -12748,7 +12753,7 @@ still covered by `pnpm run license:npm` policy checks.
 - class-variance-authority@0.7.1 — Apache-2.0 — https://github.com/joe-bell/cva#readme
 - client-only@0.0.1 — MIT — https://reactjs.org/
 - clsx@2.1.1 — MIT — https://github.com/lukeed/clsx#readme
-- cnfast@0.0.8 — MIT — https://github.com/aidenybai/cnfast#readme
+- cnfast@0.1.0 — MIT — https://github.com/aidenybai/cnfast#readme
 - collapse-white-space@2.1.0 — MIT — https://github.com/wooorm/collapse-white-space#readme
 - color-convert@2.0.1 — MIT — https://github.com/Qix-/color-convert#readme
 - color-name@1.1.4 — MIT — https://github.com/colorjs/color-name
@@ -12778,7 +12783,7 @@ still covered by `pnpm run license:npm` policy checks.
 - es-module-lexer@2.2.0 — MIT — https://github.com/guybedford/es-module-lexer#readme
 - esast-util-from-estree@2.0.0 — MIT — https://github.com/syntax-tree/esast-util-from-estree#readme
 - esast-util-from-js@2.0.1 — MIT — https://github.com/syntax-tree/esast-util-from-js#readme
-- esbuild@0.28.1 — MIT — https://github.com/evanw/esbuild#readme
+- esbuild@0.28.2 — MIT — https://github.com/evanw/esbuild#readme
 - escape-string-regexp@4.0.0 — MIT — https://github.com/sindresorhus/escape-string-regexp#readme
 - escape-string-regexp@5.0.0 — MIT — https://github.com/sindresorhus/escape-string-regexp#readme
 - eslint-plugin-svelte@3.20.0 — MIT — https://sveltejs.github.io/eslint-plugin-svelte
@@ -12814,10 +12819,10 @@ still covered by `pnpm run license:npm` policy checks.
 - flat-cache@4.0.1 — MIT — https://github.com/jaredwray/flat-cache#readme
 - flatted@3.4.2 — ISC — https://github.com/WebReflection/flatted#readme
 - formatly@0.3.0 — MIT — https://github.com/JoshuaKGoldberg/formatly#readme
-- framer-motion@12.42.2 — MIT — https://github.com/motiondivision/motion#readme
-- fumadocs-core@16.10.7 — MIT — https://fumadocs.dev
-- fumadocs-mdx@15.0.13 — MIT — https://fumadocs.dev
-- fumadocs-ui@16.10.7 — MIT — https://fumadocs.dev
+- framer-motion@13.1.0 — MIT — https://github.com/motiondivision/motion#readme
+- fumadocs-core@16.14.4 — MIT — https://fumadocs.dev
+- fumadocs-mdx@15.2.3 — MIT — https://fumadocs.dev
+- fumadocs-ui@16.14.4 — MIT — https://fumadocs.dev
 - get-nonce@1.0.1 — MIT — https://github.com/theKashey/get-nonce
 - get-tsconfig@4.14.0 — MIT — https://github.com/privatenumber/get-tsconfig#readme
 - github-slugger@2.0.0 — ISC — https://github.com/Flet/github-slugger
@@ -12856,7 +12861,6 @@ still covered by `pnpm run license:npm` policy checks.
 - jiti@2.7.0 — MIT — https://github.com/unjs/jiti#readme
 - js-tokens@4.0.0 — MIT — https://github.com/lydell/js-tokens#readme
 - js-yaml@4.3.0 — MIT — https://github.com/nodeca/js-yaml#readme
-- js-yaml@5.2.1 — MIT — https://github.com/nodeca/js-yaml#readme
 - jsdom@29.1.1 — MIT — https://github.com/jsdom/jsdom#readme
 - json-buffer@3.0.1 — MIT — https://github.com/dominictarr/json-buffer
 - json-schema-traverse@0.4.1 — MIT — https://github.com/epoberezkin/json-schema-traverse#readme
@@ -12872,9 +12876,10 @@ still covered by `pnpm run license:npm` policy checks.
 - lodash.merge@4.6.2 — MIT — https://lodash.com/
 - longest-streak@3.1.0 — MIT — https://github.com/wooorm/longest-streak#readme
 - lru-cache@11.5.1 — BlueOak-1.0.0 — https://github.com/isaacs/node-lru-cache#readme
-- lucide-react@1.23.0 — ISC — https://lucide.dev
+- lucide-react@1.31.0 — ISC — https://lucide.dev
 - lz-string@1.5.0 — MIT — http://pieroxy.net/blog/pages/lz-string/index.html
 - magic-string@0.30.21 — MIT — https://github.com/Rich-Harris/magic-string#readme
+- magic-string@1.2.0 — MIT — https://github.com/Rich-Harris/magic-string#readme
 - markdown-extensions@2.0.0 — MIT — https://github.com/sindresorhus/markdown-extensions#readme
 - markdown-table@3.0.4 — MIT — https://github.com/wooorm/markdown-table#readme
 - mdast-util-find-and-replace@3.0.2 — MIT — https://github.com/syntax-tree/mdast-util-find-and-replace#readme
@@ -12931,15 +12936,16 @@ still covered by `pnpm run license:npm` policy checks.
 - micromark@4.0.2 — MIT — https://github.com/micromark/micromark/tree/main#readme
 - minimatch@10.2.5 — BlueOak-1.0.0 — https://github.com/isaacs/minimatch#readme
 - minimatch@3.1.5 — ISC — https://github.com/isaacs/minimatch#readme
-- motion-dom@12.42.2 — MIT — https://github.com/motiondivision/motion#readme
-- motion-utils@12.39.0 — MIT — https://github.com/motiondivision/motion#readme
-- motion@12.42.2 — MIT — https://github.com/motiondivision/motion#readme
+- motion-dom@13.0.0 — MIT — https://github.com/motiondivision/motion#readme
+- motion-utils@13.0.0 — MIT — https://github.com/motiondivision/motion#readme
+- motion@13.1.0 — MIT — https://github.com/motiondivision/motion#readme
 - mri@1.2.0 — MIT — https://github.com/lukeed/mri#readme
 - ms@2.1.3 — MIT — https://github.com/vercel/ms#readme
-- nanoid@3.3.15 — MIT — https://github.com/ai/nanoid#readme
+- nanoid@3.3.18 — MIT — https://github.com/ai/nanoid#readme
 - natural-compare@1.4.0 — MIT — https://github.com/litejs/natural-compare-lite#readme
 - next-themes@0.4.6 — MIT — https://github.com/pacocoursey/next-themes#readme
-- next@16.2.10 — MIT — https://nextjs.org
+- next@16.3.1 — MIT — https://nextjs.org
+- npm-to-yarn@3.2.0 — MIT — https://github.com/nebrelbug/npm-to-yarn#readme
 - obug@2.1.3 — MIT — https://github.com/sxzz/obug#readme
 - oniguruma-parser@0.12.2 — MIT — https://github.com/slevithan/oniguruma-parser#readme
 - oniguruma-to-es@4.3.6 — MIT — https://github.com/slevithan/oniguruma-to-es#readme
@@ -12958,14 +12964,15 @@ still covered by `pnpm run license:npm` policy checks.
 - phosphor-svelte@3.1.0 — MIT — https://phosphoricons.com
 - picocolors@1.1.1 — ISC — https://github.com/alexeyraspopov/picocolors#readme
 - picomatch@4.0.4 — MIT — https://github.com/micromatch/picomatch
+- picomatch@4.0.5 — MIT — https://github.com/micromatch/picomatch
 - playwright-core@1.61.1 — Apache-2.0 — https://playwright.dev
 - playwright@1.61.1 — Apache-2.0 — https://playwright.dev
 - postcss-load-config@3.1.4 — MIT — https://github.com/postcss/postcss-load-config#readme
 - postcss-safe-parser@7.0.1 — MIT — https://github.com/postcss/postcss-safe-parser#readme
 - postcss-scss@4.0.9 — MIT — https://github.com/postcss/postcss-scss#readme
 - postcss-selector-parser@7.1.4 — MIT — https://github.com/postcss/postcss-selector-parser
-- postcss@8.4.31 — MIT — https://postcss.org/
-- postcss@8.5.16 — MIT — https://postcss.org/
+- postcss@8.5.23 — MIT — https://postcss.org/
+- postcss@8.5.26 — MIT — https://postcss.org/
 - prelude-ls@1.2.1 — MIT — http://preludels.com
 - prettier-plugin-svelte@4.1.1 — MIT — https://github.com/sveltejs/prettier-plugin-svelte#readme
 - prettier@3.9.4 — MIT — https://prettier.io
@@ -12979,7 +12986,7 @@ still covered by `pnpm run license:npm` policy checks.
 - react-style-singleton@2.2.3 — MIT — https://github.com/theKashey/react-style-singleton#readme
 - react@19.2.7 — MIT — https://react.dev/
 - readdirp@4.1.2 — MIT — https://github.com/paulmillr/readdirp
-- readdirp@5.0.0 — MIT — https://github.com/paulmillr/readdirp
+- readdirp@5.1.1 — MIT — https://github.com/paulmillr/readdirp
 - recma-build-jsx@1.0.0 — MIT — https://github.com/mdx-js/recma
 - recma-jsx@1.0.1 — MIT — https://github.com/mdx-js/recma
 - recma-parse@1.0.0 — MIT — https://github.com/mdx-js/recma
@@ -13007,7 +13014,7 @@ still covered by `pnpm run license:npm` policy checks.
 - semver@7.8.5 — ISC — https://github.com/npm/node-semver#readme
 - shebang-command@2.0.0 — MIT — https://github.com/kevva/shebang-command#readme
 - shebang-regex@3.0.0 — MIT — https://github.com/sindresorhus/shebang-regex#readme
-- shiki@4.3.1 — MIT — https://github.com/shikijs/shiki#readme
+- shiki@4.4.3 — MIT — https://github.com/shikijs/shiki#readme
 - siginfo@2.0.0 — ISC — https://github.com/emilbayes/siginfo#readme
 - smol-toml@1.7.0 — BSD-3-Clause — https://github.com/squirrelchat/smol-toml#readme
 - source-map-js@1.2.1 — BSD-3-Clause — https://github.com/7rulnik/source-map-js
@@ -13034,6 +13041,7 @@ still covered by `pnpm run license:npm` policy checks.
 - tapable@2.3.3 — MIT — https://github.com/webpack/tapable
 - tinybench@2.9.0 — MIT — https://github.com/tinylibs/tinybench#readme
 - tinyexec@1.2.4 — MIT — https://github.com/tinylibs/tinyexec#readme
+- tinyexec@1.3.0 — MIT — https://github.com/tinylibs/tinyexec#readme
 - tinyglobby@0.2.17 — MIT — https://superchupu.dev/tinyglobby
 - tinyrainbow@3.1.0 — MIT — https://github.com/tinylibs/tinyrainbow#readme
 - tldts-core@7.4.5 — MIT — https://github.com/remusao/tldts#readme
@@ -13082,6 +13090,9 @@ still covered by `pnpm run license:npm` policy checks.
 - yaml@1.10.3 — ISC — https://eemeli.org/yaml/v1/
 - yaml@2.9.0 — ISC — https://eemeli.org/yaml/
 - yocto-queue@0.1.0 — MIT — https://github.com/sindresorhus/yocto-queue#readme
+- yuku-analyzer@0.8.7 — MIT — https://github.com/yuku-toolchain/yuku#readme
+- yuku-ast@0.8.7 — MIT — https://github.com/yuku-toolchain/yuku#readme
+- zbsearch@4.0.0 — Apache-2.0 — https://github.com/micheleriva/zbsearch#readme
 - zimmerframe@1.1.4 — MIT — https://github.com/sveltejs/zimmerframe#readme
 - zod@4.4.3 — MIT — https://zod.dev
 - zwitch@2.0.4 — MIT — https://github.com/wooorm/zwitch#readme
@@ -14795,6 +14806,37 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+### @floating-ui/core@1.8.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@floating-ui+core@1.8.0/node_modules/@floating-ui/core`
+- Homepage: https://floating-ui.com
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2021-present Floating UI contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
 ### @floating-ui/dom@1.7.6
 
 - License: MIT
@@ -14826,10 +14868,41 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### @floating-ui/react-dom@2.1.8
+### @floating-ui/dom@1.8.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@floating-ui+react-dom@2.1.8_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/@floating-ui/react-dom`
+- Package path: `node_modules/.pnpm/@floating-ui+dom@1.8.0/node_modules/@floating-ui/dom`
+- Homepage: https://floating-ui.com
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2021-present Floating UI contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### @floating-ui/react-dom@2.1.9
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@floating-ui+react-dom@2.1.9_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/@floating-ui/react-dom`
 - Homepage: https://floating-ui.com/docs/react-dom
 
 #### LICENSE
@@ -14861,6 +14934,37 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 - License: MIT
 - Package path: `node_modules/.pnpm/@floating-ui+utils@0.2.11/node_modules/@floating-ui/utils`
+- Homepage: https://floating-ui.com
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2021-present Floating UI contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### @floating-ui/utils@0.2.12
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@floating-ui+utils@0.2.12/node_modules/@floating-ui/utils`
 - Homepage: https://floating-ui.com
 
 #### LICENSE
@@ -14920,10 +15024,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @fumadocs/tailwind@0.0.5
+### @fumadocs/tailwind@0.1.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@fumadocs+tailwind@0.0.5_@tailwindcss+oxide@4.3.2_tailwindcss@4.3.2/node_modules/@fumadocs/tailwind`
+- Package path: `node_modules/.pnpm/@fumadocs+tailwind@0.1.1_tailwindcss@4.3.2/node_modules/@fumadocs/tailwind`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -14932,6 +15036,43 @@ SOFTWARE.
 MIT License
 
 Copyright (c) 2023 Fuma
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### @fumari/image-size@0.1.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@fumari+image-size@0.1.0/node_modules/@fumari/image-size`
+- Homepage: https://fumadocs.dev
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2026 Fuma Nama
+
+This package is a fork of probe-image-size (https://github.com/nodeca/probe-image-size).
+The image format parsers are derived from that project:
+
+Copyright (c) 2017 Nodeca
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -16256,37 +16397,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @next/env@16.2.10
+### @next/env@16.3.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@next+env@16.2.10/node_modules/@next/env`
+- Package path: `node_modules/.pnpm/@next+env@16.3.1/node_modules/@next/env`
 - Homepage: https://github.com/vercel/next.js#readme
 
 _No LICENSE/NOTICE file found in the installed package; see package metadata above._
-
-### @orama/orama@3.1.18
-
-- License: Apache-2.0
-- Package path: `node_modules/.pnpm/@orama+orama@3.1.18/node_modules/@orama/orama`
-- Homepage: https://github.com/oramasearch/orama#readme
-
-#### LICENSE.md
-
-```text
-Copyright 2023 OramaSearch Inc
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
 
 ### @oxc-project/types@0.137.0
 
@@ -16544,10 +16661,10 @@ This software contains code derived from the Puppeteer project (https://github.c
 available under the Apache 2.0 license (https://github.com/puppeteer/puppeteer/blob/master/LICENSE).
 ```
 
-### @radix-ui/number@1.1.2
+### @radix-ui/number@1.1.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+number@1.1.2/node_modules/@radix-ui/number`
+- Package path: `node_modules/.pnpm/@radix-ui+number@1.1.3/node_modules/@radix-ui/number`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16576,10 +16693,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/primitive@1.1.4
+### @radix-ui/primitive@1.1.7
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+primitive@1.1.4/node_modules/@radix-ui/primitive`
+- Package path: `node_modules/.pnpm/@radix-ui+primitive@1.1.7/node_modules/@radix-ui/primitive`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16608,10 +16725,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-accordion@1.2.15
+### @radix-ui/react-accordion@1.2.20
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-accordion@1.2.15_@types+react-dom@19.2.3_@types+react@19.2.17__@types+r_f36ca30ec3b876a324352e9e47074c3a/node_modules/@radix-ui/react-accordion`
+- Package path: `node_modules/.pnpm/@radix-ui+react-accordion@1.2.20_@types+react-dom@19.2.3_@types+react@19.2.17__@types+r_aa0b10e3861c8d86ca23b863e24db35f/node_modules/@radix-ui/react-accordion`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16640,10 +16757,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-arrow@1.1.11
+### @radix-ui/react-arrow@1.1.15
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-arrow@1.1.11_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react_b508d5a1dc0bf609ea641fa79482cab2/node_modules/@radix-ui/react-arrow`
+- Package path: `node_modules/.pnpm/@radix-ui+react-arrow@1.1.15_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react_6f6bfe660b37754b403c97b75bb4f503/node_modules/@radix-ui/react-arrow`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16672,10 +16789,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-collapsible@1.1.15
+### @radix-ui/react-collapsible@1.1.20
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-collapsible@1.1.15_@types+react-dom@19.2.3_@types+react@19.2.17__@types_67d8bbff2033887459470d58e1365dfa/node_modules/@radix-ui/react-collapsible`
+- Package path: `node_modules/.pnpm/@radix-ui+react-collapsible@1.1.20_@types+react-dom@19.2.3_@types+react@19.2.17__@types_30bf8c4a1c9254494a8469a09c956e3d/node_modules/@radix-ui/react-collapsible`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16704,10 +16821,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-collection@1.1.11
+### @radix-ui/react-collection@1.1.15
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-collection@1.1.11_@types+react-dom@19.2.3_@types+react@19.2.17__@types+_bcd833a489311c33ac4d645dbe4af8e8/node_modules/@radix-ui/react-collection`
+- Package path: `node_modules/.pnpm/@radix-ui+react-collection@1.1.15_@types+react-dom@19.2.3_@types+react@19.2.17__@types+_a6e002053e9d39acf9bcc3523eca26cd/node_modules/@radix-ui/react-collection`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16736,10 +16853,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-compose-refs@1.1.3
+### @radix-ui/react-compose-refs@1.1.5
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-compose-refs@1.1.3_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-compose-refs`
+- Package path: `node_modules/.pnpm/@radix-ui+react-compose-refs@1.1.5_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-compose-refs`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16768,10 +16885,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-context@1.1.4
+### @radix-ui/react-context@1.2.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-context@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-context`
+- Package path: `node_modules/.pnpm/@radix-ui+react-context@1.2.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-context`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16800,10 +16917,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-dialog@1.1.18
+### @radix-ui/react-dialog@1.1.23
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-dialog@1.1.18_@types+react-dom@19.2.3_@types+react@19.2.17__@types+reac_e1095577a132e8d9ea530fa57b158d09/node_modules/@radix-ui/react-dialog`
+- Package path: `node_modules/.pnpm/@radix-ui+react-dialog@1.1.23_@types+react-dom@19.2.3_@types+react@19.2.17__@types+reac_273c4552cb9ef25164f0590a20526ae7/node_modules/@radix-ui/react-dialog`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16832,10 +16949,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-direction@1.1.2
+### @radix-ui/react-direction@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-direction@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-direction`
+- Package path: `node_modules/.pnpm/@radix-ui+react-direction@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-direction`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16864,10 +16981,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-dismissable-layer@1.1.14
+### @radix-ui/react-dismissable-layer@1.1.19
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-dismissable-layer@1.1.14_@types+react-dom@19.2.3_@types+react@19.2.17___916bead71fa987d44d8e9997f75358a5/node_modules/@radix-ui/react-dismissable-layer`
+- Package path: `node_modules/.pnpm/@radix-ui+react-dismissable-layer@1.1.19_@types+react-dom@19.2.3_@types+react@19.2.17___d8fa013a40dedb9dcbb9b43b93e40407/node_modules/@radix-ui/react-dismissable-layer`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16896,10 +17013,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-focus-guards@1.1.4
+### @radix-ui/react-focus-guards@1.1.6
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-focus-guards@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-focus-guards`
+- Package path: `node_modules/.pnpm/@radix-ui+react-focus-guards@1.1.6_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-focus-guards`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16928,10 +17045,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-focus-scope@1.1.11
+### @radix-ui/react-focus-scope@1.1.16
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-focus-scope@1.1.11_@types+react-dom@19.2.3_@types+react@19.2.17__@types_953fd147250db787f54cf01e55c6edf2/node_modules/@radix-ui/react-focus-scope`
+- Package path: `node_modules/.pnpm/@radix-ui+react-focus-scope@1.1.16_@types+react-dom@19.2.3_@types+react@19.2.17__@types_bde130f859df1e2f435be4b19133ab62/node_modules/@radix-ui/react-focus-scope`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16960,10 +17077,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-id@1.1.2
+### @radix-ui/react-id@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-id@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-id`
+- Package path: `node_modules/.pnpm/@radix-ui+react-id@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-id`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -16992,10 +17109,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-navigation-menu@1.2.17
+### @radix-ui/react-navigation-menu@1.2.22
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-navigation-menu@1.2.17_@types+react-dom@19.2.3_@types+react@19.2.17__@t_0e3cfaa99ad4a827f51a6c65a7b241c1/node_modules/@radix-ui/react-navigation-menu`
+- Package path: `node_modules/.pnpm/@radix-ui+react-navigation-menu@1.2.22_@types+react-dom@19.2.3_@types+react@19.2.17__@t_2456758799118b169064549b5d608fc5/node_modules/@radix-ui/react-navigation-menu`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17024,10 +17141,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-popover@1.1.18
+### @radix-ui/react-popover@1.1.23
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-popover@1.1.18_@types+react-dom@19.2.3_@types+react@19.2.17__@types+rea_607d95123f783c20ac1a8452bed49a49/node_modules/@radix-ui/react-popover`
+- Package path: `node_modules/.pnpm/@radix-ui+react-popover@1.1.23_@types+react-dom@19.2.3_@types+react@19.2.17__@types+rea_32bf1c59e2f446563f3a0d53dcc01b69/node_modules/@radix-ui/react-popover`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17056,10 +17173,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-popper@1.3.2
+### @radix-ui/react-popper@1.3.7
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-popper@1.3.2_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react_7fe02e7186bcbf8f86d9903864cb616c/node_modules/@radix-ui/react-popper`
+- Package path: `node_modules/.pnpm/@radix-ui+react-popper@1.3.7_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react_f5e8c078a9e8d5355069302ba3c1f449/node_modules/@radix-ui/react-popper`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17088,10 +17205,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-portal@1.1.13
+### @radix-ui/react-portal@1.1.17
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-portal@1.1.13_@types+react-dom@19.2.3_@types+react@19.2.17__@types+reac_9fd48d5b638d9c49f76174408f42dd27/node_modules/@radix-ui/react-portal`
+- Package path: `node_modules/.pnpm/@radix-ui+react-portal@1.1.17_@types+react-dom@19.2.3_@types+react@19.2.17__@types+reac_b9b0c95c3b1d1af5c5387c8248266cad/node_modules/@radix-ui/react-portal`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17120,10 +17237,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-presence@1.1.6
+### @radix-ui/react-presence@1.1.10
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-presence@1.1.6_@types+react-dom@19.2.3_@types+react@19.2.17__@types+rea_dcd2172d161be68b0f7e3bfe31aff518/node_modules/@radix-ui/react-presence`
+- Package path: `node_modules/.pnpm/@radix-ui+react-presence@1.1.10_@types+react-dom@19.2.3_@types+react@19.2.17__@types+re_adc135779739cb1e915883e1a7ca716b/node_modules/@radix-ui/react-presence`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17152,10 +17269,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-primitive@2.1.7
+### @radix-ui/react-primitive@2.1.10
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-primitive@2.1.7_@types+react-dom@19.2.3_@types+react@19.2.17__@types+re_6d8fb7f79176be78f7d41dc3e06e6146/node_modules/@radix-ui/react-primitive`
+- Package path: `node_modules/.pnpm/@radix-ui+react-primitive@2.1.10_@types+react-dom@19.2.3_@types+react@19.2.17__@types+r_3184244fd74ea067d72e5f2da9c8480f/node_modules/@radix-ui/react-primitive`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17184,10 +17301,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-roving-focus@1.1.14
+### @radix-ui/react-roving-focus@1.1.19
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-roving-focus@1.1.14_@types+react-dom@19.2.3_@types+react@19.2.17__@type_e3ca977306328bad41b8bbbc2ecabf2b/node_modules/@radix-ui/react-roving-focus`
+- Package path: `node_modules/.pnpm/@radix-ui+react-roving-focus@1.1.19_@types+react-dom@19.2.3_@types+react@19.2.17__@type_cd3e7f1be5cde73061aa667928ea33e1/node_modules/@radix-ui/react-roving-focus`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17216,10 +17333,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-scroll-area@1.2.13
+### @radix-ui/react-scroll-area@1.2.18
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-scroll-area@1.2.13_@types+react-dom@19.2.3_@types+react@19.2.17__@types_96eab8e2cbcd0d82b7adf528fd5b265f/node_modules/@radix-ui/react-scroll-area`
+- Package path: `node_modules/.pnpm/@radix-ui+react-scroll-area@1.2.18_@types+react-dom@19.2.3_@types+react@19.2.17__@types_7fc60d22deb06a622ab453938c345adc/node_modules/@radix-ui/react-scroll-area`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17248,10 +17365,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-slot@1.3.0
+### @radix-ui/react-slot@1.3.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-slot@1.3.0_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-slot`
+- Package path: `node_modules/.pnpm/@radix-ui+react-slot@1.3.3_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-slot`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17280,10 +17397,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-tabs@1.1.16
+### @radix-ui/react-tabs@1.1.21
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-tabs@1.1.16_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react@_5e63412c2a2016418fda6c34361b304d/node_modules/@radix-ui/react-tabs`
+- Package path: `node_modules/.pnpm/@radix-ui+react-tabs@1.1.21_@types+react-dom@19.2.3_@types+react@19.2.17__@types+react@_7d6ba3f0011b74834facac4517a51da9/node_modules/@radix-ui/react-tabs`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17312,10 +17429,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-callback-ref@1.1.2
+### @radix-ui/react-use-callback-ref@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-callback-ref@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-callback-ref`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-callback-ref@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-callback-ref`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17344,10 +17461,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-controllable-state@1.2.3
+### @radix-ui/react-use-controllable-state@1.2.6
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-controllable-state@1.2.3_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-controllable-state`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-controllable-state@1.2.6_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-controllable-state`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17376,10 +17493,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-effect-event@0.0.3
+### @radix-ui/react-use-effect-event@0.0.5
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-effect-event@0.0.3_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-effect-event`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-effect-event@0.0.5_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-effect-event`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17408,10 +17525,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-layout-effect@1.1.2
+### @radix-ui/react-use-is-hydrated@0.1.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-layout-effect@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-layout-effect`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-is-hydrated@0.1.3_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-is-hydrated`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17440,10 +17557,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-previous@1.1.2
+### @radix-ui/react-use-layout-effect@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-previous@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-previous`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-layout-effect@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-layout-effect`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17472,10 +17589,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-rect@1.1.2
+### @radix-ui/react-use-previous@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-rect@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-rect`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-previous@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-previous`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17504,10 +17621,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-use-size@1.1.2
+### @radix-ui/react-use-rect@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-use-size@1.1.2_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-size`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-rect@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-rect`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17536,10 +17653,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/react-visually-hidden@1.2.7
+### @radix-ui/react-use-size@1.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+react-visually-hidden@1.2.7_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_5c9a2e5554327bb90be9977ab54b6749/node_modules/@radix-ui/react-visually-hidden`
+- Package path: `node_modules/.pnpm/@radix-ui+react-use-size@1.1.4_@types+react@19.2.17_react@19.2.7/node_modules/@radix-ui/react-use-size`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17568,10 +17685,42 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @radix-ui/rect@1.1.2
+### @radix-ui/react-visually-hidden@1.2.11
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@radix-ui+rect@1.1.2/node_modules/@radix-ui/rect`
+- Package path: `node_modules/.pnpm/@radix-ui+react-visually-hidden@1.2.11_@types+react-dom@19.2.3_@types+react@19.2.17__@t_a9fe9559d5318199efe7868961958938/node_modules/@radix-ui/react-visually-hidden`
+- Homepage: https://radix-ui.com/primitives
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2022 WorkOS
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### @radix-ui/rect@1.1.3
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@radix-ui+rect@1.1.3/node_modules/@radix-ui/rect`
 - Homepage: https://radix-ui.com/primitives
 
 #### LICENSE
@@ -17632,10 +17781,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/core@4.3.1
+### @shikijs/core@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+core@4.3.1/node_modules/@shikijs/core`
+- Package path: `node_modules/.pnpm/@shikijs+core@4.4.3/node_modules/@shikijs/core`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17665,10 +17814,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/engine-javascript@4.3.1
+### @shikijs/engine-javascript@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+engine-javascript@4.3.1/node_modules/@shikijs/engine-javascript`
+- Package path: `node_modules/.pnpm/@shikijs+engine-javascript@4.4.3/node_modules/@shikijs/engine-javascript`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17698,10 +17847,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/engine-oniguruma@4.3.1
+### @shikijs/engine-oniguruma@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+engine-oniguruma@4.3.1/node_modules/@shikijs/engine-oniguruma`
+- Package path: `node_modules/.pnpm/@shikijs+engine-oniguruma@4.4.3/node_modules/@shikijs/engine-oniguruma`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17731,10 +17880,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/langs@4.3.1
+### @shikijs/langs@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+langs@4.3.1/node_modules/@shikijs/langs`
+- Package path: `node_modules/.pnpm/@shikijs+langs@4.4.3/node_modules/@shikijs/langs`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17764,10 +17913,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/primitive@4.3.1
+### @shikijs/primitive@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+primitive@4.3.1/node_modules/@shikijs/primitive`
+- Package path: `node_modules/.pnpm/@shikijs+primitive@4.4.3/node_modules/@shikijs/primitive`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17797,10 +17946,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/themes@4.3.1
+### @shikijs/themes@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+themes@4.3.1/node_modules/@shikijs/themes`
+- Package path: `node_modules/.pnpm/@shikijs+themes@4.4.3/node_modules/@shikijs/themes`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17830,10 +17979,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @shikijs/types@4.3.1
+### @shikijs/types@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@shikijs+types@4.3.1/node_modules/@shikijs/types`
+- Package path: `node_modules/.pnpm/@shikijs+types@4.4.3/node_modules/@shikijs/types`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -17981,7 +18130,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ### @sveltejs/vite-plugin-svelte@7.1.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@sveltejs+vite-plugin-svelte@7.1.2_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@_dd664a738e73a9656d2b43aed4ab9e49/node_modules/@sveltejs/vite-plugin-svelte`
+- Package path: `node_modules/.pnpm/@sveltejs+vite-plugin-svelte@7.1.2_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@_d4320a6d2c4e4ef74581c23afeecb252/node_modules/@sveltejs/vite-plugin-svelte`
 - Homepage: https://github.com/sveltejs/vite-plugin-svelte#readme
 
 #### LICENSE
@@ -18008,218 +18157,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### @swc/helpers@0.5.15
-
-- License: Apache-2.0
-- Package path: `node_modules/.pnpm/@swc+helpers@0.5.15/node_modules/@swc/helpers`
-- Homepage: https://swc.rs
-
-#### LICENSE
-
-```text
-Apache License
-                        Version 2.0, January 2004
-                     http://www.apache.org/licenses/
-
-TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
-
-1. Definitions.
-
-   "License" shall mean the terms and conditions for use, reproduction,
-   and distribution as defined by Sections 1 through 9 of this document.
-
-   "Licensor" shall mean the copyright owner or entity authorized by
-   the copyright owner that is granting the License.
-
-   "Legal Entity" shall mean the union of the acting entity and all
-   other entities that control, are controlled by, or are under common
-   control with that entity. For the purposes of this definition,
-   "control" means (i) the power, direct or indirect, to cause the
-   direction or management of such entity, whether by contract or
-   otherwise, or (ii) ownership of fifty percent (50%) or more of the
-   outstanding shares, or (iii) beneficial ownership of such entity.
-
-   "You" (or "Your") shall mean an individual or Legal Entity
-   exercising permissions granted by this License.
-
-   "Source" form shall mean the preferred form for making modifications,
-   including but not limited to software source code, documentation
-   source, and configuration files.
-
-   "Object" form shall mean any form resulting from mechanical
-   transformation or translation of a Source form, including but
-   not limited to compiled object code, generated documentation,
-   and conversions to other media types.
-
-   "Work" shall mean the work of authorship, whether in Source or
-   Object form, made available under the License, as indicated by a
-   copyright notice that is included in or attached to the work
-   (an example is provided in the Appendix below).
-
-   "Derivative Works" shall mean any work, whether in Source or Object
-   form, that is based on (or derived from) the Work and for which the
-   editorial revisions, annotations, elaborations, or other modifications
-   represent, as a whole, an original work of authorship. For the purposes
-   of this License, Derivative Works shall not include works that remain
-   separable from, or merely link (or bind by name) to the interfaces of,
-   the Work and Derivative Works thereof.
-
-   "Contribution" shall mean any work of authorship, including
-   the original version of the Work and any modifications or additions
-   to that Work or Derivative Works thereof, that is intentionally
-   submitted to Licensor for inclusion in the Work by the copyright owner
-   or by an individual or Legal Entity authorized to submit on behalf of
-   the copyright owner. For the purposes of this definition, "submitted"
-   means any form of electronic, verbal, or written communication sent
-   to the Licensor or its representatives, including but not limited to
-   communication on electronic mailing lists, source code control systems,
-   and issue tracking systems that are managed by, or on behalf of, the
-   Licensor for the purpose of discussing and improving the Work, but
-   excluding communication that is conspicuously marked or otherwise
-   designated in writing by the copyright owner as "Not a Contribution."
-
-   "Contributor" shall mean Licensor and any individual or Legal Entity
-   on behalf of whom a Contribution has been received by Licensor and
-   subsequently incorporated within the Work.
-
-2. Grant of Copyright License. Subject to the terms and conditions of
-   this License, each Contributor hereby grants to You a perpetual,
-   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-   copyright license to reproduce, prepare Derivative Works of,
-   publicly display, publicly perform, sublicense, and distribute the
-   Work and such Derivative Works in Source or Object form.
-
-3. Grant of Patent License. Subject to the terms and conditions of
-   this License, each Contributor hereby grants to You a perpetual,
-   worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-   (except as stated in this section) patent license to make, have made,
-   use, offer to sell, sell, import, and otherwise transfer the Work,
-   where such license applies only to those patent claims licensable
-   by such Contributor that are necessarily infringed by their
-   Contribution(s) alone or by combination of their Contribution(s)
-   with the Work to which such Contribution(s) was submitted. If You
-   institute patent litigation against any entity (including a
-   cross-claim or counterclaim in a lawsuit) alleging that the Work
-   or a Contribution incorporated within the Work constitutes direct
-   or contributory patent infringement, then any patent licenses
-   granted to You under this License for that Work shall terminate
-   as of the date such litigation is filed.
-
-4. Redistribution. You may reproduce and distribute copies of the
-   Work or Derivative Works thereof in any medium, with or without
-   modifications, and in Source or Object form, provided that You
-   meet the following conditions:
-
-   (a) You must give any other recipients of the Work or
-       Derivative Works a copy of this License; and
-
-   (b) You must cause any modified files to carry prominent notices
-       stating that You changed the files; and
-
-   (c) You must retain, in the Source form of any Derivative Works
-       that You distribute, all copyright, patent, trademark, and
-       attribution notices from the Source form of the Work,
-       excluding those notices that do not pertain to any part of
-       the Derivative Works; and
-
-   (d) If the Work includes a "NOTICE" text file as part of its
-       distribution, then any Derivative Works that You distribute must
-       include a readable copy of the attribution notices contained
-       within such NOTICE file, excluding those notices that do not
-       pertain to any part of the Derivative Works, in at least one
-       of the following places: within a NOTICE text file distributed
-       as part of the Derivative Works; within the Source form or
-       documentation, if provided along with the Derivative Works; or,
-       within a display generated by the Derivative Works, if and
-       wherever such third-party notices normally appear. The contents
-       of the NOTICE file are for informational purposes only and
-       do not modify the License. You may add Your own attribution
-       notices within Derivative Works that You distribute, alongside
-       or as an addendum to the NOTICE text from the Work, provided
-       that such additional attribution notices cannot be construed
-       as modifying the License.
-
-   You may add Your own copyright statement to Your modifications and
-   may provide additional or different license terms and conditions
-   for use, reproduction, or distribution of Your modifications, or
-   for any such Derivative Works as a whole, provided Your use,
-   reproduction, and distribution of the Work otherwise complies with
-   the conditions stated in this License.
-
-5. Submission of Contributions. Unless You explicitly state otherwise,
-   any Contribution intentionally submitted for inclusion in the Work
-   by You to the Licensor shall be under the terms and conditions of
-   this License, without any additional terms or conditions.
-   Notwithstanding the above, nothing herein shall supersede or modify
-   the terms of any separate license agreement you may have executed
-   with Licensor regarding such Contributions.
-
-6. Trademarks. This License does not grant permission to use the trade
-   names, trademarks, service marks, or product names of the Licensor,
-   except as required for reasonable and customary use in describing the
-   origin of the Work and reproducing the content of the NOTICE file.
-
-7. Disclaimer of Warranty. Unless required by applicable law or
-   agreed to in writing, Licensor provides the Work (and each
-   Contributor provides its Contributions) on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-   implied, including, without limitation, any warranties or conditions
-   of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-   PARTICULAR PURPOSE. You are solely responsible for determining the
-   appropriateness of using or redistributing the Work and assume any
-   risks associated with Your exercise of permissions under this License.
-
-8. Limitation of Liability. In no event and under no legal theory,
-   whether in tort (including negligence), contract, or otherwise,
-   unless required by applicable law (such as deliberate and grossly
-   negligent acts) or agreed to in writing, shall any Contributor be
-   liable to You for damages, including any direct, indirect, special,
-   incidental, or consequential damages of any character arising as a
-   result of this License or out of the use or inability to use the
-   Work (including but not limited to damages for loss of goodwill,
-   work stoppage, computer failure or malfunction, or any and all
-   other commercial damages or losses), even if such Contributor
-   has been advised of the possibility of such damages.
-
-9. Accepting Warranty or Additional Liability. While redistributing
-   the Work or Derivative Works thereof, You may choose to offer,
-   and charge a fee for, acceptance of support, warranty, indemnity,
-   or other liability obligations and/or rights consistent with this
-   License. However, in accepting such obligations, You may act only
-   on Your own behalf and on Your sole responsibility, not on behalf
-   of any other Contributor, and only if You agree to indemnify,
-   defend, and hold each Contributor harmless for any liability
-   incurred by, or claims asserted against, such Contributor by reason
-   of your accepting any such warranty or additional liability.
-
-END OF TERMS AND CONDITIONS
-
-APPENDIX: How to apply the Apache License to your work.
-
-   To apply the Apache License to your work, attach the following
-   boilerplate notice, with the fields enclosed by brackets "[]"
-   replaced with your own identifying information. (Don't include
-   the brackets!)  The text should be enclosed in the appropriate
-   comment syntax for the file format. We also recommend that a
-   file or class name and description of purpose be included on the
-   same "printed page" as the copyright notice for easier
-   identification within third-party archives.
-
-Copyright 2024 SWC contributors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
 ```
 
 ### @swc/helpers@0.5.23
@@ -18533,7 +18470,7 @@ SOFTWARE.
 ### @tailwindcss/vite@4.3.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@tailwindcss+vite@4.3.2_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.1_jiti@2.7.0_yaml@2.9.0_/node_modules/@tailwindcss/vite`
+- Package path: `node_modules/.pnpm/@tailwindcss+vite@4.3.2_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.2_jiti@2.7.0_yaml@2.9.0_/node_modules/@tailwindcss/vite`
 - Homepage: https://tailwindcss.com
 
 #### LICENSE
@@ -19209,7 +19146,7 @@ SOFTWARE.
 ### @testing-library/svelte@5.4.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@testing-library+svelte@5.4.2_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@8.1.0_30d87e5350bed0937bce23a50b671336/node_modules/@testing-library/svelte`
+- Package path: `node_modules/.pnpm/@testing-library+svelte@5.4.2_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@8.1.0_2618a761b5373d8771755377cf70d159/node_modules/@testing-library/svelte`
 - Homepage: https://github.com/testing-library/svelte-testing-library#readme
 
 #### LICENSE
@@ -19462,10 +19399,10 @@ MIT License
     SOFTWARE
 ```
 
-### @types/hast@3.0.4
+### @types/hast@3.0.5
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@types+hast@3.0.4/node_modules/@types/hast`
+- Package path: `node_modules/.pnpm/@types+hast@3.0.5/node_modules/@types/hast`
 - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/hast
 
 #### LICENSE
@@ -20166,10 +20103,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @ungap/structured-clone@1.3.2
+### @ungap/structured-clone@1.3.3
 
 - License: ISC
-- Package path: `node_modules/.pnpm/@ungap+structured-clone@1.3.2/node_modules/@ungap/structured-clone`
+- Package path: `node_modules/.pnpm/@ungap+structured-clone@1.3.3/node_modules/@ungap/structured-clone`
 - Homepage: https://github.com/ungap/structured-clone#readme
 
 #### LICENSE
@@ -20227,7 +20164,7 @@ SOFTWARE.
 ### @vitest/mocker@4.1.9
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@vitest+mocker@4.1.9_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.1_jiti@2.7.0_yaml@2.9.0_/node_modules/@vitest/mocker`
+- Package path: `node_modules/.pnpm/@vitest+mocker@4.1.9_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.2_jiti@2.7.0_yaml@2.9.0_/node_modules/@vitest/mocker`
 - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/mocker
 
 #### LICENSE
@@ -20416,6 +20353,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### @yuku-toolchain/types@0.8.7
+
+- License: MIT
+- Package path: `node_modules/.pnpm/@yuku-toolchain+types@0.8.7/node_modules/@yuku-toolchain/types`
+- Homepage: https://github.com/yuku-toolchain/yuku#readme
+
+_No LICENSE/NOTICE file found in the installed package; see package metadata above._
+
 ### acorn-jsx@5.3.2
 
 - License: MIT
@@ -20450,6 +20395,38 @@ THE SOFTWARE.
 
 - License: MIT
 - Package path: `node_modules/.pnpm/acorn@8.17.0/node_modules/acorn`
+- Homepage: https://github.com/acornjs/acorn
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (C) 2012-2022 by various contributors (see AUTHORS)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### acorn@8.18.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/acorn@8.18.0/node_modules/acorn`
 - Homepage: https://github.com/acornjs/acorn
 
 #### LICENSE
@@ -21664,10 +21641,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### baseline-browser-mapping@2.10.42
+### baseline-browser-mapping@2.11.15
 
 - License: Apache-2.0
-- Package path: `node_modules/.pnpm/baseline-browser-mapping@2.10.42/node_modules/baseline-browser-mapping`
+- Package path: `node_modules/.pnpm/baseline-browser-mapping@2.11.15/node_modules/baseline-browser-mapping`
 - Homepage: https://github.com/web-platform-dx/baseline-browser-mapping#readme
 
 #### LICENSE.txt
@@ -22027,10 +22004,10 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### caniuse-lite@1.0.30001802
+### caniuse-lite@1.0.30001809
 
 - License: CC-BY-4.0
-- Package path: `node_modules/.pnpm/caniuse-lite@1.0.30001802/node_modules/caniuse-lite`
+- Package path: `node_modules/.pnpm/caniuse-lite@1.0.30001809/node_modules/caniuse-lite`
 - Homepage: https://github.com/browserslist/caniuse-lite#readme
 
 #### LICENSE
@@ -22943,10 +22920,10 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### cnfast@0.0.8
+### cnfast@0.1.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/cnfast@0.0.8/node_modules/cnfast`
+- Package path: `node_modules/.pnpm/cnfast@0.1.0/node_modules/cnfast`
 - Homepage: https://github.com/aidenybai/cnfast#readme
 
 #### LICENSE
@@ -24022,10 +23999,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### esbuild@0.28.1
+### esbuild@0.28.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild`
+- Package path: `node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild`
 - Homepage: https://github.com/evanw/esbuild#readme
 
 #### LICENSE.md
@@ -25770,10 +25747,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### framer-motion@12.42.2
+### framer-motion@13.1.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/framer-motion@12.42.2_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/framer-motion`
+- Package path: `node_modules/.pnpm/framer-motion@13.1.0_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/framer-motion`
 - Homepage: https://github.com/motiondivision/motion#readme
 
 #### LICENSE.md
@@ -25802,10 +25779,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### fumadocs-core@16.10.7
+### fumadocs-core@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-core@16.10.7_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.4_@type_5562e0a64174883fed75058e2be687bf/node_modules/fumadocs-core`
+- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_327476dd4b8cecbfbbc8c0a77e80ed44/node_modules/fumadocs-core`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -25834,10 +25811,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### fumadocs-mdx@15.0.13
+### fumadocs-mdx@15.2.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-mdx@15.0.13_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs_7614a30903e67660f87979f2b83a4ebf/node_modules/fumadocs-mdx`
+- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_a0d46c7b739e527c75608a8135c56c03/node_modules/fumadocs-mdx`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -25866,10 +25843,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### fumadocs-ui@16.10.7
+### fumadocs-ui@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-ui@16.10.7_@tailwindcss+oxide@4.3.2_@types+mdx@2.0.14_@types+react-dom@19.2.3__81d242b890101be3aaee6894ac96dd97/node_modules/fumadocs-ui`
+- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_2a89375309f241b2254949b6c89ae475/node_modules/fumadocs-ui`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -26947,38 +26924,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### js-yaml@5.2.1
-
-- License: MIT
-- Package path: `node_modules/.pnpm/js-yaml@5.2.1/node_modules/js-yaml`
-- Homepage: https://github.com/nodeca/js-yaml#readme
-
-#### LICENSE
-
-```text
-(The MIT License)
-
-Copyright (C) 2011-2015 by Vitaly Puzrin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### jsdom@29.1.1
 
 - License: MIT
@@ -27806,10 +27751,10 @@ will be liable to anyone for any damages related to this
 software or this license, under any kind of legal claim.***
 ```
 
-### lucide-react@1.23.0
+### lucide-react@1.31.0
 
 - License: ISC
-- Package path: `node_modules/.pnpm/lucide-react@1.23.0_react@19.2.7/node_modules/lucide-react`
+- Package path: `node_modules/.pnpm/lucide-react@1.31.0_react@19.2.7/node_modules/lucide-react`
 - Homepage: https://lucide.dev
 
 #### LICENSE
@@ -27896,6 +27841,24 @@ SOFTWARE.
 
 - License: MIT
 - Package path: `node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string`
+- Homepage: https://github.com/Rich-Harris/magic-string#readme
+
+#### LICENSE
+
+```text
+Copyright 2018 Rich Harris
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### magic-string@1.2.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/magic-string@1.2.0/node_modules/magic-string`
 - Homepage: https://github.com/Rich-Harris/magic-string#readme
 
 #### LICENSE
@@ -29866,10 +29829,10 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### motion-dom@12.42.2
+### motion-dom@13.0.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/motion-dom@12.42.2/node_modules/motion-dom`
+- Package path: `node_modules/.pnpm/motion-dom@13.0.0/node_modules/motion-dom`
 - Homepage: https://github.com/motiondivision/motion#readme
 
 #### LICENSE.md
@@ -29898,10 +29861,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### motion-utils@12.39.0
+### motion-utils@13.0.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/motion-utils@12.39.0/node_modules/motion-utils`
+- Package path: `node_modules/.pnpm/motion-utils@13.0.0/node_modules/motion-utils`
 - Homepage: https://github.com/motiondivision/motion#readme
 
 #### LICENSE.md
@@ -29930,10 +29893,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### motion@12.42.2
+### motion@13.1.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/motion@12.42.2_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/motion`
+- Package path: `node_modules/.pnpm/motion@13.1.0_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/motion`
 - Homepage: https://github.com/motiondivision/motion#readme
 
 #### LICENSE.md
@@ -30026,10 +29989,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### nanoid@3.3.15
+### nanoid@3.3.18
 
 - License: MIT
-- Package path: `node_modules/.pnpm/nanoid@3.3.15/node_modules/nanoid`
+- Package path: `node_modules/.pnpm/nanoid@3.3.18/node_modules/nanoid`
 - Homepage: https://github.com/ai/nanoid#readme
 
 #### LICENSE
@@ -30097,10 +30060,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### next@16.2.10
+### next@16.3.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/next@16.2.10_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
+- Package path: `node_modules/.pnpm/next@16.3.1_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
 - Homepage: https://nextjs.org
 
 #### license.md
@@ -30127,6 +30090,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### npm-to-yarn@3.2.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/npm-to-yarn@3.2.0/node_modules/npm-to-yarn`
+- Homepage: https://github.com/nebrelbug/npm-to-yarn#readme
+
+#### LICENSE
+
+```text
+Copyright 2019 Ben Gubler <nebrelbug@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ### obug@2.1.3
@@ -30578,7 +30559,7 @@ DEALINGS IN THE SOFTWARE.
 ### phosphor-svelte@3.1.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/phosphor-svelte@3.1.0_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@8.1.0_@types+_4acf5f74f002e675a4d41f44673934cd/node_modules/phosphor-svelte`
+- Package path: `node_modules/.pnpm/phosphor-svelte@3.1.0_svelte@5.56.4_@typescript-eslint+types@8.62.0__vite@8.1.0_@types+_ecf1301e5e8c6ae4ac01d7cbf6cc2071/node_modules/phosphor-svelte`
 - Homepage: https://phosphoricons.com
 
 #### LICENSE
@@ -30637,6 +30618,38 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 - License: MIT
 - Package path: `node_modules/.pnpm/picomatch@4.0.4/node_modules/picomatch`
+- Homepage: https://github.com/micromatch/picomatch
+
+#### LICENSE
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2017-present, Jon Schlinkert.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### picomatch@4.0.5
+
+- License: MIT
+- Package path: `node_modules/.pnpm/picomatch@4.0.5/node_modules/picomatch`
 - Homepage: https://github.com/micromatch/picomatch
 
 #### LICENSE
@@ -31114,7 +31127,7 @@ available under the Apache 2.0 license (https://github.com/puppeteer/puppeteer/b
 ### postcss-load-config@3.1.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/postcss-load-config@3.1.4_postcss@8.5.16/node_modules/postcss-load-config`
+- Package path: `node_modules/.pnpm/postcss-load-config@3.1.4_postcss@8.5.26/node_modules/postcss-load-config`
 - Homepage: https://github.com/postcss/postcss-load-config#readme
 
 #### LICENSE
@@ -31145,7 +31158,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### postcss-safe-parser@7.0.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/postcss-safe-parser@7.0.1_postcss@8.5.16/node_modules/postcss-safe-parser`
+- Package path: `node_modules/.pnpm/postcss-safe-parser@7.0.1_postcss@8.5.26/node_modules/postcss-safe-parser`
 - Homepage: https://github.com/postcss/postcss-safe-parser#readme
 
 #### LICENSE
@@ -31176,7 +31189,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ### postcss-scss@4.0.9
 
 - License: MIT
-- Package path: `node_modules/.pnpm/postcss-scss@4.0.9_postcss@8.5.16/node_modules/postcss-scss`
+- Package path: `node_modules/.pnpm/postcss-scss@4.0.9_postcss@8.5.26/node_modules/postcss-scss`
 - Homepage: https://github.com/postcss/postcss-scss#readme
 
 #### LICENSE
@@ -31237,10 +31250,10 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### postcss@8.4.31
+### postcss@8.5.23
 
 - License: MIT
-- Package path: `node_modules/.pnpm/postcss@8.4.31/node_modules/postcss`
+- Package path: `node_modules/.pnpm/postcss@8.5.23/node_modules/postcss`
 - Homepage: https://postcss.org/
 
 #### LICENSE
@@ -31248,7 +31261,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 ```text
 The MIT License (MIT)
 
-Copyright 2013 Andrey Sitnik <andrey@sitnik.ru>
+Copyright 2013 Andrey Sitnik <andrey@sitnik.es>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -31268,10 +31281,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### postcss@8.5.16
+### postcss@8.5.26
 
 - License: MIT
-- Package path: `node_modules/.pnpm/postcss@8.5.16/node_modules/postcss`
+- Package path: `node_modules/.pnpm/postcss@8.5.26/node_modules/postcss`
 - Homepage: https://postcss.org/
 
 #### LICENSE
@@ -31678,10 +31691,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### readdirp@5.0.0
+### readdirp@5.1.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/readdirp@5.0.0/node_modules/readdirp`
+- Package path: `node_modules/.pnpm/readdirp@5.1.1/node_modules/readdirp`
 - Homepage: https://github.com/paulmillr/readdirp
 
 #### LICENSE
@@ -31745,7 +31758,7 @@ THE SOFTWARE.
 ### recma-jsx@1.0.1
 
 - License: MIT
-- Package path: `node_modules/.pnpm/recma-jsx@1.0.1_acorn@8.17.0/node_modules/recma-jsx`
+- Package path: `node_modules/.pnpm/recma-jsx@1.0.1_acorn@8.18.0/node_modules/recma-jsx`
 - Homepage: https://github.com/mdx-js/recma
 
 #### license
@@ -32516,10 +32529,10 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### shiki@4.3.1
+### shiki@4.4.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/shiki@4.3.1/node_modules/shiki`
+- Package path: `node_modules/.pnpm/shiki@4.4.3/node_modules/shiki`
 - Homepage: https://github.com/shikijs/shiki#readme
 
 #### LICENSE
@@ -33276,6 +33289,38 @@ SOFTWARE.
 
 - License: MIT
 - Package path: `node_modules/.pnpm/tinyexec@1.2.4/node_modules/tinyexec`
+- Homepage: https://github.com/tinylibs/tinyexec#readme
+
+#### LICENSE
+
+```text
+MIT License
+
+Copyright (c) 2024 Tinylibs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### tinyexec@1.3.0
+
+- License: MIT
+- Package path: `node_modules/.pnpm/tinyexec@1.3.0/node_modules/tinyexec`
 - Homepage: https://github.com/tinylibs/tinyexec#readme
 
 #### LICENSE
@@ -34296,7 +34341,7 @@ THE SOFTWARE.
 ### vite@8.1.0
 
 - License: MIT
-- Package path: `node_modules/.pnpm/vite@8.1.0_@types+node@26.0.1_esbuild@0.28.1_jiti@2.7.0_yaml@2.9.0/node_modules/vite`
+- Package path: `node_modules/.pnpm/vite@8.1.0_@types+node@26.0.1_esbuild@0.28.2_jiti@2.7.0_yaml@2.9.0/node_modules/vite`
 - Homepage: https://vite.dev
 
 #### LICENSE.md
@@ -36594,7 +36639,7 @@ Repository: https://github.com/websockets/ws
 ### vitefu@1.1.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/vitefu@1.1.3_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.1_jiti@2.7.0_yaml@2.9.0_/node_modules/vitefu`
+- Package path: `node_modules/.pnpm/vitefu@1.1.3_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.2_jiti@2.7.0_yaml@2.9.0_/node_modules/vitefu`
 - Homepage: https://github.com/svitejs/vitefu#readme
 
 #### LICENSE
@@ -36626,7 +36671,7 @@ SOFTWARE.
 ### vitest@4.1.9
 
 - License: MIT
-- Package path: `node_modules/.pnpm/vitest@4.1.9_@types+node@26.0.1_jsdom@29.1.1_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.1_jiti@2.7.0_yaml@2.9.0_/node_modules/vitest`
+- Package path: `node_modules/.pnpm/vitest@4.1.9_@types+node@26.0.1_jsdom@29.1.1_vite@8.1.0_@types+node@26.0.1_esbuild@0.28.2_jiti@2.7.0_yaml@2.9.0_/node_modules/vitest`
 - Homepage: https://vitest.dev
 
 #### LICENSE.md
@@ -37985,6 +38030,46 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### yuku-analyzer@0.8.7
+
+- License: MIT
+- Package path: `node_modules/.pnpm/yuku-analyzer@0.8.7/node_modules/yuku-analyzer`
+- Homepage: https://github.com/yuku-toolchain/yuku#readme
+
+_No LICENSE/NOTICE file found in the installed package; see package metadata above._
+
+### yuku-ast@0.8.7
+
+- License: MIT
+- Package path: `node_modules/.pnpm/yuku-ast@0.8.7/node_modules/yuku-ast`
+- Homepage: https://github.com/yuku-toolchain/yuku#readme
+
+_No LICENSE/NOTICE file found in the installed package; see package metadata above._
+
+### zbsearch@4.0.0
+
+- License: Apache-2.0
+- Package path: `node_modules/.pnpm/zbsearch@4.0.0/node_modules/zbsearch`
+- Homepage: https://github.com/micheleriva/zbsearch#readme
+
+#### LICENSE.md
+
+```text
+Copyright 2023 ZBSearchSearch Inc
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 ```
 
 ### zimmerframe@1.1.4
