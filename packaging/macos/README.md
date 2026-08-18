@@ -5,7 +5,7 @@
 This directory documents the first macOS release surface.
 
 - Direct distribution uses Tauri's automatic `src-tauri/tauri.macos.conf.json` merge and `entitlements.macos.direct.plist`.
-- Mac App Store builds must use the generated config from `pnpm run release:macos:mas:prepare` and set `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` before compiling, so optional external codec/helper discovery is compiled off.
+- Mac App Store builds must use the generated config from `pnpm run release:macos:mas:prepare` and set `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` before compiling, so optional external codec/helper discovery is compiled off. MAS builds also set `IMGCONVERT_DISABLE_UPDATER=1`; updates are delivered by the App Store, never by Tauri updater.
 - The MAS entitlement set is intentionally narrow: App Sandbox, user-selected read/write files, and app-scoped bookmarks. Do not add broad network or filesystem entitlements without a concrete feature need.
 - HEIC import uses the macOS system ImageIO framework as a read-only `system-imageio` provider. It does not link libheif, does not bundle x265, and does not enable HEIC output until encoding, patents, and sandbox behavior are separately audited.
 - Runtime file access is routed through Tauri dialog `fileAccessMode: "scoped"`, `tauri-plugin-fs`, `tauri-plugin-persisted-scope`, and the security-scoped resource shim in `src-tauri/src/macos_security.rs`. Dialog grants are added to the Tauri filesystem scope and persisted across launches; every backend path access still balances start/stop access with RAII.
@@ -42,7 +42,7 @@ MAS candidate build on macOS, after Apple signing/provisioning is configured:
 export APPLE_TEAM_ID="<TEAMID>"
 export APPLE_SIGNING_IDENTITY="Apple Distribution: <name> (<TEAMID>)"
 export IMGCONVERT_MAS_PROVISION_PROFILE=/path/to/embedded.provisionprofile
-pnpm run release:macos:mas
+pnpm run release:macos:mas  # sets IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 and IMGCONVERT_DISABLE_UPDATER=1
 export IMGCONVERT_MAS_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: <name> (<TEAMID>)"
 pnpm run release:macos:mas:pkg
 ```

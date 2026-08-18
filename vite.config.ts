@@ -4,10 +4,15 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
 const host = process.env.TAURI_DEV_HOST;
+const disableUpdater = process.env.IMGCONVERT_DISABLE_UPDATER === "1";
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [tailwindcss(), svelte()],
+
+  define: {
+    "import.meta.env.VITE_IMGCONVERT_DISABLE_UPDATER": JSON.stringify(disableUpdater ? "1" : ""),
+  },
 
   resolve: {
     alias: {

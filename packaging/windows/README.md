@@ -59,12 +59,15 @@ is committed as the default in `scripts/prepare-windows-msix-release.mjs`
 Store ID `9P1BWD965DBX`); set the `WINDOWS_STORE_*` environment variables only
 to override those values.
 
-Store candidate preflight must compile with external codec/helper discovery disabled.
+Store candidate preflight must compile with external codec/helper discovery and
+Tauri updater disabled. Microsoft Store delivers updates, so the store package
+must not contain or expose the Tauri updater.
 `WINDOWS_STORE_VERSION` must follow Store rules: a nonzero major component and
 a zero fourth component (`1.0.0.0`, not the app version `0.1.1`):
 
 ```powershell
 $env:IMGCONVERT_DISABLE_EXTERNAL_CODECS = "1"
+$env:IMGCONVERT_DISABLE_UPDATER = "1"
 $env:WINDOWS_STORE_VERSION = "1.0.0.0"
 pnpm run release:windows:store:check
 pnpm run release:windows:msix:prepare
@@ -76,12 +79,13 @@ the layout, and pack the MSIX in one step:
 
 ```powershell
 $env:IMGCONVERT_DISABLE_EXTERNAL_CODECS = "1"
+$env:IMGCONVERT_DISABLE_UPDATER = "1"
 $env:WINDOWS_STORE_VERSION = "1.0.0.0"
 pnpm run release:windows:msix
 ```
 
-`release:windows:msix` runs `tauri build --ci --no-bundle`, prepares the
-manifest, validates the Store assets in `src-tauri/icons`, stages
+`release:windows:msix` prepares the Store manifest and a Store Tauri
+config, runs `tauri build --ci --no-bundle`, validates the Store assets in `src-tauri/icons`, stages
 `src-tauri/target/windows-msix/layout`, and packs
 `ImgConvert_<version>_x64.msix` with `makeappx.exe`. Use
 `release:windows:msix:pack` to repack an already-built binary.
@@ -100,8 +104,9 @@ certificate, so no purchased code-signing certificate is needed for the Store
 channel. Store submission still requires Store listing assets, age
 rating/privacy metadata, and a real install smoke on the submitted package
 (`release:windows:msix:smoke` covers the sideload path). The main package must
-keep `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1`; optional HEIC helpers must not be
-bundled into the Store package unless channel rules are revalidated.
+keep `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` and
+`IMGCONVERT_DISABLE_UPDATER=1`; optional HEIC helpers must not be bundled into
+the Store package unless channel rules are revalidated.
 
 Windows HEIC remains decode-only by product policy. The system route uses WIC
 runtime detection of the Microsoft HEIF Image Extensions and HEVC Video

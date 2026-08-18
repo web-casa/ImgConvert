@@ -154,6 +154,20 @@ Before uploading assets, the workflow executes the signed AppImage with
 `IMGCONVERT_PACKAGE_CONVERT_SMOKE=1`, so the published updater artifact has
 already passed the same hidden conversion smoke used by Linux package tests.
 
+## Store channels
+
+Tauri updater is intentionally disabled for Mac App Store and Microsoft Store
+builds:
+
+- MAS builds set `IMGCONVERT_DISABLE_UPDATER=1`, compile out updater plugin
+  registration, limit capabilities to `default`, and hide the in-app update
+  button. App Store updates are delivered by Apple.
+- MSIX builds do the same through the generated Store Tauri config.
+  Microsoft Store updates are delivered by Microsoft.
+
+Direct macOS and Windows builds may use Tauri updater when those channels are
+released, but store builds must never enable it.
+
 Flatpak updates remain managed by Flathub once that channel is opened. `.deb`
 and `.rpm` updates remain manual GitHub Release downloads in the first batch;
 the Tauri updater is for direct-distribution artifacts such as AppImage, macOS

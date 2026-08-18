@@ -3,7 +3,7 @@
   import { Sun, Moon, Desktop, Info, PuzzlePiece, Sparkle, DownloadSimple } from "phosphor-svelte";
   import { Button } from "$lib/components/ui/button";
   import appIconUrl from "$lib/assets/app-icon.png";
-  import { settings, engine, applyTheme, persistSettings } from "$lib/state.svelte";
+  import { settings, engine, applyTheme, persistSettings, updaterEnabled } from "$lib/state.svelte";
 
   let {
     onOpenLegal,
@@ -72,9 +72,11 @@
     <Button variant="ghost" size="icon" title="插件诊断" onclick={onOpenPluginDiagnostics}>
       <PuzzlePiece weight="duotone" />
     </Button>
-    <Button variant="ghost" size="icon" title="应用更新" onclick={onOpenUpdates}>
-      <DownloadSimple weight="duotone" />
-    </Button>
+    {#if updaterEnabled}
+      <Button variant="ghost" size="icon" title="应用更新" onclick={onOpenUpdates}>
+        <DownloadSimple weight="duotone" />
+      </Button>
+    {/if}
     <Button variant="ghost" size="icon" title="开源许可" onclick={onOpenLegal}>
       <Info weight="duotone" />
     </Button>

@@ -22,6 +22,12 @@ for (const arg of process.argv.slice(2)) {
   }
 }
 
+if (!truthy(process.env.IMGCONVERT_DISABLE_UPDATER)) {
+  fail(
+    "MAS/Store build requires IMGCONVERT_DISABLE_UPDATER=1; Mac App Store updates must come from the App Store",
+  );
+}
+
 const tauriConfig = readJson(path.join(srcTauriRoot, "tauri.conf.json"));
 const identifier = tauriConfig.identifier;
 const teamId = process.env.APPLE_TEAM_ID?.trim();
@@ -53,6 +59,12 @@ writeFileSync(
   JSON.stringify(
     {
       $schema: "https://schema.tauri.app/config/2",
+      app: {
+        security: {
+          // MAS updates come from the App Store; omit the updater capability.
+          capabilities: ["default"],
+        },
+      },
       bundle: {
         macOS: {
           minimumSystemVersion: "10.13",
@@ -122,6 +134,14 @@ function escapeXml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
+}
+
+function truthy(value) {
+  return ["1", "true", "yes", "on"].includes(
+    String(value ?? "")
+      .trim()
+      .toLowerCase(),
+  );
 }
 
 function readJson(file) {

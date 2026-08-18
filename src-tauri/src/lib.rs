@@ -186,7 +186,7 @@ async fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<Thumbnai
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .manage(BatchState::default())
         .manage(ImportScanState::default())
         .manage(ClipboardImportState::default())
@@ -195,8 +195,13 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+
+    if option_env!("IMGCONVERT_DISABLE_UPDATER") != Some("1") {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             host_platform,
             capabilities,

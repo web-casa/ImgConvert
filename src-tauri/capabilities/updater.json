@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "updater",
+  "description": "Tauri updater capability for direct (non-store) desktop builds",
+  "windows": ["main"],
+  "permissions": ["updater:default"]
+}

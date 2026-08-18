@@ -36,6 +36,11 @@ if (!isWindows && !options.allowNonWindows) {
 if (!truthy(process.env.IMGCONVERT_DISABLE_EXTERNAL_CODECS)) {
   fail("MSIX/Store preparation requires IMGCONVERT_DISABLE_EXTERNAL_CODECS=1");
 }
+if (!truthy(process.env.IMGCONVERT_DISABLE_UPDATER)) {
+  fail(
+    "MSIX/Store preparation requires IMGCONVERT_DISABLE_UPDATER=1; Microsoft Store updates must come from the Store",
+  );
+}
 
 const requiredEnv = [
   "WINDOWS_STORE_IDENTITY_NAME",
@@ -94,8 +99,26 @@ for (const [key, value] of Object.entries(replacements)) {
 const outputDir = path.join(repoRoot, "src-tauri", "target", "windows-msix");
 mkdirSync(outputDir, { recursive: true });
 const outputPath = path.join(outputDir, "AppxManifest.xml");
+const tauriConfigPath = path.join(outputDir, "tauri.store.generated.conf.json");
 writeFileSync(outputPath, manifest);
+writeFileSync(
+  tauriConfigPath,
+  JSON.stringify(
+    {
+      $schema: "https://schema.tauri.app/config/2",
+      app: {
+        security: {
+          // MSIX updates come from the Microsoft Store; omit the updater capability.
+          capabilities: ["default"],
+        },
+      },
+    },
+    null,
+    2,
+  ),
+);
 console.log(`prepared ${path.relative(repoRoot, outputPath)}`);
+console.log(`prepared ${path.relative(repoRoot, tauriConfigPath)}`);
 
 if (isWindows) {
   for (const tool of ["makeappx.exe", "signtool.exe"]) {
@@ -157,6 +180,7 @@ Options:
 
 Environment:
   IMGCONVERT_DISABLE_EXTERNAL_CODECS=1  Required.
+  IMGCONVERT_DISABLE_UPDATER=1          Required for Store builds.
   WINDOWS_STORE_IDENTITY_NAME           Optional override of the committed identity.
   WINDOWS_STORE_PUBLISHER               Optional override of the committed publisher.
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME  Optional override of the committed display name.

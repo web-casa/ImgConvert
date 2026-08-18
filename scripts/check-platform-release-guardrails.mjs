@@ -471,7 +471,11 @@ function checkTauriUpdaterGuardrails() {
   const packageDependencies = packageJson.dependencies ?? {};
   const tauriCargo = readText(path.join(repoRoot, "src-tauri", "Cargo.toml"));
   const tauriLib = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));
+  const tauriBuild = readText(path.join(repoRoot, "src-tauri", "build.rs"));
   const capabilities = readText(path.join(repoRoot, "src-tauri", "capabilities", "default.json"));
+  const updaterCapabilities = readText(
+    path.join(repoRoot, "src-tauri", "capabilities", "updater.json"),
+  );
   const stateTs = readText(path.join(repoRoot, "src", "lib", "state.svelte.ts"));
   const updateDialog = readText(
     path.join(repoRoot, "src", "lib", "components", "UpdateDialog.svelte"),
@@ -540,14 +544,29 @@ function checkTauriUpdaterGuardrails() {
   if (!tauriCargo.includes("tauri-plugin-process")) {
     failures.push("src-tauri/Cargo.toml must include tauri-plugin-process");
   }
-  if (!tauriLib.includes("tauri_plugin_updater::Builder::new().build()")) {
-    failures.push("Tauri builder must register tauri-plugin-updater");
+  if (!tauriLib.includes('option_env!("IMGCONVERT_DISABLE_UPDATER")')) {
+    failures.push("Tauri builder must compile out updater when IMGCONVERT_DISABLE_UPDATER=1");
+  }
+  if (!tauriBuild.includes("rerun-if-env-changed=IMGCONVERT_DISABLE_UPDATER")) {
+    failures.push("src-tauri/build.rs must rerun when IMGCONVERT_DISABLE_UPDATER changes");
+  }
+  if (!stateTs.includes("VITE_IMGCONVERT_DISABLE_UPDATER")) {
+    failures.push("frontend must hide updater UI when IMGCONVERT_DISABLE_UPDATER=1");
+  }
+  if (!packageScripts["release:macos:mas"]?.includes("IMGCONVERT_DISABLE_UPDATER=1")) {
+    failures.push("release:macos:mas must disable updater");
+  }
+  if (!packageScripts["release:windows:msix"]?.includes("tauri.store.generated.conf.json")) {
+    failures.push("release:windows:msix must use the Store Tauri config");
   }
   if (!tauriLib.includes("tauri_plugin_process::init()")) {
     failures.push("Tauri builder must register tauri-plugin-process for relaunch");
   }
-  if (!capabilities.includes('"updater:default"')) {
-    failures.push("Tauri capabilities must expose updater:default");
+  if (capabilities.includes('"updater:default"')) {
+    failures.push("default capability must not expose updater; store builds use default only");
+  }
+  if (!updaterCapabilities.includes('"updater:default"')) {
+    failures.push("updater capability must expose updater:default for direct builds");
   }
   if (!capabilities.includes('"process:allow-restart"')) {
     failures.push("Tauri capabilities must expose process:allow-restart only");
@@ -1167,6 +1186,14 @@ function checkMacosDirectConfig() {
 }
 
 function checkMacosStoreConfig() {
+  const prepare = readText(path.join(repoRoot, "scripts", "prepare-macos-mas-release.mjs"));
+  for (const expected of ["IMGCONVERT_DISABLE_UPDATER", 'capabilities: ["default"]']) {
+    if (!prepare.includes(expected)) {
+      failures.push(
+        `prepare-macos-mas-release.mjs must enforce Store updater disable: ${expected}`,
+      );
+    }
+  }
   const configPath = path.join(srcTauriRoot, "tauri.macos.mas.conf.json");
   const config = readJson(configPath);
   const macos = config.bundle?.macOS;
@@ -1258,6 +1285,7 @@ function checkWindowsStoreDocs() {
     "runFullTrust",
     "Partner Center",
     "IMGCONVERT_DISABLE_EXTERNAL_CODECS=1",
+    "IMGCONVERT_DISABLE_UPDATER=1",
     "release:windows:store:check",
     "release:windows:msix:prepare",
     "release:windows:msix",
@@ -1266,6 +1294,20 @@ function checkWindowsStoreDocs() {
     if (!readme.includes(expected)) {
       failures.push(`packaging/windows/README.md must document ${expected}`);
     }
+  }
+  const msixPrepare = readText(path.join(repoRoot, "scripts", "prepare-windows-msix-release.mjs"));
+  for (const expected of ["IMGCONVERT_DISABLE_UPDATER", 'capabilities: ["default"]']) {
+    if (!msixPrepare.includes(expected)) {
+      failures.push(
+        `prepare-windows-msix-release.mjs must enforce Store updater disable: ${expected}`,
+      );
+    }
+  }
+  const windowsWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "windows-smoke.yml"),
+  );
+  if (!windowsWorkflow.includes('IMGCONVERT_DISABLE_UPDATER: "1"')) {
+    failures.push("windows-smoke.yml MSIX job must set IMGCONVERT_DISABLE_UPDATER=1");
   }
   const msixTemplate = readText(
     path.join(repoRoot, "packaging", "windows", "msix", "AppxManifest.xml.template"),

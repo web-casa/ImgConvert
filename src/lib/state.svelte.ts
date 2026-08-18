@@ -468,6 +468,8 @@ export const appUpdate = $state<AppUpdateState>({
 
 let pendingAppUpdate: Update | null = null;
 
+export const updaterEnabled = import.meta.env.VITE_IMGCONVERT_DISABLE_UPDATER !== "1";
+
 export const capabilities = $state<Capabilities>({
   readable: [...CORE_CAPABILITIES.readable],
   writable: [...CORE_CAPABILITIES.writable],
@@ -496,6 +498,12 @@ export async function checkForAppUpdate(): Promise<void> {
     resetAppUpdateResult();
     appUpdate.checked = true;
     appUpdate.message = "网页预览不连接桌面更新通道";
+    return;
+  }
+  if (!updaterEnabled) {
+    resetAppUpdateResult();
+    appUpdate.checked = true;
+    appUpdate.message = "商店构建由 App Store / Microsoft Store 更新";
     return;
   }
 

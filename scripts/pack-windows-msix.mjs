@@ -57,6 +57,9 @@ if (!["debug", "release"].includes(options.profile)) {
 if (!truthy(process.env.IMGCONVERT_DISABLE_EXTERNAL_CODECS)) {
   fail("MSIX/Store packaging requires IMGCONVERT_DISABLE_EXTERNAL_CODECS=1");
 }
+if (!truthy(process.env.IMGCONVERT_DISABLE_UPDATER)) {
+  fail("MSIX/Store packaging requires IMGCONVERT_DISABLE_UPDATER=1");
+}
 
 const msixRoot = path.join(repoRoot, "src-tauri", "target", "windows-msix");
 const layoutDir = path.join(msixRoot, "layout");
@@ -222,6 +225,7 @@ Options:
 
 Environment:
   IMGCONVERT_DISABLE_EXTERNAL_CODECS=1
+  IMGCONVERT_DISABLE_UPDATER=1
   WINDOWS_STORE_IDENTITY_NAME
   WINDOWS_STORE_PUBLISHER
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME

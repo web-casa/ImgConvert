@@ -246,6 +246,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.store_msix }}
         env:
           IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+          IMGCONVERT_DISABLE_UPDATER: "1"
           WINDOWS_STORE_IDENTITY_NAME: ImgConvert.DevSmoke
           WINDOWS_STORE_PUBLISHER: CN=ImgConvertDevSmoke
           WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: ImgConvert Dev Smoke

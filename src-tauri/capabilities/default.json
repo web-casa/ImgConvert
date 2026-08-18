@@ -9,7 +9,6 @@
     "dialog:default",
     "store:default",
     "fs:scope",
-    "updater:default",
     "process:allow-restart"
   ]
 }
