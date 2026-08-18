@@ -1318,7 +1318,7 @@ function checkWindowsStoreDocs() {
   const msixTemplate = readText(
     path.join(repoRoot, "packaging", "windows", "msix", "AppxManifest.xml.template"),
   );
-  for (const expected of ["runFullTrust", "Windows.FullTrustApplication", "desktop6:Extension"]) {
+  for (const expected of ["runFullTrust", "Windows.FullTrustApplication", "desktop:Extension"]) {
     if (!msixTemplate.includes(expected)) {
       failures.push(`MSIX manifest template must include ${expected}`);
     }

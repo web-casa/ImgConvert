@@ -82,7 +82,7 @@ const template = readFileSync(templatePath, "utf8");
 for (const token of [
   "runFullTrust",
   "Windows.FullTrustApplication",
-  "desktop6:Extension",
+  "desktop:Extension",
   "TargetDeviceFamily",
   'ProcessorArchitecture="x64"',
 ]) {
