@@ -396,8 +396,14 @@ function checkFuzzCorpusGuardrails() {
   const replayExample = readText(
     path.join(repoRoot, "crates", "imgconvert-core", "examples", "replay_fuzz_corpus.rs"),
   );
-  const fuzzCorpusIgnore = readText(path.join(repoRoot, "fuzz", "corpus", ".gitignore"));
-  const realCorpusIgnore = readText(path.join(repoRoot, "corpus", "real", ".gitignore"));
+  const fuzzCorpusIgnore = readText(path.join(repoRoot, "fuzz", "corpus", ".gitignore")).replaceAll(
+    "\r\n",
+    "\n",
+  );
+  const realCorpusIgnore = readText(path.join(repoRoot, "corpus", "real", ".gitignore")).replaceAll(
+    "\r\n",
+    "\n",
+  );
 
   if (!workspaceCargo.includes('"fuzz"')) {
     failures.push("workspace Cargo.toml must exclude fuzz from normal workspace builds");
