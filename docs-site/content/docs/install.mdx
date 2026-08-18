@@ -17,7 +17,9 @@ ImgConvert 第一期只通过 GitHub Releases 分发。当前建议优先使用 
 | --- | --- |
 | `ImgConvert_0.1.2_amd64.AppImage` | x86_64 Linux 桌面直运行包 |
 | `ImgConvert_0.1.2_aarch64.AppImage` | arm64/aarch64 Linux 桌面直运行包 |
+| `ImgConvert_0.1.2_amd64.deb` | Debian/Ubuntu x86_64 系统包 |
 | `ImgConvert_0.1.2_arm64.deb` | Debian/Ubuntu arm64 系统包 |
+| `ImgConvert-0.1.2-1.x86_64.rpm` | Fedora/RHEL/openSUSE x86_64 系统包 |
 | `ImgConvert-0.1.2-1.aarch64.rpm` | Fedora/RHEL/openSUSE aarch64 系统包 |
 | `SHA256SUMS` | 人工下载后的 checksum 校验 |
 | `latest.json` | Tauri updater 使用的更新 manifest |
@@ -55,7 +57,13 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.2_amd64.AppImage
 
 ## Debian / Ubuntu
 
-当前 release 的 `.deb` 是 arm64 包：
+x86_64:
+
+```bash
+sudo apt install ./ImgConvert_0.1.2_amd64.deb
+```
+
+arm64:
 
 ```bash
 sudo apt install ./ImgConvert_0.1.2_arm64.deb
@@ -65,12 +73,17 @@ sudo apt install ./ImgConvert_0.1.2_arm64.deb
 
 ```bash
 sudo apt update
-sudo apt install ./ImgConvert_0.1.2_arm64.deb
 ```
 
 ## Fedora / RHEL / openSUSE
 
-当前 release 的 `.rpm` 是 aarch64 包：
+x86_64:
+
+```bash
+sudo dnf install ./ImgConvert-0.1.2-1.x86_64.rpm
+```
+
+aarch64:
 
 ```bash
 sudo dnf install ./ImgConvert-0.1.2-1.aarch64.rpm
@@ -79,7 +92,7 @@ sudo dnf install ./ImgConvert-0.1.2-1.aarch64.rpm
 openSUSE 可使用：
 
 ```bash
-sudo zypper install ./ImgConvert-0.1.2-1.aarch64.rpm
+sudo zypper install ./ImgConvert-0.1.2-1.x86_64.rpm
 ```
 
 ## 更新
