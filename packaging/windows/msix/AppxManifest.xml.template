@@ -10,7 +10,8 @@
   <Identity
     Name="{{WINDOWS_STORE_IDENTITY_NAME}}"
     Publisher="{{WINDOWS_STORE_PUBLISHER}}"
-    Version="{{WINDOWS_STORE_VERSION}}" />
+    Version="{{WINDOWS_STORE_VERSION}}"
+    ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>ImgConvert</DisplayName>
     <PublisherDisplayName>{{WINDOWS_STORE_PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>

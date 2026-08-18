@@ -23,6 +23,11 @@ on:
         required: true
         default: false
         type: boolean
+      store_msix:
+        description: Build the Store MSIX package and run sideload install smoke.
+        required: true
+        default: false
+        type: boolean
       bundles:
         description: Comma-separated Tauri bundles for direct build.
         required: true
@@ -242,3 +247,23 @@ jobs:
           path: |
             ${{ env.CARGO_TARGET_DIR }}/release/bundle/msi/*.msi
             ${{ env.CARGO_TARGET_DIR }}/release/bundle/nsis/*.exe
+
+      - name: Windows Store MSIX package and install smoke
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.store_msix }}
+        env:
+          IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+          WINDOWS_STORE_IDENTITY_NAME: ImgConvert.DevSmoke
+          WINDOWS_STORE_PUBLISHER: CN=ImgConvertDevSmoke
+          WINDOWS_STORE_PUBLISHER_DISPLAY_NAME: ImgConvert Dev Smoke
+          WINDOWS_STORE_VERSION: 1.0.0.0
+        run: |
+          pnpm run release:windows:msix
+          pnpm run release:windows:msix:smoke
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.store_msix }}
+        with:
+          name: imgconvert-windows-x64-msix
+          if-no-files-found: error
+          retention-days: 3
+          path: src-tauri/target/windows-msix/*.msix

@@ -42,22 +42,29 @@ const requiredEnv = [
   "WINDOWS_STORE_PUBLISHER",
   "WINDOWS_STORE_PUBLISHER_DISPLAY_NAME",
 ];
-const missing = requiredEnv.filter((name) => !process.env[name]);
+const missing = requiredEnv.filter((name) => !envOverride(name));
 if (missing.length > 0 && !options.allowMissingStoreEnv) {
-  fail(`missing Store identity environment: ${missing.join(", ")}`);
+  console.warn(
+    `using committed Partner Center identity defaults; set ${missing.join(", ")} to override`,
+  );
 }
 
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-const version = storeVersion(process.env.WINDOWS_STORE_VERSION ?? packageJson.version);
+const version = storeVersion(envOverride("WINDOWS_STORE_VERSION") ?? packageJson.version);
 const replacements = {
   WINDOWS_STORE_IDENTITY_NAME:
-    process.env.WINDOWS_STORE_IDENTITY_NAME ?? "00000ImgConvert.ImgConvert",
+    envOverride("WINDOWS_STORE_IDENTITY_NAME") ?? "53660AlanM.ImgConvert",
   WINDOWS_STORE_PUBLISHER:
-    process.env.WINDOWS_STORE_PUBLISHER ?? "CN=00000000-0000-0000-0000-000000000000",
+    envOverride("WINDOWS_STORE_PUBLISHER") ?? "CN=84AC3716-04E0-4D67-8951-0D3E51674CA0",
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME:
-    process.env.WINDOWS_STORE_PUBLISHER_DISPLAY_NAME ?? "ImgConvert",
+    envOverride("WINDOWS_STORE_PUBLISHER_DISPLAY_NAME") ?? "AlanM.",
   WINDOWS_STORE_VERSION: version,
 };
+
+function envOverride(name) {
+  const value = String(process.env[name] ?? "").trim();
+  return value || undefined;
+}
 
 const templatePath = path.join(
   repoRoot,
@@ -72,6 +79,7 @@ for (const token of [
   "Windows.FullTrustApplication",
   "desktop6:Extension",
   "TargetDeviceFamily",
+  'ProcessorArchitecture="x64"',
 ]) {
   if (!template.includes(token)) {
     fail(`MSIX manifest template must include ${token}`);
@@ -100,14 +108,23 @@ if (isWindows) {
 }
 
 function storeVersion(value) {
-  const parts = value.split(".").map((part) => Number.parseInt(part, 10));
-  if (parts.some((part) => Number.isNaN(part) || part < 0 || part > 65535)) {
-    fail(`invalid Windows Store version: ${value}`);
+  const parts = String(value).split(".");
+  if (
+    parts.length > 4 ||
+    parts.some((part) => !/^\d+$/.test(part) || Number.parseInt(part, 10) > 65535)
+  ) {
+    fail(`invalid Windows Store version: ${value} (expected up to four decimal components)`);
   }
-  while (parts.length < 4) {
-    parts.push(0);
+  const canonical = parts.map((part) => String(Number.parseInt(part, 10)));
+  while (canonical.length < 4) {
+    canonical.push("0");
   }
-  return parts.slice(0, 4).join(".");
+  if (canonical[0] === "0" || canonical[3] !== "0") {
+    fail(
+      `invalid Windows Store version: ${canonical.join(".")} (major must be >= 1 and the fourth component must be 0; set WINDOWS_STORE_VERSION, e.g. 1.0.0.0)`,
+    );
+  }
+  return canonical.join(".");
 }
 
 function toolExists(tool) {
@@ -136,14 +153,14 @@ function printHelp() {
 
 Options:
   --allow-non-windows          Allow non-Windows manifest generation preflight.
-  --allow-missing-store-env    Generate placeholder identity values for docs/CI preflight.
+  --allow-missing-store-env    Legacy no-op; identity defaults are always available.
 
 Environment:
-  IMGCONVERT_DISABLE_EXTERNAL_CODECS=1
-  WINDOWS_STORE_IDENTITY_NAME
-  WINDOWS_STORE_PUBLISHER
-  WINDOWS_STORE_PUBLISHER_DISPLAY_NAME
-  WINDOWS_STORE_VERSION
+  IMGCONVERT_DISABLE_EXTERNAL_CODECS=1  Required.
+  WINDOWS_STORE_IDENTITY_NAME           Optional override of the committed identity.
+  WINDOWS_STORE_PUBLISHER               Optional override of the committed publisher.
+  WINDOWS_STORE_PUBLISHER_DISPLAY_NAME  Optional override of the committed display name.
+  WINDOWS_STORE_VERSION                 Optional four-part Store version override.
 `);
 }
 

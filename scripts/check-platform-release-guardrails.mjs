@@ -1075,6 +1075,15 @@ function checkWindowsRuntimeGuardrails() {
   ) {
     failures.push("package.json must expose release:windows:msix:prepare for Store manifest prep");
   }
+  if (!packageScripts["release:windows:msix"]?.includes("pack-windows-msix.mjs")) {
+    failures.push("package.json must expose release:windows:msix for Store MSIX packaging");
+  }
+  if (!packageScripts["release:windows:msix:pack"]?.includes("pack-windows-msix.mjs")) {
+    failures.push("package.json must expose release:windows:msix:pack for Store MSIX packaging");
+  }
+  if (!packageScripts["release:windows:msix:smoke"]?.includes("smoke-windows-msix.mjs")) {
+    failures.push("package.json must expose release:windows:msix:smoke for MSIX install smoke");
+  }
   for (const script of [
     "scripts/smoke-windows-runtime.mjs",
     "scripts/clean-windows-bundles.mjs",
@@ -1082,6 +1091,8 @@ function checkWindowsRuntimeGuardrails() {
     "scripts/sign-windows-installers.mjs",
     "scripts/smoke-windows-installers.mjs",
     "scripts/prepare-windows-msix-release.mjs",
+    "scripts/pack-windows-msix.mjs",
+    "scripts/smoke-windows-msix.mjs",
   ]) {
     if (!existsSync(path.join(repoRoot, script))) {
       failures.push(`${script} is required for Windows direct runtime/build smoke`);
@@ -1242,6 +1253,8 @@ function checkWindowsStoreDocs() {
     "IMGCONVERT_DISABLE_EXTERNAL_CODECS=1",
     "release:windows:store:check",
     "release:windows:msix:prepare",
+    "release:windows:msix",
+    "release:windows:msix:smoke",
   ]) {
     if (!readme.includes(expected)) {
       failures.push(`packaging/windows/README.md must document ${expected}`);
