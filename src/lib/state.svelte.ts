@@ -5,6 +5,7 @@ import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
+import { setAppLocale, systemLocale, type AppLocale } from "$lib/i18n";
 import {
   check as checkTauriUpdate,
   type DownloadEvent,
@@ -281,6 +282,7 @@ export interface Settings {
   concurrency: number;
   theme: Theme;
   reduceMotion: boolean;
+  locale: AppLocale;
 }
 
 // ---- 常量 ----
@@ -396,6 +398,7 @@ export const settings = $state<Settings>({
   concurrency: 0,
   theme: "system",
   reduceMotion: false,
+  locale: "zh-CN",
 });
 
 export function qualityFloorFor(format: string): number {
@@ -1728,24 +1731,36 @@ export function applyTheme() {
 }
 
 // ---- 持久化(Tauri Store)----
+export const persistenceReady = $state({ ready: false });
 let store: Store | null = null;
 export async function initPersistence() {
-  if (!isTauriRuntime()) {
-    applyTheme();
-    return;
-  }
-
   try {
+    if (!isTauriRuntime()) {
+      const detected = await systemLocale();
+      settings.locale = detected;
+      setAppLocale(detected);
+      applyTheme();
+      return;
+    }
+
     store = await load("settings.json", { defaults: {}, autoSave: 300 });
     const saved = await store.get<Partial<Settings>>("settings");
     if (saved) {
       Object.assign(settings, saved);
       normalizeSettings();
+    } else {
+      settings.locale = await systemLocale();
     }
+    setAppLocale(settings.locale);
   } catch (e) {
     console.warn("加载设置失败,用默认值:", e);
+    const detected = await systemLocale();
+    settings.locale = detected;
+    setAppLocale(detected);
+  } finally {
+    applyTheme();
+    persistenceReady.ready = true;
   }
-  applyTheme();
 }
 export async function persistSettings() {
   if (!store) return;
@@ -1760,6 +1775,9 @@ function normalizeSettings() {
 
   if (!["light", "dark", "system"].includes(settings.theme)) {
     settings.theme = "system";
+  }
+  if (settings.locale !== "zh-CN" && settings.locale !== "en-US") {
+    settings.locale = "zh-CN";
   }
   if (typeof settings.format !== "string" || !settings.format.trim()) {
     settings.format = CORE_CAPABILITIES.writable[0];

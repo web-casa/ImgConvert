@@ -1,8 +1,19 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
-  import { Sun, Moon, Desktop, Info, PuzzlePiece, Sparkle, DownloadSimple } from "phosphor-svelte";
+  import {
+    Sun,
+    Moon,
+    Desktop,
+    Info,
+    PuzzlePiece,
+    Sparkle,
+    DownloadSimple,
+    Translate,
+  } from "phosphor-svelte";
+  import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import appIconUrl from "$lib/assets/app-icon.png";
+  import { setAppLocale } from "$lib/i18n";
   import { settings, engine, applyTheme, persistSettings, updaterEnabled } from "$lib/state.svelte";
 
   let {
@@ -32,6 +43,11 @@
     settings.reduceMotion = !settings.reduceMotion;
     applyTheme();
     persistSettings();
+  }
+  function toggleLocale() {
+    settings.locale = settings.locale === "zh-CN" ? "en-US" : "zh-CN";
+    setAppLocale(settings.locale);
+    void persistSettings();
   }
 
   const ThemeIcon = $derived(themeIcon);
@@ -68,6 +84,16 @@
     </Button>
     <Button variant="ghost" size="icon" title="主题:{themeLabel}" onclick={cycleTheme}>
       <ThemeIcon weight="duotone" />
+    </Button>
+    <Button
+      variant="ghost"
+      size="icon"
+      title={$t("topbar.language")}
+      aria-pressed={settings.locale !== "zh-CN"}
+      onclick={toggleLocale}
+    >
+      <Translate weight="duotone" />
+      <span class="text-[10px] font-semibold">{settings.locale === "zh-CN" ? "EN" : "中"}</span>
     </Button>
     <Button variant="ghost" size="icon" title="插件诊断" onclick={onOpenPluginDiagnostics}>
       <PuzzlePiece weight="duotone" />

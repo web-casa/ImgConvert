@@ -195,7 +195,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_os::init());
 
     if option_env!("IMGCONVERT_DISABLE_UPDATER") != Some("1") {
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
