@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-08-18 — v0.1.2 新仓库首个 GitHub Release
+
+- **版本升级**:`package.json`、docs-site、Tauri config/Cargo manifest/lock 统一升到 `0.1.2`;THIRD_PARTY licenses 重新生成。
+- **Linux Release**:推送 `v0.1.2` 触发 GitHub Actions,amd64+arm64 各构建 `.deb`、`.rpm`、AppImage,工作流内 Docker smoke 通过。
+- **GitHub Release**:发布 6 个 Linux 安装资产 + 合并 `SHA256SUMS`。
+- **Tauri updater**:`Updater Release` 构建并发布 x86_64 签名 AppImage/`.sig`/`latest.json`;本机 arm64 补构建签名 aarch64 AppImage 并合并双平台 `latest.json`,两个平台的远端 updater smoke 均通过。
+- **真实 runner**:macOS arm64 unsigned DMG + HEIC ImageIO smoke 通过;Windows x64 MSIX pack + sideload install smoke 通过。
+- **修复**:Linux bundle 补 `xdg-utils`;MSIX full-trust 扩展改用 `desktop:` 命名空间;Windows PowerShell smoke 恢复 PSModulePath;macOS/Windows 真实 runner 暴露的 guardrail/clippy 问题修复。
+
+---
+
+---
+
 ## 2026-08-18 — 迁移到 public 仓库并启用免费 GitHub Actions
 
 - **仓库迁移**:origin 从 `yeagoo/imgconvert` 切到 `web-casa/ImgConvert`;Tauri homepage、updater 默认 repo、docs-site 链接和 Flatpak metadata URL 同步更新。Flatpak app-id 暂保持 `io.github.yeagoo.imgconvert`,Flathub 若正式提交前再单独评估 app-id 迁移。
