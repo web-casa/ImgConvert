@@ -16,7 +16,7 @@
     "*.config.ts",
     "scripts/*.mjs"
   ],
-  "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts"],
+  "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts", "docs-site/source.config.ts"],
   "ignoreDependencies": [
     "@internationalized/date",
     "@testing-library/svelte",
