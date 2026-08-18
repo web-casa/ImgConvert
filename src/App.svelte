@@ -49,12 +49,6 @@
   let legalOpen = $state(false);
   let pluginDiagnosticsOpen = $state(false);
   let updateOpen = $state(false);
-  const progressLabel = $derived(
-    queue.length
-      ? `${doneCount}/${queue.length} 完成${skippedCount ? ` · ${skippedCount} 跳过` : ""}${errorCount ? ` · ${errorCount} 错误` : ""}`
-      : "0 个文件",
-  );
-
   onMount(() => {
     const runningInTauri = isTauriRuntime();
     void initPersistence().then(async () => {
@@ -100,7 +94,7 @@
           class="pointer-events-none fixed inset-0 z-40 grid place-items-center border-4 border-primary/50 bg-primary/10 backdrop-blur-sm"
         >
           <div class="rounded-lg border bg-card px-4 py-2 text-sm font-medium shadow-md">
-            释放以扫描图片
+            {$t("app.dropToScan")}
           </div>
         </div>
       {/if}
@@ -132,7 +126,20 @@
                   {:else if skippedCount}
                     <WarningCircle size={15} weight="fill" class="text-muted-foreground" />
                   {/if}
-                  <span class="truncate">{progressLabel}</span>
+                  <span class="truncate">
+                    {#if queue.length}
+                      {$t("app.progressDone", {
+                        done: doneCount,
+                        total: queue.length,
+                      } as any)}{#if skippedCount}{$t("app.progressSkipped", {
+                          skipped: skippedCount,
+                        } as any)}{/if}{#if errorCount}{$t("app.progressErrors", {
+                          errors: errorCount,
+                        } as any)}{/if}
+                    {:else}
+                      {$t("app.zeroFiles")}
+                    {/if}
+                  </span>
                 </div>
 
                 {#if queue.length}
@@ -147,7 +154,7 @@
 
               <ul
                 class="grid grid-cols-1 content-start gap-3 lg:grid-cols-2 2xl:grid-cols-3"
-                aria-label="转换队列"
+                aria-label={$t("app.queueAriaLabel")}
               >
                 {#each queue as item (item.key)}
                   <QueueItem {item} />
@@ -155,7 +162,7 @@
                   <li
                     class="col-span-full flex min-h-48 items-center justify-center rounded-lg border border-dashed p-8 text-sm text-muted-foreground"
                   >
-                    还没有文件
+                    {$t("app.emptyQueue")}
                   </li>
                 {/each}
               </ul>
@@ -183,12 +190,28 @@
               {:else if settledCount && settledCount === queue.length && !skippedCount}
                 <CheckCircle size={17} weight="fill" class="text-emerald-600" />
               {/if}
-              <span class="truncate">{progressLabel}</span>
+              <span class="truncate">
+                {#if queue.length}
+                  {$t("app.progressDone", {
+                    done: doneCount,
+                    total: queue.length,
+                  } as any)}{#if skippedCount}{$t("app.progressSkipped", {
+                      skipped: skippedCount,
+                    } as any)}{/if}{#if errorCount}{$t("app.progressErrors", {
+                      errors: errorCount,
+                    } as any)}{/if}
+                {:else}
+                  {$t("app.zeroFiles")}
+                {/if}
+              </span>
             </div>
             <div class="mt-1 text-xs text-muted-foreground">
               {queue.length
-                ? `目标格式 ${settings.format.toUpperCase()} · ${engine.text}`
-                : "添加图片后开始批量转换或压缩"}
+                ? $t("app.footerTargetFormat", {
+                    format: settings.format.toUpperCase(),
+                    engine: engine.text,
+                  } as any)
+                : $t("app.addImagesHint")}
             </div>
           </div>
 
@@ -200,7 +223,7 @@
               disabled={ui.converting || ui.importing || !queue.length}
             >
               <Trash />
-              清空
+              {$t("app.clear")}
             </Button>
             <Button
               variant={ui.converting ? "destructive" : "default"}
@@ -213,10 +236,10 @@
             >
               {#if ui.converting}
                 <StopCircle />
-                {ui.cancelRequested ? "取消中" : "取消转换"}
+                {ui.cancelRequested ? $t("app.canceling") : $t("app.cancelConversion")}
               {:else}
                 <PlayCircle />
-                开始转换 / 压缩
+                {$t("app.startConversion")}
               {/if}
             </Button>
           </div>

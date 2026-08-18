@@ -5,7 +5,13 @@ import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
-import { setAppLocale, systemLocale, type AppLocale } from "$lib/i18n";
+import {
+  locale as localeStore,
+  setAppLocale,
+  systemLocale,
+  translate,
+  type AppLocale,
+} from "$lib/i18n";
 import {
   check as checkTauriUpdate,
   type DownloadEvent,
@@ -315,47 +321,47 @@ const CLIPBOARD_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/we
 let hostPlatformPromise: Promise<string> | null = null;
 
 export const FORMAT_CATEGORIES = [
-  { value: "modern", label: "现代格式" },
-  { value: "standard", label: "通用格式" },
+  { value: "modern", labelKey: "state.formatCategoryModern" },
+  { value: "standard", labelKey: "state.formatCategoryStandard" },
 ];
 
 export const FORMATS: {
   value: string;
-  label: string;
+  labelKey: string;
   category: string;
-  description: string;
-  note?: string;
+  descriptionKey: string;
+  noteKey?: string;
 }[] = [
   {
     value: "avif",
-    label: "AVIF",
+    labelKey: "state.formatLabelavif",
     category: "modern",
-    description: "高压缩率,适合网页与归档",
+    descriptionKey: "state.formatAvifDescription",
   },
   {
     value: "webp",
-    label: "WebP",
+    labelKey: "state.formatLabelwebp",
     category: "modern",
-    description: "体积小,兼容现代浏览器",
+    descriptionKey: "state.formatWebpDescription",
   },
   {
     value: "jpeg",
-    label: "JPEG",
+    labelKey: "state.formatLabeljpeg",
     category: "standard",
-    description: "照片通用,兼容性最好",
+    descriptionKey: "state.formatJpegDescription",
   },
   {
     value: "png",
-    label: "PNG",
+    labelKey: "state.formatLabelpng",
     category: "standard",
-    description: "无损图形与透明背景",
+    descriptionKey: "state.formatPngDescription",
   },
   {
     value: "heic",
-    label: "HEIC",
+    labelKey: "state.formatLabelheic",
     category: "modern",
-    description: "可选插件导入,不作为输出格式",
-    note: "仅导入",
+    descriptionKey: "state.formatHeicDescription",
+    noteKey: "state.formatHeicNote",
   },
 ];
 
@@ -449,8 +455,12 @@ export const ui = $state<UiState>({
 });
 
 export const engine = $state<{ text: string; ok: boolean }>({
-  text: "检测 core 能力中…",
+  text: translate("state.engineInitializing"),
   ok: false,
+});
+
+localeStore.subscribe(() => {
+  if (engine.ok) void checkEngine();
 });
 
 export const appUpdate = $state<AppUpdateState>({
@@ -488,7 +498,8 @@ export function supportsLossless(format: string): boolean {
 }
 
 export function formatLabel(format: string): string {
-  return FORMATS.find((f) => f.value === format)?.label ?? format.toUpperCase();
+  const formatInfo = FORMATS.find((f) => f.value === format);
+  return formatInfo ? translate(formatInfo.labelKey) : format.toUpperCase();
 }
 
 export function writableFormats() {
@@ -500,13 +511,13 @@ export async function checkForAppUpdate(): Promise<void> {
   if (!isTauriRuntime()) {
     resetAppUpdateResult();
     appUpdate.checked = true;
-    appUpdate.message = "网页预览不连接桌面更新通道";
+    appUpdate.message = translate("update.webPreview");
     return;
   }
   if (!updaterEnabled) {
     resetAppUpdateResult();
     appUpdate.checked = true;
-    appUpdate.message = "商店构建由 App Store / Microsoft Store 更新";
+    appUpdate.message = translate("update.storeBuild");
     return;
   }
 
@@ -528,7 +539,7 @@ export async function checkForAppUpdate(): Promise<void> {
       appUpdate.currentVersion = null;
       appUpdate.date = null;
       appUpdate.body = null;
-      appUpdate.message = "当前已经是最新版本";
+      appUpdate.message = translate("update.latest");
       return;
     }
 
@@ -537,7 +548,7 @@ export async function checkForAppUpdate(): Promise<void> {
     appUpdate.currentVersion = pendingAppUpdate.currentVersion;
     appUpdate.date = pendingAppUpdate.date ?? null;
     appUpdate.body = pendingAppUpdate.body ?? null;
-    appUpdate.message = `发现新版本 ${pendingAppUpdate.version}`;
+    appUpdate.message = translate("update.newVersion", { version: pendingAppUpdate.version });
   } catch (error) {
     resetAppUpdateResult();
     appUpdate.checked = true;
@@ -552,7 +563,7 @@ export async function installAppUpdate(): Promise<void> {
 
   appUpdate.installing = true;
   appUpdate.error = "";
-  appUpdate.message = "正在下载更新…";
+  appUpdate.message = translate("update.downloading");
   appUpdate.downloadedBytes = 0;
   appUpdate.contentLength = null;
 
@@ -560,7 +571,7 @@ export async function installAppUpdate(): Promise<void> {
     await pendingAppUpdate.downloadAndInstall(handleUpdateDownloadEvent, { timeout: 120_000 });
     appUpdate.installed = true;
     appUpdate.available = false;
-    appUpdate.message = "更新已安装,正在重启…";
+    appUpdate.message = translate("update.installed");
     pendingAppUpdate = null;
     await relaunch();
   } catch (error) {
@@ -583,7 +594,7 @@ function handleUpdateDownloadEvent(event: DownloadEvent) {
       if (appUpdate.contentLength !== null) {
         appUpdate.downloadedBytes = appUpdate.contentLength;
       }
-      appUpdate.message = "下载完成,正在安装…";
+      appUpdate.message = translate("update.downloadComplete");
       return;
   }
 }
@@ -605,9 +616,9 @@ function resetAppUpdateResult() {
 function formatUpdaterError(error: unknown): string {
   const message = String(error);
   if (/not configured|No updater config|updater.*config/i.test(message)) {
-    return "此构建未启用更新通道。正式直发包需要使用 updater release 配置构建。";
+    return translate("update.notConfigured");
   }
-  return `更新检查失败:${message}`;
+  return translate("update.checkFailed", { message });
 }
 
 export function readableExtensions(): string[] {
@@ -635,7 +646,7 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
 
 async function hostPlatform(): Promise<string> {
   hostPlatformPromise ??= invoke<string>("host_platform").catch((error) => {
-    console.warn("读取宿主平台失败:", error);
+    console.warn("Failed to read host platform:", error);
     return "unknown";
   });
   return hostPlatformPromise;
@@ -653,7 +664,7 @@ async function pickWithTauriDialog(options: PickPathOptions): Promise<string[]> 
       !options.directory && extensions.length
         ? [
             {
-              name: "图片",
+              name: translate("state.image"),
               extensions,
             },
           ]
@@ -840,7 +851,7 @@ function normalizeAddPathInput(input: AddPathInput): ImportScanFile {
 
 export async function importPaths(paths: string[]) {
   if (ui.converting || ui.importing || paths.length === 0) return;
-  await importPathList(paths, "正在扫描导入…");
+  await importPathList(paths, translate("state.importScanning"));
 }
 
 async function importPathList(paths: string[], message: string) {
@@ -864,14 +875,14 @@ async function importPathList(paths: string[], message: string) {
     });
     ui.importErrors = scan.errors;
     if (scan.cancelled) {
-      ui.importMessage = "已取消导入扫描";
+      ui.importMessage = translate("state.importCancelled");
       return;
     }
 
     const added = addPaths(scan.files);
     ui.importMessage = formatImportSummary(added, scan);
   } catch (e) {
-    ui.importMessage = `导入失败:${e}`;
+    ui.importMessage = translate("state.importFailed", { error: String(e) });
     ui.importErrors = [];
   } finally {
     ui.importing = false;
@@ -884,7 +895,7 @@ export async function importClipboard() {
   if (ui.converting || ui.importing) return;
 
   if (!isTauriRuntime()) {
-    ui.importMessage = "网页预览无法读取系统剪贴板,请在 Tauri 桌面端使用";
+    ui.importMessage = translate("state.clipboardWebUnavailable");
     return;
   }
 
@@ -895,7 +906,7 @@ export async function importClipboard() {
       }
     | undefined;
   if (!clipboard) {
-    ui.importMessage = "当前 WebView 不支持读取剪贴板";
+    ui.importMessage = translate("state.clipboardUnsupported");
     return;
   }
 
@@ -916,7 +927,7 @@ export async function importClipboard() {
     const text = clipboard.readText ? await clipboard.readText() : "";
     const paths = parseClipboardPaths(text);
     if (paths.length) {
-      await importPathList(paths, "正在扫描剪贴板路径…");
+      await importPathList(paths, translate("state.clipboardScanning"));
       return;
     }
   } catch (error) {
@@ -924,8 +935,8 @@ export async function importClipboard() {
   }
 
   ui.importMessage = readError
-    ? `读取剪贴板失败:${String(readError)}`
-    : "剪贴板中没有可导入的图片或本机路径";
+    ? translate("state.clipboardReadFailed", { error: String(readError) })
+    : translate("state.clipboardEmpty");
 }
 
 export async function importPastedClipboard(event: ClipboardEvent) {
@@ -948,7 +959,7 @@ export async function importPastedClipboard(event: ClipboardEvent) {
   if (!paths.length) return;
 
   event.preventDefault();
-  await importPathList(paths, "正在扫描剪贴板路径…");
+  await importPathList(paths, translate("state.clipboardScanning"));
 }
 
 async function readClipboardImages(
@@ -992,7 +1003,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
   ui.importing = true;
   ui.importMode = "clipboard";
   ui.importCancelRequested = false;
-  ui.importMessage = "正在导入剪贴板图片…";
+  ui.importMessage = translate("state.clipboardImporting");
   ui.importErrors = [];
 
   let skipped = 0;
@@ -1005,7 +1016,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
           skipped += 1;
           ui.importErrors.push({
             path: image.suggestedName ?? "clipboard",
-            message: `剪贴板图片超过上限 ${fmtSize(CLIPBOARD_MAX_BYTES)}`,
+            message: translate("state.clipboardTooLarge", { size: fmtSize(CLIPBOARD_MAX_BYTES) }),
           });
           continue;
         }
@@ -1016,7 +1027,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
           skipped += 1;
           ui.importErrors.push({
             path: image.suggestedName ?? "clipboard",
-            message: `剪贴板图片超过上限 ${fmtSize(CLIPBOARD_MAX_BYTES)}`,
+            message: translate("state.clipboardTooLarge", { size: fmtSize(CLIPBOARD_MAX_BYTES) }),
           });
           continue;
         }
@@ -1043,7 +1054,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
       for (const file of files) {
         cleanupTemporaryPath(file.path);
       }
-      ui.importMessage = "已取消剪贴板导入";
+      ui.importMessage = translate("state.clipboardCancelled");
       return;
     }
 
@@ -1057,7 +1068,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
     }
     ui.importMessage = formatImportSummary({ ...added, skipped: added.skipped + skipped }, null);
   } catch (error) {
-    ui.importMessage = `剪贴板导入失败:${String(error)}`;
+    ui.importMessage = translate("state.clipboardImportFailed", { error: String(error) });
   } finally {
     ui.importing = false;
     ui.importMode = null;
@@ -1150,21 +1161,21 @@ export async function cancelImportScan() {
   ui.importCancelRequested = true;
 
   if (ui.importMode === "clipboard") {
-    ui.importMessage = "正在取消剪贴板导入…";
+    ui.importMessage = translate("state.clipboardCancelling");
     return;
   }
 
   if (!isTauriRuntime()) {
     ui.importing = false;
     ui.importMode = null;
-    ui.importMessage = "已取消导入扫描";
+    ui.importMessage = translate("state.importCancelled");
     return;
   }
 
   try {
     await invoke<boolean>("cancel_import_scan");
   } catch (e) {
-    ui.importMessage = `取消导入扫描失败:${e}`;
+    ui.importMessage = translate("state.cancelImportScanFailed", { error: String(e) });
   }
 }
 
@@ -1172,12 +1183,12 @@ function formatImportSummary(added: AddPathsResult, scan: ImportScanResult | nul
   const skipped = (scan?.skipped ?? 0) + added.skipped;
   const scanErrors = scan?.errors.length ?? 0;
   const parts: string[] = [];
-  if (added.added > 0) parts.push(`已添加 ${added.added} 个文件`);
-  if (added.duplicates > 0) parts.push(`${added.duplicates} 个重复`);
-  if (skipped > 0) parts.push(`跳过 ${skipped} 个`);
-  if (scanErrors > 0) parts.push(`${scanErrors} 个错误`);
-  if (scan?.truncated) parts.push(scan.limitReason ?? "扫描已截断");
-  return parts.join(" · ") || "未找到支持的图片";
+  if (added.added > 0) parts.push(translate("state.addedFiles", { count: added.added }));
+  if (added.duplicates > 0) parts.push(translate("state.duplicates", { count: added.duplicates }));
+  if (skipped > 0) parts.push(translate("state.skippedFiles", { count: skipped }));
+  if (scanErrors > 0) parts.push(translate("state.errorsCount", { count: scanErrors }));
+  if (scan?.truncated) parts.push(scan.limitReason ?? translate("state.scanTruncated"));
+  return parts.join(" · ") || translate("state.noSupportedImages");
 }
 
 export function addDemoItems() {
@@ -1195,7 +1206,7 @@ export function addDemoItems() {
       name: baseName(path),
       relativeDir: null,
       status: "pending",
-      detail: "网页预览示例",
+      detail: translate("state.webPreviewDemo"),
       targetFormat: null,
       metadata: null,
       thumbnail: null,
@@ -1215,7 +1226,7 @@ export function setItemTargetFormat(path: string, format: string | null) {
   item.targetFormat = normalized;
   if (item.status !== "running") {
     item.status = "pending";
-    item.detail = item.preview ? "网页预览示例" : "";
+    item.detail = item.preview ? translate("state.webPreviewDemo") : "";
     item.progress = 0;
   }
 }
@@ -1227,7 +1238,7 @@ export function resetItemFormats() {
     item.targetFormat = null;
     if (item.status !== "running") {
       item.status = "pending";
-      item.detail = item.preview ? "网页预览示例" : "";
+      item.detail = item.preview ? translate("state.webPreviewDemo") : "";
       item.progress = 0;
     }
   }
@@ -1260,7 +1271,7 @@ function cleanupTemporaryImport(item: QueueItem) {
 function cleanupTemporaryPath(path: string) {
   if (!isTauriRuntime()) return;
   void invoke<boolean>("cleanup_imported_temp_file", { path }).catch((error) => {
-    console.warn("清理剪贴板临时文件失败:", error);
+    console.warn("Failed to clean clipboard temp files:", error);
   });
 }
 
@@ -1321,7 +1332,7 @@ async function loadThumbnail(item: QueueItem) {
     item.thumbnailStatus = "ready";
   } catch (e) {
     if (!queue.includes(item)) return;
-    console.warn("缩略图生成失败:", e);
+    console.warn("Thumbnail generation failed:", e);
     item.thumbnailStatus = "error";
   }
 }
@@ -1359,7 +1370,7 @@ export async function convertAll() {
     for (const item of queue) {
       if (item.status !== "done") {
         item.status = "error";
-        item.detail = "网页预览不执行本地文件转换,请在 Tauri 桌面端运行";
+        item.detail = translate("state.webPreviewNoLocalConvert");
         item.progress = 100;
       }
     }
@@ -1384,7 +1395,7 @@ export async function cancelConversion() {
     try {
       await invoke<boolean>("cancel_batch");
     } catch (e) {
-      console.warn("取消批量任务失败:", e);
+      console.warn("Failed to cancel batch task:", e);
     }
   }
 }
@@ -1395,7 +1406,7 @@ async function convertAllWithBatch() {
 
   for (const job of jobs) {
     job.item.status = "pending";
-    job.item.detail = "排队中";
+    job.item.detail = translate("state.queued");
     job.item.progress = 0;
   }
 
@@ -1428,7 +1439,7 @@ async function convertAllWithBatch() {
     for (const job of jobs) {
       if (job.item.status === "pending" || job.item.status === "running") {
         job.item.status = "error";
-        job.item.detail = `批量任务失败:${msg}`;
+        job.item.detail = translate("state.batchFailed", { message: msg });
         job.item.progress = 100;
       }
     }
@@ -1460,10 +1471,10 @@ async function applyAskOverwriteDecisions(jobs: BatchJob[]) {
     }
 
     const confirmed = await confirmDialog(formatAskOverwriteMessage(entry), {
-      title: "确认覆盖",
+      title: translate("state.confirmOverwriteTitle"),
       kind: "warning",
-      okLabel: "覆盖",
-      cancelLabel: "跳过",
+      okLabel: translate("state.overwrite"),
+      cancelLabel: translate("state.skip"),
     });
     if (confirmed) {
       job.options.overwrite = true;
@@ -1489,7 +1500,7 @@ function prepareSingleJob(item: QueueItem): ConvertRequest | null {
   const format = itemTargetFormat(item);
   if (!capabilities.writable.includes(format)) {
     item.status = "error";
-    item.detail = `不支持的目标格式:${formatLabel(format)}`;
+    item.detail = translate("state.unsupportedTarget", { format: formatLabel(format) });
     item.progress = 100;
     return null;
   }
@@ -1539,7 +1550,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "running";
-      job.item.detail = "读取并转换";
+      job.item.detail = translate("state.readingAndConverting");
       job.item.progress = 5;
       return;
     }
@@ -1591,7 +1602,7 @@ function finalizeCancelledJobs(jobs: BatchJob[]) {
   for (const job of jobs) {
     if (job.item.status === "pending" || job.item.status === "running") {
       job.item.status = "pending";
-      job.item.detail = "已取消";
+      job.item.detail = translate("state.cancelled");
       job.item.progress = 0;
     }
   }
@@ -1603,12 +1614,12 @@ function formatResultDetail(res: ConvertResult): string {
 }
 
 function formatSkipDetail(message: string): string {
-  if (message.includes("已存在")) return "已跳过(输出已存在)";
-  return `已跳过:${message}`;
+  if (message.includes("\u5df2\u5b58\u5728")) return translate("state.skippedExisting");
+  return translate("state.skippedMessage", { message });
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {
-  return `输出文件已存在:\n${entry.output ?? entry.input}`;
+  return translate("state.outputExists", { path: entry.output ?? entry.input });
 }
 
 // ---- 引擎检测 ----
@@ -1619,7 +1630,9 @@ export async function checkEngine() {
     capabilities.lossless = [...CORE_CAPABILITIES.lossless];
     capabilities.heic = CORE_CAPABILITIES.heic;
     capabilities.codecProviders = [...CORE_CAPABILITIES.codecProviders];
-    engine.text = `网页预览 · ${capabilities.writable.map(formatLabel).join(" / ")}`;
+    engine.text = translate("state.webPreviewEngine", {
+      formats: capabilities.writable.map(formatLabel).join(" / "),
+    });
     engine.ok = true;
     return;
   }
@@ -1643,21 +1656,26 @@ export async function checkEngine() {
     );
     const heicProviderText =
       heicProvider?.kind === "manifest"
-        ? "插件"
+        ? translate("state.plugin")
         : heicProvider?.kind === "system-helper"
-          ? "系统 helper"
+          ? translate("state.systemHelper")
           : heicProvider?.kind === "system-imageio"
-            ? "系统 ImageIO"
+            ? translate("state.systemImageIO")
             : heicProvider?.kind === "system-wic"
               ? "Windows WIC"
               : heicProvider?.kind === "selected-helper"
-                ? "手动 helper"
-                : "可选 helper";
-    const heicText = capabilities.heic ? ` · HEIC 可选导入(${heicProviderText})` : "";
-    engine.text = `Core 就绪 · ${capabilities.writable.map(formatLabel).join(" / ")}${heicText}`;
+                ? translate("state.manualHelper")
+                : translate("state.optionalHelper");
+    const heicText = capabilities.heic
+      ? ` · ${translate("state.heicOptionalImport", { provider: heicProviderText })}`
+      : "";
+    engine.text = translate("state.coreReady", {
+      formats: capabilities.writable.map(formatLabel).join(" / "),
+      heic: heicText,
+    });
     engine.ok = capabilities.writable.length > 0;
   } catch (e) {
-    engine.text = `Core 能力检测失败:${e}`;
+    engine.text = translate("state.coreFailed", { error: String(e) });
     engine.ok = false;
   }
 }
@@ -1696,7 +1714,7 @@ export async function setSelectedHeicHelperPath(
       configured: false,
       available: false,
       path: null,
-      message: "网页预览环境不配置本机 helper",
+      message: translate("state.webPreviewNoHelper"),
       provider: null,
     };
   }
@@ -1717,7 +1735,7 @@ async function syncSelectedHeicHelper() {
       path: settings.heicHelperPath,
     });
   } catch (error) {
-    console.warn("同步 HEIC helper 白名单失败:", error);
+    console.warn("Failed to sync HEIC helper allowlist:", error);
   }
 }
 
@@ -1753,7 +1771,7 @@ export async function initPersistence() {
     }
     setAppLocale(settings.locale);
   } catch (e) {
-    console.warn("加载设置失败,用默认值:", e);
+    console.warn("Failed to load settings, using defaults:", e);
     const detected = await systemLocale();
     settings.locale = detected;
     setAppLocale(detected);

@@ -29,8 +29,12 @@
   const themeIcon = $derived(
     settings.theme === "dark" ? Moon : settings.theme === "light" ? Sun : Desktop,
   );
-  const themeLabel = $derived(
-    settings.theme === "dark" ? "深色" : settings.theme === "light" ? "浅色" : "跟随系统",
+  const themeLabelKey = $derived(
+    settings.theme === "dark"
+      ? "topbar.themeDark"
+      : settings.theme === "light"
+        ? "topbar.themeLight"
+        : "topbar.themeSystem",
   );
 
   function cycleTheme() {
@@ -74,15 +78,22 @@
     <Button
       variant="ghost"
       size="sm"
-      title="减少界面动画:{settings.reduceMotion ? '开' : '关'}"
+      title={`${$t("topbar.reduceMotion")}:${
+        settings.reduceMotion ? $t("topbar.reduceMotionOn") : $t("topbar.reduceMotionOff")
+      }`}
       class={settings.reduceMotion ? "text-primary" : "text-muted-foreground"}
       aria-pressed={settings.reduceMotion}
       onclick={toggleMotion}
     >
       <Sparkle weight={settings.reduceMotion ? "regular" : "duotone"} />
-      减少动画
+      {$t("topbar.reduceMotion")}
     </Button>
-    <Button variant="ghost" size="icon" title="主题:{themeLabel}" onclick={cycleTheme}>
+    <Button
+      variant="ghost"
+      size="icon"
+      title={`${$t("topbar.theme")}:${$t(themeLabelKey)}`}
+      onclick={cycleTheme}
+    >
       <ThemeIcon weight="duotone" />
     </Button>
     <Button
@@ -93,17 +104,22 @@
       onclick={toggleLocale}
     >
       <Translate weight="duotone" />
-      <span class="text-[10px] font-semibold">{settings.locale === "zh-CN" ? "EN" : "中"}</span>
+      <span class="text-[10px] font-semibold">{settings.locale === "zh-CN" ? "EN" : "ZH"}</span>
     </Button>
-    <Button variant="ghost" size="icon" title="插件诊断" onclick={onOpenPluginDiagnostics}>
+    <Button
+      variant="ghost"
+      size="icon"
+      title={$t("topbar.pluginDiagnostics")}
+      onclick={onOpenPluginDiagnostics}
+    >
       <PuzzlePiece weight="duotone" />
     </Button>
     {#if updaterEnabled}
-      <Button variant="ghost" size="icon" title="应用更新" onclick={onOpenUpdates}>
+      <Button variant="ghost" size="icon" title={$t("topbar.appUpdate")} onclick={onOpenUpdates}>
         <DownloadSimple weight="duotone" />
       </Button>
     {/if}
-    <Button variant="ghost" size="icon" title="开源许可" onclick={onOpenLegal}>
+    <Button variant="ghost" size="icon" title={$t("topbar.licenses")} onclick={onOpenLegal}>
       <Info weight="duotone" />
     </Button>
   </div>

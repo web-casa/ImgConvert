@@ -109,10 +109,11 @@
     "release:windows:msix:pack": "node scripts/pack-windows-msix.mjs",
     "release:windows:msix:smoke": "node scripts/smoke-windows-msix.mjs",
     "release:store-env:check": "node scripts/check-platform-release-guardrails.mjs --platform=all --channel=store --require-store-env",
-    "quality:frontend": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm deadcode && pnpm test && pnpm build",
+    "quality:frontend": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm deadcode && pnpm test && pnpm build && pnpm check:ui-i18n",
     "quality:rust": "pnpm run toolchain:check && cargo fmt --check && cargo clippy -p imgconvert-core -- -D warnings && cargo test -p imgconvert-core && cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check && cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml",
     "quality:security": "pnpm run docs:check && pnpm run architecture:check && pnpm run ci:cost:check && pnpm run license:check && cd src-tauri && cargo deny check bans sources",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "check:ui-i18n": "node scripts/check-ui-hardcoded-strings.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

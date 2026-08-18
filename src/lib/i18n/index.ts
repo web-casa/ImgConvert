@@ -1,6 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { locale as osLocale } from "@tauri-apps/plugin-os";
-import { init, locale as localeStore, register } from "svelte-i18n";
+import { get } from "svelte/store";
+import { init, locale as localeStore, register, t } from "svelte-i18n";
 import { enUS } from "./messages/en-US";
 import { zhCN } from "./messages/zh-CN";
 
@@ -10,6 +11,13 @@ export const locale = localeStore;
 
 register("zh-CN", () => Promise.resolve(zhCN));
 register("en-US", () => Promise.resolve(enUS));
+
+// Initialize synchronously enough for module-level consumers such as state.svelte.ts.
+// main.ts still calls initI18n() before mounting to apply the persisted/system locale.
+void init({
+  fallbackLocale: "en-US",
+  initialLocale: navigatorLocale(),
+});
 
 export function normalizeLocale(value: string | null | undefined): AppLocale {
   return value?.trim().toLowerCase().startsWith("zh") ? "zh-CN" : "en-US";
@@ -26,18 +34,22 @@ export async function systemLocale(): Promise<AppLocale> {
   try {
     return normalizeLocale(await osLocale());
   } catch (error) {
-    console.warn("读取系统语言失败,回退到浏览器语言:", error);
+    console.warn("Failed to read system locale, falling back to browser locale:", error);
     return navigatorLocale();
   }
 }
 
 export async function initI18n(initialLocale?: AppLocale): Promise<void> {
-  await init({
-    fallbackLocale: "en-US",
-    initialLocale: initialLocale ?? (await systemLocale()),
-  });
+  const requested = initialLocale ?? (await systemLocale());
+  if (get(locale) !== requested) {
+    await locale.set(requested);
+  }
 }
 
 export function setAppLocale(nextLocale: AppLocale): void {
   void locale.set(nextLocale);
+}
+
+export function translate(key: string, params?: Record<string, string | number>): string {
+  return get(t)(key, params) as string;
 }

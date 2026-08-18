@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { X } from "phosphor-svelte";
+  import { get } from "svelte/store";
+  import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -24,7 +26,7 @@
         licenseText = text;
       })
       .catch((error: unknown) => {
-        loadError = `无法加载开源许可:${String(error)}`;
+        loadError = get(t)("legal.loadError", { error: String(error) } as any) as string;
       })
       .finally(() => {
         loading = false;
@@ -61,12 +63,12 @@
     >
       <header class="flex items-start gap-3 border-b px-4 py-3">
         <div class="min-w-0 flex-1">
-          <h2 id="legal-title" class="text-sm font-semibold">开源许可</h2>
+          <h2 id="legal-title" class="text-sm font-semibold">{$t("legal.title")}</h2>
           <p class="mt-1 text-xs text-muted-foreground">
-            Apache-2.0 项目声明与第三方依赖许可归属。
+            {$t("legal.description")}
           </p>
         </div>
-        <Button variant="ghost" size="icon" title="关闭" onclick={close}>
+        <Button variant="ghost" size="icon" title={$t("legal.close")} onclick={close}>
           <X />
         </Button>
       </header>
@@ -75,7 +77,7 @@
         {#if loadError}
           <p class="text-sm text-destructive">{loadError}</p>
         {:else if loading && !licenseText}
-          <p class="text-sm text-muted-foreground">正在加载…</p>
+          <p class="text-sm text-muted-foreground">{$t("legal.loading")}</p>
         {:else}
           <pre
             class="whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-muted-foreground">{licenseText}</pre>

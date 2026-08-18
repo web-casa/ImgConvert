@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { onMount } from "svelte";
+  import { t } from "svelte-i18n";
   import { ArrowsClockwise, CheckCircle, Image, WarningCircle, X } from "phosphor-svelte";
   import FormatSelect from "$lib/components/FormatSelect.svelte";
   import {
@@ -30,18 +31,6 @@
   const progress = $derived(itemProgress(item));
   const sourceFormats = $derived(sourceFormat ? [sourceFormat] : []);
   const metadataText = $derived(formatImageMetadata(item.metadata));
-  const statusLabel = $derived(
-    item.status === "running"
-      ? "转换中"
-      : item.status === "done"
-        ? "完成"
-        : item.status === "skipped"
-          ? "跳过"
-          : item.status === "error"
-            ? "错误"
-            : "待转换",
-  );
-
   function updateFormat(value: string) {
     setItemTargetFormat(item.path, value === "__global" ? null : value);
   }
@@ -114,7 +103,7 @@
         class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
         onclick={() => removeItem(item.path)}
         disabled={busy}
-        aria-label="移除"
+        aria-label={$t("queueItem.remove")}
       >
         <X size={16} />
       </button>
@@ -133,13 +122,21 @@
         {:else if item.status === "error"}
           <WarningCircle size={13} weight="fill" />
         {/if}
-        {statusLabel}
+        {item.status === "running"
+          ? $t("queueItem.running")
+          : item.status === "done"
+            ? $t("queueItem.done")
+            : item.status === "skipped"
+              ? $t("queueItem.skipped")
+              : item.status === "error"
+                ? $t("queueItem.error")
+                : $t("queueItem.pending")}
       </span>
 
       <FormatSelect
         value={item.targetFormat ?? "__global"}
         includeGlobal
-        globalLabel={`跟随 ${formatLabel(settings.format)}`}
+        globalLabel={$t("queueItem.followGlobal", { format: formatLabel(settings.format) })}
         triggerClass="w-36"
         triggerSize="sm"
         disabled={busy}
@@ -159,7 +156,7 @@
         </div>
       {:else}
         <div class="text-xs text-muted-foreground">
-          输出为 {formatLabel(targetFormat)}
+          {$t("queueItem.outputsTo", { format: formatLabel(targetFormat) })}
         </div>
       {/if}
     </div>

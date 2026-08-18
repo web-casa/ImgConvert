@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { tick } from "svelte";
+  import { t } from "svelte-i18n";
   import { MagnifyingGlass } from "phosphor-svelte";
   import * as Select from "$lib/components/ui/select";
   import { FORMAT_CATEGORIES, writableFormats } from "$lib/state.svelte";
@@ -11,7 +12,7 @@
     value = $bindable(""),
     includeGlobal = false,
     globalValue = "__global",
-    globalLabel = "跟随全局",
+    globalLabel = $t("formatSelect.followGlobal"),
     disabled = false,
     triggerClass = "w-48",
     triggerSize = "default",
@@ -37,13 +38,17 @@
   const sourceSet = $derived(new Set(sourceFormats));
   const selectedFormat = $derived(formats.find((format) => format.value === value));
   const triggerLabel = $derived(
-    includeGlobal && value === globalValue ? globalLabel : (selectedFormat?.label ?? "选择格式"),
+    includeGlobal && value === globalValue
+      ? globalLabel
+      : selectedFormat
+        ? $t(selectedFormat.labelKey)
+        : $t("formatSelect.selectFormat"),
   );
   const filteredFormats = $derived(
     formats.filter((format) => {
       const query = search.trim().toLowerCase();
       if (!query) return true;
-      return [format.value, format.label, format.description]
+      return [format.value, $t(format.labelKey), $t(format.descriptionKey)]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -99,7 +104,7 @@
         bind:this={searchInput}
         bind:value={search}
         class="h-6 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        placeholder="搜索格式"
+        placeholder={$t("formatSelect.searchFormats")}
         onpointerdown={(event) => event.stopPropagation()}
         onkeydown={handleSearchKeydown}
       />
@@ -110,7 +115,7 @@
         <span class="flex min-w-0 flex-col items-start gap-0.5">
           <span class="font-medium">{globalLabel}</span>
           <span class="text-left text-[11px] leading-4 text-muted-foreground">
-            单文件不覆盖全局设置
+            {$t("formatSelect.singleFileKeepsGlobal")}
           </span>
         </span>
       </Select.Item>
@@ -119,36 +124,40 @@
 
     {#each groupedFormats as group (group.value)}
       <div class="px-1 pb-1 pt-2 text-[11px] font-medium text-muted-foreground">
-        {group.label}
+        {$t(group.labelKey)}
       </div>
       <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
         {#each group.formats as format (format.value)}
           <Select.Item
             value={format.value}
-            label={format.label}
+            label={$t(format.labelKey)}
             class="h-auto items-start py-2 pr-7 pl-2"
           >
             <span class="flex min-w-0 flex-col items-start gap-0.5">
               <span class="flex w-full min-w-0 items-center gap-1.5">
-                <span class="font-medium">{format.label}</span>
+                <span class="font-medium">{$t(format.labelKey)}</span>
                 {#if sourceSet.has(format.value)}
-                  <span class="rounded border px-1 text-[10px] text-muted-foreground"> 源 </span>
+                  <span class="rounded border px-1 text-[10px] text-muted-foreground">
+                    {$t("formatSelect.source")}
+                  </span>
                 {/if}
                 {#if value === format.value}
                   <span class="rounded bg-primary px-1 text-[10px] text-primary-foreground">
-                    已选
+                    {$t("formatSelect.selected")}
                   </span>
                 {/if}
               </span>
               <span class="text-left text-[11px] leading-4 text-muted-foreground">
-                {format.description}
+                {$t(format.descriptionKey)}
               </span>
             </span>
           </Select.Item>
         {/each}
       </div>
     {:else}
-      <div class="px-2 py-6 text-center text-sm text-muted-foreground">无匹配格式</div>
+      <div class="px-2 py-6 text-center text-sm text-muted-foreground">
+        {$t("formatSelect.noMatchingFormats")}
+      </div>
     {/each}
   </Select.Content>
 </Select.Root>

@@ -10,6 +10,8 @@
     WarningCircle,
     X,
   } from "phosphor-svelte";
+  import { get } from "svelte/store";
+  import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import {
     loadCodecDiagnostics,
@@ -59,7 +61,7 @@
     try {
       diagnostics = await loadCodecDiagnostics();
     } catch (error) {
-      loadError = `无法读取插件诊断:${String(error)}`;
+      loadError = get(t)("diagnostics.loadError", { error: String(error) } as any) as string;
     } finally {
       loading = false;
     }
@@ -73,16 +75,18 @@
       const selected = await pickSystemPaths({
         multiple: false,
         directory: false,
-        title: "选择 HEIC helper",
+        title: get(t)("diagnostics.chooseHeicHelper") as string,
       });
       if (!selected[0]) return;
       const diagnostic = await setSelectedHeicHelperPath(selected[0]);
       actionMessage = diagnostic.available
-        ? "手动 helper 已启用"
-        : (diagnostic.message ?? "手动 helper 不可用");
+        ? (get(t)("diagnostics.manualHelperEnabled") as string)
+        : (diagnostic.message ?? (get(t)("diagnostics.manualHelperUnavailable") as string));
       await refresh();
     } catch (error) {
-      actionMessage = `设置手动 helper 失败:${String(error)}`;
+      actionMessage = get(t)("diagnostics.setHelperFailed", {
+        error: String(error),
+      } as any) as string;
     } finally {
       helperBusy = false;
     }
@@ -94,10 +98,12 @@
     actionMessage = "";
     try {
       await setSelectedHeicHelperPath(null);
-      actionMessage = "已清除手动 helper";
+      actionMessage = get(t)("diagnostics.helperCleared") as string;
       await refresh();
     } catch (error) {
-      actionMessage = `清除手动 helper 失败:${String(error)}`;
+      actionMessage = get(t)("diagnostics.clearHelperFailed", {
+        error: String(error),
+      } as any) as string;
     } finally {
       helperBusy = false;
     }
@@ -118,25 +124,25 @@
   function statusText(status: string): string {
     switch (status) {
       case "accepted":
-        return "可用";
+        return "diagnostics.statusAccepted";
       case "ready":
-        return "就绪";
+        return "diagnostics.statusReady";
       case "rejected":
-        return "拒绝";
+        return "diagnostics.statusRejected";
       case "missing":
-        return "缺失";
+        return "diagnostics.statusMissing";
       case "empty":
-        return "空";
+        return "diagnostics.statusEmpty";
       case "untrusted":
-        return "不受信任";
+        return "diagnostics.statusUntrusted";
       case "unreadable":
-        return "不可读";
+        return "diagnostics.statusUnreadable";
       case "notDirectory":
-        return "非目录";
+        return "diagnostics.statusNotDirectory";
       case "unsupported":
-        return "未启用";
+        return "diagnostics.statusUnsupported";
       case "disabled":
-        return "已禁用";
+        return "diagnostics.statusDisabled";
       default:
         return status;
     }
@@ -171,16 +177,21 @@
       <header class="flex items-start gap-3 border-b px-4 py-3">
         <PuzzlePiece size={22} weight="duotone" class="mt-0.5 text-primary" />
         <div class="min-w-0 flex-1">
-          <h2 id="plugin-diagnostics-title" class="text-sm font-semibold">插件诊断</h2>
-          <p class="mt-1 text-xs text-muted-foreground">
-            HEIC 可选导入 provider、manifest 搜索路径与 helper 探测。macOS 使用系统 ImageIO;Windows
-            优先使用 WIC;Linux 可用 heif-convert。
-          </p>
+          <h2 id="plugin-diagnostics-title" class="text-sm font-semibold">
+            {$t("diagnostics.title")}
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">{$t("diagnostics.description")}</p>
         </div>
-        <Button variant="ghost" size="icon" title="刷新" onclick={refresh} disabled={loading}>
+        <Button
+          variant="ghost"
+          size="icon"
+          title={$t("diagnostics.refresh")}
+          onclick={refresh}
+          disabled={loading}
+        >
           <ArrowClockwise class={loading ? "animate-spin" : ""} />
         </Button>
-        <Button variant="ghost" size="icon" title="关闭" onclick={close}>
+        <Button variant="ghost" size="icon" title={$t("diagnostics.close")} onclick={close}>
           <X />
         </Button>
       </header>
@@ -195,7 +206,7 @@
         {:else if loading && !diagnostics}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowClockwise size={16} class="animate-spin" />
-            正在读取插件诊断…
+            {$t("diagnostics.loading")}
           </div>
         {:else if heic}
           <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
@@ -205,14 +216,16 @@
                   <div class="flex items-center gap-2">
                     {#if heic.enabled}
                       <CheckCircle size={18} weight="fill" class="text-emerald-600" />
-                      <h3 class="text-sm font-semibold">HEIC 可选导入已启用</h3>
+                      <h3 class="text-sm font-semibold">{$t("diagnostics.heicEnabled")}</h3>
                     {:else}
                       <WarningCircle size={18} weight="fill" class="text-muted-foreground" />
-                      <h3 class="text-sm font-semibold">HEIC 可选导入未启用</h3>
+                      <h3 class="text-sm font-semibold">{$t("diagnostics.heicDisabled")}</h3>
                     {/if}
                   </div>
                   <p class="mt-1 text-xs text-muted-foreground">
-                    扩展名: {heic.extensions.join(" / ")}
+                    {$t("diagnostics.extensions", {
+                      extensions: heic.extensions.join(" / "),
+                    } as any)}
                   </p>
                   {#if heic.disabledReason}
                     <p class="mt-1 text-xs text-muted-foreground">
@@ -225,7 +238,7 @@
                     ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                     : 'bg-muted text-muted-foreground'}"
                 >
-                  {heic.enabled ? "active" : "inactive"}
+                  {heic.enabled ? $t("diagnostics.active") : $t("diagnostics.inactive")}
                 </span>
               </div>
 
@@ -237,32 +250,32 @@
                   </div>
                   <dl class="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <div class="min-w-0">
-                      <dt class="font-medium text-foreground">类型</dt>
+                      <dt class="font-medium text-foreground">{$t("diagnostics.type")}</dt>
                       <dd>{heic.activeProvider.kind}</dd>
                     </div>
                     <div class="min-w-0">
-                      <dt class="font-medium text-foreground">许可</dt>
+                      <dt class="font-medium text-foreground">{$t("diagnostics.license")}</dt>
                       <dd>
                         {heic.activeProvider.license ??
                           (heic.activeProvider.kind === "system-imageio"
-                            ? "系统 ImageIO"
+                            ? $t("diagnostics.systemImageIO")
                             : heic.activeProvider.kind === "system-wic"
-                              ? "Windows WIC"
-                              : "系统 helper")}
+                              ? $t("diagnostics.windowsWIC")
+                              : $t("diagnostics.systemHelper"))}
                       </dd>
                     </div>
                     <div class="min-w-0 sm:col-span-2">
-                      <dt class="font-medium text-foreground">执行文件</dt>
+                      <dt class="font-medium text-foreground">{$t("diagnostics.executable")}</dt>
                       <dd class="truncate" title={heic.activeProvider.path}>
                         {heic.activeProvider.path}
                       </dd>
                     </div>
                     <div class="min-w-0 sm:col-span-2">
-                      <dt class="font-medium text-foreground">argv</dt>
+                      <dt class="font-medium text-foreground">{$t("diagnostics.argv")}</dt>
                       <dd class="truncate font-mono" title={heic.activeProvider.args.join(" ")}>
                         {heic.activeProvider.args.length > 0
                           ? heic.activeProvider.args.join(" ")
-                          : "无外部进程参数"}
+                          : $t("diagnostics.noExternalArgs")}
                       </dd>
                     </div>
                   </dl>
@@ -271,56 +284,57 @@
                 <p
                   class="mt-3 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground"
                 >
-                  未发现可用 manifest provider 或系统 helper。
+                  {$t("diagnostics.noProvider")}
                 </p>
               {/if}
             </section>
 
             <section class="rounded-lg border bg-card p-3">
-              <h3 class="text-sm font-semibold">探测摘要</h3>
+              <h3 class="text-sm font-semibold">{$t("diagnostics.summaryTitle")}</h3>
               <dl class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                {@render SummaryStat("外部 codec", heic.externalCodecsEnabled ? "启用" : "禁用")}
                 {@render SummaryStat(
-                  "手动 helper",
-                  heic.selectedHelper.available
-                    ? "可用"
-                    : heic.selectedHelper.configured
-                      ? "不可用"
-                      : "未配置",
+                  $t("diagnostics.externalCodecs"),
+                  heic.externalCodecsEnabled
+                    ? $t("diagnostics.enabled")
+                    : $t("diagnostics.disabled"),
                 )}
-                {@render SummaryStat("可用 manifest", acceptedManifests.length)}
-                {@render SummaryStat("拒绝 manifest", rejectedManifests.length)}
-                {@render SummaryStat("系统 codec", availableSystemCodecs.length)}
-                {@render SummaryStat("系统 helper", availableHelpers.length)}
+                {@render SummaryStat(
+                  $t("diagnostics.manualHelper"),
+                  heic.selectedHelper.available
+                    ? $t("diagnostics.available")
+                    : heic.selectedHelper.configured
+                      ? $t("diagnostics.unavailable")
+                      : $t("diagnostics.notConfigured"),
+                )}
+                {@render SummaryStat($t("diagnostics.acceptedManifests"), acceptedManifests.length)}
+                {@render SummaryStat($t("diagnostics.rejectedManifests"), rejectedManifests.length)}
+                {@render SummaryStat($t("diagnostics.systemCodecs"), availableSystemCodecs.length)}
+                {@render SummaryStat($t("diagnostics.systemHelpers"), availableHelpers.length)}
               </dl>
             </section>
           </div>
 
           <section class="mt-3 rounded-lg border bg-card p-3">
-            <h3 class="text-sm font-semibold">许可与渠道边界</h3>
+            <h3 class="text-sm font-semibold">{$t("diagnostics.licenseBoundaryTitle")}</h3>
             <p class="mt-2 text-xs leading-5 text-muted-foreground">
-              主程序不内置 HEIC codec,不链接 libheif,不分发 x265。HEIC 仅通过用户环境中的可选
-              decode-only helper/provider 导入;插件许可、源码/NOTICE
-              与专利风险需由插件分发方单独处理。商店或 Flatpak 构建可通过禁用外部 codec
-              自动发现保持主包边界。Windows 优先探测系统 WIC HEIF/HEVC
-              扩展;缺失时可按诊断提示安装系统扩展, 或使用单独 helper,不把 HEIC codec 打进主程序。
+              {$t("diagnostics.licenseBoundaryBody")}
             </p>
           </section>
 
           <section class="mt-3 rounded-lg border bg-card p-3">
-            <h3 class="text-sm font-semibold">系统 Codec</h3>
+            <h3 class="text-sm font-semibold">{$t("diagnostics.systemCodecsTitle")}</h3>
             <div class="mt-2 grid gap-2 md:grid-cols-2">
               {#each heic.systemCodecs as codec (codec.id)}
                 {@render SystemCodecRow(codec)}
               {:else}
-                <p class="text-sm text-muted-foreground">当前平台没有系统 codec 探测项。</p>
+                <p class="text-sm text-muted-foreground">{$t("diagnostics.noSystemCodecs")}</p>
               {/each}
             </div>
           </section>
 
           <section class="mt-3 rounded-lg border bg-card p-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold">手动 Helper</h3>
+              <h3 class="text-sm font-semibold">{$t("diagnostics.manualHelperTitle")}</h3>
               <div class="flex items-center gap-1">
                 <Button
                   variant="outline"
@@ -329,7 +343,7 @@
                   disabled={helperBusy || !heic.externalCodecsEnabled}
                 >
                   <FolderOpen />
-                  选择
+                  {$t("diagnostics.choose")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -338,7 +352,7 @@
                   disabled={helperBusy || !heic.selectedHelper.configured}
                 >
                   <Trash />
-                  清除
+                  {$t("diagnostics.clear")}
                 </Button>
               </div>
             </div>
@@ -349,14 +363,16 @@
               <div class="mt-3 rounded-md border bg-background p-3">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-xs font-medium">
-                    {heic.selectedHelper.available ? "可用" : "不可用"}
+                    {heic.selectedHelper.available
+                      ? $t("diagnostics.available")
+                      : $t("diagnostics.unavailable")}
                   </span>
                   <span
                     class="rounded border px-1.5 py-0.5 text-[11px] {heic.selectedHelper.available
                       ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                       : 'bg-muted text-muted-foreground'}"
                   >
-                    selected
+                    {$t("diagnostics.selected")}
                   </span>
                 </div>
                 <p
@@ -375,29 +391,31 @@
               <p
                 class="mt-3 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground"
               >
-                未配置手动 helper。
+                {$t("diagnostics.notConfiguredHelper")}
               </p>
             {/if}
           </section>
 
           <section class="mt-3 rounded-lg border bg-card p-3">
-            <h3 class="text-sm font-semibold">系统 Helper</h3>
+            <h3 class="text-sm font-semibold">{$t("diagnostics.systemHelpersTitle")}</h3>
             <div class="mt-2 grid gap-2 md:grid-cols-2">
               {#each heic.systemHelpers as helper (helper.command)}
                 {@render HelperRow(helper)}
               {:else}
-                <p class="text-sm text-muted-foreground">网页预览环境不探测本机 helper。</p>
+                <p class="text-sm text-muted-foreground">{$t("diagnostics.webPreviewNoHelpers")}</p>
               {/each}
             </div>
           </section>
 
           <section class="mt-3 rounded-lg border bg-card p-3">
-            <h3 class="text-sm font-semibold">Manifest 搜索</h3>
+            <h3 class="text-sm font-semibold">{$t("diagnostics.manifestSearchTitle")}</h3>
             <div class="mt-2 space-y-2">
               {#each heic.manifestDirs as dir (`${dir.source}:${dir.path}`)}
                 {@render ManifestDir(dir)}
               {:else}
-                <p class="text-sm text-muted-foreground">网页预览环境不探测 manifest。</p>
+                <p class="text-sm text-muted-foreground">
+                  {$t("diagnostics.webPreviewNoManifests")}
+                </p>
               {/each}
             </div>
           </section>
@@ -423,7 +441,7 @@
           ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
           : 'bg-muted text-muted-foreground'}"
       >
-        {codec.available ? "available" : "missing"}
+        {codec.available ? $t("diagnostics.found") : $t("diagnostics.missing")}
       </span>
     </div>
     <p class="mt-2 text-xs text-muted-foreground">{codec.message}</p>
@@ -445,7 +463,7 @@
           ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
           : 'bg-muted text-muted-foreground'}"
       >
-        {helper.available ? "found" : "missing"}
+        {helper.available ? $t("diagnostics.found") : $t("diagnostics.missing")}
       </span>
     </div>
     <p
@@ -466,7 +484,7 @@
             {dir.source}
           </span>
           <span class="rounded border px-1.5 py-0.5 text-[11px] {statusTone(dir.status)}">
-            {statusText(dir.status)}
+            {$t(statusText(dir.status))}
           </span>
         </div>
         <p class="mt-2 truncate font-mono text-xs text-muted-foreground" title={dir.path}>
@@ -495,12 +513,12 @@
         {manifest.path}
       </p>
       <span class="shrink-0 rounded border px-1.5 py-0.5 text-[11px] {statusTone(manifest.status)}">
-        {statusText(manifest.status)}
+        {$t(statusText(manifest.status))}
       </span>
     </div>
     {#if manifest.provider}
       <p class="mt-1 text-xs text-muted-foreground">
-        {manifest.provider.id} · {manifest.provider.license ?? "无许可声明"}
+        {manifest.provider.id} · {manifest.provider.license ?? $t("diagnostics.noLicense")}
       </p>
     {/if}
     {#if manifest.message}

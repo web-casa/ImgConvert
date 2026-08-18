@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { FolderOpen, ArrowsClockwise, WarningCircle } from "phosphor-svelte";
+  import { get } from "svelte/store";
+  import { t } from "svelte-i18n";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
@@ -32,36 +34,36 @@
 
   const switchHelp = {
     lossless: {
-      label: "无损压缩",
-      description: "优先保持像素不损失；仅在目标格式支持时可用，文件体积不一定最小。",
+      labelKey: "settings.lossless.label",
+      descriptionKey: "settings.lossless.description",
     },
     skipIfLarger: {
-      label: "跳过变大输出",
-      description: "候选输出不小于源文件时不写入，避免转换后文件反而变大。",
+      labelKey: "settings.skipLarger.label",
+      descriptionKey: "settings.skipLarger.description",
     },
     multiCandidate: {
-      label: "多候选取最小",
-      description: "尝试多个等价编码候选，并写入体积最小的结果，耗时会略有增加。",
+      labelKey: "settings.multiCandidate.label",
+      descriptionKey: "settings.multiCandidate.description",
     },
     autoQuality: {
-      label: "自动质量",
-      description: "JPEG/WebP 会搜索达到目标评分的最低质量，尽量减少体积。",
+      labelKey: "settings.autoQuality.label",
+      descriptionKey: "settings.autoQuality.description",
     },
     generationLossProtection: {
-      label: "代际防护",
-      description: "有损源再次输出有损格式时要求足够体积收益，减少反复压缩造成的劣化。",
+      labelKey: "settings.generationProtection.label",
+      descriptionKey: "settings.generationProtection.description",
     },
     resultCache: {
-      label: "结果缓存",
-      description: "源文件与设置未变时复用已有输出，适合重复处理同一批文件。",
+      labelKey: "settings.resultCache.label",
+      descriptionKey: "settings.resultCache.description",
     },
     preserveMetadata: {
-      label: "保留元数据",
-      description: "尽量保留 ICC 色彩配置和 EXIF 元数据；部分格式或字段可能无法写回。",
+      labelKey: "settings.preserveMetadata.label",
+      descriptionKey: "settings.preserveMetadata.description",
     },
     convertToSrgb: {
-      label: "转为 sRGB",
-      description: "使用嵌入 ICC 转换像素到 sRGB，并移除旧 ICC，适合统一网页和通用查看器显示。",
+      labelKey: "settings.convertToSrgb.label",
+      descriptionKey: "settings.convertToSrgb.description",
     },
   } as const;
 
@@ -81,11 +83,15 @@
   const autoQualitySupported = $derived(
     ["jpeg", "webp"].includes(settings.format) && qualityEnabled,
   );
-  const qualityTitle = $derived(settings.autoQuality && autoQualitySupported ? "质量上限" : "质量");
+  const qualityTitleKey = $derived(
+    settings.autoQuality && autoQualitySupported
+      ? "settings.qualityUpperBound"
+      : "settings.quality",
+  );
   const hasQualityFloor = $derived(["jpeg", "webp", "avif"].includes(settings.format));
   const activeQualityFloor = $derived(qualityFloorFor(settings.format));
   const activeQualityFloorLabel = $derived(
-    activeQualityFloor >= 30 ? `${activeQualityFloor}` : "关闭",
+    activeQualityFloor >= 30 ? `${activeQualityFloor}` : "settings.qualityFloorOff",
   );
   const effectiveQuality = $derived(effectiveQualityFor(settings.format));
   const qualityLabel = $derived(
@@ -93,10 +99,16 @@
       ? `${settings.quality} -> ${effectiveQuality}`
       : `${settings.quality}`,
   );
-  const concurrencyLabel = $derived(settings.concurrency > 0 ? `${settings.concurrency}` : "自动");
+  const concurrencyLabel = $derived(
+    settings.concurrency > 0 ? `${settings.concurrency}` : "settings.concurrencyAuto",
+  );
   const autoQualityScoreLabel = $derived(`${settings.autoQualityScore}`);
-  const overwriteLabel = $derived(
-    settings.overwrite === "overwrite" ? "覆盖" : settings.overwrite === "ask" ? "询问" : "跳过",
+  const overwriteLabelKey = $derived(
+    settings.overwrite === "overwrite"
+      ? "settings.overwrite"
+      : settings.overwrite === "ask"
+        ? "settings.overwriteAsk"
+        : "settings.overwriteSkip",
   );
   const avifSubsampleLabel = $derived(settings.avifSubsample === "yuv420" ? "4:2:0" : "4:4:4");
 
@@ -112,7 +124,7 @@
     if (busy) return;
 
     if (!isTauriRuntime()) {
-      outputMessage = "网页预览不支持选择本机输出目录";
+      outputMessage = get(t)("settings.webOutputDirUnsupported") as string;
       return;
     }
 
@@ -120,7 +132,7 @@
       const paths = await pickSystemPaths({
         directory: true,
         multiple: false,
-        title: "选择输出目录",
+        title: get(t)("settings.chooseOutputDir") as string,
       });
       if (busy || !paths[0]) return;
       settings.outDir = paths[0];
@@ -283,7 +295,7 @@
         "size-7 rounded-md text-muted-foreground hover:text-foreground",
         activeSwitchHelp === key && "bg-background text-foreground",
       )}
-      aria-label={`说明：${label}`}
+      aria-label={$t("settings.descriptionAria", { label } as any)}
       aria-pressed={activeSwitchHelp === key}
       onclick={() => toggleSwitchHelp(key)}
     >
@@ -291,7 +303,7 @@
     </Button>
     <div class="col-span-2 flex items-center justify-between gap-3">
       <span class="text-[11px] leading-none text-muted-foreground">
-        {checked ? "已开启" : "未开启"}
+        {checked ? $t("settings.enabled") : $t("settings.disabled")}
       </span>
       <Switch size="sm" aria-label={label} {checked} {disabled} onCheckedChange={onChange} />
     </div>
@@ -308,9 +320,9 @@
     {#if isPanel}
       <div class="flex items-center justify-between gap-3 border-b pb-3">
         <div class="min-w-0">
-          <h2 class="text-sm font-semibold">转换设置</h2>
+          <h2 class="text-sm font-semibold">{$t("settings.title")}</h2>
           <p class="mt-1 truncate text-xs text-muted-foreground">
-            {settings.format.toUpperCase()} · {qualityTitle}
+            {settings.format.toUpperCase()} · {$t(qualityTitleKey)}
             {qualityLabel}
           </p>
         </div>
@@ -322,13 +334,13 @@
           class="shrink-0"
         >
           <ArrowsClockwise weight="duotone" />
-          跟随全局
+          {$t("settings.followGlobal")}
         </Button>
       </div>
     {/if}
 
     <div class="flex flex-col gap-1.5">
-      <Label class="text-xs text-muted-foreground">目标格式</Label>
+      <Label class="text-xs text-muted-foreground">{$t("settings.targetFormat")}</Label>
       <FormatSelect
         bind:value={settings.format}
         {sourceFormats}
@@ -340,7 +352,7 @@
 
     <div class={cn("flex min-w-0 flex-col gap-2", !qualityEnabled || busy ? "opacity-40" : "")}>
       <div class="flex items-center justify-between gap-3">
-        <Label class="text-xs text-muted-foreground">{qualityTitle}</Label>
+        <Label class="text-xs text-muted-foreground">{$t(qualityTitleKey)}</Label>
         <b class="tabular-nums text-sm text-foreground">{qualityLabel}</b>
       </div>
       <div class="flex h-8 items-center">
@@ -358,8 +370,10 @@
 
     <div class={cn("flex min-w-0 flex-col gap-2", busy ? "opacity-40" : "")}>
       <div class="flex items-center justify-between gap-3">
-        <Label class="text-xs text-muted-foreground">并发</Label>
-        <b class="tabular-nums text-sm text-foreground">{concurrencyLabel}</b>
+        <Label class="text-xs text-muted-foreground">{$t("settings.concurrency")}</Label>
+        <b class="tabular-nums text-sm text-foreground">
+          {settings.concurrency > 0 ? settings.concurrency : $t("settings.concurrencyAuto")}
+        </b>
       </div>
       <div class="flex h-8 items-center">
         <Slider
@@ -375,24 +389,30 @@
     </div>
 
     <div class="flex min-w-0 flex-col gap-1.5">
-      <Label class="text-xs text-muted-foreground">已存在文件</Label>
+      <Label class="text-xs text-muted-foreground">{$t("settings.existingFiles")}</Label>
       <Select.Root
         type="single"
         bind:value={settings.overwrite}
         disabled={busy}
         onValueChange={setOverwrite}
       >
-        <Select.Trigger class="w-full" disabled={busy}>{overwriteLabel}</Select.Trigger>
+        <Select.Trigger class="w-full" disabled={busy}>{$t(overwriteLabelKey)}</Select.Trigger>
         <Select.Content>
-          <Select.Item value="ask" label="询问">询问</Select.Item>
-          <Select.Item value="skip" label="跳过">跳过</Select.Item>
-          <Select.Item value="overwrite" label="覆盖">覆盖</Select.Item>
+          <Select.Item value="ask" label={$t("settings.overwriteAsk")}>
+            {$t("settings.overwriteAsk")}
+          </Select.Item>
+          <Select.Item value="skip" label={$t("settings.overwriteSkip")}>
+            {$t("settings.overwriteSkip")}
+          </Select.Item>
+          <Select.Item value="overwrite" label={$t("settings.overwrite")}>
+            {$t("settings.overwrite")}
+          </Select.Item>
         </Select.Content>
       </Select.Root>
     </div>
 
     <div class="flex min-w-0 flex-col gap-1.5">
-      <Label class="text-xs text-muted-foreground">文件名模板</Label>
+      <Label class="text-xs text-muted-foreground">{$t("settings.fileNameTemplate")}</Label>
       <input
         value={settings.fileNameTemplate}
         class="h-8 rounded-md border bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -407,15 +427,17 @@
         <div
           class="mb-2 rounded-md border border-primary/15 bg-muted/55 px-3 py-2 text-xs leading-5 text-muted-foreground"
         >
-          <span class="font-medium text-foreground">{activeSwitchHelpContent.label}</span>
-          <span>：{activeSwitchHelpContent.description}</span>
+          <span class="font-medium text-foreground">
+            {$t(activeSwitchHelpContent.labelKey)}
+          </span>
+          <span>：{$t(activeSwitchHelpContent.descriptionKey)}</span>
         </div>
       {/if}
 
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {@render settingSwitch(
           "lossless",
-          "无损压缩",
+          $t("settings.lossless.label"),
           settings.lossless,
           !canLossless || busy,
           updateSetting((checked) => {
@@ -425,7 +447,7 @@
         )}
         {@render settingSwitch(
           "skipIfLarger",
-          "跳过变大输出",
+          $t("settings.skipLarger.label"),
           settings.skipIfLarger,
           busy,
           updateSetting((checked) => {
@@ -435,7 +457,7 @@
         )}
         {@render settingSwitch(
           "multiCandidate",
-          "多候选取最小",
+          $t("settings.multiCandidate.label"),
           settings.multiCandidate,
           busy,
           updateSetting((checked) => {
@@ -445,7 +467,7 @@
         )}
         {@render settingSwitch(
           "autoQuality",
-          "自动质量",
+          $t("settings.autoQuality.label"),
           settings.autoQuality && autoQualitySupported,
           !autoQualitySupported || busy,
           updateSetting((checked) => {
@@ -455,7 +477,7 @@
         )}
         {@render settingSwitch(
           "generationLossProtection",
-          "代际防护",
+          $t("settings.generationProtection.label"),
           settings.generationLossProtection,
           busy,
           updateSetting((checked) => {
@@ -465,7 +487,7 @@
         )}
         {@render settingSwitch(
           "resultCache",
-          "结果缓存",
+          $t("settings.resultCache.label"),
           settings.resultCache,
           busy,
           updateSetting((checked) => {
@@ -475,7 +497,7 @@
         )}
         {@render settingSwitch(
           "preserveMetadata",
-          "保留元数据",
+          $t("settings.preserveMetadata.label"),
           settings.preserveMetadata,
           busy,
           updateSetting((checked) => {
@@ -485,7 +507,7 @@
         )}
         {@render settingSwitch(
           "convertToSrgb",
-          "转为 sRGB",
+          $t("settings.convertToSrgb.label"),
           settings.colorManagementPolicy === "convertToSrgb",
           busy || !capabilities.colorPipeline.iccTransform,
           updateSetting((checked) => {
@@ -505,7 +527,7 @@
           disabled={busy || !queue.length}
         >
           <ArrowsClockwise weight="duotone" />
-          跟随全局格式
+          {$t("settings.followGlobalFormat")}
         </Button>
       </div>
     {/if}
@@ -513,15 +535,15 @@
     <div class="flex min-w-0 items-center gap-2">
       <Button variant="ghost" size="sm" onclick={pickOut} disabled={busy}>
         <FolderOpen weight="duotone" />
-        输出目录
+        {$t("settings.outputDirectory")}
       </Button>
       <button
         class="max-w-[220px] truncate text-left text-xs text-muted-foreground hover:text-foreground"
-        title={settings.outDir ?? "与原文件相同目录(点击清除自定义目录)"}
+        title={settings.outDir ?? $t("settings.sameAsSourceClear")}
         onclick={clearOut}
         disabled={busy}
       >
-        {settings.outDir ?? "与原文件相同目录"}
+        {settings.outDir ?? $t("settings.sameAsSource")}
       </button>
       {#if outputMessage}
         <span class="text-xs text-muted-foreground">{outputMessage}</span>
@@ -530,7 +552,7 @@
 
     <div class={cn("flex min-w-0 flex-col gap-2 border-t pt-3", isPanel ? "" : "lg:col-span-5")}>
       <div class="flex items-center justify-between gap-3">
-        <Label class="text-xs text-muted-foreground">格式参数</Label>
+        <Label class="text-xs text-muted-foreground">{$t("settings.formatParameters")}</Label>
         {#if settings.format === "jpeg"}
           <span class="text-xs text-muted-foreground">
             {settings.jpegProgressive ? "Progressive" : "Baseline"}
@@ -581,12 +603,12 @@
             disabled={busy}
             onCheckedChange={persistSettings}
           />
-          <Label class="text-sm">实验性限色</Label>
+          <Label class="text-sm">{$t("settings.experimentalQuantize")}</Label>
         </div>
         {#if settings.pngLossyQuantize}
           <div class="grid gap-2 pt-1 md:grid-cols-[120px_minmax(0,1fr)]" class:opacity-40={busy}>
             <div class="flex items-center justify-between gap-3 md:block">
-              <Label class="text-sm text-muted-foreground">颜色数</Label>
+              <Label class="text-sm text-muted-foreground">{$t("settings.colorCount")}</Label>
               <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
                 {settings.pngQuantColors}
               </span>
@@ -620,7 +642,9 @@
           <div class="flex items-center justify-between gap-3 md:block">
             <Label class="text-sm text-muted-foreground">near-lossless</Label>
             <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
-              {settings.webpNearLossless === 100 ? "关闭" : settings.webpNearLossless}
+              {settings.webpNearLossless === 100
+                ? $t("settings.nearLosslessOff")
+                : settings.webpNearLossless}
             </span>
           </div>
           <div class="flex h-8 min-w-0 items-center">
@@ -674,7 +698,7 @@
       {#if autoQualitySupported && settings.autoQuality}
         <div class="grid gap-2 pt-1 md:grid-cols-[120px_minmax(0,1fr)]" class:opacity-40={busy}>
           <div class="flex items-center justify-between gap-3 md:block">
-            <Label class="text-sm text-muted-foreground">目标分</Label>
+            <Label class="text-sm text-muted-foreground">{$t("settings.targetScore")}</Label>
             <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
               {autoQualityScoreLabel}
             </span>
@@ -699,9 +723,12 @@
           class:opacity-40={!qualityEnabled || busy}
         >
           <div class="flex items-center justify-between gap-3 md:block">
-            <Label class="text-sm text-muted-foreground">最低质量</Label>
+            <Label class="text-sm text-muted-foreground">{$t("settings.minimumQuality")}</Label>
             <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
-              {activeQualityFloorLabel}
+              {typeof activeQualityFloorLabel === "string" &&
+              activeQualityFloorLabel.startsWith("settings.")
+                ? $t(activeQualityFloorLabel)
+                : activeQualityFloorLabel}
             </span>
           </div>
           <div class="flex h-8 min-w-0 items-center">

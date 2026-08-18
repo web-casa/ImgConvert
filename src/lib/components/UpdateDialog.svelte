@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { ArrowClockwise, CheckCircle, DownloadSimple, WarningCircle, X } from "phosphor-svelte";
+  import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import {
     appUpdate,
@@ -57,12 +58,12 @@
       <header class="flex items-start gap-3 border-b px-4 py-3">
         <DownloadSimple size={22} weight="duotone" class="mt-0.5 text-primary" />
         <div class="min-w-0 flex-1">
-          <h2 id="update-title" class="text-sm font-semibold">应用更新</h2>
+          <h2 id="update-title" class="text-sm font-semibold">{$t("topbar.appUpdate")}</h2>
           <p class="mt-1 text-xs text-muted-foreground">
-            {isTauriRuntime() ? "检查直发包更新。" : "网页预览环境不连接更新通道。"}
+            {isTauriRuntime() ? $t("update.directBuildSubtitle") : $t("update.webPreview")}
           </p>
         </div>
-        <Button variant="ghost" size="icon" title="关闭" onclick={close}>
+        <Button variant="ghost" size="icon" title={$t("legal.close")} onclick={close}>
           <X />
         </Button>
       </header>
@@ -81,7 +82,7 @@
               <DownloadSimple size={18} weight="duotone" class="mt-0.5 text-primary" />
               <div class="min-w-0">
                 <p class="text-sm font-medium">
-                  {appUpdate.currentVersion ?? "当前版本"} → {appUpdate.version}
+                  {appUpdate.currentVersion ?? $t("update.currentVersion")} → {appUpdate.version}
                 </p>
                 {#if appUpdate.date}
                   <p class="mt-1 text-xs text-muted-foreground">{appUpdate.date}</p>
@@ -99,11 +100,11 @@
             class="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300"
           >
             <CheckCircle size={17} weight="fill" class="mt-0.5 shrink-0" />
-            <span>{appUpdate.message || "当前已经是最新版本"}</span>
+            <span>{appUpdate.message || $t("update.latest")}</span>
           </div>
         {:else}
           <p class="rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
-            尚未检查更新。
+            {$t("update.checking")}
           </p>
         {/if}
 
@@ -126,7 +127,7 @@
       <footer class="flex items-center justify-end gap-2 border-t px-4 py-3">
         <Button variant="ghost" size="sm" onclick={checkForAppUpdate} disabled={busy}>
           <ArrowClockwise class={appUpdate.checking ? "animate-spin" : ""} />
-          检查更新
+          {$t("update.check")}
         </Button>
         <Button
           variant="default"
@@ -135,7 +136,7 @@
           disabled={!appUpdate.available || busy}
         >
           <DownloadSimple />
-          安装并重启
+          {$t("update.installAndRestart")}
         </Button>
       </footer>
     </div>
