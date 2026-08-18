@@ -66,6 +66,9 @@ ignore = [
   "RUSTSEC-2025-0100",
   "RUSTSEC-2026-0194",
   "RUSTSEC-2026-0195",
+  # bincode 1.x 由 tauri-plugin-persisted-scope 引入,上游已停止开发且无安全升级;
+  # 该依赖只服务持久化 scope 配置,不在用户图片解码路径上。
+  "RUSTSEC-2025-0141",
 ]
 yanked = "deny"
 

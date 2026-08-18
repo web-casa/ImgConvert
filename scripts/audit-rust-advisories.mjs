@@ -15,6 +15,7 @@ const tauriDir = path.join(repoRoot, "src-tauri");
 //   the user image decoding path in ImgConvert.
 // - rav1e/libavif and Tauri build-time macro chains currently carry a few
 //   unmaintained-only advisories with no direct replacement in our dependency graph.
+// - bincode 1.x is pinned by tauri-plugin-persisted-scope and has no safe upgrade.
 const ignoredAdvisories = [
   "RUSTSEC-2024-0370",
   "RUSTSEC-2024-0411",
@@ -35,6 +36,7 @@ const ignoredAdvisories = [
   "RUSTSEC-2025-0100",
   "RUSTSEC-2026-0194",
   "RUSTSEC-2026-0195",
+  "RUSTSEC-2025-0141",
 ];
 
 const args = ["audit", ...ignoredAdvisories.flatMap((id) => ["--ignore", id])];
