@@ -552,8 +552,16 @@ function checkTauriUpdaterGuardrails() {
   if (!capabilities.includes('"process:allow-restart"')) {
     failures.push("Tauri capabilities must expose process:allow-restart only");
   }
-  if (JSON.stringify(tauriConfig).includes('"updater"')) {
-    failures.push("default tauri.conf.json must not hardcode updater pubkey/endpoints");
+  const defaultUpdater = tauriConfig.plugins?.updater;
+  if (
+    !defaultUpdater ||
+    defaultUpdater.pubkey !== "" ||
+    !Array.isArray(defaultUpdater.endpoints) ||
+    defaultUpdater.endpoints.length !== 0
+  ) {
+    failures.push(
+      "default tauri.conf.json must keep updater config inert (empty pubkey/endpoints)",
+    );
   }
   for (const expected of [
     "TAURI_UPDATER_PUBKEY",

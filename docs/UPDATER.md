@@ -9,8 +9,10 @@ GitHub Releases:
 https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json
 ```
 
-The default `src-tauri/tauri.conf.json` intentionally does not contain updater
-keys or endpoints. Release builds opt in by generating an extra Tauri config.
+The default `src-tauri/tauri.conf.json` keeps an inert `plugins.updater` object
+with empty pubkey/endpoints so the updater plugin can initialize in normal
+packages. Signed updater release builds opt in by generating an extra Tauri
+config that overlays the real pubkey and endpoints.
 
 For the first public release batch, GitHub Releases is the only distribution
 channel: Linux `.deb`, `.rpm`, AppImage, AppImage signature, checksums, and
