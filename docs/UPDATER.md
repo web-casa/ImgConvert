@@ -57,7 +57,7 @@ https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json
 The default artifact base URL is:
 
 ```text
-https://github.com/web-casa/ImgConvert/releases/download/v0.1.1
+https://github.com/web-casa/ImgConvert/releases/download/v0.1.2
 ```
 
 Override these when preparing a non-default repository or tag:
@@ -70,7 +70,7 @@ export TAURI_UPDATER_ENDPOINTS='["https://github.com/web-casa/ImgConvert/release
 
 pnpm run release:linux:updater
 
-export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/web-casa/ImgConvert/releases/download/v0.1.1"
+export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/web-casa/ImgConvert/releases/download/v0.1.2"
 pnpm run release:updater:manifest
 pnpm run release:updater:verify
 ```
@@ -101,7 +101,7 @@ release scope.
 After the release is published, verify the public updater surface:
 
 ```bash
-pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.1 --platform=linux-x86_64
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.2 --platform=linux-x86_64
 ```
 
 On a different CPU architecture, add `--no-run` to validate `latest.json`,
@@ -139,7 +139,7 @@ changing the old binary.
 
 Run the manual workflow `Updater Release` with:
 
-- `tag`: the release tag, for example `v0.1.1`
+- `tag`: the release tag, for example `v0.1.2`
 - `publish_release=false`: build and upload workflow artifacts only
 - `publish_release=true`: upload `latest.json`, AppImage, signature, and
   checksums to the GitHub Release

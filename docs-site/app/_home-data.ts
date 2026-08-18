@@ -112,6 +112,6 @@ export const stats = [
   { value: "∞", label: "本机转换次数 · 不上传任何图" },
 ] as const;
 
-export const downloadHref = "https://github.com/web-casa/ImgConvert/releases/tag/v0.1.1";
+export const downloadHref = "https://github.com/web-casa/ImgConvert/releases/tag/v0.1.2";
 export const repoHref = "https://github.com/web-casa/ImgConvert";
-export const version = "v0.1.1";
+export const version = "v0.1.2";

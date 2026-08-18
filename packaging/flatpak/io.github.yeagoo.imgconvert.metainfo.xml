@@ -24,12 +24,12 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.1.1/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.1.2/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.1.1" date="2026-07-06">
+    <release version="0.1.2" date="2026-08-18">
       <description>
         <p>Initial Linux release candidate with JPEG, PNG, WebP, AVIF, and optional external HEIC import boundaries.</p>
       </description>

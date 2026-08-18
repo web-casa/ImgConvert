@@ -10,14 +10,14 @@ description: 常见安装、运行、HEIC、权限和 updater 问题。
 先确认文件有执行权限：
 
 ```bash
-chmod +x ./ImgConvert_0.1.1_amd64.AppImage
-./ImgConvert_0.1.1_amd64.AppImage
+chmod +x ./ImgConvert_0.1.2_amd64.AppImage
+./ImgConvert_0.1.2_amd64.AppImage
 ```
 
 如果报 FUSE 或挂载相关错误，用提取运行模式验证：
 
 ```bash
-APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.2_amd64.AppImage
 ```
 
 如果报缺少 WebKitGTK、GTK、libayatana-appindicator 或其他动态库，需要安装发行版对应运行时包。Debian/Ubuntu 的 `.deb` 包会比 AppImage 更容易通过包管理器解析系统依赖。
@@ -27,7 +27,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
 请先确认使用的是最新 GitHub Release。若仍复现，从终端启动应用并保留输出：
 
 ```bash
-RUST_BACKTRACE=1 ./ImgConvert_0.1.1_amd64.AppImage
+RUST_BACKTRACE=1 ./ImgConvert_0.1.2_amd64.AppImage
 ```
 
 报告问题时请附上发行版版本、桌面环境、Wayland/X11、启动日志，以及触发步骤。
@@ -62,7 +62,7 @@ macOS 后续走系统 ImageIO，Windows 后续走 WIC 探测。系统缺少 HEIF
 维护者可以用远端 smoke 检查 manifest：
 
 ```bash
-pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.2 --platform=linux-x86_64 --no-run
 ```
 
 ## 图片转换失败

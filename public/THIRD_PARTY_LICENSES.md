@@ -7880,7 +7880,7 @@ limitations under the License.
 Used by:
 
 - imgconvert-core 0.1.0 — https://crates.io/crates/imgconvert-core
-- imgconvert 0.1.1 — https://crates.io/crates/imgconvert
+- imgconvert 0.1.2 — https://crates.io/crates/imgconvert
 - anyhow 1.0.103 — https://github.com/dtolnay/anyhow
 - async-trait 0.1.89 — https://github.com/dtolnay/async-trait
 - blake3 1.8.5 — https://github.com/BLAKE3-team/BLAKE3

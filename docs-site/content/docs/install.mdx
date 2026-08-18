@@ -9,16 +9,16 @@ ImgConvert 第一期只通过 GitHub Releases 分发。当前建议优先使用 
 
 当前版本：
 
-[v0.1.1 GitHub Release](https://github.com/web-casa/ImgConvert/releases/tag/v0.1.1)
+[v0.1.2 GitHub Release](https://github.com/web-casa/ImgConvert/releases/tag/v0.1.2)
 
 资产说明：
 
 | 文件 | 用途 |
 | --- | --- |
-| `ImgConvert_0.1.1_amd64.AppImage` | x86_64 Linux 桌面直运行包 |
-| `ImgConvert_0.1.1_aarch64.AppImage` | arm64/aarch64 Linux 桌面直运行包 |
-| `ImgConvert_0.1.1_arm64.deb` | Debian/Ubuntu arm64 系统包 |
-| `ImgConvert-0.1.1-1.aarch64.rpm` | Fedora/RHEL/openSUSE aarch64 系统包 |
+| `ImgConvert_0.1.2_amd64.AppImage` | x86_64 Linux 桌面直运行包 |
+| `ImgConvert_0.1.2_aarch64.AppImage` | arm64/aarch64 Linux 桌面直运行包 |
+| `ImgConvert_0.1.2_arm64.deb` | Debian/Ubuntu arm64 系统包 |
+| `ImgConvert-0.1.2-1.aarch64.rpm` | Fedora/RHEL/openSUSE aarch64 系统包 |
 | `SHA256SUMS` | 人工下载后的 checksum 校验 |
 | `latest.json` | Tauri updater 使用的更新 manifest |
 | `*.AppImage.sig` | Tauri updater 签名，不是人工 GPG 签名 |
@@ -36,21 +36,21 @@ sha256sum -c SHA256SUMS
 ## AppImage
 
 ```bash
-chmod +x ./ImgConvert_0.1.1_amd64.AppImage
-./ImgConvert_0.1.1_amd64.AppImage
+chmod +x ./ImgConvert_0.1.2_amd64.AppImage
+./ImgConvert_0.1.2_amd64.AppImage
 ```
 
 arm64/aarch64 机器使用：
 
 ```bash
-chmod +x ./ImgConvert_0.1.1_aarch64.AppImage
-./ImgConvert_0.1.1_aarch64.AppImage
+chmod +x ./ImgConvert_0.1.2_aarch64.AppImage
+./ImgConvert_0.1.2_aarch64.AppImage
 ```
 
 如果系统没有 FUSE 或 AppImage 无法挂载，可以先用提取模式验证：
 
 ```bash
-APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.2_amd64.AppImage
 ```
 
 ## Debian / Ubuntu
@@ -58,14 +58,14 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.1_amd64.AppImage
 当前 release 的 `.deb` 是 arm64 包：
 
 ```bash
-sudo apt install ./ImgConvert_0.1.1_arm64.deb
+sudo apt install ./ImgConvert_0.1.2_arm64.deb
 ```
 
 如果依赖解析失败，先更新软件源：
 
 ```bash
 sudo apt update
-sudo apt install ./ImgConvert_0.1.1_arm64.deb
+sudo apt install ./ImgConvert_0.1.2_arm64.deb
 ```
 
 ## Fedora / RHEL / openSUSE
@@ -73,13 +73,13 @@ sudo apt install ./ImgConvert_0.1.1_arm64.deb
 当前 release 的 `.rpm` 是 aarch64 包：
 
 ```bash
-sudo dnf install ./ImgConvert-0.1.1-1.aarch64.rpm
+sudo dnf install ./ImgConvert-0.1.2-1.aarch64.rpm
 ```
 
 openSUSE 可使用：
 
 ```bash
-sudo zypper install ./ImgConvert-0.1.1-1.aarch64.rpm
+sudo zypper install ./ImgConvert-0.1.2-1.aarch64.rpm
 ```
 
 ## 更新

@@ -63,7 +63,7 @@ Store candidate preflight must compile with external codec/helper discovery and
 Tauri updater disabled. Microsoft Store delivers updates, so the store package
 must not contain or expose the Tauri updater.
 `WINDOWS_STORE_VERSION` must follow Store rules: a nonzero major component and
-a zero fourth component (`1.0.0.0`, not the app version `0.1.1`):
+a zero fourth component (`1.0.0.0`, not the app version `0.1.2`):
 
 ```powershell
 $env:IMGCONVERT_DISABLE_EXTERNAL_CODECS = "1"

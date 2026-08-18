@@ -24,7 +24,7 @@ export function baseOptions(): BaseLayoutProps {
       },
       {
         text: "Release",
-        url: "https://github.com/web-casa/ImgConvert/releases/tag/v0.1.1",
+        url: "https://github.com/web-casa/ImgConvert/releases/tag/v0.1.2",
         external: true,
       },
     ],

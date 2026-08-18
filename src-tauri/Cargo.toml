@@ -1,6 +1,6 @@
 [package]
 name = "imgconvert"
-version = "0.1.1"
+version = "0.1.2"
 description = "跨平台图片批量转换工具"
 authors = ["ImgConvert"]
 license = "Apache-2.0"

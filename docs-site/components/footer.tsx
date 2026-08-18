@@ -19,7 +19,7 @@ export function SiteFooter() {
             <div>
               <div className="text-sm font-semibold">ImgConvert</div>
               <div className="mono text-xs text-[var(--imgconvert-ink-soft)]">
-                v0.1.1 · Apache-2.0
+                v0.1.2 · Apache-2.0
               </div>
             </div>
           </div>
