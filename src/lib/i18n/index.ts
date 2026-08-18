@@ -12,11 +12,13 @@ export const locale = localeStore;
 register("zh-CN", () => Promise.resolve(zhCN));
 register("en-US", () => Promise.resolve(enUS));
 
-// Initialize synchronously enough for module-level consumers such as state.svelte.ts.
-// main.ts still calls initI18n() before mounting to apply the persisted/system locale.
+// Set the initial locale synchronously so module-level consumers such as
+// state.svelte.ts can format messages immediately.
+const bootLocale = navigatorLocale();
+locale.set(bootLocale);
 void init({
   fallbackLocale: "en-US",
-  initialLocale: navigatorLocale(),
+  initialLocale: bootLocale,
 });
 
 export function normalizeLocale(value: string | null | undefined): AppLocale {
