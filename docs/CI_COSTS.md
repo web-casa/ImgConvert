@@ -33,6 +33,9 @@ Default behavior:
 - `Windows Smoke` is manual-only and runs on the free public
   `windows-latest` x64 runner. Installer signing and Store MSIX packaging
   remain opt-in because they require secrets or Store identity work.
+- `Windows Store MSIX` is a manual-only production submission build. It uses
+  the committed Partner Center identity defaults, disables external codecs and
+  Tauri updater, and uploads a 14-day `*.msix` submission artifact.
 - `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
   publish or consume real GitHub Release artifacts.
 

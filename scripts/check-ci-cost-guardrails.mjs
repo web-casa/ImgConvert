@@ -15,6 +15,7 @@ const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
+const windowsStoreRelease = readWorkflow("windows-store-release.yml");
 
 const allWorkflows = [
   ["ci.yml", ci],
@@ -23,6 +24,7 @@ const allWorkflows = [
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
   ["windows-smoke.yml", windowsSmoke],
+  ["windows-store-release.yml", windowsStoreRelease],
 ];
 
 for (const [name, text] of allWorkflows) {
@@ -35,10 +37,18 @@ checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
+checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
+checkWindowsStoreReleaseWorkflow();
+checkStandardPlatformWorkflow(
+  "windows-store-release.yml",
+  windowsStoreRelease,
+  "Windows Store",
+  "windows-latest",
+);
 
 if (!packageJson.scripts?.["ci:cost:check"]?.includes("check-ci-cost-guardrails.mjs")) {
   failures.push("package.json must expose ci:cost:check");
@@ -180,6 +190,19 @@ function checkUpdaterUpgradeSmokeWorkflow() {
 function checkStandardPlatformWorkflow(name, text, label, runner) {
   if (!text.includes(`runs-on: ${runner}`)) {
     failures.push(`${name} must keep ${label} standard runner explicit`);
+  }
+}
+
+function checkWindowsStoreReleaseWorkflow() {
+  for (const marker of [
+    "release:windows:msix",
+    'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
+    'IMGCONVERT_DISABLE_UPDATER: "1"',
+    "imgconvert-windows-x64-msix-submission",
+  ]) {
+    if (!windowsStoreRelease.includes(marker)) {
+      failures.push(`windows-store-release.yml missing marker: ${marker}`);
+    }
   }
 }
 

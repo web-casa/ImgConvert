@@ -99,6 +99,11 @@ elevated shell:
 pnpm run release:windows:msix:smoke
 ```
 
+GitHub Actions provides a dedicated `Windows Store MSIX` production build
+workflow. It uses the committed Partner Center identity defaults, builds the
+submission `.msix` with external codecs and Tauri updater disabled, and uploads
+the `imgconvert-windows-x64-msix-submission` artifact.
+
 The Microsoft Store signs accepted submissions with its own trusted
 certificate, so no purchased code-signing certificate is needed for the Store
 channel. Store submission still requires Store listing assets, age

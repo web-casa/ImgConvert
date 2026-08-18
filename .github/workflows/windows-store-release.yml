@@ -1,0 +1,197 @@
+name: Windows Store MSIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      store_version:
+        description: Four-part Microsoft Store package version.
+        required: true
+        default: 1.0.0.0
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-store-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  NODE_VERSION: "24"
+  RUSTUP_HOME: C:\rustup
+  CARGO_HOME: C:\cargo
+  CARGO_TARGET_DIR: C:\imgconvert-target
+  CC: cl
+  CXX: cl
+
+jobs:
+  windows-store:
+    name: Windows Store MSIX (x64)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Windows runner architecture
+        shell: pwsh
+        run: |
+          if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
+            throw "Windows Store build expects AMD64 runner, got $env:PROCESSOR_ARCHITECTURE"
+          }
+
+      - name: Install native codec build tools
+        shell: pwsh
+        run: |
+          choco install -y cmake meson ninja nasm
+          $toolPaths = @(
+            "C:\ProgramData\chocolatey\bin",
+            "C:\Program Files\Meson",
+            "C:\Program Files\NASM"
+          )
+          foreach ($toolPath in $toolPaths) {
+            if (Test-Path $toolPath) {
+              Add-Content -Path $env:GITHUB_PATH -Value $toolPath
+              $env:Path = "$toolPath;$env:Path"
+            }
+          }
+          cmake --version
+          meson --version
+          ninja --version
+          nasm -v
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Configure MSVC build environment
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) {
+            throw "Visual Studio Build Tools with MSVC x64 tools were not found"
+          }
+          $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+          if (-not (Test-Path $vsDevCmd)) {
+            throw "VsDevCmd.bat was not found at $vsDevCmd"
+          }
+          $envNames = @(
+            "DevEnvDir",
+            "ExtensionSdkDir",
+            "Framework40Version",
+            "FrameworkDir",
+            "FrameworkDIR64",
+            "FrameworkVersion",
+            "FrameworkVersion64",
+            "INCLUDE",
+            "LIB",
+            "LIBPATH",
+            "Path",
+            "UCRTVersion",
+            "UniversalCRTSdkDir",
+            "VCIDEInstallDir",
+            "VCINSTALLDIR",
+            "VCToolsInstallDir",
+            "VCToolsRedistDir",
+            "VCToolsVersion",
+            "VisualStudioVersion",
+            "VSINSTALLDIR",
+            "WindowsLibPath",
+            "WindowsSdkBinPath",
+            "WindowsSdkDir",
+            "WindowsSDKLibVersion",
+            "WindowsSDKVersion",
+            "WindowsSdkVerBinPath"
+          )
+          cmd /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 && set" | ForEach-Object {
+            if ($_ -match "^(.*?)=(.*)$") {
+              $name = $matches[1]
+              $value = $matches[2]
+              if ($name -and $envNames -contains $name) {
+                Set-Item -Path "Env:$name" -Value $value
+                if ($name -ieq "Path") {
+                  $pathEntries = @()
+                  $pathEntries += $value -split ";"
+                  $pathEntries += $env:Path -split ";"
+                  $seen = @{}
+                  $sanitizedPath = $pathEntries |
+                    Where-Object {
+                      $_ -and
+                      (Test-Path $_) -and
+                      $_ -notlike "*\WindowsApps" -and
+                      $_ -notlike "*\Git\usr\bin" -and
+                      $_ -notlike "*\Git\mingw64\bin"
+                    } |
+                    ForEach-Object {
+                      $resolvedPath = [System.IO.Path]::GetFullPath($_).TrimEnd("\")
+                      $key = $resolvedPath.ToLowerInvariant()
+                      if (-not $seen.ContainsKey($key)) {
+                        $seen[$key] = $true
+                        $resolvedPath
+                      }
+                    }
+                  $env:Path = ($sanitizedPath -join ";")
+                  Add-Content -Path $env:GITHUB_ENV -Value "Path=$env:Path"
+                } else {
+                  Add-Content -Path $env:GITHUB_ENV -Value "$name=$value"
+                }
+                if ($name -ieq "VCToolsInstallDir") {
+                  $linker = Join-Path $value "bin\Hostx64\x64\link.exe"
+                  if (-not (Test-Path $linker)) {
+                    throw "MSVC linker was not found at $linker"
+                  }
+                  Add-Content -Path $env:GITHUB_ENV -Value "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$linker"
+                  $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $linker
+                }
+              }
+            }
+          }
+          cl
+          Write-Host "Using Rust MSVC linker: $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm run typecheck
+
+      - name: Windows store release guardrails
+        env:
+          IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+          IMGCONVERT_DISABLE_UPDATER: "1"
+        run: pnpm run release:windows:store:check
+
+      - name: Tauri backend Windows fmt
+        run: cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Tauri backend Windows clippy
+        run: cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Tauri backend Windows tests
+        run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build Microsoft Store MSIX submission package
+        env:
+          IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+          IMGCONVERT_DISABLE_UPDATER: "1"
+          WINDOWS_STORE_VERSION: ${{ inputs.store_version }}
+        run: pnpm run release:windows:msix
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: imgconvert-windows-x64-msix-submission
+          if-no-files-found: error
+          retention-days: 14
+          path: src-tauri/target/windows-msix/*.msix
