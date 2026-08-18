@@ -35,7 +35,6 @@ path = "lib.rs"
 [workspace]
 
 [dependencies]
-imgconvert-core = { path = "../../crates/imgconvert-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -49,7 +48,9 @@ windows = { version = "0.61.3", features = [
 `,
   );
 
-  const source = readFileSync(externalCodecsPath, "utf8").replace(/^\/\/!/gm, "//");
+  const source = readFileSync(externalCodecsPath, "utf8")
+    .replace(/^\/\/!/gm, "//")
+    .replace("use imgconvert_core::RawMetadata;", "use crate::imgconvert_core::RawMetadata;");
   const windowsSystemCodecs = readFileSync(windowsSystemCodecsPath, "utf8").replace(
     /^\/\/!/gm,
     "//",
@@ -57,6 +58,70 @@ windows = { version = "0.61.3", features = [
   writeFileSync(
     join(tempRoot, "lib.rs"),
     `#![allow(dead_code)]
+pub mod imgconvert_core {
+    #[derive(Debug, Clone)]
+    pub struct RawMetadata {
+        pub icc: Option<Vec<u8>>,
+        pub exif: Option<Vec<u8>>,
+        pub xmp: Option<Vec<u8>>,
+        pub iptc: Option<Vec<u8>>,
+    }
+
+    impl RawMetadata {
+        pub fn normalized_orientation(mut self) -> Self {
+            if let Some(xmp) = self.xmp.take() {
+                self.xmp = Some(match String::from_utf8(xmp) {
+                    Ok(text) => strip_xmp_orientation_attributes(&text).into_bytes(),
+                    Err(error) => error.into_bytes(),
+                });
+            }
+            self
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.icc.as_ref().is_none_or(Vec::is_empty)
+                && self.exif.as_ref().is_none_or(Vec::is_empty)
+                && self.xmp.as_ref().is_none_or(Vec::is_empty)
+                && self.iptc.as_ref().is_none_or(Vec::is_empty)
+        }
+    }
+
+    fn strip_xmp_orientation_attributes(input: &str) -> String {
+        let mut out = input.to_string();
+        for name in ["tiff:Orientation", "exif:Orientation"] {
+            while let Some(start) = out.find(name) {
+                let after_name = start + name.len();
+                let Some(eq_relative) = out[after_name..].find('=') else {
+                    break;
+                };
+                let eq = after_name + eq_relative;
+                if !out[after_name..eq].chars().all(char::is_whitespace) {
+                    break;
+                }
+                let Some((quote_offset, quote)) = out[eq + 1..]
+                    .char_indices()
+                    .find(|(_, ch)| !ch.is_whitespace())
+                else {
+                    break;
+                };
+                if quote != '"' {
+                    break;
+                }
+                let quote_start = eq + 1 + quote_offset;
+                let Some(value_end_relative) = out[quote_start + 1..].find(quote) else {
+                    break;
+                };
+                let mut remove_start = start;
+                while remove_start > 0 && out.as_bytes()[remove_start - 1].is_ascii_whitespace() {
+                    remove_start -= 1;
+                }
+                out.replace_range(remove_start..=quote_start + value_end_relative + 1, "");
+            }
+        }
+        out
+    }
+}
+
 pub mod external_codecs {
 ${source}
 }
