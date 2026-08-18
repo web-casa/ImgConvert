@@ -12880,7 +12880,7 @@ still covered by `pnpm run license:npm` policy checks.
 - es6-weak-map@2.0.3 — ISC — https://github.com/medikoo/es6-weak-map#readme
 - esast-util-from-estree@2.0.0 — MIT — https://github.com/syntax-tree/esast-util-from-estree#readme
 - esast-util-from-js@2.0.1 — MIT — https://github.com/syntax-tree/esast-util-from-js#readme
-- esbuild@0.19.12 — MIT — https://github.com/evanw/esbuild#readme
+- esbuild@0.25.12 — MIT — https://github.com/evanw/esbuild#readme
 - esbuild@0.28.2 — MIT — https://github.com/evanw/esbuild#readme
 - escape-string-regexp@4.0.0 — MIT — https://github.com/sindresorhus/escape-string-regexp#readme
 - escape-string-regexp@5.0.0 — MIT — https://github.com/sindresorhus/escape-string-regexp#readme
@@ -24405,10 +24405,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### esbuild@0.19.12
+### esbuild@0.25.12
 
 - License: MIT
-- Package path: `node_modules/.pnpm/esbuild@0.19.12/node_modules/esbuild`
+- Package path: `node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild`
 - Homepage: https://github.com/evanw/esbuild#readme
 
 #### LICENSE.md
