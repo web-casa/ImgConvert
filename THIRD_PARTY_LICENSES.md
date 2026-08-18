@@ -5221,7 +5221,7 @@ Used by:
 - core-graphics 0.25.0 — https://github.com/servo/core-foundation-rs
 - crossbeam-channel 0.5.15 — https://github.com/crossbeam-rs/crossbeam
 - crossbeam-deque 0.8.6 — https://github.com/crossbeam-rs/crossbeam
-- crossbeam-epoch 0.9.18 — https://github.com/crossbeam-rs/crossbeam
+- crossbeam-epoch 0.9.20 — https://github.com/crossbeam-rs/crossbeam
 - crossbeam-utils 0.8.21 — https://github.com/crossbeam-rs/crossbeam
 - derive_arbitrary 1.4.2 — https://github.com/rust-fuzz/arbitrary
 - displaydoc 0.2.6 — https://github.com/yaahc/displaydoc
