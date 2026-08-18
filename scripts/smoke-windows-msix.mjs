@@ -295,11 +295,21 @@ function findWindowsSdkTool(tool) {
 
 function runPowerShell(script, label, runOptions = {}) {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const env = { ...process.env, ...(runOptions.env ?? {}) };
+  // GitHub Actions sometimes inherits a PowerShell 7 module path when spawning
+  // Windows PowerShell 5.1, which breaks Security/PKI autoload and the Cert:
+  // drive. Restore the Windows PowerShell module roots explicitly.
+  const windows = process.env.WINDIR ?? "C:\\Windows";
+  const programFiles = process.env.ProgramFiles ?? "C:\\Program Files";
+  env.PSModulePath = [
+    path.join(windows, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+    path.join(programFiles, "WindowsPowerShell", "Modules"),
+  ].join(path.delimiter);
   return run(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
     label,
-    { ...runOptions, capture: true },
+    { ...runOptions, env, capture: true },
   );
 }
 
