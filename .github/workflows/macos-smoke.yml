@@ -3,11 +3,6 @@ name: macOS Smoke
 on:
   workflow_dispatch:
     inputs:
-      confirm_paid_runner:
-        description: Confirm spending GitHub-hosted macOS runner minutes for this run.
-        required: true
-        default: false
-        type: boolean
       heic_smoke:
         description: Generate a small HEIC fixture with macOS sips and run ImageIO import smoke.
         required: true
@@ -44,7 +39,6 @@ env:
 jobs:
   macos-smoke:
     name: macOS Smoke (arm64)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_paid_runner }}
     runs-on: macos-15
     timeout-minutes: 90
     steps:

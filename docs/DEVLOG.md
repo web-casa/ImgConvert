@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-08-18 — 迁移到 public 仓库并启用免费 GitHub Actions
+
+- **仓库迁移**:origin 从 `yeagoo/imgconvert` 切到 `web-casa/ImgConvert`;Tauri homepage、updater 默认 repo、docs-site 链接和 Flatpak metadata URL 同步更新。Flatpak app-id 暂保持 `io.github.yeagoo.imgconvert`,Flathub 若正式提交前再单独评估 app-id 迁移。
+- **public 仓库 Actions 策略**:public 仓库的 GitHub-hosted 标准 runner 免费,因此 CI 恢复 `main` push / PR 自动触发;`v*` tag 自动触发 Linux amd64+arm64 release;macOS/Windows/updater workflow 仍手动触发,但移除 `confirm_paid_runner` / `confirm_runner` 付费确认门槛。
+- **护栏更新**:`check-ci-cost-guardrails.mjs` 改为校验“只允许免费标准 runner、禁止 paid/larger runner 与 schedule”,并校验 CI/release 的自动触发形态;`docs/CI_COSTS.md`、ROADMAP/ENGINE 同步新策略。
+- **验证**:`actionlint`、`pnpm run ci:cost:check`、`release:platform:check`、`release:flatpak:verify`、`docs:check` 均通过。
+
+---
+
 ## 2026-07-06 — 第一期发布范围收敛:GitHub Releases only
 
 用户确认第一期不提交任何商店,只在 GitHub Releases 发布。Codex 同步 repo 侧口径:

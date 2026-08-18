@@ -16,18 +16,29 @@ const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 
-checkManualOnly("ci.yml", ci);
-checkManualOnly("release-linux.yml", linuxRelease);
-checkManualOnly("release-updater.yml", updaterRelease);
-checkManualOnly("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
-checkManualOnly("macos-smoke.yml", macosSmoke);
-checkManualOnly("windows-smoke.yml", windowsSmoke);
-checkCiWorkflow();
+const allWorkflows = [
+  ["ci.yml", ci],
+  ["release-linux.yml", linuxRelease],
+  ["release-updater.yml", updaterRelease],
+  ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
+  ["macos-smoke.yml", macosSmoke],
+  ["windows-smoke.yml", windowsSmoke],
+];
+
+for (const [name, text] of allWorkflows) {
+  checkPublicFreeRunnerPolicy(name, text);
+}
+
+checkAutomaticLinuxCiWorkflow();
 checkLinuxReleaseWorkflow();
+checkManualWorkflow("release-updater.yml", updaterRelease);
+checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
+checkManualWorkflow("macos-smoke.yml", macosSmoke);
+checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
-checkPaidPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
-checkPaidPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
+checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
+checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
 
 if (!packageJson.scripts?.["ci:cost:check"]?.includes("check-ci-cost-guardrails.mjs")) {
   failures.push("package.json must expose ci:cost:check");
@@ -44,39 +55,68 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("CI cost guardrail check passed.");
+console.log("CI cost guardrail check passed (public-repo standard runners only).");
 
-function checkManualOnly(name, text) {
-  for (const trigger of ["push", "pull_request", "pull_request_target", "schedule"]) {
-    if (hasYamlKeyLine(text, trigger)) {
-      failures.push(`${name} must not use automatic trigger ${trigger}`);
-    }
-  }
+function checkPublicFreeRunnerPolicy(name, text) {
   if (!text.includes("workflow_dispatch:")) {
     failures.push(`${name} must be manually dispatchable`);
   }
+  if (hasYamlKeyLine(text, "schedule")) {
+    failures.push(`${name} must not use schedule trigger`);
+  }
+  if (/\bconfirm_paid_runner\b/.test(text) || /\bconfirm_runner\b/.test(text)) {
+    failures.push(`${name} must not require a paid-runner confirmation input`);
+  }
+  if (/\bpaid\b/i.test(text)) {
+    failures.push(`${name} must not describe standard public runners as paid`);
+  }
+  const paidRunnerPattern = /runs-on:\s*[^\n#]*(?:large|xlarge|gpu|64core|32core|16core)/i;
+  if (paidRunnerPattern.test(text)) {
+    failures.push(`${name} must not use paid larger runner labels`);
+  }
+  for (const match of text.matchAll(/runs-on:\s*([^\n#]+)/g)) {
+    const runner = match[1].trim();
+    if (!isAllowedRunner(runner)) {
+      failures.push(`${name} uses unsupported GitHub-hosted runner label: ${runner}`);
+    }
+  }
 }
 
-function checkCiWorkflow() {
+function isAllowedRunner(runner) {
+  return [
+    "ubuntu-24.04",
+    "ubuntu-24.04-arm",
+    "windows-latest",
+    "macos-15",
+    "${{ matrix.runner }}",
+  ].includes(runner);
+}
+
+function checkAutomaticLinuxCiWorkflow() {
   requireBooleanInputDefault(ci, "platform_checks", false, "ci.yml");
   requireBooleanInputDefault(ci, "fuzz_corpus", false, "ci.yml");
   requireBooleanInputDefault(ci, "package_smoke", false, "ci.yml");
   requireBooleanInputDefault(ci, "package_smoke_arm64", false, "ci.yml");
 
-  if (!ci.includes("name: Fuzz Corpus Replay")) {
-    failures.push("ci.yml must expose an optional fuzz corpus replay job");
+  for (const trigger of ["push", "pull_request"]) {
+    if (!hasYamlKeyLine(ci, trigger)) {
+      failures.push(`ci.yml must run automatically on ${trigger}`);
+    }
   }
-  if (!ci.includes("inputs.fuzz_corpus")) {
-    failures.push("ci.yml fuzz corpus job must be gated by inputs.fuzz_corpus");
+  if (!ci.includes("name: Fuzz Corpus Replay")) {
+    failures.push("ci.yml must expose a fuzz corpus replay job");
+  }
+  if (!ci.includes("github.event_name != 'workflow_dispatch' || inputs.fuzz_corpus")) {
+    failures.push("ci.yml fuzz corpus job must run automatically and stay toggleable on dispatch");
   }
   if (!ci.includes("pnpm run fuzz:ci")) {
     failures.push("ci.yml fuzz corpus job must run pnpm run fuzz:ci");
   }
   if (!ci.includes("inputs.package_smoke_arm64")) {
-    failures.push("ci.yml package smoke matrix must require package_smoke_arm64 for arm64");
+    failures.push("ci.yml package smoke matrix must require package_smoke_arm64 on dispatch");
   }
   if (!ci.includes("ubuntu-24.04-arm")) {
-    failures.push("ci.yml must keep the arm64 runner explicit when enabled");
+    failures.push("ci.yml must keep the free public arm64 runner explicit when enabled");
   }
 }
 
@@ -84,14 +124,25 @@ function checkLinuxReleaseWorkflow() {
   requireBooleanInputDefault(linuxRelease, "docker_smoke", false, "release-linux.yml");
   requireBooleanInputDefault(linuxRelease, "build_arm64", false, "release-linux.yml");
 
+  if (!hasYamlKeyLine(linuxRelease, "push") || !linuxRelease.includes('tags: ["v*"]')) {
+    failures.push("release-linux.yml must build automatically for v* tags");
+  }
   if (!linuxRelease.includes("inputs.build_arm64")) {
-    failures.push("release-linux.yml must require build_arm64 before adding arm64 to matrix");
+    failures.push("release-linux.yml must require build_arm64 on dispatch");
   }
   if (!linuxRelease.includes("ubuntu-24.04-arm")) {
-    failures.push("release-linux.yml must keep the arm64 runner explicit when enabled");
+    failures.push("release-linux.yml must keep the free public arm64 runner explicit when enabled");
   }
   if (!linuxRelease.includes("inputs.docker_smoke")) {
     failures.push("release-linux.yml Docker smoke must be gated by docker_smoke input");
+  }
+}
+
+function checkManualWorkflow(name, text) {
+  for (const trigger of ["push", "pull_request", "pull_request_target"]) {
+    if (hasYamlKeyLine(text, trigger)) {
+      failures.push(`${name} must remain manual-only`);
+    }
   }
 }
 
@@ -115,16 +166,6 @@ function checkUpdaterReleaseWorkflow() {
 }
 
 function checkUpdaterUpgradeSmokeWorkflow() {
-  requireBooleanInputDefault(
-    updaterUpgradeSmoke,
-    "confirm_runner",
-    false,
-    "updater-upgrade-smoke.yml",
-  );
-
-  if (!updaterUpgradeSmoke.includes("inputs.confirm_runner")) {
-    failures.push("updater-upgrade-smoke.yml must gate the job by confirm_runner");
-  }
   if (!updaterUpgradeSmoke.includes("runs-on: ubuntu-24.04")) {
     failures.push("updater-upgrade-smoke.yml must keep the GitHub-hosted runner explicit");
   }
@@ -136,13 +177,9 @@ function checkUpdaterUpgradeSmokeWorkflow() {
   }
 }
 
-function checkPaidPlatformWorkflow(name, text, label, runner) {
-  requireBooleanInputDefault(text, "confirm_paid_runner", false, name);
+function checkStandardPlatformWorkflow(name, text, label, runner) {
   if (!text.includes(`runs-on: ${runner}`)) {
-    failures.push(`${name} must keep ${label} runner explicit`);
-  }
-  if (!text.includes("inputs.confirm_paid_runner")) {
-    failures.push(`${name} must gate ${label} runner job by confirm_paid_runner`);
+    failures.push(`${name} must keep ${label} standard runner explicit`);
   }
 }
 

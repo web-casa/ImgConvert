@@ -1,6 +1,8 @@
 name: Linux Release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       docker_smoke:
@@ -9,7 +11,7 @@ on:
         default: false
         type: boolean
       build_arm64:
-        description: Include paid Linux arm64 runner in release build.
+        description: Include free public Linux arm64 runner in release build.
         required: true
         default: false
         type: boolean
@@ -34,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.build_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_arm64 || github.event_name != 'workflow_dispatch' && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
     steps:
       - uses: actions/checkout@v7
       - run: |

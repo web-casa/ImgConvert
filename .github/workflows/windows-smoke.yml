@@ -3,11 +3,6 @@ name: Windows Smoke
 on:
   workflow_dispatch:
     inputs:
-      confirm_paid_runner:
-        description: Confirm spending GitHub-hosted Windows runner minutes for this run.
-        required: true
-        default: false
-        type: boolean
       build_direct:
         description: Build unsigned Windows direct installers.
         required: true
@@ -54,7 +49,6 @@ env:
 jobs:
   windows-smoke:
     name: Windows Smoke (x64)
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_paid_runner }}
     runs-on: windows-latest
     timeout-minutes: 75
     steps:

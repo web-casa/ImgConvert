@@ -183,7 +183,7 @@ function validateBaseUrl(raw) {
 }
 
 function defaultArtifactBaseUrl() {
-  const repo = process.env.GITHUB_REPOSITORY?.trim() || "yeagoo/imgconvert";
+  const repo = process.env.GITHUB_REPOSITORY?.trim() || "web-casa/ImgConvert";
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
     fail(`GITHUB_REPOSITORY must be owner/name: ${repo}`);
   }

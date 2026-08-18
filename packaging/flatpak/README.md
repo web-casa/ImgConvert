@@ -33,7 +33,7 @@ flatpak run --user --command=imgconvert --env=IMGCONVERT_DISABLE_EXTERNAL_CODECS
 For a Flathub PR, publish `target/flatpak/sources/imgconvert-<version>-source.tar.gz` to a release URL first, then rewrite the manifest source while keeping the generated `sha256`:
 
 ```bash
-pnpm run release:flatpak:prepare -- --source-url=https://github.com/yeagoo/imgconvert/releases/download/v0.1.1/imgconvert-0.1.1-source.tar.gz
+pnpm run release:flatpak:prepare -- --source-url=https://github.com/web-casa/ImgConvert/releases/download/v0.1.1/imgconvert-0.1.1-source.tar.gz
 pnpm run release:flatpak:verify
 ```
 
@@ -42,7 +42,7 @@ Flathub-specific metadata/linter checks and PR workspace generation:
 ```bash
 pnpm run release:flathub:metadata
 pnpm run release:flathub:metadata:lint
-pnpm run release:flathub:main-pr -- --source-url=https://github.com/yeagoo/imgconvert/releases/download/v0.1.1/imgconvert-0.1.1-source.tar.gz --release-ref=v0.1.1
+pnpm run release:flathub:main-pr -- --source-url=https://github.com/web-casa/ImgConvert/releases/download/v0.1.1/imgconvert-0.1.1-source.tar.gz --release-ref=v0.1.1
 ```
 
 `release:flathub:metadata:lint` runs `flatpak-builder-lint` only when

@@ -29,7 +29,7 @@
     "active": true,
     "targets": "all",
     "publisher": "ImgConvert contributors",
-    "homepage": "https://github.com/yeagoo/imgconvert",
+    "homepage": "https://github.com/web-casa/ImgConvert",
     "license": "Apache-2.0",
     "licenseFile": "../LICENSE",
     "category": "Photography",

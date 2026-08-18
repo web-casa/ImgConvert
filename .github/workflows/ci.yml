@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       platform_checks:
@@ -19,7 +23,7 @@ on:
         default: false
         type: boolean
       package_smoke_arm64:
-        description: Include paid Linux arm64 runner in optional package smoke.
+        description: Include free public Linux arm64 runner in optional package smoke.
         required: true
         default: false
         type: boolean
@@ -80,7 +84,7 @@ jobs:
 
   fuzz-corpus:
     name: Fuzz Corpus Replay
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.fuzz_corpus }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.fuzz_corpus }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -140,7 +144,7 @@ jobs:
 
   tauri-backend-windows:
     name: Tauri Backend Windows HEIC
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform_checks }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.platform_checks) }}
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -199,7 +203,7 @@ jobs:
 
   tauri-build-smoke:
     name: Tauri Build Smoke (${{ matrix.arch }})
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.package_smoke }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.package_smoke) }}
     runs-on: ${{ matrix.runner }}
     needs:
       - frontend
@@ -210,12 +214,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.package_smoke_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.package_smoke_arm64 || github.event_name != 'workflow_dispatch' && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
     steps:
       - uses: actions/checkout@v7
-      - name: Skip arm64 package smoke on pull requests
-        if: github.event_name == 'pull_request' && matrix.arch == 'arm64'
-        run: echo "arm64 package smoke runs on push, tag, and manual CI only."
       - run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -235,28 +236,20 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
       - uses: pnpm/action-setup@v6
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
         with:
           version: 10.34.4
           run_install: false
       - uses: actions/setup-node@v6
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@1.96.0
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
       - run: pnpm install --frozen-lockfile
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
       - run: pnpm run release:linux:debug
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
       - run: pnpm run release:linux:smoke:deb:debug
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
       - uses: actions/upload-artifact@v7
-        if: github.event_name != 'pull_request' || matrix.arch != 'arm64'
         with:
           name: imgconvert-linux-${{ matrix.arch }}-debug
           if-no-files-found: error

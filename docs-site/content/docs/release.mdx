@@ -11,7 +11,7 @@ description: GitHub Releases 第一期发布范围、资产和发布前检查。
 
 GitHub Release:
 
-[https://github.com/yeagoo/imgconvert/releases/tag/v0.1.1](https://github.com/yeagoo/imgconvert/releases/tag/v0.1.1)
+[https://github.com/web-casa/ImgConvert/releases/tag/v0.1.1](https://github.com/web-casa/ImgConvert/releases/tag/v0.1.1)
 
 已发布资产：
 
@@ -42,8 +42,8 @@ pnpm run release:readiness:github:ready
 ## 远端 smoke
 
 ```bash
-pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
-pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-aarch64 --no-run
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.1 --platform=linux-x86_64 --no-run
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.1 --platform=linux-aarch64 --no-run
 ```
 
 `--no-run` 会下载远端 `latest.json`、AppImage 和 `.sig`，校验 manifest 签名一致性，但不在当前机器执行不同架构的 AppImage。

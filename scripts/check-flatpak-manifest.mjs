@@ -227,7 +227,7 @@ function inspectMetainfo(text) {
     "<metadata_license>CC0-1.0</metadata_license>",
     "<project_license>Apache-2.0</project_license>",
     '<developer id="io.github.yeagoo">',
-    '<url type="vcs-browser">https://github.com/yeagoo/imgconvert</url>',
+    '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     '<launchable type="desktop-id">io.github.yeagoo.imgconvert.desktop</launchable>',
     "<screenshots>",
   ]) {

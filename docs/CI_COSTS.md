@@ -1,19 +1,40 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# CI Cost Guardrails
+# GitHub Actions Cost Policy
 
-ImgConvert workflows are intentionally manual-only. They must not use automatic
-`push`, `pull_request`, or `schedule` triggers until the billing policy changes.
+The repository is public, so the standard GitHub-hosted runners used by these
+workflows are free. The policy is to use only those free standard labels:
+
+- `ubuntu-24.04` (x86_64)
+- `ubuntu-24.04-arm` (arm64)
+- `windows-latest`
+- `macos-15`
+
+Paid larger runners are not allowed. `pnpm run ci:cost:check` verifies that
+every workflow is dispatchable, never schedules recurring jobs, never uses
+paid/larger runner labels, and keeps the workflows below in their expected
+shape.
 
 Default behavior:
 
-- `CI`: Ubuntu-only quality checks. Optional Windows checks, fuzz corpus replay,
-  and package smoke are off by default.
-- `Linux Release`: builds amd64 by default. Linux arm64 and Docker runtime smoke
-  are off by default.
-- `macOS Smoke`: requires `confirm_paid_runner=true` before the `macos-15`
-  runner is allocated.
-- `Windows Smoke`: requires `confirm_paid_runner=true` before the
-  `windows-latest` runner is allocated.
+- `CI` runs automatically on `main` pushes and pull requests. The Ubuntu
+  frontend, Rust core, Tauri backend, security/license, fuzz corpus replay, and
+  web preview E2E jobs run on `ubuntu-24.04`. The Windows HEIC check runs on
+  `windows-latest` for `main` pushes. The Linux package build/install smoke
+  runs on both `ubuntu-24.04` and `ubuntu-24.04-arm` for `main` pushes.
+  Manual dispatch keeps the Windows check, package smoke, fuzz replay, and
+  arm64 package smoke optional with `false` defaults.
+- `Linux Release` builds `amd64` and `arm64` automatically when a `v*` tag is
+  pushed. The tag build also runs the Docker install/runtime smoke matrix.
+  Manual dispatch defaults to `amd64` only, with free public arm64 and Docker
+  smoke as explicit opt-ins.
+- `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
+  runner. Signing, notarization, DMG, and MAS candidate steps remain opt-in
+  because they require Apple secrets.
+- `Windows Smoke` is manual-only and runs on the free public
+  `windows-latest` x64 runner. Installer signing and Store MSIX packaging
+  remain opt-in because they require secrets or Store identity work.
+- `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
+  publish or consume real GitHub Release artifacts.
 
 Run the static guardrail after changing workflows:
 
@@ -21,7 +42,7 @@ Run the static guardrail after changing workflows:
 pnpm run ci:cost:check
 ```
 
-Before deciding whether to spend hosted runner minutes, run the read-only
+Before deciding whether to run packaging or publishing jobs, run the read-only
 release readiness report:
 
 ```bash
@@ -30,7 +51,7 @@ pnpm run release:readiness
 
 It does not build artifacts or trigger GitHub Actions. It only reports which
 local checks/artifacts are present and which remaining items require external
-credentials, paid runners, or store review.
+credentials, store review, or platform runners.
 
 Before publishing the first GitHub Releases batch, run the stricter local gate:
 
@@ -41,12 +62,3 @@ pnpm run release:readiness:github:ready
 That command is still local and read-only, but it exits non-zero if any
 GitHub-release in-scope artifact, updater signature, manifest, or prerequisite
 is not ready.
-
-Use the explicit expensive toggles only when you need the artifact or platform
-signal from that run:
-
-- `package_smoke_arm64` or `build_arm64`: Linux arm64 runner.
-- `docker_smoke`: Docker install/runtime matrix after Linux release build.
-- `confirm_paid_runner`: macOS/Windows hosted runner allocation.
-- `build_direct`, `notarize_direct`, `build_mas_candidate`, `sign_direct`,
-  `install_smoke`: packaging/signing work after the platform smoke has started.

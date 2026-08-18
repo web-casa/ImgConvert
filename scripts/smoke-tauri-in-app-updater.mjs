@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const options = {
-  repo: process.env.GITHUB_REPOSITORY ?? "yeagoo/imgconvert",
+  repo: process.env.GITHUB_REPOSITORY ?? "web-casa/ImgConvert",
   fromTag: "v0.1.0",
   toTag: "",
   platform: "linux-x86_64",
@@ -578,7 +578,7 @@ that clicks the old app's update dialog and waits for the AppImage to be
 replaced by the latest artifact.
 
 Options:
-  --repo=<owner/name>                GitHub repository, defaults to GITHUB_REPOSITORY or yeagoo/imgconvert.
+  --repo=<owner/name>                GitHub repository, defaults to GITHUB_REPOSITORY or web-casa/ImgConvert.
   --from-tag=<tag>                   Old release tag, defaults to v0.1.0.
   --to-tag=<tag>                     Expected version at releases/latest/download/latest.json.
   --platform=<target>                Currently only linux-x86_64 is supported.

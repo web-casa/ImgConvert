@@ -18,7 +18,7 @@ const options = {
   output: path.join(repoRoot, "target", "flathub"),
   sourceUrl:
     process.env.FLATHUB_SOURCE_URL ??
-    `https://github.com/yeagoo/imgconvert/releases/download/v${version}/${archiveName}`,
+    `https://github.com/web-casa/ImgConvert/releases/download/v${version}/${archiveName}`,
   releaseRef: process.env.FLATHUB_RELEASE_REF ?? `v${version}`,
 };
 
@@ -164,7 +164,7 @@ function rewriteHeicFileSources(manifest, sourceFiles) {
 }
 
 function rawGithubBase(relativeDir) {
-  return `https://raw.githubusercontent.com/yeagoo/imgconvert/${options.releaseRef}/${relativeDir}`;
+  return `https://raw.githubusercontent.com/web-casa/ImgConvert/${options.releaseRef}/${relativeDir}`;
 }
 
 function sha256File(file) {

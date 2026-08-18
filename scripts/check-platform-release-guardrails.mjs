@@ -661,7 +661,6 @@ function checkTauriUpdaterGuardrails() {
   }
   for (const expected of [
     "workflow_dispatch:",
-    "confirm_runner",
     "ubuntu-24.04",
     "xdotool",
     "xvfb",
@@ -809,9 +808,9 @@ function checkFlathubReleaseGuardrails() {
 
   for (const expected of [
     '<developer id="io.github.yeagoo">',
-    '<url type="homepage">https://github.com/yeagoo/imgconvert</url>',
-    '<url type="vcs-browser">https://github.com/yeagoo/imgconvert</url>',
-    '<url type="bugtracker">https://github.com/yeagoo/imgconvert/issues</url>',
+    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="bugtracker">https://github.com/web-casa/ImgConvert/issues</url>',
     "<screenshots>",
     '<screenshot type="default">',
     "<caption>Batch image conversion queue and output settings</caption>",
@@ -825,8 +824,8 @@ function checkFlathubReleaseGuardrails() {
   }
   for (const expected of [
     '<developer id="io.github.yeagoo">',
-    '<url type="homepage">https://github.com/yeagoo/imgconvert</url>',
-    '<url type="vcs-browser">https://github.com/yeagoo/imgconvert</url>',
+    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     "<project_license>LGPL-3.0-or-later</project_license>",
   ]) {
     if (!heicMetainfo.includes(expected)) {

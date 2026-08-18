@@ -6,7 +6,7 @@ ImgConvert uses the Tauri v2 updater with a static `latest.json` hosted on
 GitHub Releases:
 
 ```text
-https://github.com/yeagoo/imgconvert/releases/latest/download/latest.json
+https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json
 ```
 
 The default `src-tauri/tauri.conf.json` intentionally does not contain updater
@@ -49,13 +49,13 @@ matches the local artifact and `.sig`.
 The default updater endpoint is:
 
 ```text
-https://github.com/yeagoo/imgconvert/releases/latest/download/latest.json
+https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json
 ```
 
 The default artifact base URL is:
 
 ```text
-https://github.com/yeagoo/imgconvert/releases/download/v0.1.1
+https://github.com/web-casa/ImgConvert/releases/download/v0.1.1
 ```
 
 Override these when preparing a non-default repository or tag:
@@ -64,11 +64,11 @@ Override these when preparing a non-default repository or tag:
 export TAURI_UPDATER_PUBKEY="$(cat ~/.tauri/imgconvert-updater.key.pub)"
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/imgconvert-updater.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
-export TAURI_UPDATER_ENDPOINTS='["https://github.com/yeagoo/imgconvert/releases/latest/download/latest.json"]'
+export TAURI_UPDATER_ENDPOINTS='["https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json"]'
 
 pnpm run release:linux:updater
 
-export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/yeagoo/imgconvert/releases/download/v0.1.1"
+export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/web-casa/ImgConvert/releases/download/v0.1.1"
 pnpm run release:updater:manifest
 pnpm run release:updater:verify
 ```
@@ -99,7 +99,7 @@ release scope.
 After the release is published, verify the public updater surface:
 
 ```bash
-pnpm run release:updater:smoke -- --repo=yeagoo/imgconvert --tag=v0.1.1 --platform=linux-x86_64
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.1 --platform=linux-x86_64
 ```
 
 On a different CPU architecture, add `--no-run` to validate `latest.json`,
@@ -125,8 +125,7 @@ package conversion smoke on the updated file:
 pnpm run release:updater:upgrade-smoke -- --from-tag=v0.1.0 --to-tag=v0.1.1
 ```
 
-On GitHub Actions, run the manual workflow `Updater Upgrade Smoke` with
-`confirm_runner=true`. It installs `Xvfb` and `xdotool`, then executes the same
+On GitHub Actions, run the manual workflow `Updater Upgrade Smoke`. It installs `Xvfb` and `xdotool`, then executes the same
 script on an Ubuntu x86_64 runner.
 
 Because already-published old releases cannot receive new test hooks, the

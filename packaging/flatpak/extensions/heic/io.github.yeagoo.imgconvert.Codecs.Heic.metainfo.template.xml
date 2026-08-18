@@ -10,8 +10,8 @@
   <developer id="io.github.yeagoo">
     <name>ImgConvert contributors</name>
   </developer>
-  <url type="homepage">https://github.com/yeagoo/imgconvert</url>
-  <url type="vcs-browser">https://github.com/yeagoo/imgconvert</url>
+  <url type="homepage">https://github.com/web-casa/ImgConvert</url>
+  <url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>
   <description>
     <p>
       Adds optional HEIC/HEIF import through a process-isolated helper. The main

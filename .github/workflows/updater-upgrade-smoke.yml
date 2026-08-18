@@ -3,11 +3,6 @@ name: Updater Upgrade Smoke
 on:
   workflow_dispatch:
     inputs:
-      confirm_runner:
-        description: Run one GitHub-hosted Ubuntu x86_64 job for the real in-app updater smoke.
-        required: true
-        default: false
-        type: boolean
       from_tag:
         description: Old updater-enabled release tag to launch.
         required: true
@@ -32,7 +27,6 @@ env:
 jobs:
   linux-x86_64:
     name: Linux x86_64 In-App Updater
-    if: ${{ inputs.confirm_runner }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

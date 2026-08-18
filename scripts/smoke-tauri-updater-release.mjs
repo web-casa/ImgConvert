@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const options = {
-  repo: process.env.GITHUB_REPOSITORY ?? "yeagoo/imgconvert",
+  repo: process.env.GITHUB_REPOSITORY ?? "web-casa/ImgConvert",
   tag: "",
   platform: defaultPlatform(),
   outputDir: path.join(repoRoot, "target", "updater-smoke"),
@@ -207,7 +207,7 @@ function printHelp() {
   console.log(`Usage: node scripts/smoke-tauri-updater-release.mjs [options]
 
 Options:
-  --repo=<owner/name>       GitHub repository, defaults to GITHUB_REPOSITORY or yeagoo/imgconvert.
+  --repo=<owner/name>       GitHub repository, defaults to GITHUB_REPOSITORY or web-casa/ImgConvert.
   --tag=<tag>               Download latest.json from a specific release tag instead of latest.
   --platform=<target>       Platform key, for example linux-x86_64 or linux-aarch64.
   --output-dir=<path>       Download directory, defaults to target/updater-smoke.

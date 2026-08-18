@@ -137,7 +137,10 @@ function githubLocalChecks() {
   return [
     commandReadiness("docs:check", "README and public status text must match the current roadmap."),
     commandReadiness("architecture:check", "Main architecture and license boundary guardrails."),
-    commandReadiness("ci:cost:check", "Manual-only GitHub Actions and paid-runner defaults."),
+    commandReadiness(
+      "ci:cost:check",
+      "Public-repo GitHub Actions free standard runner guardrails.",
+    ),
     commandReadiness(
       "release:platform:check",
       "macOS/Windows/Flatpak/updater static release guardrails.",
