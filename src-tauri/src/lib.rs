@@ -2,6 +2,7 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 mod access;
+mod command_error;
 mod convert;
 mod external_codecs;
 mod import;
@@ -27,6 +28,7 @@ use thumbnail::{ThumbnailOptions, ThumbnailResult};
 
 use crate::external_codecs::{CodecDiagnostics, SelectedHelperDiagnostic};
 use crate::native_dialog::NativePickOptions;
+use command_error::CommandError;
 
 pub use convert::ConvertResult;
 
@@ -65,17 +67,24 @@ fn codec_diagnostics() -> CodecDiagnostics {
 
 /// 设置用户显式选择的 HEIC helper。空值表示清除白名单。
 #[tauri::command]
-fn set_selected_heic_helper(path: Option<String>) -> Result<SelectedHelperDiagnostic, String> {
-    external_codecs::set_selected_heic_helper(path)
+fn set_selected_heic_helper(
+    path: Option<String>,
+) -> Result<SelectedHelperDiagnostic, CommandError> {
+    let requested_path = path.clone();
+    external_codecs::set_selected_heic_helper(path).map_err(|detail| {
+        CommandError::codec_configuration_failed(requested_path.as_deref(), detail)
+    })
 }
 
 /// 转换单张图片。前端按文件循环调用以便逐项汇报进度。
 #[tauri::command]
-async fn convert_image(options: ConvertOptions) -> Result<ConvertResult, String> {
+async fn convert_image(options: ConvertOptions) -> Result<ConvertResult, CommandError> {
     // 图像编解码和文件 IO 都是阻塞工作,放到阻塞线程池避免卡住异步运行时。
+    let error_options = options.clone();
     tauri::async_runtime::spawn_blocking(move || convert::convert(&options))
         .await
-        .map_err(|e| format!("任务调度失败: {e}"))?
+        .map_err(|error| CommandError::task_failed(format!("任务调度失败: {error}")))?
+        .map_err(|detail| convert::command_error_for_conversion(&error_options, detail))
 }
 
 /// 批量转换图片。进度通过 Tauri Channel 返回,取消在文件边界生效。
@@ -85,8 +94,8 @@ async fn convert_batch(
     progress: Channel<BatchProgressEvent>,
     concurrency: Option<usize>,
     state: State<'_, BatchState>,
-) -> Result<BatchSummary, String> {
-    let batch = state.begin()?;
+) -> Result<BatchSummary, CommandError> {
+    let batch = state.begin().map_err(CommandError::batch_failed)?;
     let batch_id = batch.id();
     let cancel = batch.token();
 
@@ -94,8 +103,8 @@ async fn convert_batch(
         convert::convert_batch(options, progress, cancel, concurrency)
     })
     .await
-    .map_err(|e| format!("批量任务调度失败: {e}"))
-    .and_then(|inner| inner);
+    .map_err(|error| CommandError::task_failed(format!("批量任务调度失败: {error}")))
+    .and_then(|inner| inner.map_err(CommandError::batch_failed));
 
     state.finish(batch_id);
     result
@@ -105,10 +114,10 @@ async fn convert_batch(
 #[tauri::command]
 async fn plan_conversions(
     options: Vec<ConvertOptions>,
-) -> Result<Vec<ConversionPlanEntry>, String> {
+) -> Result<Vec<ConversionPlanEntry>, CommandError> {
     tauri::async_runtime::spawn_blocking(move || convert::conversion_plan(&options))
         .await
-        .map_err(|e| format!("转换规划任务调度失败: {e}"))
+        .map_err(|error| CommandError::task_failed(format!("转换规划任务调度失败: {error}")))
 }
 
 /// 请求取消当前批量任务。返回值表示是否找到正在运行的任务并发出取消信号。
@@ -122,15 +131,17 @@ fn cancel_batch(state: State<'_, BatchState>) -> bool {
 async fn scan_import_paths(
     options: ScanImportOptions,
     state: State<'_, ImportScanState>,
-) -> Result<ImportScanResult, String> {
-    let scan = state.begin()?;
+) -> Result<ImportScanResult, CommandError> {
+    let scan = state
+        .begin()
+        .map_err(|detail| CommandError::import_failed(None, detail))?;
     let scan_id = scan.id();
     let cancel = scan.token();
 
     let result =
         tauri::async_runtime::spawn_blocking(move || import::scan_import_paths(options, cancel))
             .await
-            .map_err(|e| format!("导入扫描任务调度失败: {e}"));
+            .map_err(|error| CommandError::task_failed(format!("导入扫描任务调度失败: {error}")));
 
     state.finish(scan_id);
     result
@@ -147,14 +158,15 @@ fn cancel_import_scan(state: State<'_, ImportScanState>) -> bool {
 async fn import_clipboard_image(
     options: ClipboardImageImportOptions,
     state: State<'_, ClipboardImportState>,
-) -> Result<ImportScanFile, String> {
+) -> Result<ImportScanFile, CommandError> {
     let clipboard_import =
         tauri::async_runtime::spawn_blocking(move || import::import_clipboard_image(options))
             .await
-            .map_err(|e| format!("剪贴板导入任务调度失败: {e}"))??;
+            .map_err(|error| CommandError::task_failed(format!("剪贴板导入任务调度失败: {error}")))?
+            .map_err(CommandError::clipboard_import_failed)?;
     if let Err(error) = state.register(clipboard_import.managed_path.clone()) {
         import::cleanup_clipboard_file_best_effort(&clipboard_import.managed_path);
-        return Err(error);
+        return Err(CommandError::clipboard_import_failed(error));
     }
     Ok(clipboard_import.file)
 }
@@ -164,24 +176,29 @@ async fn import_clipboard_image(
 fn cleanup_imported_temp_file(
     path: String,
     state: State<'_, ClipboardImportState>,
-) -> Result<bool, String> {
-    import::cleanup_imported_temp_file(path, &state)
+) -> Result<bool, CommandError> {
+    import::cleanup_imported_temp_file(path, &state).map_err(CommandError::clipboard_import_failed)
 }
 
 /// Linux AppImage 下优先使用宿主系统文件选择器,避免 WebKit/GTK dialog 进程内崩溃。
 #[tauri::command]
-async fn pick_paths(options: NativePickOptions) -> Result<Vec<String>, String> {
+async fn pick_paths(options: NativePickOptions) -> Result<Vec<String>, CommandError> {
     tauri::async_runtime::spawn_blocking(move || native_dialog::pick_paths(&options))
         .await
-        .map_err(|e| format!("文件选择器任务调度失败:{e}"))?
+        .map_err(|error| CommandError::task_failed(format!("文件选择器任务调度失败:{error}")))?
+        .map_err(CommandError::native_dialog_failed)
 }
 
 /// 为队列项生成缩略图。全透明图片返回 null,前端保留格式占位。
 #[tauri::command]
-async fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailResult>, String> {
+async fn generate_thumbnail(
+    options: ThumbnailOptions,
+) -> Result<Option<ThumbnailResult>, CommandError> {
+    let input = options.input.clone();
     tauri::async_runtime::spawn_blocking(move || thumbnail::generate_thumbnail(options))
         .await
-        .map_err(|e| format!("缩略图任务调度失败: {e}"))?
+        .map_err(|error| CommandError::task_failed(format!("缩略图任务调度失败: {error}")))?
+        .map_err(|detail| CommandError::thumbnail_failed(input, detail))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

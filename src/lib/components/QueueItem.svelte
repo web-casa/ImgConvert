@@ -136,7 +136,9 @@
       <FormatSelect
         value={item.targetFormat ?? "__global"}
         includeGlobal
-        globalLabel={$t("queueItem.followGlobal", { format: formatLabel(settings.format) })}
+        globalLabel={$t("queueItem.followGlobal", {
+          values: { format: formatLabel(settings.format) },
+        })}
         triggerClass="w-36"
         triggerSize="sm"
         disabled={busy}
@@ -156,7 +158,7 @@
         </div>
       {:else}
         <div class="text-xs text-muted-foreground">
-          {$t("queueItem.outputsTo", { format: formatLabel(targetFormat) })}
+          {$t("queueItem.outputsTo", { values: { format: formatLabel(targetFormat) } })}
         </div>
       {/if}
     </div>

@@ -13,6 +13,7 @@
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
+  import { formatCommandError } from "$lib/command-error";
   import {
     loadCodecDiagnostics,
     pickSystemPaths,
@@ -61,7 +62,9 @@
     try {
       diagnostics = await loadCodecDiagnostics();
     } catch (error) {
-      loadError = get(t)("diagnostics.loadError", { error: String(error) } as any) as string;
+      loadError = get(t)("diagnostics.loadError", {
+        values: { error: formatCommandError(error) },
+      } as any) as string;
     } finally {
       loading = false;
     }
@@ -85,7 +88,7 @@
       await refresh();
     } catch (error) {
       actionMessage = get(t)("diagnostics.setHelperFailed", {
-        error: String(error),
+        values: { error: formatCommandError(error) },
       } as any) as string;
     } finally {
       helperBusy = false;
@@ -102,7 +105,7 @@
       await refresh();
     } catch (error) {
       actionMessage = get(t)("diagnostics.clearHelperFailed", {
-        error: String(error),
+        values: { error: formatCommandError(error) },
       } as any) as string;
     } finally {
       helperBusy = false;
@@ -224,7 +227,7 @@
                   </div>
                   <p class="mt-1 text-xs text-muted-foreground">
                     {$t("diagnostics.extensions", {
-                      extensions: heic.extensions.join(" / "),
+                      values: { extensions: heic.extensions.join(" / ") },
                     } as any)}
                   </p>
                   {#if heic.disabledReason}

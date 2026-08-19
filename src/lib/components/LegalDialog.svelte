@@ -26,7 +26,9 @@
         licenseText = text;
       })
       .catch((error: unknown) => {
-        loadError = get(t)("legal.loadError", { error: String(error) } as any) as string;
+        loadError = get(t)("legal.loadError", {
+          values: { error: String(error) },
+        } as any) as string;
       })
       .finally(() => {
         loading = false;

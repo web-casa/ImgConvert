@@ -4,6 +4,7 @@
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
+  import { formatCommandError } from "$lib/command-error";
   import {
     cancelImportScan,
     importClipboard,
@@ -38,7 +39,7 @@
       await importPaths(paths);
     } catch (error) {
       ui.importMessage = get(t)("dropzone.errorDropHint", {
-        error: String(error),
+        values: { error: formatCommandError(error) },
       } as any) as string;
     }
   }
@@ -61,7 +62,7 @@
       await importPaths(paths);
     } catch (error) {
       ui.importMessage = get(t)("dropzone.errorFolderDropHint", {
-        error: String(error),
+        values: { error: formatCommandError(error) },
       } as any) as string;
     }
   }
@@ -121,7 +122,7 @@
           </li>
         {/each}
         {#if hiddenImportErrors}
-          <li>{$t("dropzone.hiddenErrors", { count: hiddenImportErrors } as any)}</li>
+          <li>{$t("dropzone.hiddenErrors", { values: { count: hiddenImportErrors } } as any)}</li>
         {/if}
       </ul>
     </details>

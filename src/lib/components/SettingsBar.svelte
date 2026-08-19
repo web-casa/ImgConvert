@@ -3,6 +3,7 @@
   import { FolderOpen, ArrowsClockwise, WarningCircle } from "phosphor-svelte";
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
+  import { formatCommandError } from "$lib/command-error";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
@@ -139,7 +140,7 @@
       outputMessage = "";
       persistSettings();
     } catch (error) {
-      outputMessage = String(error);
+      outputMessage = formatCommandError(error);
     }
   }
 
@@ -295,7 +296,7 @@
         "size-7 rounded-md text-muted-foreground hover:text-foreground",
         activeSwitchHelp === key && "bg-background text-foreground",
       )}
-      aria-label={$t("settings.descriptionAria", { label } as any)}
+      aria-label={$t("settings.descriptionAria", { values: { label } } as any)}
       aria-pressed={activeSwitchHelp === key}
       onclick={() => toggleSwitchHelp(key)}
     >

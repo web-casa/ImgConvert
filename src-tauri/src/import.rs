@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
 use crate::access::{self, AuthorizedPath};
+use crate::command_error::CommandError;
 use crate::external_codecs;
 
 const DEFAULT_MAX_FILES: usize = 20_000;
@@ -82,7 +83,7 @@ pub struct ImportImageMetadata {
 #[serde(rename_all = "camelCase")]
 pub struct ImportScanError {
     pub path: String,
-    pub message: String,
+    pub error: CommandError,
 }
 
 #[derive(Debug)]
@@ -639,9 +640,10 @@ impl Scanner {
     }
 
     fn error(&mut self, path: &Path, message: impl Into<String>) {
+        let path = path.to_string_lossy().to_string();
         self.errors.push(ImportScanError {
-            path: path.to_string_lossy().to_string(),
-            message: message.into(),
+            error: CommandError::import_failed(Some(&path), message),
+            path,
         });
     }
 }

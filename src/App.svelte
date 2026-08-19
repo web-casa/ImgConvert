@@ -129,12 +129,11 @@
                   <span class="truncate">
                     {#if queue.length}
                       {$t("app.progressDone", {
-                        done: doneCount,
-                        total: queue.length,
+                        values: { done: doneCount, total: queue.length },
                       } as any)}{#if skippedCount}{$t("app.progressSkipped", {
-                          skipped: skippedCount,
+                          values: { skipped: skippedCount },
                         } as any)}{/if}{#if errorCount}{$t("app.progressErrors", {
-                          errors: errorCount,
+                          values: { errors: errorCount },
                         } as any)}{/if}
                     {:else}
                       {$t("app.zeroFiles")}
@@ -193,12 +192,11 @@
               <span class="truncate">
                 {#if queue.length}
                   {$t("app.progressDone", {
-                    done: doneCount,
-                    total: queue.length,
+                    values: { done: doneCount, total: queue.length },
                   } as any)}{#if skippedCount}{$t("app.progressSkipped", {
-                      skipped: skippedCount,
+                      values: { skipped: skippedCount },
                     } as any)}{/if}{#if errorCount}{$t("app.progressErrors", {
-                      errors: errorCount,
+                      values: { errors: errorCount },
                     } as any)}{/if}
                 {:else}
                   {$t("app.zeroFiles")}
@@ -208,8 +206,7 @@
             <div class="mt-1 text-xs text-muted-foreground">
               {queue.length
                 ? $t("app.footerTargetFormat", {
-                    format: settings.format.toUpperCase(),
-                    engine: engine.text,
+                    values: { format: settings.format.toUpperCase(), engine: engine.text },
                   } as any)
                 : $t("app.addImagesHint")}
             </div>

@@ -24,6 +24,7 @@ use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
 use crate::access;
+use crate::command_error::CommandError;
 use crate::external_codecs;
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -257,7 +258,7 @@ pub struct ConversionPlanEntry {
     pub input: String,
     pub output: Option<String>,
     pub exists: bool,
-    pub error: Option<String>,
+    pub error: Option<CommandError>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -293,12 +294,12 @@ pub enum BatchProgressEvent {
     FileSkipped {
         index: usize,
         input: String,
-        message: String,
+        error: CommandError,
     },
     FileError {
         index: usize,
         input: String,
-        message: String,
+        error: CommandError,
     },
     Cancelled {
         completed: usize,
@@ -583,10 +584,47 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
                 input: options.input.clone(),
                 output: None,
                 exists: false,
-                error: Some(error),
+                error: Some(command_error_for_conversion(options, error)),
             },
         })
         .collect()
+}
+
+/// Converts the legacy, internal conversion error text into the stable IPC
+/// contract at the command boundary. The strings remain internal diagnostics;
+/// frontend code never renders them.
+pub fn command_error_for_conversion(
+    options: &ConvertOptions,
+    detail: impl Into<String>,
+) -> CommandError {
+    let detail = detail.into();
+    let output = || {
+        output_path(options)
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|_| options.input.clone())
+    };
+
+    if detail.starts_with("输入文件不存在:") {
+        return CommandError::file_not_found(options.input.clone(), detail);
+    }
+    if detail.starts_with("没有权限访问输入文件:") {
+        return CommandError::permission_denied(options.input.clone(), detail);
+    }
+    if detail.starts_with("不支持的目标格式:")
+        || detail.starts_with("HEIC 输出暂未启用")
+        || detail.starts_with("TIFF 暂未纳入")
+    {
+        return CommandError::unsupported_format(options.format.clone(), detail);
+    }
+    if detail.starts_with("输出已存在") {
+        return CommandError::output_exists(output(), detail);
+    }
+    if detail.starts_with("候选输出不小于源文件") || detail.starts_with("代际损失防护:")
+    {
+        return CommandError::output_not_smaller(output(), detail);
+    }
+
+    CommandError::conversion_failed(options.input.clone(), detail)
 }
 
 fn temp_file(out: &Path) -> Result<(PathBuf, File), String> {
@@ -698,12 +736,12 @@ fn cleanup_partial_note(path: &Path) -> String {
 pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
     let input = Path::new(&opts.input);
     let _input_scope = access::scoped_path_access(input);
-    let input_metadata = fs::metadata(input).map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            format!("输入文件不存在: {}", input.display())
-        } else {
-            format!("无法访问输入文件 {}: {e}", input.display())
+    let input_metadata = fs::metadata(input).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => format!("输入文件不存在: {}", input.display()),
+        std::io::ErrorKind::PermissionDenied => {
+            format!("没有权限访问输入文件: {}", input.display())
         }
+        _ => format!("无法访问输入文件 {}: {error}", input.display()),
     })?;
     if !input_metadata.is_file() {
         return Err(format!("输入路径不是文件: {}", input.display()));
@@ -1248,7 +1286,10 @@ fn prepare_batch_work(
                     preflight_events.push(BatchProgressEvent::FileError {
                         index,
                         input: options.input,
-                        message: format!("输出路径在本批次内重复: {}", output.display()),
+                        error: CommandError::batch_failed(format!(
+                            "输出路径在本批次内重复: {}",
+                            output.display()
+                        )),
                     });
                     continue;
                 }
@@ -1326,18 +1367,23 @@ fn batch_worker_loop(
 
         let event = match convert(&opts) {
             Ok(result) => BatchProgressEvent::FileFinished { index, result },
-            Err(message) if should_count_as_skipped(&opts, &message) => {
-                BatchProgressEvent::FileSkipped {
-                    index,
-                    input,
-                    message,
+            Err(detail) => {
+                let skipped = should_count_as_skipped(&opts, &detail);
+                let error = command_error_for_conversion(&opts, detail);
+                if skipped {
+                    BatchProgressEvent::FileSkipped {
+                        index,
+                        input,
+                        error,
+                    }
+                } else {
+                    BatchProgressEvent::FileError {
+                        index,
+                        input,
+                        error,
+                    }
                 }
             }
-            Err(message) => BatchProgressEvent::FileError {
-                index,
-                input,
-                message,
-            },
         };
 
         if send_worker_event(&tx, event, &cancel).is_err() {
@@ -1948,6 +1994,43 @@ mod tests {
             preserve_metadata: Some(false),
             color_management_policy: None,
         }
+    }
+
+    #[test]
+    fn command_error_mapping_keeps_conversion_details_out_of_the_ipc_code() {
+        let mut options = test_convert_options("/images/source.png".to_string());
+
+        let missing = command_error_for_conversion(&options, "输入文件不存在: /images/source.png");
+        assert_eq!(missing.code, crate::command_error::ErrorCode::FileNotFound);
+        assert_eq!(
+            missing.params,
+            Some(serde_json::json!({ "path": "/images/source.png" }))
+        );
+
+        options.format = "tiff".to_string();
+        let unsupported = command_error_for_conversion(&options, "TIFF 暂未纳入 v1 可写格式");
+        assert_eq!(
+            unsupported.code,
+            crate::command_error::ErrorCode::UnsupportedFormat
+        );
+        assert_eq!(
+            unsupported.params,
+            Some(serde_json::json!({ "format": "tiff" }))
+        );
+        assert_eq!(
+            unsupported.detail.as_deref(),
+            Some("TIFF 暂未纳入 v1 可写格式")
+        );
+
+        let fallback = command_error_for_conversion(&options, "codec backend failed");
+        assert_eq!(
+            fallback.code,
+            crate::command_error::ErrorCode::ConversionFailed
+        );
+        assert_eq!(
+            fallback.params,
+            Some(serde_json::json!({ "path": "/images/source.png" }))
+        );
     }
 
     #[test]

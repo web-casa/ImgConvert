@@ -53,5 +53,5 @@ export function setAppLocale(nextLocale: AppLocale): void {
 }
 
 export function translate(key: string, params?: Record<string, string | number>): string {
-  return get(t)(key, params) as string;
+  return get(t)(key, params ? { values: params } : undefined) as string;
 }

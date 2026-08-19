@@ -5,6 +5,7 @@ import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
+import { formatCommandError, type CommandError } from "$lib/command-error";
 import {
   locale as localeStore,
   setAppLocale,
@@ -121,6 +122,10 @@ export interface ConvertResult {
 }
 export interface ImportScanError {
   path: string;
+  error: CommandError;
+}
+export interface UiImportError {
+  path: string;
   message: string;
 }
 export interface ImportScanFile {
@@ -176,7 +181,7 @@ export interface ConversionPlanEntry {
   input: string;
   output: string | null;
   exists: boolean;
-  error: string | null;
+  error: CommandError | null;
 }
 export interface AppUpdateState {
   checking: boolean;
@@ -239,11 +244,11 @@ type BatchProgressEvent =
   | { event: "fileFinished"; data: { index: number; result: ConvertResult } }
   | {
       event: "fileSkipped";
-      data: { index: number; input: string; message: string };
+      data: { index: number; input: string; error: CommandError };
     }
   | {
       event: "fileError";
-      data: { index: number; input: string; message: string };
+      data: { index: number; input: string; error: CommandError };
     }
   | { event: "cancelled"; data: { completed: number; total: number } }
   | { event: "finished"; data: { summary: BatchSummary } };
@@ -440,7 +445,7 @@ interface UiState {
   importMode: ImportMode;
   importCancelRequested: boolean;
   importMessage: string;
-  importErrors: ImportScanError[];
+  importErrors: UiImportError[];
 }
 
 export const ui = $state<UiState>({
@@ -873,7 +878,10 @@ async function importPathList(paths: string[], message: string) {
         recursive: true,
       },
     });
-    ui.importErrors = scan.errors;
+    ui.importErrors = scan.errors.map((error) => ({
+      path: error.path,
+      message: formatCommandError(error.error),
+    }));
     if (scan.cancelled) {
       ui.importMessage = translate("state.importCancelled");
       return;
@@ -882,7 +890,7 @@ async function importPathList(paths: string[], message: string) {
     const added = addPaths(scan.files);
     ui.importMessage = formatImportSummary(added, scan);
   } catch (e) {
-    ui.importMessage = translate("state.importFailed", { error: String(e) });
+    ui.importMessage = formatCommandError(e);
     ui.importErrors = [];
   } finally {
     ui.importing = false;
@@ -1045,7 +1053,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
         skipped += 1;
         ui.importErrors.push({
           path: image.suggestedName ?? "clipboard",
-          message: String(error),
+          message: formatCommandError(error),
         });
       }
     }
@@ -1068,7 +1076,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
     }
     ui.importMessage = formatImportSummary({ ...added, skipped: added.skipped + skipped }, null);
   } catch (error) {
-    ui.importMessage = translate("state.clipboardImportFailed", { error: String(error) });
+    ui.importMessage = formatCommandError(error);
   } finally {
     ui.importing = false;
     ui.importMode = null;
@@ -1175,7 +1183,7 @@ export async function cancelImportScan() {
   try {
     await invoke<boolean>("cancel_import_scan");
   } catch (e) {
-    ui.importMessage = translate("state.cancelImportScanFailed", { error: String(e) });
+    ui.importMessage = formatCommandError(e);
   }
 }
 
@@ -1435,11 +1443,11 @@ async function convertAllWithBatch() {
       finalizeCancelledJobs(jobs);
     }
   } catch (e) {
-    const msg = String(e);
+    const msg = formatCommandError(e);
     for (const job of jobs) {
       if (job.item.status === "pending" || job.item.status === "running") {
         job.item.status = "error";
-        job.item.detail = translate("state.batchFailed", { message: msg });
+        job.item.detail = msg;
         job.item.progress = 100;
       }
     }
@@ -1574,7 +1582,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "skipped";
-      job.item.detail = formatSkipDetail(event.data.message);
+      job.item.detail = formatSkipDetail(event.data.error);
       job.item.progress = 100;
       return;
     }
@@ -1582,7 +1590,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "error";
-      job.item.detail = event.data.message;
+      job.item.detail = formatCommandError(event.data.error);
       job.item.progress = 100;
       return;
     }
@@ -1613,9 +1621,8 @@ function formatResultDetail(res: ConvertResult): string {
   return `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
 }
 
-function formatSkipDetail(message: string): string {
-  if (message.includes("\u5df2\u5b58\u5728")) return translate("state.skippedExisting");
-  return translate("state.skippedMessage", { message });
+function formatSkipDetail(error: CommandError): string {
+  return formatCommandError(error);
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {
@@ -1675,7 +1682,7 @@ export async function checkEngine() {
     });
     engine.ok = capabilities.writable.length > 0;
   } catch (e) {
-    engine.text = translate("state.coreFailed", { error: String(e) });
+    engine.text = translate("state.coreFailed", { error: formatCommandError(e) });
     engine.ok = false;
   }
 }
