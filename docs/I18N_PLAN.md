@@ -115,6 +115,54 @@ errors: {
 - 旧 String 错误在 command 出口统一包装为 `ConversionFailed` / 对应 code
 - `detail` 只放底层错误原文，不决定用户语言
 
+### 6.1 Phase 3 已确认的 IPC 错误契约
+
+> 本节在实现前锁定，避免前后端各自猜测 Tauri reject payload。Tauri command 的
+> `Err` 必须序列化为下列 JSON 对象；不得再把 Rust 的中文/英文底层错误字符串直接
+> 当作用户界面文案。
+
+```json
+{
+  "code": "fileNotFound",
+  "params": { "path": "/images/missing.png" },
+  "detail": "输入文件不存在: /images/missing.png"
+}
+```
+
+`code` 使用 `camelCase` 枚举值。当前 Phase 3 的稳定集合为：
+
+| Rust `ErrorCode` | IPC `code` | `params` | 使用场景 |
+| --- | --- | --- | --- |
+| `FileNotFound` | `fileNotFound` | `path` | 已知输入文件不存在 |
+| `PermissionDenied` | `permissionDenied` | `path` | 已知文件/目录权限拒绝 |
+| `UnsupportedFormat` | `unsupportedFormat` | `format` | 不支持的输入或目标格式 |
+| `OutputExists` | `outputExists` | `path` | 输出路径已存在且策略不允许覆盖 |
+| `OutputNotSmaller` | `outputNotSmaller` | `path` | skip-if-larger / 代际防护导致的跳过 |
+| `ConversionFailed` | `conversionFailed` | `path` | 其余单文件转换失败 |
+| `BatchFailed` | `batchFailed` | 无 | 批量协调或进度通道失败 |
+| `ImportFailed` | `importFailed` | `path`（可选） | 导入扫描失败 |
+| `ClipboardImportFailed` | `clipboardImportFailed` | 无 | 剪贴板图片导入失败 |
+| `NativeDialogFailed` | `nativeDialogFailed` | 无 | Linux 原生文件选择器失败 |
+| `ThumbnailFailed` | `thumbnailFailed` | `path` | 缩略图生成失败 |
+| `CodecConfigurationFailed` | `codecConfigurationFailed` | `path`（可选） | HEIC helper 配置失败 |
+| `TaskFailed` | `taskFailed` | 无 | 阻塞任务调度/不可归类的后端失败 |
+
+规则：
+
+- `params` 只放适合 UI 插值的标量值（当前为路径或格式）；未使用时为 `null`。
+- `detail` 保留原始技术原因，前端可在开发者控制台记录，但**绝不**显示或插值到用户界面。
+- 前端只按 `errors.<code>` 渲染 ICU message；未知、旧版字符串或畸形 payload 一律走
+  `errors.taskFailed`，不能回退显示原始错误。
+- 除 command reject 外，批量 `fileError` / `fileSkipped` progress event、导入扫描的逐项
+  error、以及输出规划的 error 字段也使用同一个 `CommandError` 结构，避免绕过本地化
+  的字符串通道。
+- `codec_diagnostics()` 是成功返回的技术诊断快照，不属于 command error 通道；但
+  `set_selected_heic_helper()` 的失败必须遵循此契约。
+
+前端通过项目现有 `svelte-i18n`（其 formatter 基于 `intl-messageformat`）插值，消息采用
+ICU 语法，例如 `"File not found: {path}"`。两份 locale 文件同时新增同一组 `errors.*`
+key，并由现有 key parity 测试守护。
+
 ## 7. CI 硬编码检查
 
 新增：
