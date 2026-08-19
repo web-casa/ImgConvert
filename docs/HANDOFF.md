@@ -28,6 +28,8 @@
 - i18n Phase 3 完成：Tauri command 错误使用结构化 `CommandError`，前端按 ICU message 本地化
 - Phase 4a 文案与隐私来源已完成并复核：双语 Store metadata、`PRIVACY.en.md`、无外部资源的 Pages 隐私页与公开 runner 部署工作流；结果缓存政策准确区分关闭复用与删除本机缓存
 - Phase 4b 已完成：Fumadocs 的中英路由、首批英文文档和双语浏览器 smoke
+- Phase 5 已完成：key parity / hardcoded-string gate、确定性 Playwright 语言切换 smoke、Windows
+  hosted MSIX install smoke 和 Store submission artifact 重建均已复核通过
 
 ## 3. 多语言现状
 
@@ -46,8 +48,16 @@
 - 所有可失败 Tauri command、批量 progress、导入逐项错误和转换规划错误均使用该 envelope
 - `src/lib/command-error.ts` 只按 `errors.<code>` 本地化；`detail` 仅供开发调试，畸形/旧 payload 回退通用错误
 - ICU 插值统一使用 `svelte-i18n` v4 的 `{ values: params }` 接口
+- 静态打包的 message 使用 `addMessages()` 后同步 `init()`；不能把它们重新包装为异步
+  `register()` loader，否则中文首次启动会在模块级翻译前缺少 locale
+- Playwright 覆盖固定 `zh-CN` 首屏与中英双向切换；首次启动 locale 不再依赖执行机默认语言
 - docs-site 保持中文默认 URL（`/`、`/docs/...`）和显式英文 URL（`/en-US/...`、`/en-US/docs/...`）；英文只提供首页、安装、使用、隐私、排障，不回退未翻译的中文正文
 - docs-site 隐私页只通过 `<include>` 引用根目录的 `PRIVACY.md` / `PRIVACY.en.md`，并由 `check-docs-site-i18n.mjs` 守护路由、导航和规范政策来源
+- `windows-smoke.yml` 的 `store_msix` 路径由 platform guardrail 守护：保持 `windows-latest`、
+  DevSmoke identity、Store disable flags、MSIX build 与 sideload install smoke。2026-08-19 的
+  [Windows Smoke run 32218246687](https://github.com/web-casa/ImgConvert/actions/runs/32218246687)
+  已通过；[Windows Store MSIX run 32218253749](https://github.com/web-casa/ImgConvert/actions/runs/32218253749)
+  已重建 submission artifact
 
 ### 未完成
 
@@ -67,8 +77,9 @@ Phase 3 与仓库内 Phase 4b 已完成并复核。Phase 4a 的双语 Store meta
 Windows Store MSIX 截图、当日 Partner Center CSV、IARC 和账户负责人提交；不自动创建
 submission、设置市场/价格或点击发布。
 
-仓库内下一阶段是 Phase 5 的持续 QA 与发布准备：保持现有 key parity、Playwright 语言切换、
-平台 guardrail 和真实 Windows Store runner 入口；它不替代上述管理员/Partner Center 动作。
+Phase 5 的仓库内 QA 与非发布 Windows runner 验收已完成：key parity、`check:ui-i18n`、确定性
+Playwright 语言切换、platform guardrail、MSIX sideload conversion smoke 与 submission artifact
+重建均通过。它不替代上述管理员/Partner Center 动作。
 
 Phase 3 的已落地契约见 `docs/I18N_PLAN.md`：
 

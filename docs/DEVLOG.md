@@ -5,6 +5,27 @@
 
 ---
 
+## 2026-08-19 — Phase 5：i18n QA、Windows MSIX 真 runner 与 review 修复
+
+- **review 修复**：新的固定 `zh-CN` Playwright 首屏 smoke 复现了真实的 i18n 初始化竞态：静态
+  message 被包装成异步 `svelte-i18n register()` loader，`state.svelte.ts` 模块级 engine 文案会在
+  locale 设置前格式化。改为 `addMessages()` 同步注册两份静态字典，再 `init()`，修复中文首次启动。
+- **浏览器 QA**：Playwright 新增确定性中文 context，验证中文首屏、Topbar 中→英后的 title / 主操作
+  文案、以及切回中文；现有 key parity、Vitest 和 `check:ui-i18n` 继续由 `quality:frontend` 执行。
+- **Windows 回归护栏**：platform guardrail 现在锁定手动 `store_msix` 路径的标准
+  `windows-latest` runner、临时 `ImgConvert.DevSmoke` identity、外部 codec/updater 禁用、MSIX build
+  与 sideload install smoke；Windows packaging README 同步记录非发布运行方式。
+- **真实 runner**：[Windows Smoke run 32218246687](https://github.com/web-casa/ImgConvert/actions/runs/32218246687)
+  成功执行 Store-configured MSIX build、临时签名/sideload 和安装后 JPEG/WebP/PNG/AVIF 转换 smoke；
+  [Windows Store MSIX run 32218253749](https://github.com/web-casa/ImgConvert/actions/runs/32218253749)
+  成功重建并上传 `imgconvert-windows-x64-msix-submission` artifact。main 自动 CI 同时通过。
+- **本地验证**：`quality:frontend`、`quality:security`、`release:platform:check`、Playwright 3/3、
+  Linux Tauri debug `.deb` build 与已安装包 conversion smoke 均通过。
+- **边界**：未启用 Pages、未下载/提交 Partner Center artifact、未创建 submission；Store 继续禁用
+  external codec/updater，Flatpak app-id 与免费标准 runner 策略未变。
+
+---
+
 ## 2026-08-19 — Phase 4b：docs-site 英文站与 Phase 4a 复核修复
 
 - **4a 隐私复核**：审计 Rust 结果缓存后，双语政策和静态公开页明确说明：持久记录仅含哈希和文件大小，不含图片字节或路径；设置页只能关闭结果复用，删除已有设置/缓存记录需删除相应本机应用数据或缓存目录。`check-pages-privacy.mjs` 同步守护双语生效日期、缓存说明、无远程资源、CSP 与 `no-referrer`。

@@ -289,6 +289,13 @@ URL，不把未翻译文档静默展示为中文。
 
 ### Phase 5：QA 与发布
 
+**当前状态（2026-08-19）：** 仓库内 QA、Windows hosted runner MSIX install smoke 与 Store
+submission artifact 重建均已完成。`Windows Smoke`
+([run 32218246687](https://github.com/web-casa/ImgConvert/actions/runs/32218246687)) 使用临时
+`ImgConvert.DevSmoke` identity 成功执行 sideload 后的转换 smoke；`Windows Store MSIX`
+([run 32218253749](https://github.com/web-casa/ImgConvert/actions/runs/32218253749)) 成功上传
+`imgconvert-windows-x64-msix-submission` artifact。两者均未创建 Partner Center submission。
+
 - key parity / missing key 测试
 - `check:ui-i18n` 接入 `quality:frontend`
 - Playwright 语言切换 smoke
