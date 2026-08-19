@@ -3,6 +3,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta
+      content="base-uri 'none'; connect-src 'none'; default-src 'self'; font-src 'self'; form-action 'none'; frame-src 'none'; img-src 'self' data:; media-src 'none'; object-src 'none'; script-src 'none'; style-src 'self'"
+      http-equiv="Content-Security-Policy"
+    />
+    <meta content="no-referrer" name="referrer" />
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <meta
       content="ImgConvert privacy policy in English and Simplified Chinese."
@@ -106,11 +111,15 @@
           <p>
             ImgConvert stores conversion preferences locally. If you actively choose a custom output
             directory or a HEIC helper, its path is stored in local settings for your next use.
-            During conversion, ImgConvert may also create temporary files and thumbnail caches in
-            the local temporary directory or app-data directory. These files are used only to
-            complete the current conversion task, and you may delete them at any time. Settings,
-            caches, and temporary files are never synchronized to a server; you can remove them
-            through the relevant app settings or by deleting local app data.
+            During conversion, ImgConvert may also create temporary files, thumbnail caches, and
+            result-cache records in the local temporary directory or app-data directory.
+            Result-cache records contain only hashes and file sizes used to verify or reuse
+            conversion results; they do not contain image bytes or file paths and may remain after a
+            task completes until you clear them. Temporary files are used only to complete the
+            current conversion task, and you may delete them at any time. Settings, caches, and
+            temporary files are never synchronized to a server; you can disable result reuse in the
+            app. To remove saved settings and cache records, delete the relevant local app-data or
+            cache directory.
           </p>
 
           <h3>Windows HEIC decoding</h3>
@@ -187,7 +196,7 @@
           <h3>本机设置、缓存与临时文件</h3>
           <p>
             应用会在本机保存转换偏好设置。若你主动选择自定义输出目录或 HEIC
-            helper，其路径会保存在本机设置中，以便下次继续使用。转换过程中，应用还可能在本机临时目录或应用数据目录中创建临时文件和缩略图缓存。这些文件仅用于完成当前转换任务，用户可以随时删除。设置、缓存和临时文件都不会同步到任何服务器；你可以通过应用中的相关设置或删除本机应用数据清除它们。
+            helper，其路径会保存在本机设置中，以便下次继续使用。转换过程中，应用还可能在本机临时目录或应用数据目录中创建临时文件、缩略图缓存和结果缓存记录。结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小，不包含图片字节或文件路径；它可能在当前任务结束后继续保留，直至被清除。临时文件仅用于完成当前转换任务，用户可以随时删除。设置、缓存和临时文件都不会同步到任何服务器；你可以在应用中关闭结果复用。如需删除已保存的设置和缓存记录，请删除相应的本机应用数据或缓存目录。
           </p>
 
           <h3>Windows HEIC 解码</h3>

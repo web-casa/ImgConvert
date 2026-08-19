@@ -46,12 +46,15 @@ background.
 
 ImgConvert stores conversion preferences locally. If you actively choose a custom
 output directory or a HEIC helper, its path is stored in local settings for your
-next use. During conversion, ImgConvert may also create temporary files and
-thumbnail caches in the local temporary directory or app-data directory. These
-files are used only to complete the current conversion task, and you may delete
-them at any time. Settings, caches, and temporary files are never synchronized to
-a server; you can remove them through the relevant app settings or by deleting
-local app data.
+next use. During conversion, ImgConvert may also create temporary files,
+thumbnail caches, and result-cache records in the local temporary directory or
+app-data directory. Result-cache records contain only hashes and file sizes used
+to verify or reuse conversion results; they do not contain image bytes or file
+paths and may remain after a task completes until you clear them. Temporary files
+are used only to complete the current conversion task, and you may delete them at
+any time. Settings, caches, and temporary files are never synchronized to a
+server; you can disable result reuse in the app. To remove saved settings and
+cache records, delete the relevant local app-data or cache directory.
 
 ## Windows HEIC decoding
 
