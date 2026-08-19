@@ -110,6 +110,15 @@ jobs:
           IMGCONVERT_MACOS_HEIC_SMOKE_INPUT: ${{ runner.temp }}/imgconvert-macos-heic/smoke.heic
         run: pnpm run release:macos:smoke
 
+      - name: Upload Apple Silicon AVIF benchmark report
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: imgconvert-macos-arm64-avif-benchmark
+          if-no-files-found: error
+          retention-days: 14
+          path: target/benchmarks/platform-*-darwin-arm64.json
+
       - name: Check direct signing/notarization secrets
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.notarize_direct }}
         env:

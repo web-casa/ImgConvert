@@ -54,6 +54,12 @@ pnpm run bench:avif:macos
 IMGCONVERT_AVIF_BENCHMARK_SPEEDS=6,8,10 IMGCONVERT_AVIF_BENCHMARK_ITERATIONS=5 pnpm run bench:avif:macos
 ```
 
+The manual `macOS Smoke` workflow runs the same release-profile benchmark on the
+free public `macos-15` arm64 runner and retains the resulting
+`imgconvert-macos-arm64-avif-benchmark` JSON artifact for 14 days. Use its log
+and artifact together when recording a default-speed decision; do not infer
+Apple Silicon performance from a non-macOS preflight.
+
 Runtime smoke on macOS:
 
 ```bash
@@ -66,7 +72,7 @@ pnpm run release:macos:notarize -- --dmg=/path/to/ImgConvert.dmg --keychain-prof
 
 GitHub Actions:
 
-- Pushes to `main` run `macOS Smoke` on `macos-15` arm64, including generated HEIC fixture import through ImageIO.
+- Manual `macOS Smoke` runs on `macos-15` arm64, including the Apple Silicon AVIF benchmark and, by default, generated HEIC fixture import through ImageIO.
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
 - Manual `build_mas_candidate=true` imports Apple signing secrets, generates MAS entitlements/provisioning config, builds a signed `.app`, and optionally produces a `.pkg` when `IMGCONVERT_MAS_INSTALLER_IDENTITY` is set.

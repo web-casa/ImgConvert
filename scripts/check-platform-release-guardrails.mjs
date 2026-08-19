@@ -991,6 +991,15 @@ function checkMacosRuntimeGuardrails() {
       failures.push(`macOS Smoke workflow must verify ${expected}`);
     }
   }
+  for (const expected of [
+    "imgconvert-macos-arm64-avif-benchmark",
+    "target/benchmarks/platform-*-darwin-arm64.json",
+    "retention-days: 14",
+  ]) {
+    if (!macosWorkflow.includes(expected)) {
+      failures.push(`macOS Smoke workflow must retain ${expected} for AVIF benchmark review`);
+    }
+  }
 
   const cargoToml = readText(path.join(repoRoot, "src-tauri", "Cargo.toml"));
   const libRs = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));

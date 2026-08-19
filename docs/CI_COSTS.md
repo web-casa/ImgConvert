@@ -28,7 +28,8 @@ Default behavior:
   Manual dispatch defaults to `amd64` only, with free public arm64 and Docker
   smoke as explicit opt-ins.
 - `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
-  runner. Signing, notarization, DMG, and MAS candidate steps remain opt-in
+  runner. It retains the Apple Silicon AVIF benchmark JSON artifact for 14
+  days; signing, notarization, DMG, and MAS candidate steps remain opt-in
   because they require Apple secrets.
 - `Windows Smoke` is manual-only and runs on the free public
   `windows-latest` x64 runner. Installer signing and Store MSIX packaging
