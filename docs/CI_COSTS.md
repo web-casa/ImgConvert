@@ -41,6 +41,13 @@ Default behavior:
 - `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
   publish or consume real GitHub Release artifacts.
 
+The `CI` workflow's Ubuntu jobs that need native build packages use the shared
+`scripts/ci-install-apt-packages.sh` bootstrap. Its `apt-get update` work is
+bounded to three 180-second attempts with a short backoff, and package install
+is bounded to ten minutes. This converts a transient hosted-runner mirror stall
+into a clear retry or failure instead of silently consuming an entire CI job;
+it does not add a runner, schedule, package source, or privileged service.
+
 Run the static guardrail after changing workflows:
 
 ```bash

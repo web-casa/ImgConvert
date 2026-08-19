@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-08-19 — CI Ubuntu 依赖安装审查：限制 apt 停滞并重试
+
+- **审查证据**：`af71fe4` 的自动 CI 两次在不同 `ubuntu-24.04` jobs 的 `sudo apt-get update`
+  停滞；同一 attempt 的 frontend/security/E2E/Windows job 及 Store production MSIX smoke 均可
+  通过。因此不把 runner 网络停滞误判为应用测试失败，也不接受它占满 20/25 分钟 job timeout。
+- **修复契约**：所有 CI 的 Ubuntu 原生依赖安装必须经统一 bootstrap：update 至多三次、每次
+  180 秒并带短暂退避，install 至多十分钟；失败须带明确标签退出。workflow 只继续使用公开免费
+  标准 runner，未新增定时任务或第三方服务。
+- **验证要求**：shell 静态检查、CI cost/platform guardrail 和一次完整 public-runner CI 重跑
+  必须通过；若 runner 再次耗尽三次有界尝试，应记录基础设施失败而不是绕过测试。
+
+---
+
 ## 2026-08-19 — Windows Store 上架审查：保护 submission artifact 并补齐 `runFullTrust` 说明
 
 - **审查发现**：production `Windows Store MSIX` workflow 过去只生成/上传包，真实 runner 的
