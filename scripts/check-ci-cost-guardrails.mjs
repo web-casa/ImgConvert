@@ -151,6 +151,13 @@ function checkLinuxCiAptBootstrap() {
     "timeout --kill-after",
     "apt-get update",
     "apt-get install",
+    "GITHUB_ACTIONS",
+    "RUNNER_ENVIRONMENT",
+    "github-hosted",
+    "azure.archive.ubuntu.com",
+    "archive.ubuntu.com",
+    "restore_ubuntu_runner_mirror",
+    "restore_status",
   ]) {
     if (!bootstrap.includes(marker)) {
       failures.push(`CI Ubuntu native dependency bootstrap is missing marker: ${marker}`);
