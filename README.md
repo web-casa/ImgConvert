@@ -67,6 +67,7 @@ pnpm run release:platform:check # 架构/发布/文档静态护栏
 - [docs/ENGINE.md](docs/ENGINE.md) —— 混合架构引擎:core/crate 参数、系统 HEIC、C 工具链、打包/签名
 - [docs/LEGAL.md](docs/LEGAL.md) —— Apache-2.0、依赖许可红线、HEVC 专利、第三方组件合规
 - [docs/REFERENCES.md](docs/REFERENCES.md) —— 参考开源项目调研与可复用点
+- [PRIVACY.md](PRIVACY.md) / [PRIVACY.en.md](PRIVACY.en.md) —— 中英文隐私政策源文件；GitHub Pages 启用后公开于隐私页
 
 ## 📜 许可证
 

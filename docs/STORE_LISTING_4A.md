@@ -2,9 +2,9 @@
 
 # Phase 4a — Microsoft Store listing 与隐私政策准备包
 
-> 状态：**准备中，未提交 Partner Center**。本文件只收集已核实的工程事实、
-> 当前 Microsoft Store 输入项和需要发布责任人确认的内容；它不是已批准的营销
-> 文案、隐私政策翻译或提交文件。
+> 状态：**文案与隐私事实已确认，未提交 Partner Center**。本文件收集已核实的工程
+> 事实、已确认的 Store 输入文案与仍由账户负责人完成的提交动作；它不是 Partner Center
+> 导出的 CSV，也不代表已经提交或认证。
 
 ## 1. 范围与不变量
 
@@ -28,7 +28,7 @@
 | Store 包资源 | `packaging/windows/msix/AppxManifest.xml.template` | 仅 `en-US`，保持不变。 |
 | 核心格式 | `README.md`、capabilities 实现 | JPEG、PNG、WebP、AVIF 的本机批量转换；不要承诺 TIFF/JXL 或 HEIC 输出。 |
 | HEIC 边界 | `PRIVACY.md`、`docs/LEGAL.md`、Windows packaging 文档 | Windows 系统 WIC 的可选、仅解码能力；依赖 HEIF/HEVC 扩展可用性。 |
-| 本地处理/无遥测声明 | `PRIVACY.md` | 作为英文隐私政策翻译的源材料，仍须由发布责任人/法务逐条确认。 |
+| 本地处理/无遥测声明 | `PRIVACY.md`、发布负责人确认 | 图片和路径可为用户主动操作而在本机读取，但不会上传、收集或向第三方传输；用户选择的输出目录和 HEIC helper 路径可保存在本机设置中；无遥测或第三方网络服务。 |
 | 许可证 | `LICENSE`、`src-tauri/tauri.conf.json` | Apache-2.0；适用许可条款的最终呈现由发布责任人确认。 |
 | 当前截图 | `packaging/flatpak/screenshots/main.png` | 1440×1000 的中文网页预览，仅作构图参考；不是 Windows Store/MSIX 实机截图，不能直接当作已验收资产。 |
 | 当前图标 | `src-tauri/icons/` | 有 MSIX 所需图标；Partner Center 的 listing logo 仍需以当前导出的模板和校验结果为准。 |
@@ -47,19 +47,69 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 应以 Partner Center 导出的模板为准。多语言 CSV 的导出/导入流程见
 [Microsoft 的 MSIX CSV 指南](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/import-and-export-store-listings)。
 
+### 3.1 已确认的发布参数
+
+| 字段 | 已确认值 | 录入边界 |
+| --- | --- | --- |
+| Distribution / visibility | Public | 由 Partner Center 账户负责人执行最终提交。 |
+| Pricing | Free | 不添加试用、广告或应用内购买。 |
+| Markets | 账户可用的全部市场 | 如 Partner Center 对个别市场提出额外税务或合规要求，以其要求为准。 |
+| Category | Photo & video | 与本地图片转换工具的实际用途一致。 |
+| Support/contact URL | `https://github.com/web-casa/ImgConvert/issues` | 作为公开支持入口。 |
+| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/` | Pages 启用前不可填入真实 submission；见第 7 节。 |
+| License | Apache License 2.0 | 链接至 `https://www.apache.org/licenses/LICENSE-2.0`。 |
+
 | 字段 | `en-US` | `zh-CN` | 状态/负责人 |
 | --- | --- | --- | --- |
-| Product name | `ImgConvert` | `ImgConvert` | 确认使用已保留名称。 |
-| Short description | `[待发布负责人批准]` | `[待发布负责人批准]` | 不从 README 自动截取，避免与长描述重复。 |
-| Description | `[基于第 4 节事实表起草后批准]` | `[基于第 4 节事实表起草后批准]` | 必填。 |
-| Product features | `[从第 4 节选择 ≤20 条]` | `[从第 4 节选择 ≤20 条]` | 可选；每条短句，不夸大能力。 |
+| Product name | `ImgConvert` | `ImgConvert` | 需在 Partner Center 以已保留名称为准。 |
+| Short description | `Batch-convert and compress images locally — no account or upload required.` | `在本机批量转换和压缩图片，无需账号或上传。` | 可直接填入当日导出的模板。 |
+| Description | 见下方英文长描述 | 见下方中文长描述 | 必填；不得删除 HEIC 边界。 |
+| Product features | 见下方英文 features | 见下方中文 features | 逐条填入当日模板支持的 feature 字段。 |
 | What's new | 首次提交留空 | 首次提交留空 | 仅后续更新填写。 |
-| Search terms | `[待确认，最多 7 个]` | `[待确认，最多 7 个]` | 不包含竞品、价格或误导性词汇。 |
-| Applicable license terms | `[确认 Apache-2.0 呈现方式/URL]` | `[确认 Apache-2.0 呈现方式/URL]` | 需与仓库 `LICENSE` 一致。 |
-| Privacy policy URL | `[待部署的稳定 HTTPS URL]` | 同一 URL 或本地化 URL | Win32/MSIX 类产品必须提供，不能填临时预览地址。 |
-| Support/contact URL | `[待确认]` | `[待确认]` | 可使用 issue tracker，但响应责任人需确认。 |
-| Pricing, markets, visibility, category | `[待发布负责人确认]` | 同一产品决策 | 不从开源仓库推断“免费”或全球可用。 |
-| IARC age-rating 问卷 | `[待 Partner Center 账户负责人作答]` | 同一提交 | 不代填。 |
+| Search terms | `image converter`; `batch image converter`; `image compressor`; `JPEG converter`; `PNG converter`; `WebP converter`; `AVIF converter` | `图片转换`; `批量图片转换`; `图片压缩`; `JPEG转换`; `PNG转换`; `WebP转换`; `AVIF转换` | 不包含竞品、价格或误导性词汇。 |
+| Applicable license terms | `Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0` | `Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0` | 与仓库 `LICENSE` 一致。 |
+| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/#en` | `https://web-casa.github.io/ImgConvert/privacy/#zh-CN` | Pages 部署成功后填入。 |
+| Support/contact URL | `https://github.com/web-casa/ImgConvert/issues` | `https://github.com/web-casa/ImgConvert/issues` | 已确认。 |
+| Pricing, markets, visibility, category | Free; all account-eligible markets; Public; Photo & video | 免费；账户可用的全部市场；公开；照片和视频 | 已确认。 |
+| IARC age-rating 问卷 | 见第 3.3 节 | 见第 3.3 节 | 账户负责人必须据实作答并提交。 |
+
+### 3.2 待录入的双语长描述与 features
+
+**`en-US` description**
+
+> ImgConvert is a local-first desktop tool for batch image conversion and compression on Windows. Add files or folders, choose JPEG, PNG, WebP, or AVIF, adjust quality and metadata settings, and process the queue on your device.
+>
+> Your images, file paths, clipboard content, and conversion results stay on your device. ImgConvert has no accounts, ads, analytics, cloud conversion, or third-party network services.
+>
+> The Microsoft Store edition does not include an external HEIC helper and does not create HEIC output. When Windows system HEIF/HEVC extensions are available, Windows WIC may provide optional HEIC input decoding.
+
+**`en-US` product features**
+
+- Convert JPEG, PNG, WebP, and AVIF images in batches.
+- Import files or folders and follow conversion progress in a queue.
+- Choose output quality, lossless settings, metadata preservation, and color-management options.
+- Handle existing-output conflicts and cancel an active batch when needed.
+- Keep image processing on your device without an account or upload.
+
+**`zh-CN` description**
+
+> ImgConvert 是一款面向 Windows 的本地优先桌面图片批量转换与压缩工具。导入文件或文件夹，选择 JPEG、PNG、WebP 或 AVIF，调整质量和元数据设置，然后在本机完成队列处理。
+>
+> 图片、文件路径、剪贴板内容和转换结果均保留在设备上。ImgConvert 不提供账号、广告、分析、云端转换或第三方网络服务。
+>
+> Microsoft Store 版本不包含外部 HEIC helper，也不输出 HEIC。系统安装并提供 HEIF/HEVC 扩展时，Windows WIC 可能提供可选的 HEIC 输入解码能力。
+
+**`zh-CN` product features**
+
+- 批量转换 JPEG、PNG、WebP 和 AVIF 图片。
+- 导入文件或文件夹，在队列中查看转换进度。
+- 设置输出质量、无损模式、元数据保留和色彩管理选项。
+- 处理同名输出冲突，并可按需取消正在运行的批次。
+- 无需账号或上传，图片处理始终在本机完成。
+
+### 3.3 IARC 作答事实表（账户负责人提交）
+
+按已确认的产品事实，如问卷出现对应问题，应如实说明：没有广告、应用内购买、账号、社交/聊天、公开用户生成内容、赌博内容、第三方遥测或个人数据收集。图片与剪贴板内容仅由用户主动选择并在本机处理，不会上传或分享。预计结果应为一般受众级别，但最终评级由 IARC/Partner Center 依据实际问卷生成，不能在仓库中预先声明为保证结果。
 
 ## 4. 可安全复用的事实库（非最终广告文案）
 
@@ -81,20 +131,18 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 - “零专利风险”“完全无损适用于任何格式”等不可证实承诺。
 - 未经确认的价格、市场、客服 SLA、隐私/合规认证或性能数据。
 
-## 5. 英文隐私政策准备
+## 5. 英文隐私政策与公开页
 
-现有 `PRIVACY.md` 是中文源文本。最终英文版应与其逐段语义一致，并在发布前由
-发布责任人确认以下问题：
+发布责任人已确认：Microsoft Store 版没有遥测、崩溃报告、远程配置、账户、支付、
+广告 SDK 或第三方网络服务；现有中文政策准确描述 Store build。英文对应文本保存在
+[`PRIVACY.en.md`](../PRIVACY.en.md)，双语公开版将部署到
+`https://web-casa.github.io/ImgConvert/privacy/`。两种语言均以本机处理、用户明确文件
+授权、临时文件/缓存、Windows HEIC 边界、元数据选项、儿童隐私、第三方服务、政策更新
+和 GitHub Issues 联系方式为相同章节顺序。
 
-1. 产品是否在任何版本启用了遥测、崩溃报告、远程配置、账户、支付或第三方网络
-   服务；若答案变化，不能沿用“不会收集”的陈述。
-2. 临时文件、缩略图缓存和设置文件的实际位置、保留时间以及用户可删除方式。
-3. 对外可访问、长期稳定的 HTTPS 隐私政策 URL，以及维护/变更日期的责任人。
-4. 联系方式、适用法律、儿童隐私及地区性告知是否需要额外法律文本。
-5. Windows 系统 HEIF/HEVC 扩展的说明是否符合目标市场的产品/法律要求。
-
-Microsoft 要求隐私政策说明产品访问、收集或传输的个人信息及其使用、存储、共享与
-用户控制方式；政策应随功能变化更新。详见
+若日后加入任何网络服务或改变数据实践，必须先同步更新两种政策、公开页与 Store
+listing，再发布该版本。Microsoft 要求隐私政策说明产品访问、收集或传输的个人信息及其
+使用、存储、共享与用户控制方式；政策应随功能变化更新。详见
 [Store Policies §10.5](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies)。
 
 ## 6. 截图与 logo 工作表
@@ -115,10 +163,11 @@ Microsoft 要求隐私政策说明产品访问、收集或传输的个人信息�
 
 ## 7. 进入实际提交前的门槛
 
-1. 发布责任人批准双语 description/feature、价格/市场/分类、关键词、年龄评级答案、
-   许可条款、支持联系方式和隐私政策 URL。
-2. 法务或发布责任人批准英文隐私政策，确认它与真实数据实践一致。
-3. 在 Windows runner/机器构建 Store MSIX，并保持：
+1. 仓库管理员在 GitHub **Settings → Pages → Build and deployment → Source** 选择
+   **GitHub Actions**；首次 workflow 成功后，验证
+   `https://web-casa.github.io/ImgConvert/privacy/` 中英文锚点和 Issues 链接。该 repo
+   当前尚未配置 Pages，未完成此步前不得将 URL 填入 Partner Center。
+2. 在 Windows runner/机器构建 Store MSIX，并保持：
 
    ```powershell
    $env:IMGCONVERT_DISABLE_EXTERNAL_CODECS = "1"
@@ -129,7 +178,9 @@ Microsoft 要求隐私政策说明产品访问、收集或传输的个人信息�
    pnpm run release:windows:msix:smoke
    ```
 
-4. 将确认过的文字和实机资产填入**刚导出的** Partner Center CSV，按 UTF-8 导入或在
+3. 使用实际 Windows Store 候选 MSIX 获取第 6 节所列的中英文实机截图；不得将网页预览
+   当作 Store 截图。
+4. 将本文件确认过的文字和实机资产填入**刚导出的** Partner Center CSV，按 UTF-8 导入或在
    Partner Center 逐语言录入；再由账户负责人发起认证。
 
 本阶段不授权自动创建 Partner Center submission、上传包、设置市场/价格或点击发布。

@@ -238,9 +238,11 @@ package.json: check:ui-i18n
 
 ### Phase 4a：Store listing 与隐私政策
 
-**准备状态（2026-08-19）：** 已建立 [Store listing 与隐私政策准备包](STORE_LISTING_4A.md)。
-在发布责任人确认双语文案、隐私政策 URL、市场/价格、年龄评级和实机截图前，不生成
-可导入的 Partner Center CSV，也不发起提交。
+**当前状态（2026-08-19）：** 发布负责人已确认公开免费、账户可用全部市场、本地优先
+定位、GitHub Pages、GitHub Issues 和现有无遥测事实。已在
+[Store listing 与隐私政策准备包](STORE_LISTING_4A.md) 写入双语文案、英文政策和 Pages
+工作流；仍需仓库管理员启用 Pages、生成 Windows 实机截图，并由 Partner Center 账户
+负责人导出 CSV、完成 IARC 和提交。未完成这些外部动作前，不发起 submission。
 
 - Partner Center 中文 / English listing
 - 隐私政策中英双语
