@@ -160,7 +160,7 @@ errors: {
 规则：
 
 - `params` 只放适合 UI 插值的标量值（当前为路径或格式）；未使用时为 `null`。
-- `detail` 保留原始技术原因，前端可在开发者控制台记录，但**绝不**显示或插值到用户界面。
+- `detail` 保留原始技术原因，前端只可在**开发环境**的开发者控制台记录，且**绝不**显示或插值到用户界面；生产环境的后台失败日志必须先映射为本地化 message，不能直接输出 reject payload。
 - 前端只按 `errors.<code>` 渲染 ICU message；未知、旧版字符串或畸形 payload 一律走
   `errors.taskFailed`，不能回退显示原始错误。
 - 除 command reject 外，批量 `fileError` / `fileSkipped` progress event、导入扫描的逐项
@@ -175,6 +175,10 @@ key，并由现有 key parity 测试守护。项目的 `translate()` 封装和�
 必须把插值对象放入 `values`：`translate(key, params)` 会转为 `{ values: params }`，直接调用
 则使用 `$t(key, { values: params })`。这是 `svelte-i18n` v4 的 ICU 参数接口，不能把 params
 直接作为第二个对象的顶层字段。
+
+### 6.2 Phase 3 复核补充（2026-08-19）
+
+- UI 路径和后台路径都必须经过同一错误格式化层。缩略图、剪贴板临时文件清理、HEIC helper 同步等没有用户提示的后台失败，生产环境只能记录本地化后的通用消息；原始 `detail` 仅由格式化层在开发环境记录。
 
 ## 7. CI 硬编码检查
 

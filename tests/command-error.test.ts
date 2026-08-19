@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatCommandError, parseCommandError } from "../src/lib/command-error";
+import { formatCommandError, logCommandError, parseCommandError } from "../src/lib/command-error";
 import { initI18n } from "../src/lib/i18n";
 
 afterEach(async () => {
@@ -57,6 +57,21 @@ describe("structured command errors", () => {
     );
     expect(formatCommandError({ code: "fileNotFound", params: null, detail: "missing" })).toBe(
       "The requested operation could not be completed. Please try again.",
+    );
+  });
+
+  it("routes background logs through the localized message", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    logCommandError("Thumbnail generation failed", {
+      code: "thumbnailFailed",
+      params: { path: "/images/source.png" },
+      detail: "decoder backend failure",
+    });
+
+    expect(warn).toHaveBeenLastCalledWith(
+      "Thumbnail generation failed:",
+      "Could not generate an image preview: /images/source.png",
     );
   });
 });

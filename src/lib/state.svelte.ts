@@ -5,7 +5,7 @@ import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
-import { formatCommandError, type CommandError } from "$lib/command-error";
+import { formatCommandError, logCommandError, type CommandError } from "$lib/command-error";
 import {
   locale as localeStore,
   setAppLocale,
@@ -651,7 +651,7 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
 
 async function hostPlatform(): Promise<string> {
   hostPlatformPromise ??= invoke<string>("host_platform").catch((error) => {
-    console.warn("Failed to read host platform:", error);
+    logCommandError("Failed to read host platform", error);
     return "unknown";
   });
   return hostPlatformPromise;
@@ -1279,7 +1279,7 @@ function cleanupTemporaryImport(item: QueueItem) {
 function cleanupTemporaryPath(path: string) {
   if (!isTauriRuntime()) return;
   void invoke<boolean>("cleanup_imported_temp_file", { path }).catch((error) => {
-    console.warn("Failed to clean clipboard temp files:", error);
+    logCommandError("Failed to clean clipboard temp files", error);
   });
 }
 
@@ -1340,7 +1340,7 @@ async function loadThumbnail(item: QueueItem) {
     item.thumbnailStatus = "ready";
   } catch (e) {
     if (!queue.includes(item)) return;
-    console.warn("Thumbnail generation failed:", e);
+    logCommandError("Thumbnail generation failed", e);
     item.thumbnailStatus = "error";
   }
 }
@@ -1403,7 +1403,7 @@ export async function cancelConversion() {
     try {
       await invoke<boolean>("cancel_batch");
     } catch (e) {
-      console.warn("Failed to cancel batch task:", e);
+      logCommandError("Failed to cancel batch task", e);
     }
   }
 }
@@ -1742,7 +1742,7 @@ async function syncSelectedHeicHelper() {
       path: settings.heicHelperPath,
     });
   } catch (error) {
-    console.warn("Failed to sync HEIC helper allowlist:", error);
+    logCommandError("Failed to sync HEIC helper allowlist", error);
   }
 }
 

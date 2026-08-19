@@ -70,6 +70,14 @@ export function formatCommandError(error: unknown): string {
   }
 }
 
+/**
+ * Logs a command failure without leaking its backend detail in production.
+ * `formatCommandError` retains the structured detail for local development.
+ */
+export function logCommandError(context: string, error: unknown): void {
+  console.warn(`${context}:`, formatCommandError(error));
+}
+
 function parseCommandErrorJson(value: string): CommandError | null {
   try {
     return parseCommandErrorObject(JSON.parse(value) as unknown);
