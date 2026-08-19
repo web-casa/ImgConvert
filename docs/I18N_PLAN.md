@@ -316,8 +316,10 @@ submission artifact 重建均已完成。`Windows Smoke`
   `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` 和 `IMGCONVERT_DISABLE_UPDATER=1`，并按顺序运行
   `release:windows:msix` 与 `release:windows:msix:smoke`。静态 platform guardrail 必须守住
   这些标记；此 smoke 不得发布或创建 Partner Center submission。
-- `Windows Store MSIX` workflow 只重建并上传 submission artifact。下载 artifact、录入
-  Partner Center、IARC 和提交仍是账户负责人执行的外部动作，不能由仓库 QA 自动代替。
+- `Windows Store MSIX` workflow 使用正式 Partner Center identity 重建 submission artifact，
+  但先对临时副本执行 sideload conversion smoke，再上传未被临时签名改写的原始 artifact。下载
+  artifact、录入 Partner Center、IARC、`runFullTrust` 用途说明和提交仍是账户负责人执行的外部
+  动作，不能由仓库 QA 自动代替。
 
 ## 9. 排期
 

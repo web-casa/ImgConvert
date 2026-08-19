@@ -36,7 +36,8 @@ Default behavior:
   remain opt-in because they require secrets or Store identity work.
 - `Windows Store MSIX` is a manual-only production submission build. It uses
   the committed Partner Center identity defaults, disables external codecs and
-  Tauri updater, and uploads a 14-day `*.msix` submission artifact.
+  Tauri updater, verifies a temporary copy through the elevated sideload smoke,
+  and uploads the untouched original `*.msix` submission artifact for 14 days.
 - `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
   publish or consume real GitHub Release artifacts.
 

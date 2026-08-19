@@ -112,6 +112,21 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 
 按已确认的产品事实，如问卷出现对应问题，应如实说明：没有广告、应用内购买、账号、社交/聊天、公开用户生成内容、赌博内容、第三方遥测或个人数据收集。图片与剪贴板内容仅由用户主动选择并在本机处理，不会上传或分享。预计结果应为一般受众级别，但最终评级由 IARC/Partner Center 依据实际问卷生成，不能在仓库中预先声明为保证结果。
 
+### 3.4 Submission options：`runFullTrust` 用途说明（账户负责人提交）
+
+MSIX manifest 声明了 `runFullTrust`，它是提交时需要说明用途的 restricted capability。不能把
+sideload 成功当作 Store 审核已同意；账户负责人必须在 Partner Center 的 **Submission options**
+中据实填写。Microsoft 要求对每个 restricted capability 说明为何需要及如何使用，详见
+[App capability declarations](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/app-capability-declarations)
+和 [Submission options](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/manage-submission-options)。
+
+可作为事实准确的英文初稿（仍由账户负责人在提交当日核对后录入）：
+
+> ImgConvert is a packaged Win32/Tauri desktop application. `runFullTrust` is required to launch its full-trust desktop process. The app converts image files only after the user explicitly selects files or folders and chooses an output directory. It does not declare `broadFileSystemAccess`, elevation, device, network, or background-task capabilities. To test, launch the app, import a JPEG/PNG/WebP/AVIF sample with the file picker, select one of those output formats, choose an output directory, and start the conversion. No account, network service, external codec helper, or in-app updater is required for the Microsoft Store build.
+
+不得声称 Store 已批准此 capability；最终审批和任何补充问题均由 Microsoft/Partner Center
+决定。
+
 ## 4. 可安全复用的事实库（非最终广告文案）
 
 以下句子只可在逐条确认后进入 description、feature 或截图 caption：
@@ -179,9 +194,14 @@ listing，再发布该版本。Microsoft 要求隐私政策说明产品访问、
    pnpm run release:windows:msix:smoke
    ```
 
+   `release:windows:msix:smoke` 必须只对放在临时目录的副本签名、安装和删除；由
+   `release:windows:msix` 产出的原始 `*.msix` 不得被 smoke 改写，才可作为待上传的
+   submission artifact。手动 `Windows Store MSIX` workflow 必须遵循“build → 临时副本
+   smoke → upload 原始 artifact”的顺序。
+
 3. 使用实际 Windows Store 候选 MSIX 获取第 6 节所列的中英文实机截图；不得将网页预览
    当作 Store 截图。
 4. 将本文件确认过的文字和实机资产填入**刚导出的** Partner Center CSV，按 UTF-8 导入或在
-   Partner Center 逐语言录入；再由账户负责人发起认证。
+   Partner Center 逐语言录入，并填写第 3.4 节的 `runFullTrust` 用途说明；再由账户负责人发起认证。
 
 本阶段不授权自动创建 Partner Center submission、上传包、设置市场/价格或点击发布。

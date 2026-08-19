@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-19 — Windows Store 上架审查：保护 submission artifact 并补齐 `runFullTrust` 说明
+
+- **审查发现**：production `Windows Store MSIX` workflow 过去只生成/上传包，真实 runner 的
+  sideload smoke 只覆盖 `ImgConvert.DevSmoke` identity；同时 `release:windows:msix:smoke` 会把
+  传入的原始 `.msix` 临时签名，若在正式候选包上执行会污染待上传 artifact。
+- **修复契约**：Store production workflow 必须按“build → 对临时副本 self-sign/sideload/convert
+  smoke → upload untouched original artifact”运行，并由静态 guardrail 守住。安装 smoke 还必须
+  比对 packed manifest 和当前 prepared manifest 的 identity，避免把陈旧或不同 identity 的包当作
+  正式候选验收。
+- **Partner Center 资料修复**：manifest 的 `runFullTrust` 是 restricted capability；
+  `STORE_LISTING_4A.md` 新增事实准确的 Submission options 初稿和测试路径。账户负责人仍须在
+  提交时据实填入，Microsoft 的审批不由仓库预先声明。
+- **边界**：没有创建/上传 Partner Center submission、没有更改 Store 的
+  `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` / `IMGCONVERT_DISABLE_UPDATER=1`、免费 public runner
+  策略或 Flatpak app-id。
+
+---
+
 ## 2026-08-19 — Apple Silicon AVIF/rav1e 实测：保持 speed 8 默认
 
 - **真实 Apple Silicon runner**：[macOS Smoke run 32225662409](https://github.com/web-casa/ImgConvert/actions/runs/32225662409) 在公开免费 `macos-15` `arm64` runner 上通过架构检查、Tauri fmt/clippy/test 与 release runtime smoke。benchmark artifact 的 host 为 `darwin/arm64`、3 CPU、约 7 GiB 内存。

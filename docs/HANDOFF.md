@@ -58,7 +58,9 @@
   DevSmoke identity、Store disable flags、MSIX build 与 sideload install smoke。2026-08-19 的
   [Windows Smoke run 32218246687](https://github.com/web-casa/ImgConvert/actions/runs/32218246687)
   已通过；[Windows Store MSIX run 32218253749](https://github.com/web-casa/ImgConvert/actions/runs/32218253749)
-  已重建 submission artifact
+  已重建 submission artifact。production workflow 现在也会在上传前对临时副本执行正式 identity
+  smoke，原始 submission artifact 不会被临时签名改写；Partner Center 仍需填写 `runFullTrust`
+  用途说明。
 
 ### 未完成
 

@@ -90,10 +90,11 @@ config, runs `tauri build --ci --no-bundle`, validates the Store assets in `src-
 `ImgConvert_<version>_x64.msix` with `makeappx.exe`. Use
 `release:windows:msix:pack` to repack an already-built binary.
 
-Sideload install smoke signs the MSIX with a temporary self-signed certificate
-matching the manifest publisher, trusts it, installs the package, and runs the
-hidden conversion smoke from the installed `ImgConvert.exe`. It requires an
-elevated shell:
+Sideload install smoke first copies the MSIX into a temporary directory, then
+signs that copy with a temporary self-signed certificate matching the manifest
+publisher, trusts it, installs the copy, and runs the hidden conversion smoke
+from the installed `ImgConvert.exe`. The original submission artifact remains
+unchanged. It requires an elevated shell:
 
 ```powershell
 pnpm run release:windows:msix:smoke
@@ -101,8 +102,9 @@ pnpm run release:windows:msix:smoke
 
 GitHub Actions provides a dedicated `Windows Store MSIX` production build
 workflow. It uses the committed Partner Center identity defaults, builds the
-submission `.msix` with external codecs and Tauri updater disabled, and uploads
-the `imgconvert-windows-x64-msix-submission` artifact.
+submission `.msix` with external codecs and Tauri updater disabled, runs the
+sideload smoke against a temporary copy, then uploads the untouched
+`imgconvert-windows-x64-msix-submission` artifact.
 
 For a real hosted-runner install smoke, manually dispatch `Windows Smoke` with
 `store_msix=true`. That path uses the isolated `ImgConvert.DevSmoke` identity,
@@ -118,7 +120,10 @@ rating/privacy metadata, and a real install smoke on the submitted package
 (`release:windows:msix:smoke` covers the sideload path). The main package must
 keep `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` and
 `IMGCONVERT_DISABLE_UPDATER=1`; optional HEIC helpers must not be bundled into
-the Store package unless channel rules are revalidated.
+the Store package unless channel rules are revalidated. `runFullTrust` is a
+restricted capability; the account owner must provide its factual use case in
+Partner Center Submission options before certification, as recorded in
+`docs/STORE_LISTING_4A.md`.
 
 Windows HEIC remains decode-only by product policy. The system route uses WIC
 runtime detection of the Microsoft HEIF Image Extensions and HEVC Video
