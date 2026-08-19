@@ -54,7 +54,11 @@
 
 ## 4. 下一步建议：Phase 4a
 
-Phase 3 已完成。下一步需要准备 Store listing、隐私政策和截图说明的中英双语内容；这些属于面向用户的业务/法务文案，应在发布前由人类确认。
+Phase 3 已完成并复核。Phase 4a 的工程事实、Partner Center 输入项、截图工作表及人工
+确认门槛见 [`docs/STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)。下一步需要准备 Store
+listing、隐私政策和截图说明的中英双语内容；这些属于面向用户的业务/法务文案，应在
+发布前由人类确认。未获确认前不生成 CSV、不创建 Partner Center submission，也不设置
+市场或价格。
 
 Phase 3 的已落地契约见 `docs/I18N_PLAN.md`：
 

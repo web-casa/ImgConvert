@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-08-19 — Phase 3 复核与 Phase 4a 准备
+
+- **复核修复**：审查 Tauri IPC envelope、前端解析/ICU 映射和后台 invoke 路径后，统一缩略图、临时文件清理、HEIC helper 同步等后台 command 失败日志。生产环境仅记录本地化 message，不再将 backend `detail` 原样写到控制台；开发环境保留受控的技术诊断。
+- **回归保护**：新增 `logCommandError()` 单测，验证后台路径通过 `code`/`params` 生成本地化消息，保留 `zh-CN`/`en-US` key parity 现有检查。
+- **4a 准备**：新增 [`STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)，记录已核实的产品/渠道边界、Partner Center 资料工作表、隐私政策待确认问题和实机截图要求。未制作未获批准的广告/法务文案、CSV 或实际提交。
+
+---
+
 ## 2026-08-19 — i18n Phase 3：结构化 Tauri command 错误
 
 - **IPC 契约**：新增 `CommandError { code, params, detail }` / `ErrorCode`。所有可失败的 Tauri command 在边界处返回结构化错误；底层 `Result<T, String>` 继续留在内部实现。
