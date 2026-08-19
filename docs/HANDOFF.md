@@ -25,6 +25,7 @@
 - 隐私政策：`PRIVACY.md`
 - Logo 已全部替换并压缩
 - 前端 i18n Phase 1/2 完成：`zh-CN` + `en-US`
+- i18n Phase 3 完成：Tauri command 错误使用结构化 `CommandError`，前端按 ICU message 本地化
 
 ## 3. 多语言现状
 
@@ -39,20 +40,23 @@
 - `scripts/check-ui-hardcoded-strings.mjs` 接入 `quality:frontend`
 - `tests/i18n.test.ts` key parity 测试
 - `svelte-i18n>esbuild` override 修复 audit
+- `src-tauri/src/command_error.rs` 定义 `CommandError { code, params, detail }` 与稳定错误码
+- 所有可失败 Tauri command、批量 progress、导入逐项错误和转换规划错误均使用该 envelope
+- `src/lib/command-error.ts` 只按 `errors.<code>` 本地化；`detail` 仅供开发调试，畸形/旧 payload 回退通用错误
+- ICU 插值统一使用 `svelte-i18n` v4 的 `{ values: params }` 接口
 
 ### 未完成
 
-- Rust 后端错误仍是 `Result<T, String>`，中文错误会直通前端
 - Store listing 英文未准备
 - 隐私政策英文未准备
 - docs-site 英文站未做
 - MSIX 包内 MRT 本地化未做（暂时明确不做）
 
-## 4. 下一步建议：Phase 3
+## 4. 下一步建议：Phase 4a
 
-目标：Rust 后端结构化错误码迁移。
+Phase 3 已完成。下一步需要准备 Store listing、隐私政策和截图说明的中英双语内容；这些属于面向用户的业务/法务文案，应在发布前由人类确认。
 
-设计已写入 `docs/I18N_PLAN.md`：
+Phase 3 的已落地契约见 `docs/I18N_PLAN.md`：
 
 ```rust
 pub struct CommandError {
@@ -62,13 +66,12 @@ pub struct CommandError {
 }
 ```
 
-重点：
+已完成的边界：
 
-- 迁移所有 `#[tauri::command]` 边界
-- 内部 `Result<T, String>` 可保留
-- 前端用 ICU 插值渲染 `params`
-- 底层错误原文放 `detail` 或日志
-- 需要同步更新测试与前端错误处理
+- 内部 `Result<T, String>` 保留在底层；只在 Tauri command 边界转换为 `Result<T, CommandError>`
+- 前端用 ICU 插值渲染 `params`，不显示 `detail`
+- 批量事件、导入扫描明细与转换规划遵循同一结构，避免字符串旁路
+- `codec_diagnostics()` 仍是成功返回的技术快照；HEIC helper 配置失败则走结构化错误
 
 ## 5. 关键约定与坑
 
@@ -107,7 +110,7 @@ git push origin main
 
 ## 8. 当前阻塞项
 
-- Phase 3：无外部阻塞，可直接开发
+- Phase 4a：Store listing/隐私政策中英文案需要发布责任人确认
 - macOS 签名/MAS：需要 Apple secrets
 - Windows 直发签名：需要代码签名证书
 - Store 提交：需要 Partner Center 账号与 listing 资料

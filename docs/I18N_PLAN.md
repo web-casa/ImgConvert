@@ -14,7 +14,7 @@
 - 前端：`svelte-i18n` v4
   - 支持 Svelte 5
   - 项目规模下足够，不引入框架级 i18n
-- OS locale：`@tauri-apps/plugin-locale`
+- OS locale：`@tauri-apps/plugin-os`
   - Tauri 桌面端优先使用 OS locale
   - 网页预览 fallback 到 `navigator.language`
 
@@ -79,21 +79,29 @@ locale: "zh-CN" | "en-US"
 
 ```rust
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommandError {
     pub code: ErrorCode,
     pub params: Option<serde_json::Value>,
     pub detail: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ErrorCode {
     FileNotFound,
-    UnsupportedFormat,
     PermissionDenied,
+    UnsupportedFormat,
+    OutputExists,
+    OutputNotSmaller,
     ConversionFailed,
-    ImportCancelled,
-    HeicDecoderNotFound,
+    BatchFailed,
+    ImportFailed,
+    ClipboardImportFailed,
+    NativeDialogFailed,
+    ThumbnailFailed,
+    CodecConfigurationFailed,
+    TaskFailed,
 }
 ```
 
@@ -116,6 +124,8 @@ errors: {
 - `detail` 只放底层错误原文，不决定用户语言
 
 ### 6.1 Phase 3 已确认的 IPC 错误契约
+
+**状态：2026-08-19 已完成。**
 
 > 本节在实现前锁定，避免前后端各自猜测 Tauri reject payload。Tauri command 的
 > `Err` 必须序列化为下列 JSON 对象；不得再把 Rust 的中文/英文底层错误字符串直接
@@ -211,16 +221,16 @@ package.json: check:ui-i18n
 
 ### Phase 3：Rust 结构化错误迁移
 
-- 定义 `CommandError` / `ErrorCode`
-- 迁移核心 command 边界：
+- [x] 定义 `CommandError` / `ErrorCode`
+- [x] 迁移核心 command 边界：
   - import
   - convert
   - native dialog
   - clipboard
   - thumbnail
   - external codec diagnostics
-- 前端错误映射与 ICU 插值
-- 保留底层 detail
+- [x] 前端错误映射与 ICU 插值
+- [x] 保留底层 detail，且不在用户界面显示
 
 ### Phase 4a：Store listing 与隐私政策
 

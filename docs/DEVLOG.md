@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-08-19 — i18n Phase 3：结构化 Tauri command 错误
+
+- **IPC 契约**：新增 `CommandError { code, params, detail }` / `ErrorCode`。所有可失败的 Tauri command 在边界处返回结构化错误；底层 `Result<T, String>` 继续留在内部实现。
+- **无字符串旁路**：批量 `fileError` / `fileSkipped` progress event、导入扫描逐项错误及转换规划错误也改为同一 envelope。`codec_diagnostics()` 保持成功返回的技术快照，HEIC helper 配置失败走 `codecConfigurationFailed`。
+- **前端本地化**：新增 `errors.*` 双语 key 和 `command-error` 解析/映射层；只按 `code` 与 `params` 渲染 ICU message，`detail` 仅在开发控制台记录，旧版或畸形 payload 统一回退通用错误。同步修复 `svelte-i18n` v4 需要 `{ values: params }` 的 ICU 插值调用。
+- **验证**：`quality:frontend`、`quality:rust`、`quality:security`、全平台 release guardrail、Playwright，以及 Linux Tauri debug `.deb` build/artifact smoke 均通过。
+- **发布约束**：未改变 Store 的 updater/外部 codec 禁用策略，未修改 Flatpak app-id。
+
+---
+
 ## 2026-08-18 — i18n Phase 1/2：zh-CN + en-US 前端双语
 
 - **Phase 1**：接入 `svelte-i18n` 与 `@tauri-apps/plugin-os`，新增 `src/lib/i18n/`、`settings.locale`、Topbar 语言切换、启动 loading gate 与 OS locale 检测。
