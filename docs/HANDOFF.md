@@ -26,6 +26,7 @@
 - Logo 已全部替换并压缩
 - 前端 i18n Phase 1/2 完成：`zh-CN` + `en-US`
 - i18n Phase 3 完成：Tauri command 错误使用结构化 `CommandError`，前端按 ICU message 本地化
+- Phase 4a 文案与隐私来源已完成：双语 Store metadata、`PRIVACY.en.md`、无外部资源的 Pages 隐私页与公开 runner 部署工作流
 
 ## 3. 多语言现状
 
@@ -47,18 +48,22 @@
 
 ### 未完成
 
-- Store listing 英文未准备
-- 隐私政策英文未准备
+- GitHub Pages 尚未由仓库管理员启用，公开隐私页尚未实际部署
+- Windows Store 候选 MSIX 的中英文实机截图未生成
+- Partner Center CSV、IARC 问卷与实际 submission 未完成
 - docs-site 英文站未做
 - MSIX 包内 MRT 本地化未做（暂时明确不做）
 
 ## 4. 下一步建议：Phase 4a
 
-Phase 3 已完成并复核。Phase 4a 的工程事实、Partner Center 输入项、截图工作表及人工
-确认门槛见 [`docs/STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)。下一步需要准备 Store
-listing、隐私政策和截图说明的中英双语内容；这些属于面向用户的业务/法务文案，应在
-发布前由人类确认。未获确认前不生成 CSV、不创建 Partner Center submission，也不设置
-市场或价格。
+Phase 3 已完成并复核。Phase 4a 的双语 Store metadata、英文隐私政策、截图工作表及外部
+门槛见 [`docs/STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)。发布负责人已确认公开免费、
+账户可用全部市场、本地优先定位、GitHub Pages、GitHub Issues 和无遥测事实。
+
+接下来由仓库管理员在 **Settings → Pages** 将 Source 设为 **GitHub Actions**；首次
+`pages.yml` 成功后再验证 `https://web-casa.github.io/ImgConvert/privacy/`。之后仍需实际
+Windows Store MSIX 截图、当日 Partner Center CSV、IARC 和账户负责人提交；不自动创建
+submission、设置市场/价格或点击发布。
 
 Phase 3 的已落地契约见 `docs/I18N_PLAN.md`：
 
@@ -84,6 +89,7 @@ pub struct CommandError {
   - `IMGCONVERT_DISABLE_UPDATER=1`
 - MAS/MSIX 不启用 Tauri updater
 - Windows Store 身份默认值在 `scripts/prepare-windows-msix-release.mjs`
+- `pages/` 是独立、无依赖的双语隐私页；`pages.yml` 只使用 `ubuntu-24.04`，Pages 未启用时自动跳过 push 部署
 - Flatpak app-id 仍是 `io.github.yeagoo.imgconvert`
 - 不要删除 `docs/DEVLOG.md` 的历史条目
 - Rust 中文日志/注释保留中文，不要求迁移
@@ -114,7 +120,7 @@ git push origin main
 
 ## 8. 当前阻塞项
 
-- Phase 4a：Store listing/隐私政策中英文案需要发布责任人确认
+- Phase 4a：需要仓库管理员启用 GitHub Pages，并由 Partner Center 账户负责人执行 IARC/CSV/提交
 - macOS 签名/MAS：需要 Apple secrets
 - Windows 直发签名：需要代码签名证书
 - Store 提交：需要 Partner Center 账号与 listing 资料

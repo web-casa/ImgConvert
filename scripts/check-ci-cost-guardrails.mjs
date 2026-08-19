@@ -16,6 +16,7 @@ const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
+const pages = readWorkflow("pages.yml");
 
 const allWorkflows = [
   ["ci.yml", ci],
@@ -25,6 +26,7 @@ const allWorkflows = [
   ["macos-smoke.yml", macosSmoke],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
+  ["pages.yml", pages],
 ];
 
 for (const [name, text] of allWorkflows) {
@@ -49,6 +51,7 @@ checkStandardPlatformWorkflow(
   "Windows Store",
   "windows-latest",
 );
+checkPagesWorkflow();
 
 if (!packageJson.scripts?.["ci:cost:check"]?.includes("check-ci-cost-guardrails.mjs")) {
   failures.push("package.json must expose ci:cost:check");
@@ -202,6 +205,21 @@ function checkWindowsStoreReleaseWorkflow() {
   ]) {
     if (!windowsStoreRelease.includes(marker)) {
       failures.push(`windows-store-release.yml missing marker: ${marker}`);
+    }
+  }
+}
+
+function checkPagesWorkflow() {
+  for (const marker of [
+    "github.event.repository.has_pages == true",
+    "actions/configure-pages@v5",
+    "actions/upload-pages-artifact@v4",
+    "actions/deploy-pages@v4",
+    "path: pages",
+    "name: github-pages",
+  ]) {
+    if (!pages.includes(marker)) {
+      failures.push(`pages.yml missing marker: ${marker}`);
     }
   }
 }

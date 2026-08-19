@@ -43,7 +43,7 @@
     "release:readiness:github": "node scripts/report-release-readiness.mjs --scope=github",
     "release:readiness:github:ready": "node scripts/report-release-readiness.mjs --scope=github --require-publishable",
     "release:readiness:all": "node scripts/report-release-readiness.mjs --scope=all",
-    "docs:check": "node scripts/check-readme-status.mjs",
+    "docs:check": "node scripts/check-readme-status.mjs && node scripts/check-pages-privacy.mjs",
     "release:readiness:check": "pnpm run docs:check && node scripts/report-release-readiness.mjs --check",
     "ci:cost:check": "node scripts/check-ci-cost-guardrails.mjs",
     "toolchain:check": "node scripts/check-native-toolchain.mjs",

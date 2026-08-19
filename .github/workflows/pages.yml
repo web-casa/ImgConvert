@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+
+name: Publish Privacy Policy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pages/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # The repository does not have Pages enabled yet. Skipping push-triggered
+    # work until it does avoids a failing deployment while keeping future page
+    # edits automatic once an administrator selects GitHub Actions as source.
+    if: github.event_name == 'workflow_dispatch' || github.event.repository.has_pages == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload privacy-policy artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy privacy-policy artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

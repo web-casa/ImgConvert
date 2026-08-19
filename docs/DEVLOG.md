@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-08-19 — Phase 4a：已确认 Store 文案与 GitHub Pages 隐私页
+
+- **确认范围**：发布负责人选择公开、免费、账户可用全部市场、`Photo & video` 分类、本地优先定位、GitHub Pages 隐私 URL、GitHub Issues 支持入口，并确认 Store build 无遥测、广告、账号、崩溃报告、远程配置或第三方网络服务。
+- **Store metadata**：[`STORE_LISTING_4A.md`](./STORE_LISTING_4A.md) 现在包含可录入的 `en-US` / `zh-CN` short description、长描述、features、关键词、许可、IARC 事实表与截图工作表；仍坚持从 Partner Center 导出当日 CSV，且不自动提交。
+- **隐私公开页**：新增 `PRIVACY.en.md`、`pages/privacy/` 双语静态页和 `pages.yml`。页面没有远程字体、脚本或图片资源；不改现有 Next/Fumadocs 架构。仓库当前未启用 Pages，管理员选择 GitHub Actions source 后才会实际部署。
+- **准确性修复**：审计 `settings.json` 后，政策明确披露用户主动选择的输出目录与 HEIC helper 路径会保存在本机设置；图片和路径不会上传、收集或向第三方传输。新增 `check-pages-privacy.mjs`，并接入 `docs:check`。
+- **约束与验证**：Pages workflow 仅用 `ubuntu-24.04`，纳入 CI 成本护栏；未改 Store 外部 codec/updater 禁用策略或 Flatpak app-id。`quality:frontend`、`quality:security`、`quality:rust`、全平台 guardrail、Playwright、Linux Tauri debug `.deb` smoke 通过。
+
+---
+
 ## 2026-08-19 — Phase 3 复核与 Phase 4a 准备
 
 - **复核修复**：审查 Tauri IPC envelope、前端解析/ICU 映射和后台 invoke 路径后，统一缩略图、临时文件清理、HEIC helper 同步等后台 command 失败日志。生产环境仅记录本地化 message，不再将 backend `detail` 原样写到控制台；开发环境保留受控的技术诊断。
