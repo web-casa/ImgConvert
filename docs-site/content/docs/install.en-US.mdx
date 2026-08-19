@@ -1,0 +1,102 @@
+---
+title: Installation
+description: Download, verify, and install ImgConvert from GitHub Releases.
+---
+
+The first ImgConvert release is distributed only through GitHub Releases. AppImage is the recommended starting point for desktop testing; `.deb` and `.rpm` are system packages for their respective architectures.
+
+## Download
+
+Current version:
+
+[v0.1.2 GitHub Release](https://github.com/web-casa/ImgConvert/releases/tag/v0.1.2)
+
+Assets:
+
+| File | Purpose |
+| --- | --- |
+| `ImgConvert_0.1.2_amd64.AppImage` | Direct-run Linux desktop package for x86_64 |
+| `ImgConvert_0.1.2_aarch64.AppImage` | Direct-run Linux desktop package for arm64/aarch64 |
+| `ImgConvert_0.1.2_amd64.deb` | Debian/Ubuntu system package for x86_64 |
+| `ImgConvert_0.1.2_arm64.deb` | Debian/Ubuntu system package for arm64 |
+| `ImgConvert-0.1.2-1.x86_64.rpm` | Fedora/RHEL/openSUSE system package for x86_64 |
+| `ImgConvert-0.1.2-1.aarch64.rpm` | Fedora/RHEL/openSUSE system package for aarch64 |
+| `SHA256SUMS` | Checksum verification for manually downloaded assets |
+| `latest.json` | Update manifest used by the Tauri updater |
+| `*.AppImage.sig` | Tauri updater signatures, not manual GPG signatures |
+
+## Verify downloads
+
+Put the release assets in the same directory, then run:
+
+```bash
+sha256sum -c SHA256SUMS
+```
+
+`SHA256SUMS` is the verification entry point for manual downloads. The `.sig` file beside an AppImage is a signature used by the Tauri updater manifest; ordinary users do not need to use it manually.
+
+## AppImage
+
+```bash
+chmod +x ./ImgConvert_0.1.2_amd64.AppImage
+./ImgConvert_0.1.2_amd64.AppImage
+```
+
+On arm64/aarch64 machines, use:
+
+```bash
+chmod +x ./ImgConvert_0.1.2_aarch64.AppImage
+./ImgConvert_0.1.2_aarch64.AppImage
+```
+
+If FUSE is unavailable or the AppImage cannot mount, validate it in extract-and-run mode first:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.2_amd64.AppImage
+```
+
+## Debian / Ubuntu
+
+For x86_64:
+
+```bash
+sudo apt install ./ImgConvert_0.1.2_amd64.deb
+```
+
+For arm64:
+
+```bash
+sudo apt install ./ImgConvert_0.1.2_arm64.deb
+```
+
+If dependency resolution fails, update package metadata first:
+
+```bash
+sudo apt update
+```
+
+## Fedora / RHEL / openSUSE
+
+For x86_64:
+
+```bash
+sudo dnf install ./ImgConvert-0.1.2-1.x86_64.rpm
+```
+
+For aarch64:
+
+```bash
+sudo dnf install ./ImgConvert-0.1.2-1.aarch64.rpm
+```
+
+On openSUSE, you can use:
+
+```bash
+sudo zypper install ./ImgConvert-0.1.2-1.x86_64.rpm
+```
+
+## Updates
+
+The AppImage release contains Tauri updater assets, and in-app updates read `latest.json` from the GitHub Release.
+
+For system packages, the first release still recommends manually downloading and installing each GitHub Release. A future distribution-repository, Flathub, or store channel will document its update policy separately.

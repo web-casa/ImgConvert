@@ -9,7 +9,7 @@
     "build": "pnpm run source && next build",
     "start": "next start --port 3001",
     "source": "fumadocs-mdx",
-    "typecheck": "pnpm run source && tsc --noEmit",
+    "typecheck": "pnpm run source && next typegen && tsc --noEmit",
     "check": "pnpm run typecheck && pnpm run build"
   },
   "dependencies": {

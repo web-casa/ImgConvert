@@ -1,0 +1,62 @@
+---
+title: Usage
+description: Batch import, format selection, compression, and metadata options in ImgConvert.
+---
+
+The ImgConvert flow is: import images, choose a target format and compression strategy, confirm the output location, then start the batch conversion.
+
+## Import
+
+You can import images by:
+
+- Dragging images or folders into the window.
+- Choosing files from the file picker.
+- Choosing a folder for recursive import.
+- Importing an image from the clipboard.
+
+After import, the queue asynchronously reads basic information and thumbnails. Very large images are handled under a memory budget, so conversion concurrency may be reduced automatically.
+
+## Choose a format
+
+Target formats are driven by the current backend capability matrix. The primary app includes output support for:
+
+- JPEG
+- PNG
+- WebP
+- AVIF
+
+HEIC is an optional input only; ImgConvert does not produce HEIC output. When the system path or helper is unavailable, the interface marks HEIC as unavailable and diagnostics explain why.
+
+## Compression options
+
+Common strategies:
+
+- `skip-if-larger`: skip writing a converted result when it is larger than the source.
+- Auto quality: primarily for JPEG/WebP, searches for a smaller output at acceptable quality.
+- Smallest of multiple candidates: compares several candidate results within the available budget.
+- True-lossless AVIF: exposed only when the capability matrix explicitly supports it.
+
+For smaller files, prefer WebP or AVIF. For compatibility, prefer JPEG or PNG.
+
+## Metadata and color
+
+ImgConvert treats metadata as a user asset by default, not as incidental data that can be dropped casually.
+
+Current support includes:
+
+- Physically applying EXIF orientation and rewriting orientation to `1`.
+- Preserving ICC profiles or converting them according to the selected policy.
+- Preserving or stripping EXIF, XMP, and IPTC.
+- Test guardrails for Display P3 and sRGB-related paths.
+
+If you publish images to the web and do not want to expose camera, location, or editing-software information, turn off metadata preservation.
+
+## Batch conversion
+
+During conversion, ImgConvert shows the status, progress, failure reason, and summary for every file. Cancellation stops work that has not started where possible; an image already inside a codec completes at its current conversion point before resources are reclaimed.
+
+Failed items do not block the rest of the queue. After completion, use the failure reason to address file permissions, format capability, or damaged input, then import the item again.
+
+## Output advice
+
+Set the output directory to a separate folder so converted files do not mix with originals. Keep backups of original images before a bulk compression or format migration.

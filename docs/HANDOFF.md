@@ -26,7 +26,8 @@
 - Logo 已全部替换并压缩
 - 前端 i18n Phase 1/2 完成：`zh-CN` + `en-US`
 - i18n Phase 3 完成：Tauri command 错误使用结构化 `CommandError`，前端按 ICU message 本地化
-- Phase 4a 文案与隐私来源已完成：双语 Store metadata、`PRIVACY.en.md`、无外部资源的 Pages 隐私页与公开 runner 部署工作流
+- Phase 4a 文案与隐私来源已完成并复核：双语 Store metadata、`PRIVACY.en.md`、无外部资源的 Pages 隐私页与公开 runner 部署工作流；结果缓存政策准确区分关闭复用与删除本机缓存
+- Phase 4b 已完成：Fumadocs 的中英路由、首批英文文档和双语浏览器 smoke
 
 ## 3. 多语言现状
 
@@ -45,25 +46,29 @@
 - 所有可失败 Tauri command、批量 progress、导入逐项错误和转换规划错误均使用该 envelope
 - `src/lib/command-error.ts` 只按 `errors.<code>` 本地化；`detail` 仅供开发调试，畸形/旧 payload 回退通用错误
 - ICU 插值统一使用 `svelte-i18n` v4 的 `{ values: params }` 接口
+- docs-site 保持中文默认 URL（`/`、`/docs/...`）和显式英文 URL（`/en-US/...`、`/en-US/docs/...`）；英文只提供首页、安装、使用、隐私、排障，不回退未翻译的中文正文
+- docs-site 隐私页只通过 `<include>` 引用根目录的 `PRIVACY.md` / `PRIVACY.en.md`，并由 `check-docs-site-i18n.mjs` 守护路由、导航和规范政策来源
 
 ### 未完成
 
 - GitHub Pages 尚未由仓库管理员启用，公开隐私页尚未实际部署
 - Windows Store 候选 MSIX 的中英文实机截图未生成
 - Partner Center CSV、IARC 问卷与实际 submission 未完成
-- docs-site 英文站未做
 - MSIX 包内 MRT 本地化未做（暂时明确不做）
 
-## 4. 下一步建议：Phase 4a
+## 4. 下一步建议：Phase 4a 外部动作与 Phase 5
 
-Phase 3 已完成并复核。Phase 4a 的双语 Store metadata、英文隐私政策、截图工作表及外部
-门槛见 [`docs/STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)。发布负责人已确认公开免费、
-账户可用全部市场、本地优先定位、GitHub Pages、GitHub Issues 和无遥测事实。
+Phase 3 与仓库内 Phase 4b 已完成并复核。Phase 4a 的双语 Store metadata、英文隐私政策、
+截图工作表及外部门槛见 [`docs/STORE_LISTING_4A.md`](./STORE_LISTING_4A.md)。发布负责人已
+确认公开免费、账户可用全部市场、本地优先定位、GitHub Pages、GitHub Issues 和无遥测事实。
 
 接下来由仓库管理员在 **Settings → Pages** 将 Source 设为 **GitHub Actions**；首次
 `pages.yml` 成功后再验证 `https://web-casa.github.io/ImgConvert/privacy/`。之后仍需实际
 Windows Store MSIX 截图、当日 Partner Center CSV、IARC 和账户负责人提交；不自动创建
 submission、设置市场/价格或点击发布。
+
+仓库内下一阶段是 Phase 5 的持续 QA 与发布准备：保持现有 key parity、Playwright 语言切换、
+平台 guardrail 和真实 Windows Store runner 入口；它不替代上述管理员/Partner Center 动作。
 
 Phase 3 的已落地契约见 `docs/I18N_PLAN.md`：
 
@@ -90,6 +95,8 @@ pub struct CommandError {
 - MAS/MSIX 不启用 Tauri updater
 - Windows Store 身份默认值在 `scripts/prepare-windows-msix-release.mjs`
 - `pages/` 是独立、无依赖的双语隐私页；`pages.yml` 只使用 `ubuntu-24.04`，Pages 未启用时自动跳过 push 部署
+- `pages/` 的 CSP 禁止脚本、connect、frame、object 与远程资源；政策正文变更必须同时通过 `check-pages-privacy.mjs`
+- docs-site 的默认中文 locale 由 `proxy.ts` 隐藏；不要删除 `fallbackLanguage: null`、自定义语言链接、根级未知路径 catch-all 或 pathname 规范化，否则会引入未翻译回退、通用 404 或 hydration mismatch
 - Flatpak app-id 仍是 `io.github.yeagoo.imgconvert`
 - 不要删除 `docs/DEVLOG.md` 的历史条目
 - Rust 中文日志/注释保留中文，不要求迁移
@@ -100,12 +107,14 @@ pub struct CommandError {
 ```bash
 pnpm run quality:frontend
 pnpm run quality:security
+pnpm run docs:web:check
 pnpm run release:flatpak:verify
 pnpm run release:readiness:check
 pnpm run ci:cost:check
 node scripts/check-platform-release-guardrails.mjs --platform=all --channel=all
 pnpm exec playwright test
 pnpm run release:linux:debug
+pnpm run release:linux:smoke:deb:debug
 ```
 
 ## 7. 提交与推送

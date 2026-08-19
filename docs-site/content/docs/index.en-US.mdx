@@ -1,0 +1,39 @@
+---
+title: Get started
+description: The entry point for ImgConvert usage, releases, and maintenance documentation.
+---
+
+ImgConvert is a **local-first batch image converter** built with **Tauri 2, Svelte 5, and a Rust imaging core**. The current first-release scope is GitHub Releases; it does not submit an app to any store.
+
+## Current status
+
+- First release channel: GitHub Releases.
+- First Linux assets: `.deb`, `.rpm`, AppImage, AppImage `.sig`, `latest.json`, and `SHA256SUMS`.
+- Core formats: JPEG, PNG, WebP, and AVIF.
+- HEIC: not built into the primary app. It is an optional import path through platform capabilities or an external helper/extension.
+- License: the application is Apache-2.0, and its primary dependency tree excludes GPL, AGPL, and LGPL.
+
+## Local development
+
+```bash
+pnpm install
+pnpm run dev
+pnpm run tauri dev
+```
+
+To develop the documentation site:
+
+```bash
+pnpm run docs:web:dev
+```
+
+## Start here
+
+- [Installation](./install)
+- [Usage](./usage)
+- [Troubleshooting](./troubleshooting)
+- [Privacy policy](./privacy)
+
+## Suggested reading path
+
+New users should start with [Installation](./install) and [Usage](./usage). If you encounter a runtime, permission, HEIC, or updater problem, read [Troubleshooting](./troubleshooting). The Chinese documentation currently contains the release, command, architecture, format, HEIC, and development-maintenance references that have not yet received English translations.

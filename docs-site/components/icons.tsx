@@ -6,7 +6,7 @@ import type { SVGProps } from "react";
  * lets us color via the currentColor chain.
  */
 
-type IconName =
+export type IconName =
   | "shield"
   | "launch"
   | "scale"

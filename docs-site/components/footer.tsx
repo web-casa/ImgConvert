@@ -1,8 +1,63 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { NavIcon } from "@/components/icons";
+import type { DocsLocale } from "@/lib/locale-routing";
+import { localePath } from "@/lib/locale-routing";
 
-export function SiteFooter() {
+type SiteFooterProps = {
+  locale: DocsLocale;
+};
+
+type FooterLink = {
+  href: string;
+  label: string;
+};
+
+const footerCopy: Record<
+  DocsLocale,
+  {
+    commitment: string;
+    docs: FooterLink[];
+    docsTitle: string;
+    engineering: FooterLink[];
+    engineeringTitle: string;
+    resourcesTitle: string;
+  }
+> = {
+  "zh-CN": {
+    commitment: "本地优先 · 不上传任何图片 · 主依赖树禁 GPL / AGPL / LGPL",
+    docs: [
+      { href: "/docs/install", label: "安装" },
+      { href: "/docs/usage", label: "使用" },
+      { href: "/docs/commands", label: "命令速查" },
+    ],
+    docsTitle: "文档",
+    engineering: [
+      { href: "/docs/architecture", label: "架构" },
+      { href: "/docs/formats", label: "格式能力" },
+      { href: "/docs/privacy", label: "隐私政策" },
+    ],
+    engineeringTitle: "工程",
+    resourcesTitle: "资源",
+  },
+  "en-US": {
+    commitment: "Local-first · No image uploads · GPL / AGPL / LGPL excluded",
+    docs: [
+      { href: "/docs/install", label: "Install" },
+      { href: "/docs/usage", label: "Usage" },
+      { href: "/docs/troubleshooting", label: "Troubleshooting" },
+    ],
+    docsTitle: "Docs",
+    engineering: [{ href: "/docs/privacy", label: "Privacy policy" }],
+    engineeringTitle: "Project",
+    resourcesTitle: "Resources",
+  },
+};
+
+export function SiteFooter({ locale }: SiteFooterProps) {
+  const copy = footerCopy[locale];
+
   return (
     <footer className="site-footer">
       <div className="mx-auto max-w-6xl px-6 py-10">
@@ -25,29 +80,21 @@ export function SiteFooter() {
           </div>
 
           <div className="grid grid-cols-2 gap-x-10 gap-y-6 sm:grid-cols-3">
-            <FooterCol title="文档">
-              <Link className="block" href="/docs/install">
-                安装
-              </Link>
-              <Link className="block" href="/docs/usage">
-                使用
-              </Link>
-              <Link className="block" href="/docs/commands">
-                命令速查
-              </Link>
+            <FooterCol title={copy.docsTitle}>
+              {copy.docs.map((link) => (
+                <Link className="block" href={localePath(locale, link.href)} key={link.href}>
+                  {link.label}
+                </Link>
+              ))}
             </FooterCol>
-            <FooterCol title="工程">
-              <Link className="block" href="/docs/architecture">
-                架构
-              </Link>
-              <Link className="block" href="/docs/formats">
-                格式能力
-              </Link>
-              <Link className="block" href="/docs/development">
-                开发质量
-              </Link>
+            <FooterCol title={copy.engineeringTitle}>
+              {copy.engineering.map((link) => (
+                <Link className="block" href={localePath(locale, link.href)} key={link.href}>
+                  {link.label}
+                </Link>
+              ))}
             </FooterCol>
-            <FooterCol title="资源">
+            <FooterCol title={copy.resourcesTitle}>
               <a
                 className="flex items-center gap-1.5"
                 href="https://github.com/web-casa/ImgConvert"
@@ -71,7 +118,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 flex flex-col gap-3 border-t border-[var(--imgconvert-line)] pt-5 text-xs text-[var(--imgconvert-ink-soft)] md:flex-row md:items-center md:justify-between">
-          <span>本地优先 · 不上传任何图片 · 主依赖树禁 GPL / AGPL / LGPL</span>
+          <span>{copy.commitment}</span>
           <span className="mono">© {new Date().getFullYear()} ImgConvert contributors</span>
         </div>
       </div>
@@ -79,7 +126,7 @@ export function SiteFooter() {
   );
 }
 
-function FooterCol({ title, children }: { title: string; children: React.ReactNode }) {
+function FooterCol({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2.5 text-sm">
       <span className="eyebrow eyebrow-flush text-[0.65rem]">{title}</span>

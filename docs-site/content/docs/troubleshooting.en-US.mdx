@@ -1,0 +1,77 @@
+---
+title: Troubleshooting
+description: Common installation, runtime, HEIC, permission, and updater issues.
+---
+
+This page covers the issues most likely to affect first-release GitHub Release users.
+
+## AppImage does not start
+
+First confirm that the file is executable:
+
+```bash
+chmod +x ./ImgConvert_0.1.2_amd64.AppImage
+./ImgConvert_0.1.2_amd64.AppImage
+```
+
+If you see a FUSE or mount-related error, try extract-and-run mode:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./ImgConvert_0.1.2_amd64.AppImage
+```
+
+If WebKitGTK, GTK, `libayatana-appindicator`, or another dynamic library is missing, install the runtime package for your distribution. On Debian/Ubuntu, the `.deb` package can resolve system dependencies more easily through the package manager than AppImage.
+
+## The app exits after choosing files
+
+Confirm that you are using the latest GitHub Release. If the problem remains, start the app from a terminal and keep its output:
+
+```bash
+RUST_BACKTRACE=1 ./ImgConvert_0.1.2_amd64.AppImage
+```
+
+When reporting an issue, include your distribution version, desktop environment, Wayland/X11, launch log, and steps to reproduce.
+
+## Cannot write to the output directory
+
+Common causes are:
+
+- The output directory does not grant write permission.
+- The output directory is on a read-only mount, external drive, or sandboxed path.
+- A file name conflicts, or another program has the target file open.
+
+First switch the output directory to a new folder below your user home directory, then try the conversion again.
+
+## Cannot import HEIC
+
+HEIC is optional and is not part of the primary app's built-in codec set.
+
+Linux direct-distribution packages can provide decode-only import through a system helper or explicit plugin. Common dependencies include `libheif-examples` plus system thumbnail or pixel-format support packages. The Flatpak route uses a separate HEIC extension rather than placing an LGPL helper in the main package.
+
+macOS will use system ImageIO in a future path, and Windows will use WIC detection. When the system lacks an HEIF/HEVC provider, the app only provides guidance; it does not promise to install one automatically.
+
+## The updater cannot find an update
+
+The first updater reads `latest.json` from the GitHub Release. Check, in order:
+
+1. Whether the current version is below the release version.
+2. Whether your network or proxy can access GitHub Release assets.
+3. Whether the Release contains the AppImage, `.sig`, and `latest.json` together.
+4. Whether `latest.json` contains an entry for the current platform.
+
+Maintainers can check the remote manifest with:
+
+```bash
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.2 --platform=linux-x86_64 --no-run
+```
+
+## Image conversion fails
+
+Failures usually fall into four categories:
+
+- The input is damaged or is not the declared image format.
+- The current format capability does not support that input/output combination.
+- The image is too large and exceeds the memory budget or the system runs out of memory.
+- The output path has a permission, disk-space, or file-lock problem.
+
+Reproduce the issue with a small number of files first, then change the output directory. If only one image fails, keep the original as a bug sample instead of overwriting or recompressing it.

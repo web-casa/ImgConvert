@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-08-19 — Phase 4b：docs-site 英文站与 Phase 4a 复核修复
+
+- **4a 隐私复核**：审计 Rust 结果缓存后，双语政策和静态公开页明确说明：持久记录仅含哈希和文件大小，不含图片字节或路径；设置页只能关闭结果复用，删除已有设置/缓存记录需删除相应本机应用数据或缓存目录。`check-pages-privacy.mjs` 同步守护双语生效日期、缓存说明、无远程资源、CSP 与 `no-referrer`。
+- **4b 路由与内容**：docs-site 接入 Fumadocs i18n。中文继续使用既有 `/` / `/docs/...` URL，英文使用 `/en-US/...` / `/en-US/docs/...`；loader 禁用未翻译页面回退。首批英文覆盖首页、安装、使用、隐私和排障；英文导航不暴露未翻译文档，中文页切到英文时会安全回到英文文档首页。
+- **规范政策与 review 修复**：文档隐私页只 `<include>` 根目录两份政策正文，避免第三份漂移副本。复核修复了英文文档深链和根级未知路径的 locale-aware 404、隐藏中文 locale 的 Fumadocs SSR/client pathname hydration mismatch，以及规范政策自身 H1 与 Fumadocs 页面标题重复的问题。
+- **验证**：`quality:frontend`（现已覆盖 docs-site 编译）、`quality:security`、`release:platform:check`、既有 Playwright 2/2、生产 docs Playwright 路由/搜索/404/语言切换 smoke、静态隐私页 CSP smoke、Linux Tauri debug `.deb` build 与包内转换 smoke 全部通过。
+- **边界**：未启用 GitHub Pages、未创建 Partner Center submission，未改变 Store 的外部 codec/updater 禁用、免费标准 runner 策略或 Flatpak app-id。
+
+---
+
 ## 2026-08-19 — Phase 4a：已确认 Store 文案与 GitHub Pages 隐私页
 
 - **确认范围**：发布负责人选择公开、免费、账户可用全部市场、`Photo & video` 分类、本地优先定位、GitHub Pages 隐私 URL、GitHub Issues 支持入口，并确认 Store build 无遥测、广告、账号、崩溃报告、远程配置或第三方网络服务。

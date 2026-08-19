@@ -251,8 +251,37 @@ package.json: check:ui-i18n
 
 ### Phase 4b：docs-site 英文站（独立，不阻塞发布）
 
-- Fumadocs i18n 结构与英文内容
-- 首页、安装、使用、隐私、排障优先
+**当前状态（2026-08-19）：** 已完成 Fumadocs i18n 路由与首批英文内容；保持中文既有
+URL，不把未翻译文档静默展示为中文。
+
+- [x] Fumadocs i18n 结构与英文内容
+- [x] 首页、安装、使用、隐私、排障优先
+
+#### 4b 实施契约（2026-08-19）
+
+- `zh-CN` 是隐藏在 URL 中的默认 locale，继续使用既有的 `/` 和
+  `/docs/...` 中文链接；`en-US` 使用显式的 `/en-US/...` 和
+  `/en-US/docs/...` 链接。不能为这次文档国际化破坏已分享的中文 URL。
+- 文档 loader 使用 Fumadocs 的 dot 文件解析和 `fallbackLanguage: null`。
+  英文 URL 只能呈现实际翻译过的英文页面；尚未翻译的中文文档不能静默回退为中文。
+- Next 16 的 `proxy.ts` 负责 locale rewrite；搜索 API 保持在 `app/api/search`
+  之外，不放进 `[lang]` 路由段。loader、页面树、页面查询和搜索全部传入当前 locale。
+- `zh-CN` 隐藏前缀后的 Fumadocs framework pathname 必须在 SSR 与浏览器两端都规范为
+  `/docs/...`；否则 rewrite 后的内部 `/zh-CN/docs/...` 会让活动导航或交互组件发生
+  hydration mismatch。`en-US` 的显式前缀不得被移除。
+- 英文第一批仅覆盖首页、安装、使用、隐私和排障。英文 `meta.en-US.json` 只列出
+  这些已翻译页面，避免导航到空页。语言切换遇到尚无英文版本的中文文档时应回到英文
+  文档首页，而不是生成 404。用户直接输入未翻译英文文档深链或未知英文根级路径时，
+  必须返回带当前 locale 上下文的 404，不能回退中文或显示框架默认页。
+- 文档站隐私页使用 Fumadocs `<include>` 引用仓库根目录的 `PRIVACY.md` 和
+  `PRIVACY.en.md`。这两份政策仍是唯一正文来源；不得复制为第三份可漂移的政策文本。
+  由于规范政策正文自身提供 H1，文档页不得再额外渲染 Fumadocs 的页面标题或摘要，
+  以免产生重复的一级标题。
+- 这项工作只改 docs-site 的内容、路由和验证，不部署或启用 GitHub Pages，不创建
+  Partner Center submission，也不改变 Store 的 codec/updater 禁用约束、公共 runner
+  策略或 Flatpak app-id。
+- 每次变更至少执行 docs-site 的 typecheck/build、双语路由与内容静态检查，以及实际
+  浏览器 smoke；根仓库的 `quality:frontend` 应同时覆盖 docs-site 的编译检查。
 
 ### Phase 5：QA 与发布
 
@@ -273,4 +302,4 @@ package.json: check:ui-i18n
 | 4b docs-site 英文 | 2 天 | 独立排期，不阻塞发布 |
 | 5 QA/发布 | 0.5 天 | 含真实 Windows runner |
 
-发布阻塞合计：`1 + 2 + 3 + 4a + 5 ≈ 8 天`；4b 后续单独完成。
+发布阻塞合计：`1 + 2 + 3 + 4a + 5 ≈ 8 天`；4b 已于 2026-08-19 单独完成。
