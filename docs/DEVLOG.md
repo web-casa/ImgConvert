@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-08-19 — Phase 4a 外部动作：GitHub Pages 隐私页上线
+
+- **Pages 启用与部署**：仓库 Pages 已切换为 GitHub Actions source；[Publish Privacy Policy run
+  32222596177](https://github.com/web-casa/ImgConvert/actions/runs/32222596177) 在标准
+  `ubuntu-24.04` runner 上成功上传并部署静态隐私页。
+- **线上验证**：`https://web-casa.github.io/ImgConvert/privacy/` 返回 HTTPS 200，包含 `#en` /
+  `#zh-CN` 双语锚点及 GitHub Issues 支持链接；Store listing 可使用已验证的双语 privacy URL。
+- **边界**：未下载或上传 MSIX、未生成 Windows 实机截图、未创建 Partner Center CSV/IARC/
+  submission；Store external codec/updater 禁用、免费标准 runner 策略与 Flatpak app-id 均未改变。
+
+---
+
 ## 2026-08-19 — Phase 5：i18n QA、Windows MSIX 真 runner 与 review 修复
 
 - **review 修复**：新的固定 `zh-CN` Playwright 首屏 smoke 复现了真实的 i18n 初始化竞态：静态

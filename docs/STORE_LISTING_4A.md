@@ -2,9 +2,9 @@
 
 # Phase 4a — Microsoft Store listing 与隐私政策准备包
 
-> 状态：**文案与隐私事实已确认，未提交 Partner Center**。本文件收集已核实的工程
-> 事实、已确认的 Store 输入文案与仍由账户负责人完成的提交动作；它不是 Partner Center
-> 导出的 CSV，也不代表已经提交或认证。
+> 状态：**公开隐私页已部署，文案与隐私事实已确认，未提交 Partner Center**。本文件收集
+> 已核实的工程事实、已确认的 Store 输入文案与仍由账户负责人完成的提交动作；它不是
+> Partner Center 导出的 CSV，也不代表已经提交或认证。
 
 ## 1. 范围与不变量
 
@@ -30,6 +30,7 @@
 | HEIC 边界 | `PRIVACY.md`、`docs/LEGAL.md`、Windows packaging 文档 | Windows 系统 WIC 的可选、仅解码能力；依赖 HEIF/HEVC 扩展可用性。 |
 | 本地处理/无遥测声明 | `PRIVACY.md`、发布负责人确认 | 图片和路径可为用户主动操作而在本机读取，但不会上传、收集或向第三方传输；用户选择的输出目录和 HEIC helper 路径可保存在本机设置中；无遥测或第三方网络服务。 |
 | 许可证 | `LICENSE`、`src-tauri/tauri.conf.json` | Apache-2.0；适用许可条款的最终呈现由发布责任人确认。 |
+| 公开隐私页 | [Publish Privacy Policy run 32222596177](https://github.com/web-casa/ImgConvert/actions/runs/32222596177) | GitHub Pages 已于 2026-08-19 以 GitHub Actions source 部署；`https://web-casa.github.io/ImgConvert/privacy/` 已验证 HTTPS 200、`#en` / `#zh-CN` 双语锚点及 Issues 链接。 |
 | 当前截图 | `packaging/flatpak/screenshots/main.png` | 1440×1000 的中文网页预览，仅作构图参考；不是 Windows Store/MSIX 实机截图，不能直接当作已验收资产。 |
 | 当前图标 | `src-tauri/icons/` | 有 MSIX 所需图标；Partner Center 的 listing logo 仍需以当前导出的模板和校验结果为准。 |
 
@@ -56,7 +57,7 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 | Markets | 账户可用的全部市场 | 如 Partner Center 对个别市场提出额外税务或合规要求，以其要求为准。 |
 | Category | Photo & video | 与本地图片转换工具的实际用途一致。 |
 | Support/contact URL | `https://github.com/web-casa/ImgConvert/issues` | 作为公开支持入口。 |
-| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/` | Pages 启用前不可填入真实 submission；见第 7 节。 |
+| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/` | 已部署并完成线上验证；可填入 Partner Center 草稿，仍不得代替最终人工核验。 |
 | License | Apache License 2.0 | 链接至 `https://www.apache.org/licenses/LICENSE-2.0`。 |
 
 | 字段 | `en-US` | `zh-CN` | 状态/负责人 |
@@ -68,7 +69,7 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 | What's new | 首次提交留空 | 首次提交留空 | 仅后续更新填写。 |
 | Search terms | `image converter`; `batch image converter`; `image compressor`; `JPEG converter`; `PNG converter`; `WebP converter`; `AVIF converter` | `图片转换`; `批量图片转换`; `图片压缩`; `JPEG转换`; `PNG转换`; `WebP转换`; `AVIF转换` | 不包含竞品、价格或误导性词汇。 |
 | Applicable license terms | `Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0` | `Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0` | 与仓库 `LICENSE` 一致。 |
-| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/#en` | `https://web-casa.github.io/ImgConvert/privacy/#zh-CN` | Pages 部署成功后填入。 |
+| Privacy policy URL | `https://web-casa.github.io/ImgConvert/privacy/#en` | `https://web-casa.github.io/ImgConvert/privacy/#zh-CN` | 已部署；录入前由账户负责人再打开确认。 |
 | Support/contact URL | `https://github.com/web-casa/ImgConvert/issues` | `https://github.com/web-casa/ImgConvert/issues` | 已确认。 |
 | Pricing, markets, visibility, category | Free; all account-eligible markets; Public; Photo & video | 免费；账户可用的全部市场；公开；照片和视频 | 已确认。 |
 | IARC age-rating 问卷 | 见第 3.3 节 | 见第 3.3 节 | 账户负责人必须据实作答并提交。 |
@@ -135,7 +136,7 @@ Microsoft 当前要求每个 Store listing 至少有一段 description 和一张
 
 发布责任人已确认：Microsoft Store 版没有遥测、崩溃报告、远程配置、账户、支付、
 广告 SDK 或第三方网络服务；现有中文政策准确描述 Store build。英文对应文本保存在
-[`PRIVACY.en.md`](../PRIVACY.en.md)，双语公开版将部署到
+[`PRIVACY.en.md`](../PRIVACY.en.md)，双语公开版已部署到
 `https://web-casa.github.io/ImgConvert/privacy/`。两种语言均以本机处理、用户明确文件
 授权、临时文件/缓存、Windows HEIC 边界、元数据选项、儿童隐私、第三方服务、政策更新
 和 GitHub Issues 联系方式为相同章节顺序。
@@ -163,10 +164,10 @@ listing，再发布该版本。Microsoft 要求隐私政策说明产品访问、
 
 ## 7. 进入实际提交前的门槛
 
-1. 仓库管理员在 GitHub **Settings → Pages → Build and deployment → Source** 选择
-   **GitHub Actions**；首次 workflow 成功后，验证
-   `https://web-casa.github.io/ImgConvert/privacy/` 中英文锚点和 Issues 链接。该 repo
-   当前尚未配置 Pages，未完成此步前不得将 URL 填入 Partner Center。
+1. [x] 仓库管理员已将 GitHub **Settings → Pages → Build and deployment → Source** 设为
+   **GitHub Actions**。首次 [Publish Privacy Policy workflow](https://github.com/web-casa/ImgConvert/actions/runs/32222596177)
+   成功后，已验证 `https://web-casa.github.io/ImgConvert/privacy/` 的 HTTPS 200、中英文锚点和
+   Issues 链接；可以将 URL 填入 Partner Center 草稿。
 2. 在 Windows runner/机器构建 Store MSIX，并保持：
 
    ```powershell
