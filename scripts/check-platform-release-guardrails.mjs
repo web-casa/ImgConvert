@@ -1138,6 +1138,23 @@ function checkWindowsRuntimeGuardrails() {
       failures.push(`Windows Smoke workflow must support ${expected}`);
     }
   }
+  for (const expected of [
+    "store_msix",
+    "runs-on: windows-latest",
+    'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
+    'IMGCONVERT_DISABLE_UPDATER: "1"',
+    "WINDOWS_STORE_IDENTITY_NAME: ImgConvert.DevSmoke",
+    "pnpm run release:windows:msix:smoke",
+  ]) {
+    if (!windowsWorkflow.includes(expected)) {
+      failures.push(
+        `Windows Smoke workflow must preserve the MSIX install smoke marker: ${expected}`,
+      );
+    }
+  }
+  if (!/^\s*pnpm run release:windows:msix\s*$/m.test(windowsWorkflow)) {
+    failures.push("Windows Smoke workflow must build an MSIX before its install smoke");
+  }
   const windowsSystemCodecs = readText(
     path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),
   );

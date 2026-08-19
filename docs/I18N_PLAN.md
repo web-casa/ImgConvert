@@ -42,8 +42,12 @@ src/lib/i18n/
 ## 4. 语言初始化时序
 
 1. 应用启动时，同步初始化 `svelte-i18n`
+   - 当前两份 message 都随应用静态打包，必须先用 `addMessages()` 注册，再调用 `init()`；
+     不得把它们包装成 `register(() => Promise.resolve(...))` 异步 loader。`state.svelte.ts`
+     在模块加载期间就会格式化 engine 状态，异步 loader 会让首屏 locale 尚未设置并导致
+     `svelte-i18n` 抛错。
 2. 先用同步可得值决定首屏语言：
-   - Tauri：`@tauri-apps/plugin-locale` 的 OS locale
+   - Tauri：`@tauri-apps/plugin-os` 的 OS locale
    - Web：`navigator.language`
 3. 异步读取 Tauri Store 的持久化 `settings.locale`
 4. Store 加载完成后，如存在持久化值则 `locale.set(persisted)`
@@ -202,7 +206,7 @@ package.json: check:ui-i18n
 ### Phase 1：i18n 基础设施
 
 - 接入 `svelte-i18n`
-- 接入 `@tauri-apps/plugin-locale`
+- 接入 `@tauri-apps/plugin-os`
 - `zh-CN.ts` / `en-US.ts` 骨架
 - `settings.locale` 持久化
 - Topbar 语言切换按钮
@@ -290,6 +294,22 @@ URL，不把未翻译文档静默展示为中文。
 - Playwright 语言切换 smoke
 - Windows MSIX 真实 runner smoke
 - 重建 Store submission 包
+
+#### Phase 5 仓库内实施契约（2026-08-19）
+
+- `tests/i18n.test.ts` 必须继续比较两份 locale 的完整 leaf key 集合；
+  `quality:frontend` 必须继续执行 Vitest 和 `check:ui-i18n`，防止新增或遗漏
+  `zh-CN` / `en-US` key 只在一侧出现。
+- Playwright 必须显式设定浏览器 context locale，不能依赖执行机语言；smoke 至少验证中文
+  初始首屏、Topbar 语言按钮切至英文后的 title/主操作文案，以及切回中文后的同一用户可见
+  状态。这样覆盖真实的 OS/browser locale 初始化和持久化前切换路径。
+- `windows-smoke.yml` 的手动 `store_msix` 路径是 Windows hosted 真实 runner smoke 的 repo
+  入口：必须使用 `windows-latest` 标准 hosted runner、临时 `ImgConvert.DevSmoke` identity、
+  `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` 和 `IMGCONVERT_DISABLE_UPDATER=1`，并按顺序运行
+  `release:windows:msix` 与 `release:windows:msix:smoke`。静态 platform guardrail 必须守住
+  这些标记；此 smoke 不得发布或创建 Partner Center submission。
+- `Windows Store MSIX` workflow 只重建并上传 submission artifact。下载 artifact、录入
+  Partner Center、IARC 和提交仍是账户负责人执行的外部动作，不能由仓库 QA 自动代替。
 
 ## 9. 排期
 

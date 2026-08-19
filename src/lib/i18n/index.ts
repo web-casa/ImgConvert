@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { locale as osLocale } from "@tauri-apps/plugin-os";
 import { get } from "svelte/store";
-import { init, locale as localeStore, register, t } from "svelte-i18n";
+import { addMessages, init, locale as localeStore, t } from "svelte-i18n";
 import { enUS } from "./messages/en-US";
 import { zhCN } from "./messages/zh-CN";
 
@@ -9,13 +9,14 @@ export type AppLocale = "zh-CN" | "en-US";
 
 export const locale = localeStore;
 
-register("zh-CN", () => Promise.resolve(zhCN));
-register("en-US", () => Promise.resolve(enUS));
+// Both dictionaries are bundled statically. Register them before init so the
+// locale is available during module-level translations in state.svelte.ts.
+addMessages("zh-CN", zhCN);
+addMessages("en-US", enUS);
 
 // Set the initial locale synchronously so module-level consumers such as
 // state.svelte.ts can format messages immediately.
 const bootLocale = navigatorLocale();
-locale.set(bootLocale);
 void init({
   fallbackLocale: "en-US",
   initialLocale: bootLocale,

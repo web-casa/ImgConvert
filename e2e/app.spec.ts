@@ -23,3 +23,30 @@ test("keeps the primary conversion action visible in a short viewport", async ({
     page.getByRole("button", { name: /开始转换 \/ 压缩|Start conversion \/ compression/ }),
   ).toBeVisible();
 });
+
+test.describe("locale switching", () => {
+  test.use({ locale: "zh-CN" });
+
+  test("updates visible UI when switching between Chinese and English", async ({ page }) => {
+    await page.goto("/");
+
+    const chineseLanguageButton = page.getByTitle("语言");
+    await expect(chineseLanguageButton).toBeVisible();
+    await expect(chineseLanguageButton).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("button", { name: "开始转换 / 压缩" })).toBeVisible();
+
+    await chineseLanguageButton.click();
+
+    const englishLanguageButton = page.getByTitle("Language");
+    await expect(englishLanguageButton).toBeVisible();
+    await expect(englishLanguageButton).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("button", { name: "Start conversion / compression" }),
+    ).toBeVisible();
+
+    await englishLanguageButton.click();
+
+    await expect(page.getByTitle("语言")).toBeVisible();
+    await expect(page.getByRole("button", { name: "开始转换 / 压缩" })).toBeVisible();
+  });
+});
