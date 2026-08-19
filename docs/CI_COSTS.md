@@ -47,6 +47,13 @@ bounded to three 180-second attempts with a short backoff, and package install
 is bounded to ten minutes. This converts a transient hosted-runner mirror stall
 into a clear retry or failure instead of silently consuming an entire CI job;
 it does not add a runner, schedule, package source, or privileged service.
+When `GITHUB_ACTIONS=true` and `RUNNER_ENVIRONMENT=github-hosted`, if the
+hosted Ubuntu image's `apt-mirrors.txt` contains the unavailable Azure archive
+host, the bootstrap temporarily substitutes the official
+`archive.ubuntu.com` host for that script invocation and restores the runner's
+original mirror file on exit. If restoration fails after an otherwise successful
+bootstrap, the step fails rather than silently continuing with a modified runner
+configuration.
 
 Run the static guardrail after changing workflows:
 

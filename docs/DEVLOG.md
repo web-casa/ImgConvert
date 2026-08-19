@@ -13,6 +13,12 @@
 - **修复契约**：所有 CI 的 Ubuntu 原生依赖安装必须经统一 bootstrap：update 至多三次、每次
   180 秒并带短暂退避，install 至多十分钟；失败须带明确标签退出。workflow 只继续使用公开免费
   标准 runner，未新增定时任务或第三方服务。
+- **根因后的定向补救**：完整日志确认 runner 的 `apt-mirrors.txt` 中
+  `azure.archive.ubuntu.com` package-index 请求会在 fallback 至
+  `archive.ubuntu.com` 的 InRelease 后仍停滞。bootstrap 仅在
+  `GITHUB_ACTIONS=true` 且 `RUNNER_ENVIRONMENT=github-hosted` 时临时将该主机替为日志已验证可达的
+  官方 `archive.ubuntu.com`，并在退出时恢复原 mirror file；不改项目依赖源或持久化 runner 配置。
+  若原先的 bootstrap 成功而还原失败，步骤必须失败，避免静默带着修改后的 runner 配置继续。
 - **验证要求**：shell 静态检查、CI cost/platform guardrail 和一次完整 public-runner CI 重跑
   必须通过；若 runner 再次耗尽三次有界尝试，应记录基础设施失败而不是绕过测试。
 
