@@ -189,6 +189,9 @@ jobs:
           WINDOWS_STORE_VERSION: ${{ inputs.store_version }}
         run: pnpm run release:windows:msix
 
+      - name: Sideload production MSIX and run conversion smoke
+        run: pnpm run release:windows:msix:smoke
+
       - uses: actions/upload-artifact@v7
         with:
           name: imgconvert-windows-x64-msix-submission

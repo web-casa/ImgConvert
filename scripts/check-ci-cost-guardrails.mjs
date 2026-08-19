@@ -199,6 +199,7 @@ function checkStandardPlatformWorkflow(name, text, label, runner) {
 function checkWindowsStoreReleaseWorkflow() {
   for (const marker of [
     "release:windows:msix",
+    "release:windows:msix:smoke",
     'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
     'IMGCONVERT_DISABLE_UPDATER: "1"',
     "imgconvert-windows-x64-msix-submission",

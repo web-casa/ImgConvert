@@ -1142,6 +1142,9 @@ function checkWindowsRuntimeGuardrails() {
   const windowsWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "windows-smoke.yml"),
   );
+  const windowsStoreWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "windows-store-release.yml"),
+  );
   for (const expected of ["sign_direct", "install_smoke", "WINDOWS_CERTIFICATE_BASE64"]) {
     if (!windowsWorkflow.includes(expected)) {
       failures.push(`Windows Smoke workflow must support ${expected}`);
@@ -1163,6 +1166,31 @@ function checkWindowsRuntimeGuardrails() {
   }
   if (!/^\s*pnpm run release:windows:msix\s*$/m.test(windowsWorkflow)) {
     failures.push("Windows Smoke workflow must build an MSIX before its install smoke");
+  }
+  for (const expected of [
+    "runs-on: windows-latest",
+    "pnpm run release:windows:msix",
+    "pnpm run release:windows:msix:smoke",
+    "imgconvert-windows-x64-msix-submission",
+  ]) {
+    if (!windowsStoreWorkflow.includes(expected)) {
+      failures.push(
+        `Windows Store MSIX workflow must build, smoke, and retain its production submission artifact: ${expected}`,
+      );
+    }
+  }
+  const msixSmoke = readText(path.join(repoRoot, "scripts", "smoke-windows-msix.mjs"));
+  for (const expected of [
+    "copyFileSync(sourcePackagePath, smokePackagePath)",
+    "ensurePackagedManifestMatchesPrepared",
+    "assertSourceArtifactUnchanged",
+    "SHA-256 verified",
+  ]) {
+    if (!msixSmoke.includes(expected)) {
+      failures.push(
+        `MSIX smoke must preserve and verify the source submission artifact: ${expected}`,
+      );
+    }
   }
   const windowsSystemCodecs = readText(
     path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),

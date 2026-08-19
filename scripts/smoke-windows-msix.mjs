@@ -1,8 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,10 +61,10 @@ function main() {
 
   const preparedManifest = readPreparedManifest();
   const version = manifestValue(preparedManifest, "Version");
-  const packagePath = path.join(msixRoot, `ImgConvert_${version}_x64.msix`);
-  if (!existsSync(packagePath)) {
+  const sourcePackagePath = path.join(msixRoot, `ImgConvert_${version}_x64.msix`);
+  if (!existsSync(sourcePackagePath)) {
     fail(
-      `expected artifact ${path.relative(repoRoot, packagePath)} was not found; run pnpm run release:windows:msix first`,
+      `expected artifact ${path.relative(repoRoot, sourcePackagePath)} was not found; run pnpm run release:windows:msix first`,
     );
   }
 
@@ -61,30 +72,38 @@ function main() {
     const identityName = xmlUnescape(manifestValue(preparedManifest, "Name"));
     const publisher = xmlUnescape(manifestValue(preparedManifest, "Publisher"));
     console.log(
-      `preflight artifact ${path.relative(repoRoot, packagePath)} (${statSync(packagePath).size} bytes)`,
+      `preflight artifact ${path.relative(repoRoot, sourcePackagePath)} (${statSync(sourcePackagePath).size} bytes)`,
     );
     console.log(`preflight identity ${identityName} / ${publisher}`);
     return;
   }
 
   tmpRoot = mkdtempSync(path.join(os.tmpdir(), "imgconvert-windows-msix-smoke-"));
-  const packageManifest = unpackPackageManifest(packagePath);
-  const identityName = xmlUnescape(manifestValue(packageManifest, "Name"));
-  const publisher = xmlUnescape(manifestValue(packageManifest, "Publisher"));
+  let identityName = null;
   let certificateThumbprint = null;
   let packageInstalled = false;
 
   try {
+    const sourceArtifactSha256 = sha256File(sourcePackagePath);
+    const packageManifest = unpackPackageManifest(sourcePackagePath);
+    ensurePackagedManifestMatchesPrepared(preparedManifest, packageManifest);
+    identityName = xmlUnescape(manifestValue(packageManifest, "Name"));
+    const publisher = xmlUnescape(manifestValue(packageManifest, "Publisher"));
+    const smokePackagePath = path.join(requiredTmpRoot(), path.basename(sourcePackagePath));
+    copyFileSync(sourcePackagePath, smokePackagePath);
     ensurePackageAbsent(identityName);
     certificateThumbprint = createSmokeCertificate(publisher);
-    signPackage(packagePath);
+    signPackage(smokePackagePath);
     trustSmokeCertificate(certificateThumbprint);
-    installPackage(packagePath);
+    installPackage(smokePackagePath);
     packageInstalled = true;
     runInstalledSmoke(identityName);
-    console.log("Windows MSIX install smoke completed.");
+    assertSourceArtifactUnchanged(sourcePackagePath, sourceArtifactSha256);
+    console.log(
+      "Windows MSIX install smoke completed; source submission artifact was not modified (SHA-256 verified).",
+    );
   } finally {
-    if (packageInstalled && !options.keepInstalled) {
+    if (packageInstalled && identityName && !options.keepInstalled) {
       removePackage(identityName);
     }
     if (certificateThumbprint && !options.keepInstalled) {
@@ -130,6 +149,47 @@ function unpackPackageManifest(packagePath) {
     fail("unpacked MSIX does not contain AppxManifest.xml");
   }
   return readFileSync(manifestPath, "utf8");
+}
+
+function ensurePackagedManifestMatchesPrepared(preparedManifest, packageManifest) {
+  for (const attribute of ["Name", "Publisher", "Version", "ProcessorArchitecture"]) {
+    const expected = xmlUnescape(manifestValue(preparedManifest, attribute));
+    const actual = xmlUnescape(manifestValue(packageManifest, attribute));
+    if (actual !== expected) {
+      fail(
+        `packed MSIX Identity ${attribute} does not match the prepared manifest: expected ${expected}, got ${actual}`,
+      );
+    }
+  }
+}
+
+function assertSourceArtifactUnchanged(sourcePackagePath, expectedSha256) {
+  const actualSha256 = sha256File(sourcePackagePath);
+  if (actualSha256 !== expectedSha256) {
+    fail(
+      `source submission artifact changed during the smoke: expected SHA-256 ${expectedSha256}, got ${actualSha256}`,
+    );
+  }
+}
+
+function sha256File(filePath) {
+  const hash = createHash("sha256");
+  const descriptor = openSync(filePath, "r");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  let position = 0;
+  try {
+    for (;;) {
+      const bytesRead = readSync(descriptor, buffer, 0, buffer.length, position);
+      if (bytesRead === 0) {
+        break;
+      }
+      hash.update(buffer.subarray(0, bytesRead));
+      position += bytesRead;
+    }
+  } finally {
+    closeSync(descriptor);
+  }
+  return hash.digest("hex");
 }
 
 function xmlUnescape(value) {
@@ -348,12 +408,15 @@ function requiredTmpRoot() {
 function printHelp() {
   console.log(`Usage: node scripts/smoke-windows-msix.mjs [options]
 
-Signs the .msix matching the prepared manifest version with a temporary
-self-signed certificate matching the package's own manifest publisher (read by
-unpacking the .msix), sideloads it, and runs the hidden package conversion
-smoke from the installed ImgConvert.exe. Requires an elevated (Administrator)
-shell so the smoke certificate can be trusted. The smoke refuses to run when a
-package with the same identity is already installed for the current user.
+Copies the .msix matching the prepared manifest version into a temporary
+directory, verifies the packed identity matches that prepared manifest, signs
+only the copy with a temporary self-signed certificate matching the package's
+own manifest publisher, sideloads it, and runs the hidden package conversion
+smoke from the installed ImgConvert.exe. The source submission artifact is not
+modified and is SHA-256 checked before and after the smoke. Requires an elevated
+(Administrator) shell so the smoke certificate can be trusted. The smoke refuses
+to run when a package with the same identity is already installed for the current
+user.
 
 Options:
   --allow-non-windows     Allow non-Windows artifact preflight.
