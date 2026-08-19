@@ -49,7 +49,7 @@ function checkReadmeIsCurrent() {
     "真实发布验收",
     "外部验收",
     "真实图片 corpus",
-    "macOS/Windows benchmark",
+    "Windows benchmark",
   ]) {
     if (!readme.includes(expected)) {
       failures.push(`README must describe current project status marker: ${expected}`);

@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-19 — Apple Silicon AVIF/rav1e 实测：保持 speed 8 默认
+
+- **真实 Apple Silicon runner**：[macOS Smoke run 32225662409](https://github.com/web-casa/ImgConvert/actions/runs/32225662409) 在公开免费 `macos-15` `arm64` runner 上通过架构检查、Tauri fmt/clippy/test 与 release runtime smoke。benchmark artifact 的 host 为 `darwin/arm64`、3 CPU、约 7 GiB 内存。
+- **测量口径**：release profile、`1024×768`、quality 82、lossy AVIF/rav1e、`maxThreads=1`、speed 8/10 各 3 次；这是当前单文件产品编码路径的 deterministic fixture 测量，而不是 AOM 无损或多线程混合数据。
+- **结果与决定**：speed 8 median **791.185 ms / 34,477 B**（0.994 MP/s），speed 10 median **286.359 ms / 67,290 B**（2.746 MP/s）。speed 8 慢 **2.763×**，但体积小 **48.76%**；自动推荐也为 8。因此不修改 `EncodeOptions::default().avif_speed = 8`，不创建 macOS 特例，也不因这项 speed 决策更换为 ImageIO/svt-av1。
+- **审计留存修复**：`ci(macos): retain AVIF benchmark reports` 为手动 `macOS Smoke` 增加 `imgconvert-macos-arm64-avif-benchmark` artifact；本次已实际上传 995 B JSON（artifact ID `9355679291`），保留 14 天。macOS README 与 platform guardrail 同步锁定这条契约。
+- **文档 guardrail 修复**：`check-readme-status` 原先强制 README 保留“macOS/Windows benchmark”待办，现改为只要求仍未完成的“Windows benchmark”，避免为了通过检查而保留已完成的 macOS 状态。
+- **边界**：未改变 Store 的 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` / `IMGCONVERT_DISABLE_UPDATER=1`、免费 public runner 策略或 Flatpak app-id `io.github.yeagoo.imgconvert`。
+
+---
+
 ## 2026-08-19 — Phase 4a 外部动作：GitHub Pages 隐私页上线
 
 - **Pages 启用与部署**：仓库 Pages 已切换为 GitHub Actions source；[Publish Privacy Policy run

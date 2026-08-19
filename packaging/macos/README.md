@@ -87,6 +87,6 @@ macOS release acceptance still requires a real machine pass:
 
 - HEIC `.heic/.heif` import through ImageIO in direct build.
 - MAS sandbox file-open/output-directory flow using scoped dialog grants and persisted scope. The hidden path smoke covers the conversion backend; the interactive GUI permission prompt still needs a real acceptance pass.
-- AVIF benchmark on Apple Silicon before changing defaults.
+- Apple Silicon AVIF benchmark has completed on `macos-15` arm64; rerun it before changing the rav1e default or codec choice.
 - `.dmg` Developer ID signing, `notarytool` submission, stapling, and Gatekeeper assessment.
 - App Store Connect upload/TestFlight/review remain account operations outside this repository.

@@ -78,10 +78,10 @@
 > 🚦 **强制门槛**:进入 P3 打包前必须通过——① 干净 Linux(Debian/Ubuntu/Fedora)上转换跑通;② 依赖树**不含 GPL/AGPL/LGPL**(无 imagequant/dssim/x265);③ `THIRD_PARTY_LICENSES` 可自动生成 + **应用内「开源许可」页**可见;④ 文件访问只走「用户显式授权目录」抽象(为 Flatpak portal / 未来 MAS bookmark 留门)。
 
 - [x] **core crate 尖刺**(2026-06):建 `crates/imgconvert-core`,`Codec` trait + `ImageData`(RGBA8,8-bit SDR,带不变量校验)+ pipeline,接 `mozjpeg`/`oxipng`/`webp`/`image`,跑通 JPEG/PNG/WebP 一轮转换 + 跨格式转换;`image` 已 `default-features=false`(避免带回 AVIF/ravif/rayon/nasm);JPEG 编码 `catch_unwind` 截 Rust panic、alpha 合成白底;WebP 解码 `BitstreamFeatures` 预检拒动图/超尺寸。aarch64 Linux 编译 + clippy(`-D warnings`)+ fmt + 10 测试全过。P2 已用 `webp::WebPConfig`/`encode_advanced()` 接入 method;near_lossless/sharp_yuv 仍留到后续高级参数面板再评估是否需要更底层 binding。
-- [x] **AVIF 后端尖刺**(2026-06):`libavif-sys 0.17`(`codec-rav1e` 有损编码 + `codec-dav1d` 解码,`default-features=false`)接入 core,`AvifCodec` 实现编解码 + magic 检测(`ftyp`/avif·avis)。后续为 AVIF 真无损补充 `codec-aom`,lossless 时选择 AOM,lossy 仍走 rav1e。验证:**alpha 往返**(YUV444 + RGBA)、**ICC 逐字节往返**(`avif_preserves_icc` 测试,证实弃用裸 ravif 的主因已解决,评审 #8)、**convert 管线 PNG↔AVIF**。FFI 用 RAII guard(`ImageGuard`/`EncoderGuard`/`DecoderGuard`/`RwDataGuard`)保证各返回路径释放 C 资源。⚠️ 待办:(a) **N3** `maxThreads=1` 已设但未证实压住编码器内部线程(需 macOS/多核机实测线程数);(b) speed=8 默认值待 arm64 实测(评审 #2)。
+- [x] **AVIF 后端尖刺**(2026-06):`libavif-sys 0.17`(`codec-rav1e` 有损编码 + `codec-dav1d` 解码,`default-features=false`)接入 core,`AvifCodec` 实现编解码 + magic 检测(`ftyp`/avif·avis)。后续为 AVIF 真无损补充 `codec-aom`,lossless 时选择 AOM,lossy 仍走 rav1e。验证:**alpha 往返**(YUV444 + RGBA)、**ICC 逐字节往返**(`avif_preserves_icc` 测试,证实弃用裸 ravif 的主因已解决,评审 #8)、**convert 管线 PNG↔AVIF**。FFI 用 RAII guard(`ImageGuard`/`EncoderGuard`/`DecoderGuard`/`RwDataGuard`)保证各返回路径释放 C 资源。⚠️ 待办:**N3** `maxThreads=1` 已设但尚未用多核工具证明压住编码器内部线程;speed=8 默认值已由 Apple Silicon 实测确认。
 - [x] **C 工具链尖刺**:新增 `pnpm run toolchain:check`,检查 cmake / meson / ninja,并在 x86/x86_64 检查 NASM;当前 Linux arm64 本机通过。三发行版/双架构 release matrix 仍放 P3 CI,但本地和 CI 已有明确失败诊断。
 - [x] **文件访问抽象尖刺(新增,前移)**:新增 `src-tauri/src/access.rs` 授权路径边界,导入扫描、输出目录和剪贴板临时文件都先收口为 grant;不依赖 canonical 路径,为 Flatpak portal 映射路径和 macOS security-scoped bookmark shim 留接口。Flatpak 包内 runtime conversion smoke 已在 P3 落地;交互式文件 portal 选择/授权流仍作为人工发布验收项。
-- [x] **并发尖刺**:文件级 worker 上限 + 内存预算降并发已落地;`AVIF_ENCODER_MAX_THREADS=1` 作为 core 常量写入 libavif encoder,并通过 `runtime_diagnostics()` 暴露默认并发、内存预算和 AVIF 内部线程上限。rav1e 平台性能/Apple Silicon speed 仍按 macOS 阶段实测。
+- [x] **并发尖刺**:文件级 worker 上限 + 内存预算降并发已落地;`AVIF_ENCODER_MAX_THREADS=1` 作为 core 常量写入 libavif encoder,并通过 `runtime_diagnostics()` 暴露默认并发、内存预算和 AVIF 内部线程上限。Apple Silicon rav1e speed 已实测并保持默认 8;内部线程上限本身仍需独立的多核线程观测。
 - [x] **许可清单尖刺**:`cargo-about` 生成 `THIRD_PARTY_LICENSES`;**做应用内「开源许可」页**(全文,含 IJG/BSD/Apache NOTICE);`cargo deny` 禁 GPL/AGPL/LGPL。npm 侧读取已安装包的 LICENSE/NOTICE/COPYING 文件并纳入生成物;少量缺失文件的 npm 包在生成物中标记,发布前人工复核。
 - [x] **进度/取消协议**:Tauri **Channel** + `CancellationToken` 最小闭环。当前 `convert_batch` 串行执行,取消在文件边界生效;P1 再接文件级并发/信号量/内存预算。
 - [x] **最小 CI**:`cargo fmt --check`、`cargo clippy`、`cargo test`、`cargo deny check`、`pnpm run check`、`pnpm run build`。已新增 `.github/workflows/ci.yml`,并补 `quality:frontend` / `quality:rust` / `quality:security` / Playwright Web preview E2E。
@@ -89,7 +89,7 @@
 - [x] **(macOS runner 验收)ImageIO HEIC smoke**:GitHub-hosted `macos-15` 默认用隐藏转换入口生成 PNG fixture,再用 `sips` 生成 HEIC,通过 ImageIO provider 跑完整路径转换 smoke。MAS sandbox GUI 交互仍需 Apple 账号/签名后的人工验收;HEIC 编码输出暂不启用,若未来要做必须单独审计 HEVC 编码专利/沙盒行为/产品文案。
 - [x] **HEIC 外部插件协议尖刺(P1.5 候选)**:主程序只做 manifest 发现 + 独立进程调用 + 能力矩阵合并;Linux 插件优先检测系统 `heif-convert`/`heif-dec`,Windows 插件可单独打包 decode-only `imgconvert-heic-helper.exe`。主程序依赖树继续禁 GPL/AGPL/LGPL;插件单独 LGPL 分发,第一版只读 HEIC/HEIF,不写 HEIC。Linux/Windows 外部 helper 协议、manifest 与诊断 UI 已落地;Windows WIC 系统路线已在 Windows 发布阶段以 read-only provider 落地。
 - [x] **(macOS 阶段第一批)rav1e arm64 benchmark harness**:新增 `IMGCONVERT_AVIF_BENCHMARK=1` 隐藏入口与 `pnpm run bench:avif:macos`,默认测 1024×768、speed 8/10、3 轮,输出 JSON lines;benchmark 有尺寸/像素预算,避免误设环境变量导致大内存 smoke。
-- [ ] **(macOS 实机验收)rav1e arm64 实测**:M 系列上跑 `pnpm run bench:avif:macos`,必要时对比 ImageIO/svt-av1,再锁 macOS 默认 speed(评审 #2,最重要的待实测项)。
+- [x] **(macOS 实机验收)rav1e arm64 实测**(2026-08-19):[macOS Smoke run 32225662409](https://github.com/web-casa/ImgConvert/actions/runs/32225662409) 在免费公开 `macos-15` 的 `arm64` runner 上，用 release profile 跑 `1024×768`、quality 82、speed 8/10 各 3 次；artifact 记录 host 为 `darwin/arm64`、3 CPU、约 7 GiB 内存。lossy rav1e (`maxThreads=1`) 的中位数为 speed 8 **791.185 ms / 34,477 B**，speed 10 **286.359 ms / 67,290 B**。speed 8 虽慢 **2.763×**，但文件小 **48.76%**；远超「省不到 2% 且慢过 1.4× 才改 10」的切换条件，因此保持 `EncodeOptions::default().avif_speed = 8`，不引入 macOS 特例或更换 codec。ImageIO/svt-av1 是不同编码器选择，不是这一 rav1e speed 决策所必需的对照。该 workflow 已上传 14 天保留的 `imgconvert-macos-arm64-avif-benchmark` JSON artifact。
 - [x] **(macOS 阶段第一批)security-scoped resource start/stop 钩子**:新增 `macos_security.rs`,用 `CFURLStartAccessingSecurityScopedResource` / `CFURLStopAccessingSecurityScopedResource` 做 RAII;导入扫描和转换读写路径已接入 `access::scoped_path_access()`。
 - [x] **(macOS 阶段第一批)runtime smoke 聚合入口**:新增 `pnpm run release:macos:smoke`,可在 macOS 真机上串起 release guardrail、AVIF benchmark、可选 HEIC 样张路径转换 smoke、可选 direct build 和 `.dmg` notarization/staple/Gatekeeper 检查;Linux 上可用 `--allow-non-macos --skip-benchmark --skip-heic` 做脚本预检。
 - [x] **(macOS 阶段)security-scoped 授权持久化 repo 侧闭环**:前端 Tauri dialog 在 macOS 使用 `fileAccessMode: "scoped"`,后端注册 `tauri-plugin-fs` + `tauri-plugin-persisted-scope`,capability 仅给 `fs:scope` 用于持久化 dialog 授权;导入/转换路径继续用 `macos_security.rs` RAII start/stop 生命周期。真实 MAS GUI prompt/重启后授权恢复仍需签名包实机验收。
@@ -131,7 +131,7 @@
 
 ## P2 — 高级压缩与保真
 
-- [x] **per-format 参数第一批**(在 core 已接 mozjpeg/oxipng/webp/libavif-sys 之上):quality、progressive、oxipng level、AVIF speed、WebP method;默认值为 oxipng=4 / AVIF speed=8 / WebP method=4,其中 AVIF/WebP 已用 Linux arm64 release benchmark 第一批复核,macOS/Windows 继续按发布验收补数据。已贯通 core、Tauri IPC、设置持久化和 shadcn 格式参数 UI。
+- [x] **per-format 参数第一批**(在 core 已接 mozjpeg/oxipng/webp/libavif-sys 之上):quality、progressive、oxipng level、AVIF speed、WebP method;默认值为 oxipng=4 / AVIF speed=8 / WebP method=4,其中 AVIF/WebP 已用 Linux arm64 release benchmark 第一批复核，AVIF speed=8 已由 macOS Apple Silicon 真实 runner 复核；Windows 数据继续按发布验收补齐。已贯通 core、Tauri IPC、设置持久化和 shadcn 格式参数 UI。
 - [x] 全局有损/无损开关 + 每格式质量下限阈值(TIFF 为 **P2 可选**,非 v1 承诺,与顶部「TIFF 推后」一致)。当前全局无损对 PNG/WebP/AVIF 生效;JPEG/WebP/AVIF 有损模式可设 30-100 的质量下限,低于 30 视为禁用。
 - [x] **有损 PNG 量化用宽松库**:`color_quant`(MIT)实验性限色,默认关闭;仍输出普通 PNG 并继续走 oxipng。⚠️ **不用 imagequant/GPL**。
 - [x] **skip-if-larger / 永不变差第一批**:候选输出不小于源文件时跳过写入,批量计为 skipped;默认开启,可在设置里关闭以强制格式迁移。
@@ -161,7 +161,7 @@
 - [x] **质量 heuristics 第三批**:core 的 `detect_lossy_artifacts()` 扩展 JPEG 8×8 色度网格评分,覆盖亮度网格不明显但 Cb/Cr 在块边界跳变的 PNG;该结果继续只作为 conservative hint 触发代际防护,不宣称来源格式证明。
 - [x] **平台质量 benchmark harness**:新增 `pnpm run bench:platform`,隐藏入口输出 AVIF/WebP JSON lines,支持平台、宽高、轮数、quality、AVIF speeds、WebP methods 参数化;`bench:avif:macos` 继续兼容 Apple Silicon AVIF 专项。
 - [x] **图像质量测试体系第一批**:新增 `pnpm run test:image-quality` 和 core integration test suite,覆盖 golden lossless 像素一致性、高质量有损 PSNR/MAE 下限、corrupted input 干净失败、输出确定性与 JPEG 网格 artifact hint。
-- [x] **平台质量 benchmark 数据闭环第一批**:`bench:platform` 默认改为 release profile 并生成 `target/benchmarks/*.json` 汇总报告/默认参数建议;本机 Linux arm64 release 数据复核后继续保留 AVIF speed=8 与 WebP method=4;core/Tauri 已接 per-file 180s wall-clock 软超时(`IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 可覆盖),多候选/自动质量在候选边界停止。macOS/Windows 真实 runner 数据留到对应发布验收时用同一报告格式补齐,公共仓库使用免费标准 runner。
+- [x] **平台质量 benchmark 数据闭环第一批**:`bench:platform` 默认改为 release profile 并生成 `target/benchmarks/*.json` 汇总报告/默认参数建议;本机 Linux arm64 release 数据复核后继续保留 AVIF speed=8 与 WebP method=4;2026-08-19 的 macOS `macos-15` arm64 runner 数据也确认 AVIF speed=8，并上传同格式 JSON artifact 供 14 天复核。core/Tauri 已接 per-file 180s wall-clock 软超时(`IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 可覆盖),多候选/自动质量在候选边界停止。Windows 真实 runner 数据留到对应发布验收时用同一报告格式补齐，公共仓库只使用免费标准 runner。
 - [x] **Fuzz + 真实图片 corpus 第一批**:新增 `fuzz/` cargo-fuzz crate,覆盖 decode/probe/thumbnail、bounded convert、metadata semantics 三个 target;新增 `pnpm run fuzz:prepare` 生成 deterministic seeds 并从本地 `corpus/real` / `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF 到 ignored corpus,写 `target/fuzz-corpus/real-corpus-manifest.json`;`pnpm run fuzz:check` 编译 fuzz targets。真实图片不入仓库,避免版权/隐私污染。
 - [x] **Fuzz corpus replay 回归入口**:新增 `pnpm run fuzz:replay`,不依赖 `cargo-fuzz` 即可把 prepared corpus 和 `fuzz/artifacts/<target>/` crash inputs 走 core decode/convert/metadata 路径并生成 `target/fuzz-corpus/replay-report.json`;`pnpm run fuzz:smoke` 已升级为 prepare + compile + replay,适合低成本本机/CI 守门。
 - [x] **Fuzz crash artifact 最小化入口**:新增 `pnpm run fuzz:minimize` dry-run 报告和显式 `pnpm run fuzz:minimize:run`。后者调用 `cargo fuzz tmin <target> <artifact>` 后复跑 artifacts;报告不泄漏外部绝对路径。长期 fuzz 运行与真实 crash 样本积累仍需开发者显式执行。
@@ -204,7 +204,7 @@
 | # | 评审发现 | 处理 | 落点 |
 |---|---|---|---|
 | 1 | 禁 LGPL 与 Linux libheif 自相矛盾 | **主程序不内置 HEIC**;如做 HEIC,只能外部 helper decode-only 单独分发 | 本文件 / LEGAL |
-| 2 | rav1e 无 arm64 汇编,Apple Silicon AVIF 慢 | Linux x86 v1 不咬人;macOS 阶段实测后定后端 | P0.5 / ENGINE |
+| 2 | rav1e 无 arm64 汇编,Apple Silicon AVIF 慢 | macOS `arm64` 实测后保持 speed 8：虽慢 2.763×，但体积小 48.76%，不更换后端 | P0.5 / ENGINE |
 | 3 | ssimulacra2 二分搜索 × AVIF 不可用;PNG 无 quality 可搜 | 自动质量**仅 JPEG/WebP** | P2 |
 | 4 | 文件级并发 × rav1e 内部线程 oversubscribe | rav1e `threads=1` | P0.5 / P1 |
 | 5 | Windows HEIC 仅解码、需 HEVC 扩展 | 运行时探测 + 不承诺开箱即用,不编码 | P3 |

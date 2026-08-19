@@ -21,6 +21,7 @@
 - Tauri updater：x86_64 + aarch64 签名 AppImage、`.sig`、`latest.json`
 - Windows Store 生产 MSIX workflow 与真实 runner smoke
 - macOS 真实 runner unsigned DMG + HEIC ImageIO smoke
+- Apple Silicon rav1e AVIF 实测：免费 `macos-15` arm64 runner 确认默认 speed=8（比 10 慢 2.763×，但输出小 48.76%）；JSON artifact 保留 14 天
 - Microsoft Store / MAS 构建禁用 Tauri updater
 - 隐私政策：`PRIVACY.md`
 - Logo 已全部替换并压缩

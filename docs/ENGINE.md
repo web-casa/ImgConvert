@@ -50,7 +50,7 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 
 ### bench 默认值(项目实测持续校准)
 - **oxipng level 4**(比 2 省 8–28%,时间 2×;6 只再省 ~1% 不值)
-- **AVIF speed 8**(Linux arm64 release 实测 `1024x768/q82/3轮`:speed 8 median 432.170 ms / 34,477 B;speed 10 median 175.945 ms / 67,290 B。speed 8 慢约 2.46×,但体积约省 48.8%,继续作为默认;macOS M 系列仍需实机报告复核)
+- **AVIF speed 8**(Linux arm64 release 实测 `1024x768/q82/3轮`:speed 8 median 432.170 ms / 34,477 B;speed 10 median 175.945 ms / 67,290 B。Apple Silicon 的 [macOS Smoke run 32225662409](https://github.com/web-casa/ImgConvert/actions/runs/32225662409) 以同口径复核: speed 8 median 791.185 ms / 34,477 B;speed 10 median 286.359 ms / 67,290 B。speed 8 在 macOS 慢 2.763×,但体积小 48.76%,继续作为全平台默认)
 - **WebP method 4**(Linux arm64 release 实测 method 4 median 28.280 ms / 17,220 B;method 6 median 31.570 ms / 17,270 B,更慢且更大,继续保留 method 4。当前通过 `webp::WebPConfig` + `encode_advanced()` 传入,不需要额外引入 `libwebp-sys` 直连依赖)
 - **JPEG progressive 默认开**(通常比 baseline **略小**、但更慢——⚠️ Codex 指出「~3×」量级不实,以项目实测百分比为准;UI 提供 baseline「最大兼容」选项)
 - **skip-if-larger 默认开**:Tauri 胶水层在 core 编码后、写文件前比较候选输出与源文件字节数;候选 `>=` 源文件时跳过写入并计入 skipped。该策略保护覆盖/原地优化,但用户可在 UI 关闭以强制格式迁移。
@@ -191,11 +191,11 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 - **WebP 无损候选 vs 有损候选同时竞争,取小者**。JPEG 只做有损搜索;AVIF 不做自动质量。
 - **代际损失防护**:对已是有损的源(JPEG/AVIF/lossy WebP),按 **bits-per-pixel** 分级收紧门槛;当前最低收益阈值为 2%/3%/5%/8%。VP8L lossless WebP 与 AVIF lossless 目标不触发。PNG 默认仍按无损源处理,但若 core 的 JPEG 8×8 亮度/色度网格或 WebP-like 4×4 块边界 hint 明显命中,会在用户启用 `generationLossProtection` 时按有损来源处理。
 - **结果缓存**:Tauri 层用源文件 `blake3` + 目标格式 + 编码设置 hash 生成 cache key。缓存只记录已有输出的 hash/size,命中时跳过重新编码;不缓存图片内容。默认开启。v4 key 纳入 color policy;在 `preserveMetadata=true` 或 `colorManagementPolicy=convertToSrgb` 时还会纳入 HEIC helper sidecar metadata hash,避免同像素不同 ICC/EXIF/XMP 或 ICC 变换输入误命中。
-- **平台 benchmark**:`pnpm run bench:platform` 默认用 release profile 跑隐藏入口,输出 AVIF/WebP JSON lines,并生成 `target/benchmarks/*.json` 汇总报告(样本、median、吞吐、字节数、默认参数建议),用于 Linux/macOS/Windows/arm64 复核 AVIF speed、WebP method、耗时和输出体积。`--profile=debug` 仅用于脚本烟测。旧 `bench:avif:macos` 复用同一报告层,作为 Apple Silicon AVIF 专项入口。
+- **平台 benchmark**:`pnpm run bench:platform` 默认用 release profile 跑隐藏入口,输出 AVIF/WebP JSON lines,并生成 `target/benchmarks/*.json` 汇总报告(样本、median、吞吐、字节数、默认参数建议),用于 Linux/macOS/Windows/arm64 复核 AVIF speed、WebP method、耗时和输出体积。`--profile=debug` 仅用于脚本烟测。旧 `bench:avif:macos` 复用同一报告层,作为 Apple Silicon AVIF 专项入口；手动 `macOS Smoke` 会上传 `imgconvert-macos-arm64-avif-benchmark` JSON artifact 并保留 14 天。
 - **wall-clock 软超时**:Tauri 转换路径默认每文件 180s 预算,可用 `IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 覆盖,`0/off/disabled/none` 关闭。core 的 timed API 在解码后、候选编码/评分边界检查 deadline;单个进程内 C/Rust codec 调用不做强杀,避免不安全地终止线程,但超时结果不会写盘,多候选/自动质量不会继续追加后续候选。
 - **图像质量测试体系**:`pnpm run test:image-quality` 运行 core integration suite,覆盖 deterministic golden fixtures、PNG/WebP/AVIF lossless 像素逐字节一致性、JPEG/WebP/AVIF 高质量有损 PSNR/MAE 下限、corrupted input 干净失败、输出字节确定性和 JPEG 8×8 亮度/色度网格、WebP-like 4×4 block artifact hint。该入口只用自生成 fixture,适合 CI;真实相机 corpus/fuzz 仍是独立后续项。
 - **Fuzz/corpus**:`fuzz/` 为独立 cargo-fuzz crate,不进普通 workspace。`decode_pipeline` 覆盖 magic/probe/thumbnail/有界 decode,`convert_pipeline` 覆盖有界真实转换,`metadata_semantics` 覆盖 EXIF/XMP/IPTC 语义检查和规范化。`pnpm run fuzz:prepare` 生成 deterministic seeds,并从本地 `corpus/real` 或 `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF 到 ignored corpus;真实图片和 fuzz artifacts 不入仓库。`pnpm run fuzz:replay` 不依赖 `cargo-fuzz`,会把 prepared corpus 与 `fuzz/artifacts/<target>/` crash inputs 走普通 core 路径并写 `target/fuzz-corpus/replay-report.json`;`fuzz:smoke` 串起 prepare + compile + replay。`pnpm run fuzz:minimize` 默认 dry-run 生成 `target/fuzz-corpus/minimize-report.json`;显式 `fuzz:minimize:run` 才调用 `cargo fuzz tmin` 并复跑 artifacts。
-- 未做:macOS M 系列/Windows 真实 runner benchmark 报告、真实 corpus 驱动的更多压缩噪声指纹、长期 fuzz 运行和真实 crash 样本积累。
+- 未做:Windows 真实 runner benchmark 报告、真实 corpus 驱动的更多压缩噪声指纹、长期 fuzz 运行和真实 crash 样本积累。
 
 ---
 
