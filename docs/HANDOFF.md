@@ -27,7 +27,8 @@
 - Apple Silicon rav1e AVIF 实测：免费 `macos-15` arm64 runner 确认默认 speed=8（比 10 慢 2.763×，但输出小 48.76%）；JSON artifact 保留 14 天
 - Microsoft Store / MAS 构建禁用 Tauri updater
 - v0.2.0 的 macOS/Store 渠道隔离、tag/version 不变量、凭据边界与人工发布顺序已文档化；
-  自动化实现待完成
+  `macOS DMG Release`、Store `release_tag`、updater tag 校验与 release apt bootstrap 已实现，
+  仍未创建 tag 或触发外部发布
 - 隐私政策：`PRIVACY.md`
 - Logo 已全部替换并压缩
 - 前端 i18n Phase 1/2 完成：`zh-CN` + `en-US`

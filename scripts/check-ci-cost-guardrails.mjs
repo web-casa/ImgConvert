@@ -14,6 +14,7 @@ const linuxRelease = readWorkflow("release-linux.yml");
 const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
+const macosRelease = readWorkflow("macos-release.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
 const pages = readWorkflow("pages.yml");
@@ -24,6 +25,7 @@ const allWorkflows = [
   ["release-updater.yml", updaterRelease],
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
+  ["macos-release.yml", macosRelease],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
   ["pages.yml", pages],
@@ -34,16 +36,19 @@ for (const [name, text] of allWorkflows) {
 }
 
 checkAutomaticLinuxCiWorkflow();
-checkLinuxCiAptBootstrap();
+checkUbuntuAptBootstrap();
 checkLinuxReleaseWorkflow();
 checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
+checkManualWorkflow("macos-release.yml", macosRelease);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
+checkMacosDmgReleaseWorkflow();
+checkStandardPlatformWorkflow("macos-release.yml", macosRelease, "macOS DMG Release", "macos-15");
 checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
 checkWindowsStoreReleaseWorkflow();
 checkStandardPlatformWorkflow(
@@ -134,14 +139,14 @@ function checkAutomaticLinuxCiWorkflow() {
   }
 }
 
-function checkLinuxCiAptBootstrap() {
+function checkUbuntuAptBootstrap() {
   const bootstrapPath = path.join(repoRoot, "scripts", "ci-install-apt-packages.sh");
   if (!existsSync(bootstrapPath)) {
-    failures.push("CI Ubuntu native dependency bootstrap script is missing");
+    failures.push("Ubuntu native dependency bootstrap script is missing");
     return;
   }
   if (process.platform !== "win32" && (statSync(bootstrapPath).mode & 0o111) === 0) {
-    failures.push("CI Ubuntu native dependency bootstrap script must be executable");
+    failures.push("Ubuntu native dependency bootstrap script must be executable");
   }
   const bootstrap = readFileSync(bootstrapPath, "utf8");
   for (const marker of [
@@ -160,18 +165,25 @@ function checkLinuxCiAptBootstrap() {
     "restore_status",
   ]) {
     if (!bootstrap.includes(marker)) {
-      failures.push(`CI Ubuntu native dependency bootstrap is missing marker: ${marker}`);
+      failures.push(`Ubuntu native dependency bootstrap is missing marker: ${marker}`);
     }
   }
   const invocation = "scripts/ci-install-apt-packages.sh";
-  const invocationCount = ci.split(invocation).length - 1;
-  if (invocationCount !== 4) {
-    failures.push(
-      `ci.yml must use the bounded Ubuntu dependency bootstrap four times, found ${invocationCount}`,
-    );
-  }
-  if (ci.includes("sudo apt-get update")) {
-    failures.push("ci.yml must not retain unbounded sudo apt-get update commands");
+  for (const [name, workflow, expectedCount] of [
+    ["ci.yml", ci, 4],
+    ["release-linux.yml", linuxRelease, 1],
+    ["release-updater.yml", updaterRelease, 1],
+    ["updater-upgrade-smoke.yml", updaterUpgradeSmoke, 1],
+  ]) {
+    const invocationCount = workflow.split(invocation).length - 1;
+    if (invocationCount !== expectedCount) {
+      failures.push(
+        `${name} must use the bounded Ubuntu dependency bootstrap ${expectedCount} time(s), found ${invocationCount}`,
+      );
+    }
+    if (workflow.includes("sudo apt-get update")) {
+      failures.push(`${name} must not retain unbounded sudo apt-get update commands`);
+    }
   }
 }
 
@@ -190,6 +202,17 @@ function checkLinuxReleaseWorkflow() {
   }
   if (!linuxRelease.includes("inputs.docker_smoke")) {
     failures.push("release-linux.yml Docker smoke must be gated by docker_smoke input");
+  }
+  for (const marker of [
+    "fetch-depth: 0",
+    "github.event_name == 'push'",
+    "github.ref_name",
+    "verify-release-tag.mjs",
+    "IMGCONVERT_RELEASE_TAG",
+  ]) {
+    if (!linuxRelease.includes(marker)) {
+      failures.push(`release-linux.yml must verify pushed release tags: ${marker}`);
+    }
   }
 }
 
@@ -218,6 +241,11 @@ function checkUpdaterReleaseWorkflow() {
   if (!updaterRelease.includes("inputs.publish_release")) {
     failures.push("release-updater.yml publishing must be gated by publish_release");
   }
+  for (const marker of ["fetch-depth: 0", "verify-release-tag.mjs", "IMGCONVERT_RELEASE_TAG"]) {
+    if (!updaterRelease.includes(marker)) {
+      failures.push(`release-updater.yml must verify its immutable release tag: ${marker}`);
+    }
+  }
 }
 
 function checkUpdaterUpgradeSmokeWorkflow() {
@@ -238,8 +266,40 @@ function checkStandardPlatformWorkflow(name, text, label, runner) {
   }
 }
 
-function checkWindowsStoreReleaseWorkflow() {
+function checkMacosDmgReleaseWorkflow() {
+  requireStringInput(macosRelease, "tag", "macos-release.yml");
+  requireBooleanInputDefault(macosRelease, "publish_release", false, "macos-release.yml");
+
   for (const marker of [
+    "contents: write",
+    "ref: ${{ inputs.tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "IMGCONVERT_RELEASE_TAG",
+    "APPLE_CERTIFICATE",
+    "release:macos:notarize",
+    "imgconvert-macos-arm64-dmg-release",
+    "GH_TOKEN",
+    "gh release view",
+    "gh release upload",
+    "inputs.publish_release",
+  ]) {
+    if (!macosRelease.includes(marker)) {
+      failures.push(`macos-release.yml missing signed/notarized publication marker: ${marker}`);
+    }
+  }
+  if (/^\s+draft:\s*/m.test(macosRelease)) {
+    failures.push("macos-release.yml must not create or change a GitHub Release draft state");
+  }
+}
+
+function checkWindowsStoreReleaseWorkflow() {
+  requireStringInput(windowsStoreRelease, "release_tag", "windows-store-release.yml");
+  for (const marker of [
+    "ref: ${{ inputs.release_tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "IMGCONVERT_RELEASE_TAG",
     "release:windows:msix",
     "release:windows:msix:smoke",
     'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
@@ -280,6 +340,25 @@ function requireBooleanInputDefault(text, inputName, expected, workflowName) {
   }
   if (!new RegExp(`\\n\\s{8}default:\\s*${expected}\\b`).test(inputBlock.groups.body)) {
     failures.push(`${workflowName} input ${inputName} must default to ${expected}`);
+  }
+}
+
+function requireStringInput(text, inputName, workflowName) {
+  const inputBlock = text.match(
+    new RegExp(`\\n\\s{6}${escapeRegExp(inputName)}:\\n(?<body>(?:\\s{8}.+\\n)+)`),
+  );
+  if (!inputBlock?.groups?.body) {
+    failures.push(`${workflowName} must define workflow_dispatch input ${inputName}`);
+    return;
+  }
+  if (!/\n\s{8}required:\s*true\b/.test(inputBlock.groups.body)) {
+    failures.push(`${workflowName} input ${inputName} must be required`);
+  }
+  if (!/\n\s{8}type:\s*string\b/.test(inputBlock.groups.body)) {
+    failures.push(`${workflowName} input ${inputName} must be string`);
+  }
+  if (/\n\s{8}default\s*:/.test(inputBlock.groups.body)) {
+    failures.push(`${workflowName} input ${inputName} must not default to a mutable ref`);
   }
 }
 

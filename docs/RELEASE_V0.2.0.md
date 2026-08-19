@@ -2,7 +2,7 @@
 
 # v0.2.0 双渠道发布契约
 
-> 状态：发布方案已确认，仓库自动化准备中；这不是“已发布”声明。当前公开
+> 状态：发布方案及仓库内自动化已完成；这不是“已发布”声明。当前公开
 > Release 仍为 Linux-only 的 `v0.1.2`。只有 tag、签名/公证、资产验收和账户负责人
 > 的外部步骤全部完成后，才能将本文件描述的 `v0.2.0` 标为已发布。
 
@@ -35,7 +35,7 @@
 工作流在 checkout 后必须验证：
 
 1. 输入只接受 `v<major>.<minor>.<patch>` 形式的 tag；
-2. 输入 tag 恰好等于上述三个应用版本字段的 `v${version}`；
+2. 输入 tag 恰好等于上述列出的版本字段（含 Cargo lockfile）的 `v${version}`；
 3. 本地 `HEAD` 正是该 Git tag 指向的 commit。
 
 这样可以阻止从分支、移动 ref 或版本字段不一致的快照构建。文档站当前展示的
@@ -60,7 +60,8 @@ Partner Center 中确认它高于该 identity 已有的任何版本；当前 `1.
 
 工作流不创建 Release，也不改变现有 Release 的 draft/published 状态。发布负责人先用
 已有的 Linux updater 发布入口创建/补全 draft Release，再以 `publish_release=true` 运行
-macOS 工作流。上传步骤必须先查询目标 Release 是否存在，且不允许静默覆盖同名资产。
+macOS 工作流。上传步骤必须先查询目标 Release 是否存在，并使用不带 `--clobber` 的
+`gh release upload`，不允许静默覆盖同名资产。
 这避免 macOS 任务单独发布半成品或改写已审阅资产。
 
 所需 GitHub Secrets：
@@ -107,8 +108,8 @@ Store build 永远禁用 Tauri updater 和外部 codec/helper；这个约束适�
 
 1. 在 `main` 上完成质量门禁、建立统一的 `0.2.0` 版本提交并推送；不修改现有
    `v0.1.2` tag。
-2. 创建并推送注释 tag `v0.2.0`。tag push 触发现有 Linux release build；先检查它的
-   Actions artifacts 与包 smoke。
+2. 创建并推送注释 tag `v0.2.0`。tag push 触发现有 Linux release build；每个 tag job
+   先校验 tag/version 再构建。先检查它的 Actions artifacts 与包 smoke。
 3. 运行 `Updater Release`：指定 `v0.2.0`，在签名资产验证后以
    `publish_release=true`、`draft_release=true` 创建/补全 GitHub draft Release。
 4. 运行 `macOS DMG Release`：指定 `v0.2.0`，仅在第 3 步的 draft 已存在时启用

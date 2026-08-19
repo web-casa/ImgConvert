@@ -31,17 +31,24 @@ Default behavior:
   runner. It retains the Apple Silicon AVIF benchmark JSON artifact for 14
   days; signing, notarization, DMG, and MAS candidate steps remain opt-in
   because they require Apple secrets.
+- `macOS DMG Release` is a manual-only `macos-15` arm64 release job. It accepts
+  only an exact application tag, requires Apple signing/notarization secrets,
+  retains the verified DMG for 14 days, and only uploads it to an already
+  existing same-tag GitHub Release when `publish_release=true`. It never uses
+  `--clobber`, creates a Release, or changes a Release draft state.
 - `Windows Smoke` is manual-only and runs on the free public
   `windows-latest` x64 runner. Installer signing and Store MSIX packaging
   remain opt-in because they require secrets or Store identity work.
 - `Windows Store MSIX` is a manual-only production submission build. It uses
-  the committed Partner Center identity defaults, disables external codecs and
-  Tauri updater, verifies a temporary copy through the elevated sideload smoke,
-  and uploads the untouched original `*.msix` submission artifact for 14 days.
+  an exact app tag plus the committed Partner Center identity defaults, disables
+  external codecs and Tauri updater, verifies a temporary copy through the
+  elevated sideload smoke, and uploads the untouched original `*.msix`
+  submission artifact for 14 days.
 - `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
   publish or consume real GitHub Release artifacts.
 
-The `CI` workflow's Ubuntu jobs that need native build packages use the shared
+All Ubuntu CI and release jobs that need native build packages (`CI`, `Linux
+Release`, `Updater Release`, and `Updater Upgrade Smoke`) use the shared
 `scripts/ci-install-apt-packages.sh` bootstrap. Its `apt-get update` work is
 bounded to three 180-second attempts with a short backoff, and package install
 is bounded to ten minutes. This converts a transient hosted-runner mirror stall

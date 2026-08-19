@@ -160,23 +160,14 @@ function verifyCodesign(artifact) {
     failures.push("--require-signed can only be verified on macOS");
     return;
   }
-  const artifactsToVerify = artifact.toLowerCase().endsWith(".dmg")
-    ? appsInsideMountedDmg(artifact)
-    : [artifact];
-  for (const item of artifactsToVerify) {
-    const result = spawnSync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", item], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    });
-    if (result.status !== 0) {
-      failures.push(
-        `codesign verification failed for ${path.relative(repoRoot, item)}: ${result.stderr.trim()}`,
-      );
-    }
+  if (artifact.toLowerCase().endsWith(".dmg")) {
+    verifyAppsInsideMountedDmg(artifact);
+    return;
   }
+  verifyCodesignTarget(artifact);
 }
 
-function appsInsideMountedDmg(dmgPath) {
+function verifyAppsInsideMountedDmg(dmgPath) {
   const mountPoint = path.join(
     "/Volumes",
     `imgconvert-verify-${process.pid}-${Date.now().toString(16)}`,
@@ -200,9 +191,27 @@ function appsInsideMountedDmg(dmgPath) {
         `mounted DMG does not contain an .app bundle: ${path.relative(repoRoot, dmgPath)}`,
       );
     }
-    return apps;
+    for (const app of apps) {
+      verifyCodesignTarget(app);
+    }
   } finally {
     spawnSync("hdiutil", ["detach", mountPoint, "-quiet"], { cwd: repoRoot });
+  }
+}
+
+function verifyCodesignTarget(artifact) {
+  const result = spawnSync(
+    "codesign",
+    ["--verify", "--deep", "--strict", "--verbose=2", artifact],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  if (result.status !== 0) {
+    failures.push(
+      `codesign verification failed for ${path.relative(repoRoot, artifact)}: ${result.stderr.trim()}`,
+    );
   }
 }
 

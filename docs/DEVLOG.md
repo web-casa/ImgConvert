@@ -10,6 +10,8 @@
 - **目标**：后续 `v0.2.0` 从同一不可变 tag 构建 GitHub 直发的已签名/公证 Apple Silicon DMG 与 Microsoft Store x64 MSIX submission artifact。
 - **隔离**：DMG 使用 Apple Developer ID 信任链；MSIX 保持 Partner Center identity、Store updater 与 external codec/helper 编译禁用，且不作为 GitHub 直发资产。
 - **不变量**：tag 必须匹配根 package、Tauri config 与 Cargo manifest 的 app version；Store 的四段 package version 由 Partner Center 已有版本决定，不能由 semver 直接猜测。
+- **仓库自动化**：新增 `macOS DMG Release`（精确 tag checkout、Developer ID 签名、公证、staple、Gatekeeper 验收、已存在 Release 的非覆盖附件）；自动 Linux tag build、`Windows Store MSIX` 与 `Updater Release` 同样在 checkout 后校验 tag/version。macOS base64 凭据导入兼容 BSD/GNU 参数，避免 macOS runner 因 `--decode` 不兼容失败。
+- **发布可靠性**：Linux Release、Updater Release 和 Updater Upgrade Smoke 复用已实跑的有界 Ubuntu apt bootstrap，防止镜像更新卡住完整 release job；DMG 内嵌 `.app` 的 codesign 验证保持卷挂载到校验完成，避免卸载后对失效路径做误判。
 - **边界**：本记录只确认发布设计，不声称 tag、Apple 签名/公证、GitHub asset 或 Partner Center submission 已完成。详细步骤见 [`RELEASE_V0.2.0.md`](./RELEASE_V0.2.0.md)。
 
 ---

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build and publish, for example v0.1.2.
+        description: Immutable release tag to build and publish, for example v0.2.0.
         required: true
         type: string
       publish_release:
@@ -44,9 +44,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Verify release tag and source version
+        env:
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \

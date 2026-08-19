@@ -941,6 +941,9 @@ function checkMacos() {
 
 function checkMacosRuntimeGuardrails() {
   const packageScripts = packageJson.scripts ?? {};
+  if (!packageScripts["release:tag:check"]?.includes("verify-release-tag.mjs")) {
+    failures.push("package.json must expose release:tag:check for immutable release verification");
+  }
   if (!packageScripts["bench:platform"]?.includes("benchmark-platform.mjs")) {
     failures.push("package.json must expose bench:platform for AVIF/WebP platform timing");
   }
@@ -986,6 +989,9 @@ function checkMacosRuntimeGuardrails() {
     }
   }
   const macosWorkflow = readText(path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"));
+  const macosReleaseWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "macos-release.yml"),
+  );
   for (const expected of ["Verify macOS runner architecture", "uname -m", "arm64"]) {
     if (!macosWorkflow.includes(expected)) {
       failures.push(`macOS Smoke workflow must verify ${expected}`);
@@ -999,6 +1005,27 @@ function checkMacosRuntimeGuardrails() {
     if (!macosWorkflow.includes(expected)) {
       failures.push(`macOS Smoke workflow must retain ${expected} for AVIF benchmark review`);
     }
+  }
+  for (const expected of [
+    "workflow_dispatch:",
+    "tag:",
+    "publish_release",
+    "runs-on: macos-15",
+    "ref: ${{ inputs.tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "APPLE_CERTIFICATE",
+    "release:macos:notarize",
+    "imgconvert-macos-arm64-dmg-release",
+    "gh release view",
+    "gh release upload",
+  ]) {
+    if (!macosReleaseWorkflow.includes(expected)) {
+      failures.push(`macOS DMG Release workflow must preserve ${expected}`);
+    }
+  }
+  if (/^\s+draft:\s*/m.test(macosReleaseWorkflow)) {
+    failures.push("macOS DMG Release must not create or change a GitHub Release draft state");
   }
 
   const cargoToml = readText(path.join(repoRoot, "src-tauri", "Cargo.toml"));
@@ -1169,6 +1196,10 @@ function checkWindowsRuntimeGuardrails() {
   }
   for (const expected of [
     "runs-on: windows-latest",
+    "release_tag",
+    "ref: ${{ inputs.release_tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
     "pnpm run release:windows:msix",
     "pnpm run release:windows:msix:smoke",
     "imgconvert-windows-x64-msix-submission",

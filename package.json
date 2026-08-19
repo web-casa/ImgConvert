@@ -1,7 +1,7 @@
 {
   "name": "imgconvert",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.34.4",
@@ -43,6 +43,7 @@
     "release:readiness:github": "node scripts/report-release-readiness.mjs --scope=github",
     "release:readiness:github:ready": "node scripts/report-release-readiness.mjs --scope=github --require-publishable",
     "release:readiness:all": "node scripts/report-release-readiness.mjs --scope=all",
+    "release:tag:check": "node scripts/verify-release-tag.mjs",
     "docs:check": "node scripts/check-readme-status.mjs && node scripts/check-pages-privacy.mjs && node scripts/check-docs-site-i18n.mjs",
     "release:readiness:check": "pnpm run docs:check && node scripts/report-release-readiness.mjs --check",
     "ci:cost:check": "node scripts/check-ci-cost-guardrails.mjs",

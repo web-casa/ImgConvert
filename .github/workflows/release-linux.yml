@@ -39,9 +39,15 @@ jobs:
         include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_arm64 || github.event_name != 'workflow_dispatch' && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify pushed release tag and source version
+        if: ${{ github.event_name == 'push' }}
+        env:
+          IMGCONVERT_RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \

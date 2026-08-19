@@ -1,0 +1,199 @@
+name: macOS DMG Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable release tag to build, for example v0.2.0.
+        required: true
+        type: string
+      publish_release:
+        description: Attach the verified DMG to an existing same-tag GitHub Release.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-dmg-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  NODE_VERSION: "24"
+
+jobs:
+  macos-dmg-release:
+    name: macOS DMG Release (arm64)
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify release tag and source version
+        env:
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
+
+      - name: Verify macOS runner architecture
+        run: |
+          echo "macOS version: $(sw_vers -productVersion)"
+          echo "Runner architecture: $(uname -m)"
+          if [ "$(uname -m)" != "arm64" ]; then
+            echo "macOS DMG Release expects arm64 runner, got $(uname -m)"
+            exit 1
+          fi
+
+      - name: Check direct signing/notarization secrets
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          test -n "$APPLE_CERTIFICATE" || { echo "APPLE_CERTIFICATE secret is required"; exit 1; }
+          test -n "$APPLE_CERTIFICATE_PASSWORD" || { echo "APPLE_CERTIFICATE_PASSWORD secret is required"; exit 1; }
+          test -n "$KEYCHAIN_PASSWORD" || { echo "KEYCHAIN_PASSWORD secret is required"; exit 1; }
+          if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
+            test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required with API notarization"; exit 1; }
+            test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required with API notarization"; exit 1; }
+            test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required with API notarization"; exit 1; }
+          else
+            test -n "$APPLE_ID" || { echo "APPLE_ID secret is required without API notarization"; exit 1; }
+            test -n "$APPLE_PASSWORD" || { echo "APPLE_PASSWORD secret is required without API notarization"; exit 1; }
+            test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required without API notarization"; exit 1; }
+          fi
+
+      - name: Install native codec build tools
+        run: brew install cmake meson ninja nasm
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm run typecheck
+
+      - name: macOS direct-release guardrails
+        run: pnpm run release:macos:direct:check
+
+      - name: Tauri backend macOS fmt
+        run: cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Tauri backend macOS clippy
+        run: cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Tauri backend macOS tests
+        run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
+
+      - name: Import Apple signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          if ! printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/imgconvert-signing.p12" 2>/dev/null; then
+            printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$RUNNER_TEMP/imgconvert-signing.p12"
+          fi
+          security create-keychain -p "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
+          security default-keychain -s imgconvert-build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
+          security set-keychain-settings -t 3600 -u imgconvert-build.keychain
+          security import "$RUNNER_TEMP/imgconvert-signing.p12" \
+            -k imgconvert-build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
+          security find-identity -v -p codesigning imgconvert-build.keychain
+
+      - name: Prepare App Store Connect API key
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_KEY_BASE64" ]; then
+            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            if ! printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path" 2>/dev/null; then
+              printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$key_path"
+            fi
+            echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+          fi
+
+      - name: Select direct signing identity
+        env:
+          IMGCONVERT_DIRECT_SIGNING_IDENTITY: ${{ secrets.IMGCONVERT_DIRECT_SIGNING_IDENTITY }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          identity="${IMGCONVERT_DIRECT_SIGNING_IDENTITY:-$APPLE_SIGNING_IDENTITY}"
+          if [ -z "$identity" ]; then
+            identity="$(security find-identity -v -p codesigning imgconvert-build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          fi
+          test -n "$identity" || { echo "Developer ID Application signing identity was not found"; exit 1; }
+          echo "IMGCONVERT_DIRECT_EFFECTIVE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Build signed direct DMG
+        env:
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+        run: APPLE_SIGNING_IDENTITY="$IMGCONVERT_DIRECT_EFFECTIVE_SIGNING_IDENTITY" pnpm run release:macos
+
+      - name: Notarize and verify direct DMG
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm run release:macos:notarize
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: imgconvert-macos-arm64-dmg-release-${{ inputs.tag }}
+          if-no-files-found: error
+          retention-days: 14
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Require existing GitHub Release before attachment
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
+
+      - name: Attach verified DMG to existing GitHub Release
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          shopt -s nullglob
+          dmgs=(src-tauri/target/release/bundle/dmg/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ]; then
+            echo "expected exactly one verified DMG, found ${#dmgs[@]}"
+            exit 1
+          fi
+          gh release upload "$IMGCONVERT_RELEASE_TAG" "${dmgs[@]}" --repo "$GITHUB_REPOSITORY"

@@ -3,6 +3,10 @@ name: Windows Store MSIX
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: Immutable app release tag to build, for example v0.2.0.
+        required: true
+        type: string
       store_version:
         description: Four-part Microsoft Store package version.
         required: true
@@ -13,8 +17,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-store-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-store-release-${{ inputs.release_tag }}-${{ inputs.store_version }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,6 +37,15 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+
+      - name: Verify release tag and source version
+        shell: pwsh
+        env:
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node scripts/verify-release-tag.mjs --tag="$env:IMGCONVERT_RELEASE_TAG"
 
       - name: Verify Windows runner architecture
         shell: pwsh

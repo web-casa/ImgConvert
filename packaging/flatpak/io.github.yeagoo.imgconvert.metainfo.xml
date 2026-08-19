@@ -29,6 +29,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.0" date="2026-08-19">
+      <description>
+        <p>Adds Chinese and English interface localization, structured localized conversion errors, and release-channel hardening while retaining the Flatpak main package's external-codec boundary.</p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-08-18">
       <description>
         <p>Initial Linux release candidate with JPEG, PNG, WebP, AVIF, and optional external HEIC import boundaries.</p>
