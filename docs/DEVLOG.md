@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-08-18 — i18n Phase 1/2：zh-CN + en-US 前端双语
+
+- **Phase 1**：接入 `svelte-i18n` 与 `@tauri-apps/plugin-os`，新增 `src/lib/i18n/`、`settings.locale`、Topbar 语言切换、启动 loading gate 与 OS locale 检测。
+- **Phase 2**：完成全部前端组件与 `state.svelte.ts` 用户可见文案迁移；FORMAT 数据改为 labelKey/descriptionKey；新增 `scripts/check-ui-hardcoded-strings.mjs` 并接入 `quality:frontend`；新增 i18n key parity 测试。
+- **Review 修复**：svelte-i18n 初始 locale 同步设置；e2e 断言兼容中英；engine 文案随 locale 刷新；`svelte-i18n>esbuild` override 修复 npm audit。
+- **状态**：前端 UI 双语完成；Rust 后端错误码迁移仍是 Phase 3。
+
+---
+
+## 2026-08-18 — Microsoft Store 生产 MSIX 与真实 runner 验收
+
+- 新增 `windows-store-release.yml`，使用 committed Partner Center identity 构建 production `.msix`，禁用外部 codec 与 Tauri updater。
+- 真实 runner：macOS unsigned DMG + ImageIO HEIC smoke 通过；Windows MSIX pack + sideload install smoke 通过。
+- Store updater 策略：MAS/MSIX 不启用 Tauri updater，更新交给 Apple/Microsoft。
+
+---
+
+## 2026-08-18 — Logo 全量替换
+
+- 使用 `~/jietu/005.png`（1000x1000）生成并压缩全部 Tauri/Store/Web 图标，保留 RGBA；提交 `f2314c3`。
+
+---
+
 ## 2026-08-18 — v0.1.2 新仓库首个 GitHub Release
 
 - **版本升级**:`package.json`、docs-site、Tauri config/Cargo manifest/lock 统一升到 `0.1.2`;THIRD_PARTY licenses 重新生成。
@@ -13,8 +36,6 @@
 - **Tauri updater**:`Updater Release` 构建并发布 x86_64 签名 AppImage/`.sig`/`latest.json`;本机 arm64 补构建签名 aarch64 AppImage 并合并双平台 `latest.json`,两个平台的远端 updater smoke 均通过。
 - **真实 runner**:macOS arm64 unsigned DMG + HEIC ImageIO smoke 通过;Windows x64 MSIX pack + sideload install smoke 通过。
 - **修复**:Linux bundle 补 `xdg-utils`;MSIX full-trust 扩展改用 `desktop:` 命名空间;Windows PowerShell smoke 恢复 PSModulePath;macOS/Windows 真实 runner 暴露的 guardrail/clippy 问题修复。
-
----
 
 ---
 
