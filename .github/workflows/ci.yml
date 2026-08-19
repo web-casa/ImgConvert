@@ -68,8 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \
@@ -99,8 +98,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \
@@ -123,8 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \
@@ -218,8 +215,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          scripts/ci-install-apt-packages.sh \
             build-essential \
             cmake \
             meson \

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +34,7 @@ for (const [name, text] of allWorkflows) {
 }
 
 checkAutomaticLinuxCiWorkflow();
+checkLinuxCiAptBootstrap();
 checkLinuxReleaseWorkflow();
 checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
@@ -130,6 +131,40 @@ function checkAutomaticLinuxCiWorkflow() {
   }
   if (!ci.includes("ubuntu-24.04-arm")) {
     failures.push("ci.yml must keep the free public arm64 runner explicit when enabled");
+  }
+}
+
+function checkLinuxCiAptBootstrap() {
+  const bootstrapPath = path.join(repoRoot, "scripts", "ci-install-apt-packages.sh");
+  if (!existsSync(bootstrapPath)) {
+    failures.push("CI Ubuntu native dependency bootstrap script is missing");
+    return;
+  }
+  if (process.platform !== "win32" && (statSync(bootstrapPath).mode & 0o111) === 0) {
+    failures.push("CI Ubuntu native dependency bootstrap script must be executable");
+  }
+  const bootstrap = readFileSync(bootstrapPath, "utf8");
+  for (const marker of [
+    "update_attempts=3",
+    "update_timeout_seconds=180",
+    "install_timeout_seconds=600",
+    "timeout --kill-after",
+    "apt-get update",
+    "apt-get install",
+  ]) {
+    if (!bootstrap.includes(marker)) {
+      failures.push(`CI Ubuntu native dependency bootstrap is missing marker: ${marker}`);
+    }
+  }
+  const invocation = "scripts/ci-install-apt-packages.sh";
+  const invocationCount = ci.split(invocation).length - 1;
+  if (invocationCount !== 4) {
+    failures.push(
+      `ci.yml must use the bounded Ubuntu dependency bootstrap four times, found ${invocationCount}`,
+    );
+  }
+  if (ci.includes("sudo apt-get update")) {
+    failures.push("ci.yml must not retain unbounded sudo apt-get update commands");
   }
 }
 
