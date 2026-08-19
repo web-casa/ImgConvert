@@ -9,6 +9,9 @@
 - 分支：`main`
 - 当前 tag：`v0.1.2`
 - Release：`https://github.com/web-casa/ImgConvert/releases/tag/v0.1.2`
+- 已确认的下一发行目标：`v0.2.0` 双渠道准备（GitHub 已签名/公证 arm64 DMG + Microsoft
+  Store x64 MSIX submission）；尚未创建 tag 或公开 Release，完整契约见
+  [`RELEASE_V0.2.0.md`](./RELEASE_V0.2.0.md)
 - 已配置 Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_UPDATER_PUBKEY`
 - 未配置 Secrets：Apple/Windows 签名、MAS provisioning、Store 提交账号
 - CI：public 仓库标准 runner 免费；`main` push 自动跑 CI；`v*` tag 自动跑 Linux Release
@@ -23,6 +26,8 @@
 - macOS 真实 runner unsigned DMG + HEIC ImageIO smoke
 - Apple Silicon rav1e AVIF 实测：免费 `macos-15` arm64 runner 确认默认 speed=8（比 10 慢 2.763×，但输出小 48.76%）；JSON artifact 保留 14 天
 - Microsoft Store / MAS 构建禁用 Tauri updater
+- v0.2.0 的 macOS/Store 渠道隔离、tag/version 不变量、凭据边界与人工发布顺序已文档化；
+  自动化实现待完成
 - 隐私政策：`PRIVACY.md`
 - Logo 已全部替换并压缩
 - 前端 i18n Phase 1/2 完成：`zh-CN` + `en-US`
@@ -144,6 +149,6 @@ git push origin main
 ## 8. 当前阻塞项
 
 - Phase 4a：需要仓库管理员启用 GitHub Pages，并由 Partner Center 账户负责人执行 IARC/CSV/提交
-- macOS 签名/MAS：需要 Apple secrets
+- v0.2.0 macOS 直发：需要 Apple Developer ID/notarization secrets，并在签名/公证后由发布负责人复核 GitHub draft Release
 - Windows 直发签名：需要代码签名证书
 - Store 提交：需要 Partner Center 账号与 listing 资料

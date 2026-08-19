@@ -25,6 +25,26 @@
 
 ---
 
+## 近期发布决定 — v0.2.0 双渠道准备（2026-08-19）
+
+`v0.1.2` 保持其 Linux-only 发布历史；不移动既有 tag 或用后续 `main` 代码重写该
+Release。已确认的 `v0.2.0` 交付目标是：
+
+- GitHub Release 直发已 Developer ID 签名、公证并 staple 的 Apple Silicon (`arm64`) DMG；
+  v0.2.0 不承诺 macOS Tauri updater，也不从 GitHub 直发 Windows MSIX。
+- Microsoft Store 使用从同一个 `v0.2.0` tag 构建的 x64 MSIX submission artifact；Store
+  版持续在编译时禁用 external codec/helper 与 Tauri updater，更新由 Store 交付。
+- 两个渠道的身份、信任链和外部提交不同；tag/应用版本必须一致，但 DMG 与 MSIX 不可互换。
+  Store 版本由 Partner Center 的既有版本决定，不能从应用 semver 直接推测。
+- 自动化只使用 public GitHub-hosted standard runners；Apple 签名/公证和 Partner Center
+  提交仍需授权账户负责人执行。Flatpak app-id
+  `io.github.yeagoo.imgconvert` 不属于本批变更。
+
+精确的版本、tag、凭据、发布顺序和禁止事项见
+[`RELEASE_V0.2.0.md`](./RELEASE_V0.2.0.md)。
+
+---
+
 ## P0 — UI/UX 外壳(先做,先看)
 
 目标:不接(或假接)后端也能完整演示界面与交互。

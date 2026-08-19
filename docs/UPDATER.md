@@ -14,9 +14,12 @@ with empty pubkey/endpoints so the updater plugin can initialize in normal
 packages. Signed updater release builds opt in by generating an extra Tauri
 config that overlays the real pubkey and endpoints.
 
-For the first public release batch, GitHub Releases is the only distribution
-channel: Linux `.deb`, `.rpm`, AppImage, AppImage signature, checksums, and
-`latest.json`. Flathub, MAS, MSIX, and other store channels remain deferred.
+`v0.1.2` was a Linux-only public Release. The v0.2.0 release plan keeps Linux
+updater assets on GitHub Releases and adds a separate, signed/notarized direct
+macOS DMG. The DMG is a manual-download artifact in v0.2.0: this repository
+does not yet publish a signed macOS `.app.tar.gz` plus updater manifest, so it
+must not claim an in-app macOS update channel. Microsoft Store MSIX remains a
+separate submission artifact and is never a GitHub direct-download asset.
 
 ## One-time key setup
 
@@ -54,10 +57,10 @@ The default updater endpoint is:
 https://github.com/web-casa/ImgConvert/releases/latest/download/latest.json
 ```
 
-The default artifact base URL is:
+The default artifact base URL follows the application version, for example:
 
 ```text
-https://github.com/web-casa/ImgConvert/releases/download/v0.1.2
+https://github.com/web-casa/ImgConvert/releases/download/v0.2.0
 ```
 
 Override these when preparing a non-default repository or tag:
@@ -70,7 +73,7 @@ export TAURI_UPDATER_ENDPOINTS='["https://github.com/web-casa/ImgConvert/release
 
 pnpm run release:linux:updater
 
-export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/web-casa/ImgConvert/releases/download/v0.1.2"
+export TAURI_UPDATER_ARTIFACT_BASE_URL="https://github.com/web-casa/ImgConvert/releases/download/v0.2.0"
 pnpm run release:updater:manifest
 pnpm run release:updater:verify
 ```
@@ -101,7 +104,7 @@ release scope.
 After the release is published, verify the public updater surface:
 
 ```bash
-pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.1.2 --platform=linux-x86_64
+pnpm run release:updater:smoke -- --repo=web-casa/ImgConvert --tag=v0.2.0 --platform=linux-x86_64
 ```
 
 On a different CPU architecture, add `--no-run` to validate `latest.json`,
@@ -139,7 +142,7 @@ changing the old binary.
 
 Run the manual workflow `Updater Release` with:
 
-- `tag`: the release tag, for example `v0.1.2`
+- `tag`: the release tag, for example `v0.2.0`
 - `publish_release=false`: build and upload workflow artifacts only
 - `publish_release=true`: upload `latest.json`, AppImage, signature, and
   checksums to the GitHub Release

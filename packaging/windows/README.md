@@ -101,10 +101,12 @@ pnpm run release:windows:msix:smoke
 ```
 
 GitHub Actions provides a dedicated `Windows Store MSIX` production build
-workflow. It uses the committed Partner Center identity defaults, builds the
-submission `.msix` with external codecs and Tauri updater disabled, runs the
-sideload smoke against a temporary copy, then uploads the untouched
-`imgconvert-windows-x64-msix-submission` artifact.
+workflow. Its required `release_tag` checks out and verifies the immutable app
+release tag before it uses the committed Partner Center identity defaults,
+builds the submission `.msix` with external codecs and Tauri updater disabled,
+runs the sideload smoke against a temporary copy, then uploads the untouched
+`imgconvert-windows-x64-msix-submission` artifact. It never attaches MSIX to a
+GitHub Release or creates a Partner Center submission.
 
 For a real hosted-runner install smoke, manually dispatch `Windows Smoke` with
 `store_msix=true`. That path uses the isolated `ImgConvert.DevSmoke` identity,
@@ -124,6 +126,13 @@ the Store package unless channel rules are revalidated. `runFullTrust` is a
 restricted capability; the account owner must provide its factual use case in
 Partner Center Submission options before certification, as recorded in
 `docs/STORE_LISTING_4A.md`.
+
+For v0.2.0, `release_tag=v0.2.0` identifies the shared source snapshot, while
+`store_version` must be chosen by the Partner Center account owner to be newer
+than any package version already associated with this Store identity. The
+four-part Store version is not inferred from app semver. The full release order
+and GitHub-DMG/Store-MSIX channel boundary are in
+[`docs/RELEASE_V0.2.0.md`](../../docs/RELEASE_V0.2.0.md).
 
 Windows HEIC remains decode-only by product policy. The system route uses WIC
 runtime detection of the Microsoft HEIF Image Extensions and HEVC Video

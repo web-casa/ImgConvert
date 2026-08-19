@@ -76,6 +76,7 @@ GitHub Actions:
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
 - Manual `build_mas_candidate=true` imports Apple signing secrets, generates MAS entitlements/provisioning config, builds a signed `.app`, and optionally produces a `.pkg` when `IMGCONVERT_MAS_INSTALLER_IDENTITY` is set.
+- The manual `macOS DMG Release` workflow is the v0.2.0 publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, builds/signs/notarizes an arm64 DMG, and retains it as an Actions artifact. `publish_release=true` only attaches the verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
 
 Required GitHub secrets:
 
@@ -90,3 +91,9 @@ macOS release acceptance still requires a real machine pass:
 - Apple Silicon AVIF benchmark has completed on `macos-15` arm64; rerun it before changing the rav1e default or codec choice.
 - `.dmg` Developer ID signing, `notarytool` submission, stapling, and Gatekeeper assessment.
 - App Store Connect upload/TestFlight/review remain account operations outside this repository.
+
+The v0.2.0 direct-DMG release deliberately has no macOS Tauri updater asset or
+endpoint. Until a separately reviewed `.app.tar.gz` updater artifact and
+manifest exist, users obtain later macOS releases from GitHub manually. The
+exact two-channel v0.2.0 order is documented in
+[`docs/RELEASE_V0.2.0.md`](../../docs/RELEASE_V0.2.0.md).

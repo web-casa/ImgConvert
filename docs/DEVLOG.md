@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-08-19 — v0.2.0 双渠道发布契约已确认
+
+- **目标**：后续 `v0.2.0` 从同一不可变 tag 构建 GitHub 直发的已签名/公证 Apple Silicon DMG 与 Microsoft Store x64 MSIX submission artifact。
+- **隔离**：DMG 使用 Apple Developer ID 信任链；MSIX 保持 Partner Center identity、Store updater 与 external codec/helper 编译禁用，且不作为 GitHub 直发资产。
+- **不变量**：tag 必须匹配根 package、Tauri config 与 Cargo manifest 的 app version；Store 的四段 package version 由 Partner Center 已有版本决定，不能由 semver 直接猜测。
+- **边界**：本记录只确认发布设计，不声称 tag、Apple 签名/公证、GitHub asset 或 Partner Center submission 已完成。详细步骤见 [`RELEASE_V0.2.0.md`](./RELEASE_V0.2.0.md)。
+
+---
+
 ## 2026-08-19 — CI Ubuntu 依赖安装审查：限制 apt 停滞并重试
 
 - **审查证据**：`af71fe4` 的自动 CI 两次在不同 `ubuntu-24.04` jobs 的 `sudo apt-get update`
