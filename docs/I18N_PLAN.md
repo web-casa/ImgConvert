@@ -161,7 +161,10 @@ errors: {
 
 前端通过项目现有 `svelte-i18n`（其 formatter 基于 `intl-messageformat`）插值，消息采用
 ICU 语法，例如 `"File not found: {path}"`。两份 locale 文件同时新增同一组 `errors.*`
-key，并由现有 key parity 测试守护。
+key，并由现有 key parity 测试守护。项目的 `translate()` 封装和直接 `$t` / `get(t)` 调用
+必须把插值对象放入 `values`：`translate(key, params)` 会转为 `{ values: params }`，直接调用
+则使用 `$t(key, { values: params })`。这是 `svelte-i18n` v4 的 ICU 参数接口，不能把 params
+直接作为第二个对象的顶层字段。
 
 ## 7. CI 硬编码检查
 
