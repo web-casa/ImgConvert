@@ -45,6 +45,10 @@ export IMGCONVERT_MAS_PROVISION_PROFILE=/path/to/embedded.provisionprofile
 pnpm run release:macos:mas  # sets IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 and IMGCONVERT_DISABLE_UPDATER=1
 export IMGCONVERT_MAS_INSTALLER_IDENTITY="Mac Installer Distribution: <name> (<TEAMID>)"
 pnpm run release:macos:mas:pkg
+export APPLE_ID="<apple-id>"
+export APPLE_PASSWORD="<app-specific-password>"
+pnpm run release:macos:mas:submit              # App Store Connect validation only
+pnpm run release:macos:mas:submit -- --upload  # validate, then upload
 ```
 
 Apple Silicon AVIF benchmark, used to decide whether rav1e speed 8 remains a sane default on macOS:
@@ -76,13 +80,14 @@ GitHub Actions:
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
 - Manual `build_mas_candidate=true` imports separate Apple Distribution and Mac Installer Distribution certificates, verifies the embedded provisioning profile and signed entitlements, builds a signed `.app`, and requires a signed `.pkg` artifact.
-- The manual `macOS DMG Release` workflow is the v0.2.0 publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, builds/signs/notarizes an arm64 DMG, and retains it as an Actions artifact. `publish_release=true` only attaches the verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
+- The manual `macOS DMG Release` workflow is the direct-distribution publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, builds/signs/notarizes an arm64 DMG, and retains it as an Actions artifact. `publish_release=true` only attaches the verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
+- The manual `macOS MAS Release` workflow checks out the same immutable tag, requires that commit to be on the default branch, builds a signed sandboxed `.app` and Installer-signed `.pkg`, and validates the package with App Store Connect. `upload_build=false` is the safe default; set it to true only after validation succeeds and the App Store Connect app record is ready.
 
 Required GitHub secrets:
 
 - Direct signed/notarized DMG: `APPLE_DIRECT_CERTIFICATE`, `APPLE_DIRECT_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, plus either `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or `APPLE_API_KEY`/`APPLE_API_ISSUER`/`APPLE_API_KEY_BASE64`.
 - Optional direct overrides: `IMGCONVERT_DIRECT_SIGNING_IDENTITY` and `APPLE_PROVIDER_SHORT_NAME`.
-- MAS candidate: `APPLE_MAS_CERTIFICATE`, `APPLE_MAS_CERTIFICATE_PASSWORD`, `APPLE_MAS_INSTALLER_CERTIFICATE`, `APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, and `IMGCONVERT_MAS_PROVISION_PROFILE_BASE64`. The workflow auto-selects both MAS identities; `IMGCONVERT_MAS_SIGNING_IDENTITY` and `IMGCONVERT_MAS_INSTALLER_IDENTITY` are optional overrides.
+- MAS candidate/submission: `APPLE_MAS_CERTIFICATE`, `APPLE_MAS_CERTIFICATE_PASSWORD`, `APPLE_MAS_INSTALLER_CERTIFICATE`, `APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, `IMGCONVERT_MAS_PROVISION_PROFILE_BASE64`, `APPLE_ID`, and `APPLE_PASSWORD`. The workflow auto-selects both MAS identities; `IMGCONVERT_MAS_SIGNING_IDENTITY`, `IMGCONVERT_MAS_INSTALLER_IDENTITY`, and `APPLE_PROVIDER_SHORT_NAME` are optional overrides.
 
 macOS release acceptance still requires a real machine pass:
 
@@ -90,10 +95,10 @@ macOS release acceptance still requires a real machine pass:
 - MAS sandbox file-open/output-directory flow using scoped dialog grants and persisted scope. The hidden path smoke covers the conversion backend; the interactive GUI permission prompt still needs a real acceptance pass.
 - Apple Silicon AVIF benchmark has completed on `macos-15` arm64; rerun it before changing the rav1e default or codec choice.
 - `.dmg` Developer ID signing, `notarytool` submission, stapling, and Gatekeeper assessment.
-- App Store Connect upload/TestFlight/review remain account operations outside this repository.
+- App Store Connect package validation and optional build upload are automated. Build processing, metadata, TestFlight selection, pricing/availability, and App Review submission remain explicit account-owner steps.
 
-The v0.2.0 direct-DMG release deliberately has no macOS Tauri updater asset or
+The v0.2.1 direct-DMG release deliberately has no macOS Tauri updater asset or
 endpoint. Until a separately reviewed `.app.tar.gz` updater artifact and
 manifest exist, users obtain later macOS releases from GitHub manually. The
-exact two-channel v0.2.0 order is documented in
-[`docs/RELEASE_V0.2.0.md`](../../docs/RELEASE_V0.2.0.md).
+exact v0.2.1 release order is documented in
+[`docs/RELEASE_V0.2.1.md`](../../docs/RELEASE_V0.2.1.md).

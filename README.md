@@ -8,7 +8,7 @@
 **本地优先**的跨平台图片批量转换与压缩工具。Linux 已先行发布；v0.2.0 的发布准备会增加 Apple Silicon macOS 直发与 Microsoft Store Windows 渠道。
 面向开发者、设计师、站长与内容创作者:拖拽即转,优先支持 AVIF/WebP/JPEG/PNG 与有损/无损压缩,**所有处理默认在本机完成,不上传图片**。
 
-> **发布状态**:当前公开的 `v0.1.2` 只有 Linux GitHub Release 资产。已确认的 `v0.2.0` 目标是在同一 tag 上追加已签名、公证的 Apple Silicon `.dmg`，并生成独立的 Microsoft Store x64 MSIX submission artifact；后者不会作为 GitHub 直发包发布。完整交接顺序见 [docs/RELEASE_V0.2.0.md](docs/RELEASE_V0.2.0.md)。
+> **发布状态**:当前公开的 `v0.1.2` 只有 Linux GitHub Release 资产。`v0.2.0` 标签早于最终 macOS 发布修复且不会移动；当前正式候选为 `v0.2.1`，从同一不可变标签生成已签名/公证的 Apple Silicon `.dmg`、Mac App Store `.pkg` 和独立的 Microsoft Store x64 MSIX submission artifact。商店包不会作为 GitHub 直发包发布。完整交接顺序见 [docs/RELEASE_V0.2.1.md](docs/RELEASE_V0.2.1.md)。
 
 ## ✨ 功能
 

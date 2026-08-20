@@ -15,6 +15,7 @@ const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const macosRelease = readWorkflow("macos-release.yml");
+const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
@@ -27,6 +28,7 @@ const allWorkflows = [
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
   ["macos-release.yml", macosRelease],
+  ["macos-mas-release.yml", macosMasRelease],
   ["macos-notarization-finalize.yml", macosNotarizationFinalize],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
@@ -44,6 +46,7 @@ checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
 checkManualWorkflow("macos-release.yml", macosRelease);
+checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
 checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
@@ -53,6 +56,13 @@ checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15"
 checkMacosSmokeWorkflow();
 checkMacosDmgReleaseWorkflow();
 checkStandardPlatformWorkflow("macos-release.yml", macosRelease, "macOS DMG Release", "macos-15");
+checkMacosMasReleaseWorkflow();
+checkStandardPlatformWorkflow(
+  "macos-mas-release.yml",
+  macosMasRelease,
+  "macOS MAS Release",
+  "macos-15",
+);
 checkMacosNotarizationFinalizeWorkflow();
 checkStandardPlatformWorkflow(
   "macos-notarization-finalize.yml",
@@ -326,6 +336,31 @@ function checkMacosDmgReleaseWorkflow() {
   }
   if (macosRelease.includes("gh release upload")) {
     failures.push("macos-release.yml must defer release attachment to the notarization finalizer");
+  }
+}
+
+function checkMacosMasReleaseWorkflow() {
+  requireStringInput(macosMasRelease, "tag", "macos-mas-release.yml");
+  requireBooleanInputDefault(macosMasRelease, "upload_build", false, "macos-mas-release.yml");
+
+  for (const marker of [
+    "contents: read",
+    "ref: ${{ inputs.tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "release tag must point to a commit on the default branch",
+    'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
+    'IMGCONVERT_DISABLE_UPDATER: "1"',
+    "APPLE_MAS_CERTIFICATE",
+    "APPLE_MAS_INSTALLER_CERTIFICATE",
+    "IMGCONVERT_MAS_PROVISION_PROFILE_BASE64",
+    "release:macos:mas:submit",
+    "inputs.upload_build",
+    "retention-days: 14",
+  ]) {
+    if (!macosMasRelease.includes(marker)) {
+      failures.push(`macos-mas-release.yml missing release marker: ${marker}`);
+    }
   }
 }
 

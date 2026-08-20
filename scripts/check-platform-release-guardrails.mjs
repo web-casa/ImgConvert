@@ -981,6 +981,9 @@ function checkMacosRuntimeGuardrails() {
   if (!packageScripts["release:macos:mas:pkg"]?.includes("package-macos-mas-pkg.mjs")) {
     failures.push("package.json must expose release:macos:mas:pkg");
   }
+  if (!packageScripts["release:macos:mas:submit"]?.includes("submit-macos-mas-pkg.mjs")) {
+    failures.push("package.json must expose release:macos:mas:submit");
+  }
   for (const script of [
     "scripts/smoke-macos-runtime.mjs",
     "scripts/clean-macos-bundles.mjs",
@@ -988,6 +991,7 @@ function checkMacosRuntimeGuardrails() {
     "scripts/notarize-macos-dmg.mjs",
     "scripts/prepare-macos-mas-release.mjs",
     "scripts/package-macos-mas-pkg.mjs",
+    "scripts/submit-macos-mas-pkg.mjs",
   ]) {
     if (!existsSync(path.join(repoRoot, script))) {
       failures.push(`${script} is required for macOS runtime/build smoke`);
@@ -1013,6 +1017,9 @@ function checkMacosRuntimeGuardrails() {
   const macosWorkflow = readText(path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"));
   const macosReleaseWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "macos-release.yml"),
+  );
+  const macosMasReleaseWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "macos-mas-release.yml"),
   );
   const macosNotarizationFinalizeWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "macos-notarization-finalize.yml"),
@@ -1106,6 +1113,22 @@ function checkMacosRuntimeGuardrails() {
   }
   if (/^\s+draft:\s*/m.test(macosReleaseWorkflow)) {
     failures.push("macOS DMG Release must not create or change a GitHub Release draft state");
+  }
+  for (const expected of [
+    "ref: ${{ inputs.tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "release:macos:mas",
+    "release:macos:mas:pkg",
+    "release:macos:mas:submit",
+    "IMGCONVERT_DISABLE_EXTERNAL_CODECS",
+    "IMGCONVERT_DISABLE_UPDATER",
+    "IMGCONVERT_MAS_PROVISION_PROFILE_BASE64",
+    "upload_build",
+  ]) {
+    if (!macosMasReleaseWorkflow.includes(expected)) {
+      failures.push(`macOS MAS Release workflow must preserve ${expected}`);
+    }
   }
 
   const cargoToml = readText(path.join(repoRoot, "src-tauri", "Cargo.toml"));
