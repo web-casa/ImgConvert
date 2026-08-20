@@ -1,7 +1,7 @@
 [package]
 name = "imgconvert"
 version = "0.2.0"
-description = "跨平台图片批量转换工具"
+description = "Local-first cross-platform batch image converter"
 authors = ["ImgConvert"]
 license = "Apache-2.0"
 edition = "2021"

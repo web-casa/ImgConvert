@@ -57,7 +57,15 @@ pub struct ImportScanResult {
     pub errors: Vec<ImportScanError>,
     pub truncated: bool,
     pub cancelled: bool,
-    pub limit_reason: Option<String>,
+    pub limit_reason: Option<ImportScanLimitReason>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportScanLimitReason {
+    DirectoryDepth,
+    EntryCount,
+    FileCount,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -153,7 +161,7 @@ struct Scanner {
     errors: Vec<ImportScanError>,
     truncated: bool,
     cancelled: bool,
-    limit_reason: Option<String>,
+    limit_reason: Option<ImportScanLimitReason>,
 }
 
 impl ImportScanState {
@@ -451,11 +459,11 @@ impl Scanner {
         }
         if depth > self.limits.max_depth {
             self.skipped += 1;
-            self.truncate("目录深度超过上限");
+            self.truncate(ImportScanLimitReason::DirectoryDepth);
             return false;
         }
         if self.entries_seen >= self.limits.max_entries {
-            self.truncate("扫描条目达到上限");
+            self.truncate(ImportScanLimitReason::EntryCount);
             return false;
         }
 
@@ -521,7 +529,7 @@ impl Scanner {
         let child_depth = depth.saturating_add(1);
         if child_depth > self.limits.max_depth {
             self.skipped += 1;
-            self.truncate("目录深度超过上限");
+            self.truncate(ImportScanLimitReason::DirectoryDepth);
             return;
         }
 
@@ -565,7 +573,7 @@ impl Scanner {
             return;
         }
         if self.files.len() >= self.limits.max_files {
-            self.truncate("文件数量达到上限");
+            self.truncate(ImportScanLimitReason::FileCount);
             return;
         }
 
@@ -580,7 +588,7 @@ impl Scanner {
             },
         );
         if self.files.len() >= self.limits.max_files {
-            self.truncate("文件数量达到上限");
+            self.truncate(ImportScanLimitReason::FileCount);
         }
     }
 
@@ -601,10 +609,10 @@ impl Scanner {
         self.cancelled || self.truncated
     }
 
-    fn truncate(&mut self, reason: impl Into<String>) {
+    fn truncate(&mut self, reason: ImportScanLimitReason) {
         if !self.truncated {
             self.truncated = true;
-            self.limit_reason = Some(reason.into());
+            self.limit_reason = Some(reason);
         }
     }
 
@@ -1133,7 +1141,7 @@ mod tests {
 
         assert_eq!(result.files.len(), 1);
         assert!(result.truncated);
-        assert_eq!(result.limit_reason.as_deref(), Some("文件数量达到上限"));
+        assert_eq!(result.limit_reason, Some(ImportScanLimitReason::FileCount));
 
         fs::remove_dir_all(dir).unwrap();
     }
@@ -1151,7 +1159,7 @@ mod tests {
 
         assert!(result.files.is_empty());
         assert!(result.truncated);
-        assert_eq!(result.limit_reason.as_deref(), Some("扫描条目达到上限"));
+        assert_eq!(result.limit_reason, Some(ImportScanLimitReason::EntryCount));
 
         fs::remove_dir_all(dir).unwrap();
     }

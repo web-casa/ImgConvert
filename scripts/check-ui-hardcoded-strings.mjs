@@ -6,8 +6,11 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const srcRoot = path.join(repoRoot, "src");
+const tauriConfigPath = path.join(repoRoot, "src-tauri", "tauri.conf.json");
+const tauriCapabilityPath = path.join(repoRoot, "src-tauri", "capabilities", "default.json");
 const excludedDirs = new Set(["lib/i18n/messages"]);
 const failures = [];
+const cjkPattern = /[\u3000-\u303f\u3400-\u9fff\ufe30-\ufe4f\uff00-\uffef]/;
 
 for (const file of walk(srcRoot)) {
   const relative = path.relative(srcRoot, file).split(path.sep);
@@ -21,19 +24,46 @@ for (const file of walk(srcRoot)) {
   const source = readFileSync(file, "utf8");
   const codeOnly = stripComments(source);
   codeOnly.split(/\r?\n/).forEach((line, index) => {
-    if (/[\u3400-\u9fff]/.test(line)) {
+    if (cjkPattern.test(line)) {
       failures.push(`${path.relative(repoRoot, file)}:${index + 1}: ${line.trim()}`);
     }
   });
 }
 
+const tauriConfig = JSON.parse(readFileSync(tauriConfigPath, "utf8"));
+for (const [index, windowConfig] of (tauriConfig.app?.windows ?? []).entries()) {
+  if (typeof windowConfig.title === "string" && cjkPattern.test(windowConfig.title)) {
+    failures.push(
+      `${path.relative(repoRoot, tauriConfigPath)}: app.windows[${index}].title contains localized CJK text`,
+    );
+  }
+}
+
+for (const field of ["shortDescription", "longDescription"]) {
+  const value = tauriConfig.bundle?.[field];
+  if (typeof value === "string" && cjkPattern.test(value)) {
+    failures.push(
+      `${path.relative(repoRoot, tauriConfigPath)}: bundle.${field} contains localized CJK text`,
+    );
+  }
+}
+
+const tauriCapability = JSON.parse(readFileSync(tauriCapabilityPath, "utf8"));
+if (!tauriCapability.permissions?.includes("core:window:allow-set-title")) {
+  failures.push(
+    `${path.relative(repoRoot, tauriCapabilityPath)}: missing core:window:allow-set-title`,
+  );
+}
+
 if (failures.length > 0) {
-  console.error("Hardcoded CJK UI strings found in src/:");
+  console.error("Hardcoded CJK UI text or punctuation found outside i18n messages:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("UI hardcoded string check passed (no CJK outside i18n messages).");
+console.log(
+  "UI hardcoded string check passed (source UI and static window titles are locale-neutral).",
+);
 
 function walk(dir) {
   const files = [];

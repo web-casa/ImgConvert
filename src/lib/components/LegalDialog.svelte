@@ -1,20 +1,24 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { X } from "phosphor-svelte";
-  import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
+  import {
+    formatLocalizedMessage,
+    translationMessage,
+    type LocalizedMessage,
+  } from "$lib/localized-message";
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
   let licenseText = $state("");
   let loading = $state(false);
-  let loadError = $state("");
+  let loadError = $state<LocalizedMessage | null>(null);
 
   $effect(() => {
     if (!open || licenseText || loading) return;
 
     loading = true;
-    loadError = "";
+    loadError = null;
     void fetch("THIRD_PARTY_LICENSES.md")
       .then((response) => {
         if (!response.ok) {
@@ -26,9 +30,7 @@
         licenseText = text;
       })
       .catch((error: unknown) => {
-        loadError = get(t)("legal.loadError", {
-          values: { error: String(error) },
-        } as any) as string;
+        loadError = translationMessage("legal.loadError", { error: String(error) });
       })
       .finally(() => {
         loading = false;
@@ -45,6 +47,11 @@
 
   function handleBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) close();
+  }
+
+  function localizedText(message: LocalizedMessage, currentTranslation: unknown): string {
+    void currentTranslation;
+    return formatLocalizedMessage(message);
   }
 </script>
 
@@ -77,7 +84,7 @@
 
       <div class="min-h-0 flex-1 overflow-auto bg-background px-4 py-3">
         {#if loadError}
-          <p class="text-sm text-destructive">{loadError}</p>
+          <p class="text-sm text-destructive">{localizedText(loadError, $t)}</p>
         {:else if loading && !licenseText}
           <p class="text-sm text-muted-foreground">{$t("legal.loading")}</p>
         {:else}

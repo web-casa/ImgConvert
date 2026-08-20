@@ -1,4 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { locale as osLocale } from "@tauri-apps/plugin-os";
 import { get } from "svelte/store";
 import { addMessages, init, locale as localeStore, t } from "svelte-i18n";
@@ -47,12 +48,33 @@ export async function initI18n(initialLocale?: AppLocale): Promise<void> {
   if (get(locale) !== requested) {
     await locale.set(requested);
   }
+  await syncAppWindowTitle();
 }
 
 export function setAppLocale(nextLocale: AppLocale): void {
-  void locale.set(nextLocale);
+  const localeChange = locale.set(nextLocale);
+  if (localeChange) {
+    void localeChange.then(syncAppWindowTitle);
+  } else {
+    void syncAppWindowTitle();
+  }
 }
 
 export function translate(key: string, params?: Record<string, string | number>): string {
   return get(t)(key, params ? { values: params } : undefined) as string;
+}
+
+export async function syncAppWindowTitle(): Promise<void> {
+  const title = translate("app.windowTitle");
+  if (typeof document !== "undefined") {
+    document.title = title;
+    document.documentElement.lang = normalizeLocale(get(locale));
+  }
+  if (!isTauri()) return;
+
+  try {
+    await getCurrentWindow().setTitle(title);
+  } catch (error) {
+    console.warn("Failed to update the app window title:", error);
+  }
 }

@@ -5,7 +5,12 @@ import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
-import { formatCommandError, logCommandError, type CommandError } from "$lib/command-error";
+import {
+  formatCommandError,
+  logCommandError,
+  parseCommandError,
+  type CommandError,
+} from "$lib/command-error";
 import {
   locale as localeStore,
   setAppLocale,
@@ -13,6 +18,13 @@ import {
   translate,
   type AppLocale,
 } from "$lib/i18n";
+import {
+  commandErrorMessage,
+  formatLocalizedMessage,
+  messageList,
+  translationMessage,
+  type LocalizedMessage,
+} from "$lib/localized-message";
 import {
   check as checkTauriUpdate,
   type DownloadEvent,
@@ -22,6 +34,11 @@ import {
 // ---- 类型 ----
 export type ItemStatus = "pending" | "running" | "done" | "skipped" | "error";
 export type ThumbnailStatus = "idle" | "loading" | "ready" | "skipped" | "error";
+type BatchProgressStage = "readingAndConverting" | "done";
+interface LocalizedItemDetail {
+  key: string;
+  params?: Record<string, string | number>;
+}
 export interface QueueItem {
   path: string;
   key: string;
@@ -35,6 +52,9 @@ export interface QueueItem {
   thumbnail: ThumbnailPreview | null;
   thumbnailStatus: ThumbnailStatus;
   progress?: number;
+  progressStage?: BatchProgressStage | null;
+  localizedDetail?: LocalizedItemDetail | null;
+  detailError?: CommandError | null;
   preview?: boolean;
 }
 export interface Capabilities {
@@ -64,10 +84,14 @@ export interface CodecProvider {
 export interface CodecDiagnostics {
   heic: HeicCodecDiagnostics;
 }
+export interface DiagnosticMessage {
+  code: string;
+  detail: string | null;
+}
 export interface HeicCodecDiagnostics {
   enabled: boolean;
   externalCodecsEnabled: boolean;
-  disabledReason: string | null;
+  disabledReason: DiagnosticMessage | null;
   extensions: string[];
   activeProvider: CodecProviderDiagnostic | null;
   systemCodecs: SystemCodecDiagnostic[];
@@ -84,34 +108,34 @@ export interface ManifestSearchDirDiagnostic {
   source: string;
   path: string;
   status: string;
-  message: string | null;
+  message: DiagnosticMessage | null;
   manifests: ManifestDiagnostic[];
 }
 export interface ManifestDiagnostic {
   path: string;
   status: string;
-  message: string | null;
+  message: DiagnosticMessage | null;
   provider: CodecProviderDiagnostic | null;
 }
 export interface SystemHelperDiagnostic {
   command: string;
   available: boolean;
   path: string | null;
-  message: string | null;
+  message: DiagnosticMessage | null;
 }
 export interface SystemCodecDiagnostic {
   id: string;
   kind: string;
   available: boolean;
   readable: string[];
-  message: string;
-  installHint: string | null;
+  message: DiagnosticMessage;
+  installHint: DiagnosticMessage | null;
 }
 export interface SelectedHelperDiagnostic {
   configured: boolean;
   available: boolean;
   path: string | null;
-  message: string | null;
+  message: DiagnosticMessage | null;
   provider: CodecProviderDiagnostic | null;
 }
 export interface ConvertResult {
@@ -127,6 +151,7 @@ export interface ImportScanError {
 export interface UiImportError {
   path: string;
   message: string;
+  localizedMessage: LocalizedMessage;
 }
 export interface ImportScanFile {
   path: string;
@@ -148,8 +173,9 @@ export interface ImportScanResult {
   errors: ImportScanError[];
   truncated: boolean;
   cancelled: boolean;
-  limitReason: string | null;
+  limitReason: ImportScanLimitReason | null;
 }
+export type ImportScanLimitReason = "directoryDepth" | "entryCount" | "fileCount";
 export interface BatchSummary {
   total: number;
   completed: number;
@@ -239,7 +265,7 @@ type BatchProgressEvent =
   | { event: "fileStarted"; data: { index: number; input: string } }
   | {
       event: "fileProgress";
-      data: { index: number; percent: number; stage: string };
+      data: { index: number; percent: number; stage: BatchProgressStage };
     }
   | { event: "fileFinished"; data: { index: number; result: ConvertResult } }
   | {
@@ -459,6 +485,8 @@ export const ui = $state<UiState>({
   importErrors: [],
 });
 
+let importMessageSource: LocalizedMessage | null = null;
+
 export const engine = $state<{ text: string; ok: boolean }>({
   text: translate("state.engineInitializing"),
   ok: false,
@@ -466,6 +494,21 @@ export const engine = $state<{ text: string; ok: boolean }>({
 
 localeStore.subscribe(() => {
   if (engine.ok) void checkEngine();
+  if (importMessageSource) {
+    ui.importMessage = formatLocalizedMessage(importMessageSource);
+  }
+  for (const error of ui.importErrors) {
+    error.message = formatLocalizedMessage(error.localizedMessage);
+  }
+  for (const item of queue) {
+    if (item.status === "running" && item.progressStage) {
+      item.detail = translate(batchProgressStageKey(item.progressStage));
+    } else if (item.localizedDetail) {
+      item.detail = translate(item.localizedDetail.key, item.localizedDetail.params);
+    } else if (item.detailError) {
+      item.detail = formatCommandError(item.detailError);
+    }
+  }
 });
 
 export const appUpdate = $state<AppUpdateState>({
@@ -482,6 +525,18 @@ export const appUpdate = $state<AppUpdateState>({
   error: "",
   downloadedBytes: 0,
   contentLength: null,
+});
+
+let appUpdateMessageSource: LocalizedMessage | null = null;
+let appUpdateErrorSource: LocalizedMessage | null = null;
+
+localeStore.subscribe(() => {
+  if (appUpdateMessageSource) {
+    appUpdate.message = formatLocalizedMessage(appUpdateMessageSource);
+  }
+  if (appUpdateErrorSource) {
+    appUpdate.error = formatLocalizedMessage(appUpdateErrorSource);
+  }
 });
 
 let pendingAppUpdate: Update | null = null;
@@ -516,19 +571,19 @@ export async function checkForAppUpdate(): Promise<void> {
   if (!isTauriRuntime()) {
     resetAppUpdateResult();
     appUpdate.checked = true;
-    appUpdate.message = translate("update.webPreview");
+    setAppUpdateMessage(translationMessage("update.webPreview"));
     return;
   }
   if (!updaterEnabled) {
     resetAppUpdateResult();
     appUpdate.checked = true;
-    appUpdate.message = translate("update.storeBuild");
+    setAppUpdateMessage(translationMessage("update.storeBuild"));
     return;
   }
 
   appUpdate.checking = true;
-  appUpdate.error = "";
-  appUpdate.message = "";
+  setAppUpdateError(null);
+  setAppUpdateMessage(null);
   appUpdate.installed = false;
   try {
     if (pendingAppUpdate) {
@@ -544,7 +599,7 @@ export async function checkForAppUpdate(): Promise<void> {
       appUpdate.currentVersion = null;
       appUpdate.date = null;
       appUpdate.body = null;
-      appUpdate.message = translate("update.latest");
+      setAppUpdateMessage(translationMessage("update.latest"));
       return;
     }
 
@@ -553,11 +608,13 @@ export async function checkForAppUpdate(): Promise<void> {
     appUpdate.currentVersion = pendingAppUpdate.currentVersion;
     appUpdate.date = pendingAppUpdate.date ?? null;
     appUpdate.body = pendingAppUpdate.body ?? null;
-    appUpdate.message = translate("update.newVersion", { version: pendingAppUpdate.version });
+    setAppUpdateMessage(
+      translationMessage("update.newVersion", { version: pendingAppUpdate.version }),
+    );
   } catch (error) {
     resetAppUpdateResult();
     appUpdate.checked = true;
-    appUpdate.error = formatUpdaterError(error);
+    setAppUpdateError(updaterErrorMessage(error));
   } finally {
     appUpdate.checking = false;
   }
@@ -567,8 +624,8 @@ export async function installAppUpdate(): Promise<void> {
   if (!pendingAppUpdate || appUpdate.installing) return;
 
   appUpdate.installing = true;
-  appUpdate.error = "";
-  appUpdate.message = translate("update.downloading");
+  setAppUpdateError(null);
+  setAppUpdateMessage(translationMessage("update.downloading"));
   appUpdate.downloadedBytes = 0;
   appUpdate.contentLength = null;
 
@@ -576,11 +633,11 @@ export async function installAppUpdate(): Promise<void> {
     await pendingAppUpdate.downloadAndInstall(handleUpdateDownloadEvent, { timeout: 120_000 });
     appUpdate.installed = true;
     appUpdate.available = false;
-    appUpdate.message = translate("update.installed");
+    setAppUpdateMessage(translationMessage("update.installed"));
     pendingAppUpdate = null;
     await relaunch();
   } catch (error) {
-    appUpdate.error = formatUpdaterError(error);
+    setAppUpdateError(updaterErrorMessage(error));
   } finally {
     appUpdate.installing = false;
   }
@@ -599,7 +656,7 @@ function handleUpdateDownloadEvent(event: DownloadEvent) {
       if (appUpdate.contentLength !== null) {
         appUpdate.downloadedBytes = appUpdate.contentLength;
       }
-      appUpdate.message = translate("update.downloadComplete");
+      setAppUpdateMessage(translationMessage("update.downloadComplete"));
       return;
   }
 }
@@ -614,16 +671,26 @@ function resetAppUpdateResult() {
   appUpdate.body = null;
   appUpdate.downloadedBytes = 0;
   appUpdate.contentLength = null;
-  appUpdate.message = "";
-  appUpdate.error = "";
+  setAppUpdateMessage(null);
+  setAppUpdateError(null);
 }
 
-function formatUpdaterError(error: unknown): string {
+function updaterErrorMessage(error: unknown): LocalizedMessage {
   const message = String(error);
   if (/not configured|No updater config|updater.*config/i.test(message)) {
-    return translate("update.notConfigured");
+    return translationMessage("update.notConfigured");
   }
-  return translate("update.checkFailed", { message });
+  return translationMessage("update.checkFailed", { message });
+}
+
+function setAppUpdateMessage(message: LocalizedMessage | null): void {
+  appUpdateMessageSource = message;
+  appUpdate.message = message ? formatLocalizedMessage(message) : "";
+}
+
+function setAppUpdateError(message: LocalizedMessage | null): void {
+  appUpdateErrorSource = message;
+  appUpdate.error = message ? formatLocalizedMessage(message) : "";
 }
 
 export function readableExtensions(): string[] {
@@ -645,6 +712,8 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
       multiple: options.multiple ?? false,
       title: options.title ?? null,
       extensions: options.extensions ?? [],
+      filterName: translate("state.image"),
+      allFilesName: translate("state.allFiles"),
     },
   });
 }
@@ -854,21 +923,42 @@ function normalizeAddPathInput(input: AddPathInput): ImportScanFile {
   };
 }
 
-export async function importPaths(paths: string[]) {
-  if (ui.converting || ui.importing || paths.length === 0) return;
-  await importPathList(paths, translate("state.importScanning"));
+export function setImportMessage(key: string, params?: Record<string, string | number>): void {
+  setUiImportMessage(translationMessage(key, params));
 }
 
-async function importPathList(paths: string[], message: string) {
+export function setImportCommandError(error: unknown, wrapperKey?: string): void {
+  setUiImportMessage(commandErrorMessage(error, wrapperKey));
+}
+
+function setUiImportMessage(message: LocalizedMessage | null): void {
+  importMessageSource = message;
+  ui.importMessage = message ? formatLocalizedMessage(message) : "";
+}
+
+function importError(path: string, localizedMessage: LocalizedMessage): UiImportError {
+  return {
+    path,
+    localizedMessage,
+    message: formatLocalizedMessage(localizedMessage),
+  };
+}
+
+export async function importPaths(paths: string[]) {
+  if (ui.converting || ui.importing || paths.length === 0) return;
+  await importPathList(paths, "state.importScanning");
+}
+
+async function importPathList(paths: string[], messageKey: string) {
   ui.importing = true;
   ui.importMode = "scan";
   ui.importCancelRequested = false;
-  ui.importMessage = message;
+  setImportMessage(messageKey);
   ui.importErrors = [];
   try {
     if (!isTauriRuntime()) {
       const added = addPaths(paths);
-      ui.importMessage = formatImportSummary(added, null);
+      setUiImportMessage(importSummaryMessage(added, null));
       return;
     }
 
@@ -878,19 +968,18 @@ async function importPathList(paths: string[], message: string) {
         recursive: true,
       },
     });
-    ui.importErrors = scan.errors.map((error) => ({
-      path: error.path,
-      message: formatCommandError(error.error),
-    }));
+    ui.importErrors = scan.errors.map((error) =>
+      importError(error.path, commandErrorMessage(error.error)),
+    );
     if (scan.cancelled) {
-      ui.importMessage = translate("state.importCancelled");
+      setImportMessage("state.importCancelled");
       return;
     }
 
     const added = addPaths(scan.files);
-    ui.importMessage = formatImportSummary(added, scan);
+    setUiImportMessage(importSummaryMessage(added, scan));
   } catch (e) {
-    ui.importMessage = formatCommandError(e);
+    setImportCommandError(e);
     ui.importErrors = [];
   } finally {
     ui.importing = false;
@@ -903,7 +992,7 @@ export async function importClipboard() {
   if (ui.converting || ui.importing) return;
 
   if (!isTauriRuntime()) {
-    ui.importMessage = translate("state.clipboardWebUnavailable");
+    setImportMessage("state.clipboardWebUnavailable");
     return;
   }
 
@@ -914,7 +1003,7 @@ export async function importClipboard() {
       }
     | undefined;
   if (!clipboard) {
-    ui.importMessage = translate("state.clipboardUnsupported");
+    setImportMessage("state.clipboardUnsupported");
     return;
   }
 
@@ -935,16 +1024,18 @@ export async function importClipboard() {
     const text = clipboard.readText ? await clipboard.readText() : "";
     const paths = parseClipboardPaths(text);
     if (paths.length) {
-      await importPathList(paths, translate("state.clipboardScanning"));
+      await importPathList(paths, "state.clipboardScanning");
       return;
     }
   } catch (error) {
     readError ??= error;
   }
 
-  ui.importMessage = readError
-    ? translate("state.clipboardReadFailed", { error: String(readError) })
-    : translate("state.clipboardEmpty");
+  setUiImportMessage(
+    readError
+      ? translationMessage("state.clipboardReadFailed", { error: String(readError) })
+      : translationMessage("state.clipboardEmpty"),
+  );
 }
 
 export async function importPastedClipboard(event: ClipboardEvent) {
@@ -967,7 +1058,7 @@ export async function importPastedClipboard(event: ClipboardEvent) {
   if (!paths.length) return;
 
   event.preventDefault();
-  await importPathList(paths, translate("state.clipboardScanning"));
+  await importPathList(paths, "state.clipboardScanning");
 }
 
 async function readClipboardImages(
@@ -1011,7 +1102,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
   ui.importing = true;
   ui.importMode = "clipboard";
   ui.importCancelRequested = false;
-  ui.importMessage = translate("state.clipboardImporting");
+  setImportMessage("state.clipboardImporting");
   ui.importErrors = [];
 
   let skipped = 0;
@@ -1022,10 +1113,14 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
       try {
         if (image.blob.size > CLIPBOARD_MAX_BYTES) {
           skipped += 1;
-          ui.importErrors.push({
-            path: image.suggestedName ?? "clipboard",
-            message: translate("state.clipboardTooLarge", { size: fmtSize(CLIPBOARD_MAX_BYTES) }),
-          });
+          ui.importErrors.push(
+            importError(
+              image.suggestedName ?? "clipboard",
+              translationMessage("state.clipboardTooLarge", {
+                size: fmtSize(CLIPBOARD_MAX_BYTES),
+              }),
+            ),
+          );
           continue;
         }
 
@@ -1033,10 +1128,14 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
         if (ui.importCancelRequested) break;
         if (bytes.byteLength > CLIPBOARD_MAX_BYTES) {
           skipped += 1;
-          ui.importErrors.push({
-            path: image.suggestedName ?? "clipboard",
-            message: translate("state.clipboardTooLarge", { size: fmtSize(CLIPBOARD_MAX_BYTES) }),
-          });
+          ui.importErrors.push(
+            importError(
+              image.suggestedName ?? "clipboard",
+              translationMessage("state.clipboardTooLarge", {
+                size: fmtSize(CLIPBOARD_MAX_BYTES),
+              }),
+            ),
+          );
           continue;
         }
 
@@ -1051,10 +1150,9 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
         if (ui.importCancelRequested) break;
       } catch (error) {
         skipped += 1;
-        ui.importErrors.push({
-          path: image.suggestedName ?? "clipboard",
-          message: formatCommandError(error),
-        });
+        ui.importErrors.push(
+          importError(image.suggestedName ?? "clipboard", commandErrorMessage(error)),
+        );
       }
     }
 
@@ -1062,7 +1160,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
       for (const file of files) {
         cleanupTemporaryPath(file.path);
       }
-      ui.importMessage = translate("state.clipboardCancelled");
+      setImportMessage("state.clipboardCancelled");
       return;
     }
 
@@ -1074,9 +1172,9 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
         cleanupTemporaryPath(file.path);
       }
     }
-    ui.importMessage = formatImportSummary({ ...added, skipped: added.skipped + skipped }, null);
+    setUiImportMessage(importSummaryMessage({ ...added, skipped: added.skipped + skipped }, null));
   } catch (error) {
-    ui.importMessage = formatCommandError(error);
+    setImportCommandError(error);
   } finally {
     ui.importing = false;
     ui.importMode = null;
@@ -1169,34 +1267,66 @@ export async function cancelImportScan() {
   ui.importCancelRequested = true;
 
   if (ui.importMode === "clipboard") {
-    ui.importMessage = translate("state.clipboardCancelling");
+    setImportMessage("state.clipboardCancelling");
     return;
   }
 
   if (!isTauriRuntime()) {
     ui.importing = false;
     ui.importMode = null;
-    ui.importMessage = translate("state.importCancelled");
+    setImportMessage("state.importCancelled");
     return;
   }
 
   try {
     await invoke<boolean>("cancel_import_scan");
   } catch (e) {
-    ui.importMessage = formatCommandError(e);
+    setImportCommandError(e);
   }
 }
 
-function formatImportSummary(added: AddPathsResult, scan: ImportScanResult | null): string {
+export function formatImportSummary(added: AddPathsResult, scan: ImportScanResult | null): string {
+  return formatLocalizedMessage(importSummaryMessage(added, scan));
+}
+
+function importSummaryMessage(
+  added: AddPathsResult,
+  scan: ImportScanResult | null,
+): LocalizedMessage {
   const skipped = (scan?.skipped ?? 0) + added.skipped;
   const scanErrors = scan?.errors.length ?? 0;
-  const parts: string[] = [];
-  if (added.added > 0) parts.push(translate("state.addedFiles", { count: added.added }));
-  if (added.duplicates > 0) parts.push(translate("state.duplicates", { count: added.duplicates }));
-  if (skipped > 0) parts.push(translate("state.skippedFiles", { count: skipped }));
-  if (scanErrors > 0) parts.push(translate("state.errorsCount", { count: scanErrors }));
-  if (scan?.truncated) parts.push(scan.limitReason ?? translate("state.scanTruncated"));
-  return parts.join(" · ") || translate("state.noSupportedImages");
+  const parts: LocalizedMessage[] = [];
+  if (added.added > 0) {
+    parts.push(translationMessage("state.addedFiles", { count: added.added }));
+  }
+  if (added.duplicates > 0) {
+    parts.push(translationMessage("state.duplicates", { count: added.duplicates }));
+  }
+  if (skipped > 0) {
+    parts.push(translationMessage("state.skippedFiles", { count: skipped }));
+  }
+  if (scanErrors > 0) {
+    parts.push(translationMessage("state.errorsCount", { count: scanErrors }));
+  }
+  if (scan?.truncated) {
+    parts.push(
+      scan.limitReason
+        ? translationMessage(importScanLimitReasonKey(scan.limitReason))
+        : translationMessage("state.scanTruncated"),
+    );
+  }
+  return parts.length ? messageList(parts) : translationMessage("state.noSupportedImages");
+}
+
+function importScanLimitReasonKey(reason: ImportScanLimitReason): string {
+  switch (reason) {
+    case "directoryDepth":
+      return "state.scanDirectoryDepthLimit";
+    case "entryCount":
+      return "state.scanEntryCountLimit";
+    case "fileCount":
+      return "state.scanFileCountLimit";
+  }
 }
 
 export function addDemoItems() {
@@ -1208,19 +1338,21 @@ export function addDemoItems() {
     "/preview/archive-sample.avif",
   ];
   for (const path of demo) {
-    queue.push({
+    const item: QueueItem = {
       path,
       key: path,
       name: baseName(path),
       relativeDir: null,
       status: "pending",
-      detail: translate("state.webPreviewDemo"),
+      detail: "",
       targetFormat: null,
       metadata: null,
       thumbnail: null,
       thumbnailStatus: "idle",
       preview: true,
-    });
+    };
+    setLocalizedItemDetail(item, "state.webPreviewDemo");
+    queue.push(item);
   }
 }
 
@@ -1234,8 +1366,13 @@ export function setItemTargetFormat(path: string, format: string | null) {
   item.targetFormat = normalized;
   if (item.status !== "running") {
     item.status = "pending";
-    item.detail = item.preview ? translate("state.webPreviewDemo") : "";
+    if (item.preview) {
+      setLocalizedItemDetail(item, "state.webPreviewDemo");
+    } else {
+      clearItemDetail(item);
+    }
     item.progress = 0;
+    item.progressStage = null;
   }
 }
 
@@ -1246,8 +1383,13 @@ export function resetItemFormats() {
     item.targetFormat = null;
     if (item.status !== "running") {
       item.status = "pending";
-      item.detail = item.preview ? translate("state.webPreviewDemo") : "";
+      if (item.preview) {
+        setLocalizedItemDetail(item, "state.webPreviewDemo");
+      } else {
+        clearItemDetail(item);
+      }
       item.progress = 0;
+      item.progressStage = null;
     }
   }
 }
@@ -1378,8 +1520,9 @@ export async function convertAll() {
     for (const item of queue) {
       if (item.status !== "done") {
         item.status = "error";
-        item.detail = translate("state.webPreviewNoLocalConvert");
+        setLocalizedItemDetail(item, "state.webPreviewNoLocalConvert");
         item.progress = 100;
+        item.progressStage = null;
       }
     }
     return;
@@ -1414,8 +1557,9 @@ async function convertAllWithBatch() {
 
   for (const job of jobs) {
     job.item.status = "pending";
-    job.item.detail = translate("state.queued");
+    setLocalizedItemDetail(job.item, "state.queued");
     job.item.progress = 0;
+    job.item.progressStage = null;
   }
 
   try {
@@ -1443,12 +1587,12 @@ async function convertAllWithBatch() {
       finalizeCancelledJobs(jobs);
     }
   } catch (e) {
-    const msg = formatCommandError(e);
     for (const job of jobs) {
       if (job.item.status === "pending" || job.item.status === "running") {
         job.item.status = "error";
-        job.item.detail = msg;
+        setItemCommandError(job.item, e);
         job.item.progress = 100;
+        job.item.progressStage = null;
       }
     }
   }
@@ -1508,8 +1652,9 @@ function prepareSingleJob(item: QueueItem): ConvertRequest | null {
   const format = itemTargetFormat(item);
   if (!capabilities.writable.includes(format)) {
     item.status = "error";
-    item.detail = translate("state.unsupportedTarget", { format: formatLabel(format) });
+    setLocalizedItemDetail(item, "state.unsupportedTarget", { format: formatLabel(format) });
     item.progress = 100;
+    item.progressStage = null;
     return null;
   }
   return buildConvertRequest(item, format);
@@ -1558,7 +1703,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "running";
-      job.item.detail = translate("state.readingAndConverting");
+      setBatchProgressStage(job.item, "readingAndConverting");
       job.item.progress = 5;
       return;
     }
@@ -1566,7 +1711,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "running";
-      job.item.detail = event.data.stage;
+      setBatchProgressStage(job.item, event.data.stage);
       job.item.progress = Math.min(100, Math.max(0, Math.round(event.data.percent)));
       return;
     }
@@ -1574,24 +1719,27 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "done";
-      job.item.detail = formatResultDetail(event.data.result);
+      setNeutralItemDetail(job.item, formatResultDetail(event.data.result));
       job.item.progress = 100;
+      job.item.progressStage = null;
       return;
     }
     case "fileSkipped": {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "skipped";
-      job.item.detail = formatSkipDetail(event.data.error);
+      setItemCommandError(job.item, event.data.error);
       job.item.progress = 100;
+      job.item.progressStage = null;
       return;
     }
     case "fileError": {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "error";
-      job.item.detail = formatCommandError(event.data.error);
+      setItemCommandError(job.item, event.data.error);
       job.item.progress = 100;
+      job.item.progressStage = null;
       return;
     }
     case "cancelled":
@@ -1606,12 +1754,54 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
   }
 }
 
+function setBatchProgressStage(item: QueueItem, stage: BatchProgressStage): void {
+  item.progressStage = stage;
+  setLocalizedItemDetail(item, batchProgressStageKey(stage));
+}
+
+function setLocalizedItemDetail(
+  item: QueueItem,
+  key: string,
+  params?: Record<string, string | number>,
+): void {
+  item.localizedDetail = { key, params };
+  item.detailError = null;
+  item.detail = translate(key, params);
+}
+
+function setItemCommandError(item: QueueItem, error: unknown): void {
+  const commandError = parseCommandError(error);
+  item.localizedDetail = commandError ? null : { key: "errors.taskFailed" };
+  item.detailError = commandError;
+  item.detail = formatCommandError(error);
+}
+
+function setNeutralItemDetail(item: QueueItem, detail: string): void {
+  item.localizedDetail = null;
+  item.detailError = null;
+  item.detail = detail;
+}
+
+function clearItemDetail(item: QueueItem): void {
+  setNeutralItemDetail(item, "");
+}
+
+function batchProgressStageKey(stage: BatchProgressStage): string {
+  switch (stage) {
+    case "readingAndConverting":
+      return "state.readingAndConverting";
+    case "done":
+      return "queueItem.done";
+  }
+}
+
 function finalizeCancelledJobs(jobs: BatchJob[]) {
   for (const job of jobs) {
     if (job.item.status === "pending" || job.item.status === "running") {
       job.item.status = "pending";
-      job.item.detail = translate("state.cancelled");
+      setLocalizedItemDetail(job.item, "state.cancelled");
       job.item.progress = 0;
+      job.item.progressStage = null;
     }
   }
 }
@@ -1619,10 +1809,6 @@ function finalizeCancelledJobs(jobs: BatchJob[]) {
 function formatResultDetail(res: ConvertResult): string {
   const ratio = res.inSize > 0 ? Math.round((1 - res.outSize / res.inSize) * 100) : 0;
   return `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
-}
-
-function formatSkipDetail(error: CommandError): string {
-  return formatCommandError(error);
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {
@@ -1693,7 +1879,7 @@ export async function loadCodecDiagnostics(): Promise<CodecDiagnostics> {
       heic: {
         enabled: false,
         externalCodecsEnabled: false,
-        disabledReason: null,
+        disabledReason: { code: "desktopRuntimeRequired", detail: null },
         extensions: ["heic", "heif", "hif"],
         activeProvider: null,
         systemCodecs: [],
@@ -1721,7 +1907,7 @@ export async function setSelectedHeicHelperPath(
       configured: false,
       available: false,
       path: null,
-      message: translate("state.webPreviewNoHelper"),
+      message: { code: "desktopRuntimeRequired", detail: null },
       provider: null,
     };
   }
@@ -1759,11 +1945,11 @@ export function applyTheme() {
 export const persistenceReady = $state({ ready: false });
 let store: Store | null = null;
 export async function initPersistence() {
+  const detectedLocale = await systemLocale();
   try {
     if (!isTauriRuntime()) {
-      const detected = await systemLocale();
-      settings.locale = detected;
-      setAppLocale(detected);
+      settings.locale = detectedLocale;
+      setAppLocale(detectedLocale);
       applyTheme();
       return;
     }
@@ -1772,16 +1958,15 @@ export async function initPersistence() {
     const saved = await store.get<Partial<Settings>>("settings");
     if (saved) {
       Object.assign(settings, saved);
-      normalizeSettings();
+      normalizeSettings(detectedLocale);
     } else {
-      settings.locale = await systemLocale();
+      settings.locale = detectedLocale;
     }
     setAppLocale(settings.locale);
   } catch (e) {
     console.warn("Failed to load settings, using defaults:", e);
-    const detected = await systemLocale();
-    settings.locale = detected;
-    setAppLocale(detected);
+    settings.locale = detectedLocale;
+    setAppLocale(detectedLocale);
   } finally {
     applyTheme();
     persistenceReady.ready = true;
@@ -1792,7 +1977,7 @@ export async function persistSettings() {
   await store.set("settings", { ...settings });
 }
 
-function normalizeSettings() {
+function normalizeSettings(fallbackLocale: AppLocale) {
   const overwrite = settings.overwrite as unknown;
   if (overwrite !== "ask" && overwrite !== "skip" && overwrite !== "overwrite") {
     settings.overwrite = overwrite === true ? "overwrite" : "skip";
@@ -1802,7 +1987,7 @@ function normalizeSettings() {
     settings.theme = "system";
   }
   if (settings.locale !== "zh-CN" && settings.locale !== "en-US") {
-    settings.locale = "zh-CN";
+    settings.locale = fallbackLocale;
   }
   if (typeof settings.format !== "string" || !settings.format.trim()) {
     settings.format = CORE_CAPABILITIES.writable[0];

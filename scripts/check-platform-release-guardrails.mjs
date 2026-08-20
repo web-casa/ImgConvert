@@ -1226,9 +1226,21 @@ function checkWindowsRuntimeGuardrails() {
   const windowsSystemCodecs = readText(
     path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),
   );
-  for (const expected of ["system-wic", "HEIF Image Extensions", "HEVC Video Extensions"]) {
+  for (const expected of ["system-wic", "windowsHeifInstallHint"]) {
     if (!windowsSystemCodecs.includes(expected)) {
       failures.push(`Windows WIC HEIC diagnostics must mention ${expected}`);
+    }
+  }
+  for (const localeFile of ["en-US.ts", "zh-CN.ts"]) {
+    const messages = readText(path.join(repoRoot, "src", "lib", "i18n", "messages", localeFile));
+    for (const expected of [
+      "windowsHeifInstallHint",
+      "HEIF Image Extensions",
+      "HEVC Video Extensions",
+    ]) {
+      if (!messages.includes(expected)) {
+        failures.push(`Windows WIC ${localeFile} diagnostics must mention ${expected}`);
+      }
     }
   }
 }
@@ -1360,8 +1372,23 @@ function checkWindowsDirectConfig() {
   if (!isUuid(windows.wix?.upgradeCode)) {
     failures.push("Windows direct WiX config must pin a stable upgradeCode UUID");
   }
+  if (
+    !Array.isArray(windows.wix?.language) ||
+    !["en-US", "zh-CN"].every((language) => windows.wix.language.includes(language))
+  ) {
+    failures.push("Windows direct WiX config must build en-US and zh-CN installers");
+  }
   if (windows.nsis?.installMode !== "currentUser") {
     failures.push("Windows direct NSIS config must default to currentUser installMode");
+  }
+  if (
+    !Array.isArray(windows.nsis?.languages) ||
+    !["English", "SimpChinese"].every((language) => windows.nsis.languages.includes(language))
+  ) {
+    failures.push("Windows direct NSIS config must include English and Simplified Chinese");
+  }
+  if (windows.nsis?.displayLanguageSelector !== false) {
+    failures.push("Windows direct NSIS config must follow the OS language without a selector");
   }
 }
 

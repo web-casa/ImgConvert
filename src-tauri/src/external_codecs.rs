@@ -95,10 +95,33 @@ pub struct CodecDiagnostics {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DiagnosticMessage {
+    pub code: String,
+    pub detail: Option<String>,
+}
+
+impl DiagnosticMessage {
+    pub(crate) fn new(code: &str) -> Self {
+        Self {
+            code: code.to_string(),
+            detail: None,
+        }
+    }
+
+    pub(crate) fn with_detail(code: &str, detail: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            detail: Some(detail.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HeicCodecDiagnostics {
     pub enabled: bool,
     pub external_codecs_enabled: bool,
-    pub disabled_reason: Option<String>,
+    pub disabled_reason: Option<DiagnosticMessage>,
     pub extensions: Vec<&'static str>,
     pub active_provider: Option<CodecProviderDiagnostic>,
     pub system_codecs: Vec<SystemCodecDiagnostic>,
@@ -127,8 +150,8 @@ pub struct SystemCodecDiagnostic {
     pub kind: String,
     pub available: bool,
     pub readable: Vec<String>,
-    pub message: String,
-    pub install_hint: Option<String>,
+    pub message: DiagnosticMessage,
+    pub install_hint: Option<DiagnosticMessage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -137,7 +160,7 @@ pub struct ManifestSearchDirDiagnostic {
     pub source: String,
     pub path: String,
     pub status: String,
-    pub message: Option<String>,
+    pub message: Option<DiagnosticMessage>,
     pub manifests: Vec<ManifestDiagnostic>,
 }
 
@@ -146,7 +169,7 @@ pub struct ManifestSearchDirDiagnostic {
 pub struct ManifestDiagnostic {
     pub path: String,
     pub status: String,
-    pub message: Option<String>,
+    pub message: Option<DiagnosticMessage>,
     pub provider: Option<CodecProviderDiagnostic>,
 }
 
@@ -156,7 +179,7 @@ pub struct SystemHelperDiagnostic {
     pub command: String,
     pub available: bool,
     pub path: Option<String>,
-    pub message: Option<String>,
+    pub message: Option<DiagnosticMessage>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -165,7 +188,7 @@ pub struct SelectedHelperDiagnostic {
     pub configured: bool,
     pub available: bool,
     pub path: Option<String>,
-    pub message: Option<String>,
+    pub message: Option<DiagnosticMessage>,
     pub provider: Option<CodecProviderDiagnostic>,
 }
 
@@ -173,6 +196,33 @@ pub struct SelectedHelperDiagnostic {
 struct PluginSearchDir {
     source: &'static str,
     path: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ExternalCodecsDisabledReason {
+    BuildConfiguration,
+    Environment,
+}
+
+impl ExternalCodecsDisabledReason {
+    fn diagnostic(self, flatpak_extensions_enabled: bool) -> DiagnosticMessage {
+        match (self, flatpak_extensions_enabled) {
+            (Self::BuildConfiguration, false) => {
+                DiagnosticMessage::new("externalCodecsBuildDisabled")
+            }
+            (Self::BuildConfiguration, true) => {
+                DiagnosticMessage::new("externalCodecsBuildDisabledFlatpakEnabled")
+            }
+            (Self::Environment, false) => DiagnosticMessage::with_detail(
+                "externalCodecsEnvironmentDisabled",
+                DISABLE_EXTERNAL_CODECS_ENV,
+            ),
+            (Self::Environment, true) => DiagnosticMessage::with_detail(
+                "externalCodecsEnvironmentDisabledFlatpakEnabled",
+                DISABLE_EXTERNAL_CODECS_ENV,
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -251,13 +301,8 @@ pub fn codec_diagnostics() -> CodecDiagnostics {
     };
     let flatpak_extensions_enabled = flatpak_codec_extensions_enabled();
     let raw_disabled_reason = external_codec_discovery_disabled_reason();
-    let disabled_reason = raw_disabled_reason.clone().map(|reason| {
-        if flatpak_extensions_enabled {
-            format!("{reason}; Flatpak codec extension 挂载点仍启用")
-        } else {
-            reason
-        }
-    });
+    let disabled_reason =
+        raw_disabled_reason.map(|reason| reason.diagnostic(flatpak_extensions_enabled));
     CodecDiagnostics {
         heic: HeicCodecDiagnostics {
             enabled: active_system_provider.is_some() || active_helper.is_some(),
@@ -682,7 +727,7 @@ fn selected_helper_diagnostic() -> SelectedHelperDiagnostic {
             configured: false,
             available: false,
             path: None,
-            message: Some("未配置手动 helper".to_string()),
+            message: Some(DiagnosticMessage::new("selectedHelperNotConfigured")),
             provider: None,
         };
     };
@@ -693,7 +738,7 @@ fn selected_helper_diagnostic() -> SelectedHelperDiagnostic {
             configured: true,
             available: false,
             path: Some(path_text),
-            message: Some(reason),
+            message: Some(reason.diagnostic(false)),
             provider: None,
         };
     }
@@ -702,7 +747,7 @@ fn selected_helper_diagnostic() -> SelectedHelperDiagnostic {
             configured: true,
             available: false,
             path: Some(path_text),
-            message: Some("当前平台尚未启用外部 HEIC helper 信任模型".to_string()),
+            message: Some(DiagnosticMessage::new("externalCodecTrustUnsupported")),
             provider: None,
         };
     }
@@ -719,7 +764,10 @@ fn selected_helper_diagnostic() -> SelectedHelperDiagnostic {
             configured: true,
             available: false,
             path: Some(path_text),
-            message: Some(error),
+            message: Some(DiagnosticMessage::with_detail(
+                "selectedHelperUnavailable",
+                error,
+            )),
             provider: None,
         },
     }
@@ -868,7 +916,7 @@ fn manifest_dir_diagnostics() -> Vec<ManifestSearchDirDiagnostic> {
             source: DISABLE_EXTERNAL_CODECS_ENV.to_string(),
             path: String::new(),
             status: "disabled".to_string(),
-            message: Some(reason),
+            message: Some(reason.diagnostic(false)),
             manifests: Vec::new(),
         }];
     }
@@ -878,7 +926,7 @@ fn manifest_dir_diagnostics() -> Vec<ManifestSearchDirDiagnostic> {
             source: "platform".to_string(),
             path: String::new(),
             status: "unsupported".to_string(),
-            message: Some("当前平台尚未启用外部 HEIC 插件信任模型".to_string()),
+            message: Some(DiagnosticMessage::new("externalCodecTrustUnsupported")),
             manifests: Vec::new(),
         }];
     }
@@ -896,7 +944,7 @@ fn manifest_dir_diagnostic(entry: &PluginSearchDir) -> ManifestSearchDirDiagnost
             source: entry.source.to_string(),
             path,
             status: "missing".to_string(),
-            message: Some("目录不存在".to_string()),
+            message: Some(DiagnosticMessage::new("directoryMissing")),
             manifests: Vec::new(),
         };
     };
@@ -905,7 +953,7 @@ fn manifest_dir_diagnostic(entry: &PluginSearchDir) -> ManifestSearchDirDiagnost
             source: entry.source.to_string(),
             path,
             status: "notDirectory".to_string(),
-            message: Some("路径不是目录".to_string()),
+            message: Some(DiagnosticMessage::new("pathNotDirectory")),
             manifests: Vec::new(),
         };
     }
@@ -914,7 +962,7 @@ fn manifest_dir_diagnostic(entry: &PluginSearchDir) -> ManifestSearchDirDiagnost
             source: entry.source.to_string(),
             path,
             status: "untrusted".to_string(),
-            message: Some("目录或其祖先可被其它用户写入".to_string()),
+            message: Some(DiagnosticMessage::new("directoryUntrusted")),
             manifests: Vec::new(),
         };
     }
@@ -957,7 +1005,7 @@ fn manifest_dir_diagnostic(entry: &PluginSearchDir) -> ManifestSearchDirDiagnost
                 "rejected"
             };
             let message = if manifests.is_empty() {
-                Some("未发现 imgconvert-codec-*.json".to_string())
+                Some(DiagnosticMessage::new("manifestNotFound"))
             } else {
                 None
             };
@@ -974,7 +1022,10 @@ fn manifest_dir_diagnostic(entry: &PluginSearchDir) -> ManifestSearchDirDiagnost
             source: entry.source.to_string(),
             path,
             status: "unreadable".to_string(),
-            message: Some(format!("无法读取目录: {error}")),
+            message: Some(DiagnosticMessage::with_detail(
+                "directoryUnreadable",
+                error.to_string(),
+            )),
             manifests,
         },
     }
@@ -991,7 +1042,7 @@ fn manifest_diagnostic(path: &Path) -> ManifestDiagnostic {
         Err(error) => ManifestDiagnostic {
             path: path.to_string_lossy().to_string(),
             status: "rejected".to_string(),
-            message: Some(error),
+            message: Some(DiagnosticMessage::with_detail("manifestRejected", error)),
             provider: None,
         },
     }
@@ -1005,7 +1056,7 @@ fn system_helper_diagnostics() -> Vec<SystemHelperDiagnostic> {
                 command: (*command).to_string(),
                 available: false,
                 path: None,
-                message: Some(reason.clone()),
+                message: Some(reason.diagnostic(false)),
             })
             .collect();
     }
@@ -1017,7 +1068,7 @@ fn system_helper_diagnostics() -> Vec<SystemHelperDiagnostic> {
                 command: (*command).to_string(),
                 available: false,
                 path: None,
-                message: Some("当前平台尚未启用外部 HEIC helper 信任模型".to_string()),
+                message: Some(DiagnosticMessage::new("externalCodecTrustUnsupported")),
             })
             .collect();
     }
@@ -1029,7 +1080,7 @@ fn system_helper_diagnostics() -> Vec<SystemHelperDiagnostic> {
                 command: (*command).to_string(),
                 available: false,
                 path: None,
-                message: Some("PATH 未设置".to_string()),
+                message: Some(DiagnosticMessage::new("pathEnvironmentMissing")),
             })
             .collect();
     };
@@ -1047,7 +1098,7 @@ fn system_helper_diagnostics() -> Vec<SystemHelperDiagnostic> {
                 command: (*command).to_string(),
                 available: false,
                 path: None,
-                message: Some("未在受信任 PATH 目录中找到可执行文件".to_string()),
+                message: Some(DiagnosticMessage::new("helperNotFoundInTrustedPath")),
             },
         })
         .collect()
@@ -1386,15 +1437,15 @@ fn external_codec_discovery_supported() -> bool {
     false
 }
 
-fn external_codec_discovery_disabled_reason() -> Option<String> {
+fn external_codec_discovery_disabled_reason() -> Option<ExternalCodecsDisabledReason> {
     if disable_external_codecs_value(option_env!("IMGCONVERT_DISABLE_EXTERNAL_CODECS")) {
-        return Some("构建配置已禁用外部 codec/helper 自动发现".to_string());
+        return Some(ExternalCodecsDisabledReason::BuildConfiguration);
     }
 
     match env::var(DISABLE_EXTERNAL_CODECS_ENV) {
-        Ok(value) if disable_external_codecs_value(Some(value.as_str())) => Some(format!(
-            "{DISABLE_EXTERNAL_CODECS_ENV} 已禁用外部 codec/helper 自动发现"
-        )),
+        Ok(value) if disable_external_codecs_value(Some(value.as_str())) => {
+            Some(ExternalCodecsDisabledReason::Environment)
+        }
         _ => None,
     }
 }
@@ -2000,6 +2051,18 @@ mod tests {
         assert!(!disable_external_codecs_value(None));
     }
 
+    #[test]
+    fn diagnostic_messages_serialize_as_language_neutral_codes() {
+        let message = ExternalCodecsDisabledReason::Environment.diagnostic(true);
+        let value = serde_json::to_value(message).unwrap();
+
+        assert_eq!(
+            value["code"],
+            "externalCodecsEnvironmentDisabledFlatpakEnabled"
+        );
+        assert_eq!(value["detail"], DISABLE_EXTERNAL_CODECS_ENV);
+    }
+
     #[cfg(any(target_os = "linux", windows))]
     #[test]
     fn external_codec_discovery_is_enabled_on_linux_and_windows() {
@@ -2107,10 +2170,12 @@ mod tests {
             diagnostic.path.as_deref(),
             Some(helper.to_string_lossy().as_ref())
         );
-        assert!(diagnostic
-            .message
+        let message = diagnostic.message.as_ref().unwrap();
+        assert_eq!(message.code, "selectedHelperUnavailable");
+        assert!(message
+            .detail
             .as_deref()
-            .is_some_and(|message| message.contains("HEIC_SELECTED_HELPER_UNTRUSTED")));
+            .is_some_and(|detail| detail.contains("HEIC_SELECTED_HELPER_UNTRUSTED")));
 
         fs::remove_dir_all(dir).unwrap();
     }
@@ -2597,8 +2662,10 @@ printf '{"version":1,"icc":"icc.bin","exif":"exif.bin","xmp":"xmp.bin","iptc":"i
         assert_eq!(diagnostic.status, "rejected");
         assert_eq!(diagnostic.manifests.len(), 1);
         assert_eq!(diagnostic.manifests[0].status, "rejected");
-        assert!(diagnostic.manifests[0]
-            .message
+        let message = diagnostic.manifests[0].message.as_ref().unwrap();
+        assert_eq!(message.code, "manifestRejected");
+        assert!(message
+            .detail
             .as_deref()
             .unwrap()
             .contains("HEIC_PLUGIN_LICENSE_UNSUPPORTED"));

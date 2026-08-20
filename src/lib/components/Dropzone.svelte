@@ -4,13 +4,14 @@
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
-  import { formatCommandError } from "$lib/command-error";
   import {
     cancelImportScan,
     importClipboard,
     importPaths,
     isTauriRuntime,
     pickSystemPaths,
+    setImportCommandError,
+    setImportMessage,
     ui,
     readableExtensions,
   } from "$lib/state.svelte";
@@ -25,7 +26,7 @@
     if (busy) return;
 
     if (!isTauriRuntime()) {
-      ui.importMessage = get(t)("dropzone.webFilePickerUnavailable") as string;
+      setImportMessage("dropzone.webFilePickerUnavailable");
       return;
     }
 
@@ -38,9 +39,7 @@
       if (busy || !paths.length) return;
       await importPaths(paths);
     } catch (error) {
-      ui.importMessage = get(t)("dropzone.errorDropHint", {
-        values: { error: formatCommandError(error) },
-      } as any) as string;
+      setImportCommandError(error, "dropzone.errorDropHint");
     }
   }
 
@@ -48,7 +47,7 @@
     if (busy) return;
 
     if (!isTauriRuntime()) {
-      ui.importMessage = get(t)("dropzone.webDirectoryPickerUnavailable") as string;
+      setImportMessage("dropzone.webDirectoryPickerUnavailable");
       return;
     }
 
@@ -61,9 +60,7 @@
       if (busy || !paths.length) return;
       await importPaths(paths);
     } catch (error) {
-      ui.importMessage = get(t)("dropzone.errorFolderDropHint", {
-        values: { error: formatCommandError(error) },
-      } as any) as string;
+      setImportCommandError(error, "dropzone.errorFolderDropHint");
     }
   }
 </script>
@@ -122,7 +119,7 @@
           </li>
         {/each}
         {#if hiddenImportErrors}
-          <li>{$t("dropzone.hiddenErrors", { values: { count: hiddenImportErrors } } as any)}</li>
+          <li>{$t("dropzone.hiddenErrors", { values: { count: hiddenImportErrors } })}</li>
         {/if}
       </ul>
     </details>

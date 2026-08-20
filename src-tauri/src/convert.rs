@@ -271,6 +271,14 @@ pub struct BatchSummary {
     pub cancelled: bool,
 }
 
+/// 语言无关的批量进度阶段；前端按当前 locale 映射为用户文案。
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BatchProgressStage {
+    ReadingAndConverting,
+    Done,
+}
+
 /// 批量转换进度事件。`index` 是本次 batch options 数组中的下标。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "event", content = "data")]
@@ -285,7 +293,7 @@ pub enum BatchProgressEvent {
     FileProgress {
         index: usize,
         percent: f64,
-        stage: &'static str,
+        stage: BatchProgressStage,
     },
     FileFinished {
         index: usize,
@@ -1356,7 +1364,7 @@ fn batch_worker_loop(
             BatchProgressEvent::FileProgress {
                 index,
                 percent: 5.0,
-                stage: "读取并转换",
+                stage: BatchProgressStage::ReadingAndConverting,
             },
             &cancel,
         )
@@ -1429,7 +1437,7 @@ fn apply_batch_event(
             BatchProgressEvent::FileProgress {
                 index,
                 percent: 100.0,
-                stage: "完成",
+                stage: BatchProgressStage::Done,
             },
         )?;
     }
@@ -1897,6 +1905,21 @@ fn should_count_as_skipped(opts: &ConvertOptions, message: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn batch_progress_stages_serialize_as_language_neutral_codes() {
+        let reading = serde_json::to_value(BatchProgressEvent::FileProgress {
+            index: 2,
+            percent: 5.0,
+            stage: BatchProgressStage::ReadingAndConverting,
+        })
+        .unwrap();
+        let done = serde_json::to_value(BatchProgressStage::Done).unwrap();
+
+        assert_eq!(reading["event"], "fileProgress");
+        assert_eq!(reading["data"]["stage"], "readingAndConverting");
+        assert_eq!(done, "done");
+    }
 
     fn unique_test_dir(name: &str) -> PathBuf {
         let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);

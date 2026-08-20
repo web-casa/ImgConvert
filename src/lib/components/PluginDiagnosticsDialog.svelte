@@ -13,12 +13,18 @@
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
-  import { formatCommandError } from "$lib/command-error";
+  import {
+    commandErrorMessage,
+    formatLocalizedMessage,
+    translationMessage,
+    type LocalizedMessage,
+  } from "$lib/localized-message";
   import {
     loadCodecDiagnostics,
     pickSystemPaths,
     setSelectedHeicHelperPath,
     type CodecDiagnostics,
+    type DiagnosticMessage,
     type ManifestDiagnostic,
     type ManifestSearchDirDiagnostic,
     type SystemCodecDiagnostic,
@@ -29,8 +35,9 @@
   let diagnostics = $state<CodecDiagnostics | null>(null);
   let loading = $state(false);
   let helperBusy = $state(false);
-  let loadError = $state("");
-  let actionMessage = $state("");
+  let loadError = $state<LocalizedMessage | null>(null);
+  let actionMessage = $state<LocalizedMessage | null>(null);
+  let actionDiagnostic = $state<DiagnosticMessage | null>(null);
   let wasOpen = $state(false);
 
   const heic = $derived(diagnostics?.heic ?? null);
@@ -58,13 +65,11 @@
 
   async function refresh() {
     loading = true;
-    loadError = "";
+    loadError = null;
     try {
       diagnostics = await loadCodecDiagnostics();
     } catch (error) {
-      loadError = get(t)("diagnostics.loadError", {
-        values: { error: formatCommandError(error) },
-      } as any) as string;
+      loadError = commandErrorMessage(error, "diagnostics.loadError");
     } finally {
       loading = false;
     }
@@ -73,7 +78,8 @@
   async function chooseSelectedHelper() {
     if (helperBusy) return;
     helperBusy = true;
-    actionMessage = "";
+    actionMessage = null;
+    actionDiagnostic = null;
     try {
       const selected = await pickSystemPaths({
         multiple: false,
@@ -82,14 +88,16 @@
       });
       if (!selected[0]) return;
       const diagnostic = await setSelectedHeicHelperPath(selected[0]);
-      actionMessage = diagnostic.available
-        ? (get(t)("diagnostics.manualHelperEnabled") as string)
-        : (diagnostic.message ?? (get(t)("diagnostics.manualHelperUnavailable") as string));
+      if (diagnostic.available) {
+        actionMessage = translationMessage("diagnostics.manualHelperEnabled");
+      } else if (diagnostic.message) {
+        actionDiagnostic = diagnostic.message;
+      } else {
+        actionMessage = translationMessage("diagnostics.manualHelperUnavailable");
+      }
       await refresh();
     } catch (error) {
-      actionMessage = get(t)("diagnostics.setHelperFailed", {
-        values: { error: formatCommandError(error) },
-      } as any) as string;
+      actionMessage = commandErrorMessage(error, "diagnostics.setHelperFailed");
     } finally {
       helperBusy = false;
     }
@@ -98,15 +106,14 @@
   async function clearSelectedHelper() {
     if (helperBusy) return;
     helperBusy = true;
-    actionMessage = "";
+    actionMessage = null;
+    actionDiagnostic = null;
     try {
       await setSelectedHeicHelperPath(null);
-      actionMessage = get(t)("diagnostics.helperCleared") as string;
+      actionMessage = translationMessage("diagnostics.helperCleared");
       await refresh();
     } catch (error) {
-      actionMessage = get(t)("diagnostics.clearHelperFailed", {
-        values: { error: formatCommandError(error) },
-      } as any) as string;
+      actionMessage = commandErrorMessage(error, "diagnostics.clearHelperFailed");
     } finally {
       helperBusy = false;
     }
@@ -160,6 +167,75 @@
     }
     return "border-border bg-muted text-muted-foreground";
   }
+
+  const diagnosticMessageKeys: Record<string, string> = {
+    externalCodecsBuildDisabled: "diagnostics.messages.externalCodecsBuildDisabled",
+    externalCodecsBuildDisabledFlatpakEnabled:
+      "diagnostics.messages.externalCodecsBuildDisabledFlatpakEnabled",
+    externalCodecsEnvironmentDisabled: "diagnostics.messages.externalCodecsEnvironmentDisabled",
+    externalCodecsEnvironmentDisabledFlatpakEnabled:
+      "diagnostics.messages.externalCodecsEnvironmentDisabledFlatpakEnabled",
+    externalCodecTrustUnsupported: "diagnostics.messages.externalCodecTrustUnsupported",
+    desktopRuntimeRequired: "diagnostics.messages.desktopRuntimeRequired",
+    selectedHelperNotConfigured: "diagnostics.messages.selectedHelperNotConfigured",
+    selectedHelperUnavailable: "diagnostics.messages.selectedHelperUnavailable",
+    directoryMissing: "diagnostics.messages.directoryMissing",
+    pathNotDirectory: "diagnostics.messages.pathNotDirectory",
+    directoryUntrusted: "diagnostics.messages.directoryUntrusted",
+    manifestNotFound: "diagnostics.messages.manifestNotFound",
+    directoryUnreadable: "diagnostics.messages.directoryUnreadable",
+    manifestRejected: "diagnostics.messages.manifestRejected",
+    pathEnvironmentMissing: "diagnostics.messages.pathEnvironmentMissing",
+    helperNotFoundInTrustedPath: "diagnostics.messages.helperNotFoundInTrustedPath",
+    wicUnsupportedPlatform: "diagnostics.messages.wicUnsupportedPlatform",
+    wicAvailable: "diagnostics.messages.wicAvailable",
+    wicMissing: "diagnostics.messages.wicMissing",
+    wicProbeFailed: "diagnostics.messages.wicProbeFailed",
+    windowsHeifInstallHint: "diagnostics.messages.windowsHeifInstallHint",
+  };
+
+  function diagnosticText(message: DiagnosticMessage): string {
+    const key = diagnosticMessageKeys[message.code] ?? "diagnostics.messages.unknown";
+    return $t(key, {
+      values: {
+        code: message.code,
+        detail: message.detail ?? "",
+      },
+    }) as string;
+  }
+
+  function providerKindText(kind: string): string {
+    const key =
+      kind === "manifest"
+        ? "diagnostics.providerManifest"
+        : kind === "system-helper"
+          ? "diagnostics.systemHelper"
+          : kind === "selected-helper"
+            ? "diagnostics.manualHelper"
+            : kind === "system-imageio"
+              ? "diagnostics.systemImageIO"
+              : kind === "system-wic"
+                ? "diagnostics.windowsWIC"
+                : null;
+    return key ? ($t(key) as string) : kind;
+  }
+
+  function searchSourceText(source: string): string {
+    const key =
+      source === "explicit"
+        ? "diagnostics.sourceExplicit"
+        : source === "platform"
+          ? "diagnostics.sourcePlatform"
+          : source === "flatpak-extension"
+            ? "diagnostics.sourceFlatpakExtension"
+            : null;
+    return key ? ($t(key) as string) : source;
+  }
+
+  function localizedText(message: LocalizedMessage, currentTranslation: unknown): string {
+    void currentTranslation;
+    return formatLocalizedMessage(message);
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -204,7 +280,7 @@
           <p
             class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
-            {loadError}
+            {localizedText(loadError, $t)}
           </p>
         {:else if loading && !diagnostics}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -228,11 +304,11 @@
                   <p class="mt-1 text-xs text-muted-foreground">
                     {$t("diagnostics.extensions", {
                       values: { extensions: heic.extensions.join(" / ") },
-                    } as any)}
+                    })}
                   </p>
                   {#if heic.disabledReason}
                     <p class="mt-1 text-xs text-muted-foreground">
-                      {heic.disabledReason}
+                      {diagnosticText(heic.disabledReason)}
                     </p>
                   {/if}
                 </div>
@@ -254,7 +330,7 @@
                   <dl class="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <div class="min-w-0">
                       <dt class="font-medium text-foreground">{$t("diagnostics.type")}</dt>
-                      <dd>{heic.activeProvider.kind}</dd>
+                      <dd>{providerKindText(heic.activeProvider.kind)}</dd>
                     </div>
                     <div class="min-w-0">
                       <dt class="font-medium text-foreground">{$t("diagnostics.license")}</dt>
@@ -359,8 +435,14 @@
                 </Button>
               </div>
             </div>
-            {#if actionMessage}
-              <p class="mt-2 text-xs text-muted-foreground">{actionMessage}</p>
+            {#if actionMessage || actionDiagnostic}
+              <p class="mt-2 text-xs text-muted-foreground">
+                {actionDiagnostic
+                  ? diagnosticText(actionDiagnostic)
+                  : actionMessage
+                    ? localizedText(actionMessage, $t)
+                    : ""}
+              </p>
             {/if}
             {#if heic.selectedHelper.configured}
               <div class="mt-3 rounded-md border bg-background p-3">
@@ -386,7 +468,7 @@
                 </p>
                 {#if heic.selectedHelper.message}
                   <p class="mt-2 break-words font-mono text-[11px] leading-4 text-destructive">
-                    {heic.selectedHelper.message}
+                    {diagnosticText(heic.selectedHelper.message)}
                   </p>
                 {/if}
               </div>
@@ -447,12 +529,12 @@
         {codec.available ? $t("diagnostics.found") : $t("diagnostics.missing")}
       </span>
     </div>
-    <p class="mt-2 text-xs text-muted-foreground">{codec.message}</p>
+    <p class="mt-2 text-xs text-muted-foreground">{diagnosticText(codec.message)}</p>
     {#if codec.installHint}
-      <p class="mt-2 text-xs text-muted-foreground">{codec.installHint}</p>
+      <p class="mt-2 text-xs text-muted-foreground">{diagnosticText(codec.installHint)}</p>
     {/if}
     <p class="mt-2 font-mono text-[11px] text-muted-foreground">
-      {codec.kind} · {codec.readable.join(" / ")}
+      {providerKindText(codec.kind)} · {codec.readable.join(" / ")}
     </p>
   </div>
 {/snippet}
@@ -471,9 +553,9 @@
     </div>
     <p
       class="mt-2 truncate text-xs text-muted-foreground"
-      title={helper.path ?? helper.message ?? ""}
+      title={helper.path ?? (helper.message ? diagnosticText(helper.message) : "")}
     >
-      {helper.path ?? helper.message}
+      {helper.path ?? (helper.message ? diagnosticText(helper.message) : "")}
     </p>
   </div>
 {/snippet}
@@ -484,7 +566,7 @@
       <div class="min-w-0">
         <div class="flex items-center gap-2">
           <span class="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground">
-            {dir.source}
+            {searchSourceText(dir.source)}
           </span>
           <span class="rounded border px-1.5 py-0.5 text-[11px] {statusTone(dir.status)}">
             {$t(statusText(dir.status))}
@@ -496,7 +578,7 @@
       </div>
     </div>
     {#if dir.message}
-      <p class="mt-2 text-xs text-muted-foreground">{dir.message}</p>
+      <p class="mt-2 text-xs text-muted-foreground">{diagnosticText(dir.message)}</p>
     {/if}
 
     {#if dir.manifests.length}
@@ -526,7 +608,7 @@
     {/if}
     {#if manifest.message}
       <p class="mt-1 break-words font-mono text-[11px] leading-4 text-destructive">
-        {manifest.message}
+        {diagnosticText(manifest.message)}
       </p>
     {/if}
   </div>

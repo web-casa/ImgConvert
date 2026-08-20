@@ -10,13 +10,12 @@
 
 use std::path::Path;
 
-use crate::external_codecs::{CodecProviderDiagnostic, CodecProviderInfo};
+use crate::external_codecs::{CodecProviderDiagnostic, CodecProviderInfo, DiagnosticMessage};
 
 const HEIC_EXTENSIONS: &[&str] = &["heic", "heif", "hif"];
 const WIC_PROVIDER_ID: &str = "windows-wic-heic";
 const WIC_PROVIDER_KIND: &str = "system-wic";
 const WIC_PROVIDER_PATH: &str = "Windows Imaging Component";
-const HEIF_INSTALL_HINT: &str = "安装 Microsoft HEIF Image Extensions 和 HEVC Video Extensions 后重试;企业镜像可通过 Microsoft Store/winget/离线应用包下发。";
 
 #[derive(Debug, Clone)]
 pub struct WindowsSystemCodecDiagnostic {
@@ -24,8 +23,8 @@ pub struct WindowsSystemCodecDiagnostic {
     pub kind: String,
     pub available: bool,
     pub readable: Vec<String>,
-    pub message: String,
-    pub install_hint: Option<String>,
+    pub message: DiagnosticMessage,
+    pub install_hint: Option<DiagnosticMessage>,
 }
 
 pub fn heic_available() -> bool {
@@ -69,7 +68,7 @@ pub fn heic_system_diagnostic() -> WindowsSystemCodecDiagnostic {
             .map(|extension| (*extension).to_string())
             .collect(),
         message: status.message,
-        install_hint: (!status.available).then(|| HEIF_INSTALL_HINT.to_string()),
+        install_hint: (!status.available).then(|| DiagnosticMessage::new("windowsHeifInstallHint")),
     }
 }
 
@@ -84,19 +83,19 @@ fn heic_status() -> HeicStatus {
 #[derive(Debug, Clone)]
 struct HeicStatus {
     available: bool,
-    message: String,
+    message: DiagnosticMessage,
 }
 
 #[cfg(not(target_os = "windows"))]
 mod platform {
     use std::path::Path;
 
-    use super::HeicStatus;
+    use super::{DiagnosticMessage, HeicStatus};
 
     pub fn heic_status() -> HeicStatus {
         HeicStatus {
             available: false,
-            message: "Windows WIC HEIC 解码仅在 Windows 可用".to_string(),
+            message: DiagnosticMessage::new("wicUnsupportedPlatform"),
         }
     }
 
@@ -133,7 +132,7 @@ mod platform {
 
     use crate::external_codecs::{is_heic_magic, MAX_HEIC_DECODED_PNG_BYTES};
 
-    use super::HeicStatus;
+    use super::{DiagnosticMessage, HeicStatus};
 
     static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -165,15 +164,15 @@ mod platform {
         match detect_heic_decoder() {
             Ok(Some(decoder)) => HeicStatus {
                 available: true,
-                message: format!("已检测到 Windows WIC HEIC 解码器: {decoder}"),
+                message: DiagnosticMessage::with_detail("wicAvailable", decoder),
             },
             Ok(None) => HeicStatus {
                 available: false,
-                message: "未检测到 Windows WIC HEIC 解码器".to_string(),
+                message: DiagnosticMessage::new("wicMissing"),
             },
             Err(error) => HeicStatus {
                 available: false,
-                message: format!("Windows WIC HEIC 探测失败: {error}"),
+                message: DiagnosticMessage::with_detail("wicProbeFailed", error),
             },
         }
     }
@@ -196,7 +195,7 @@ mod platform {
                     WICDecoder.0 as u32,
                     WICComponentEnumerateDefault.0 as u32,
                 )
-                .map_err(|error| format!("无法枚举 WIC decoder: {error}"))?;
+                .map_err(|error| format!("unable to enumerate WIC decoders: {error}"))?;
 
             loop {
                 let mut fetched = 0u32;
@@ -205,8 +204,9 @@ mod platform {
                 if hr == S_FALSE || fetched == 0 {
                     break;
                 }
-                hr.ok()
-                    .map_err(|error| format!("读取 WIC decoder 枚举失败: {error}"))?;
+                hr.ok().map_err(|error| {
+                    format!("unable to advance WIC decoder enumeration: {error}")
+                })?;
                 let Some(unknown) = item[0].take() else {
                     continue;
                 };
@@ -225,7 +225,7 @@ mod platform {
     unsafe fn decoder_supports_heif(info: &IWICBitmapDecoderInfo) -> Result<bool, String> {
         let container = info
             .GetContainerFormat()
-            .map_err(|error| format!("无法读取 WIC decoder container: {error}"))?;
+            .map_err(|error| format!("unable to read WIC decoder container format: {error}"))?;
         if container == GUID_ContainerFormatHeif {
             return Ok(true);
         }
@@ -353,7 +353,7 @@ mod platform {
         if hr == RPC_E_CHANGED_MODE {
             return Ok(ComGuard { initialized: false });
         }
-        Err(format!("{hr:?}"))
+        Err(format!("COM initialization failed: {hr:?}"))
     }
 
     unsafe fn wic_factory() -> Result<IWICImagingFactory, String> {
@@ -362,7 +362,7 @@ mod platform {
             None::<&IUnknown>,
             CLSCTX_INPROC_SERVER,
         )
-        .map_err(|error| format!("无法创建 WIC factory: {error}"))
+        .map_err(|error| format!("unable to create WIC imaging factory: {error}"))
     }
 
     unsafe fn wic_string<F>(mut read: F) -> Result<String, String>

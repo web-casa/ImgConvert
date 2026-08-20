@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "ImgConvert · 图片批量转换",
+        "title": "ImgConvert",
         "width": 900,
         "height": 680,
         "minWidth": 720,
@@ -33,8 +33,8 @@
     "license": "Apache-2.0",
     "licenseFile": "../LICENSE",
     "category": "Photography",
-    "shortDescription": "跨平台图片批量转换工具",
-    "longDescription": "ImgConvert 是 Linux 优先的跨平台图片批量转换工具,使用 Rust 进程内图像管线转换 JPEG、PNG、WebP 与 AVIF。",
+    "shortDescription": "Local-first batch image converter",
+    "longDescription": "ImgConvert converts JPEG, PNG, WebP, and AVIF images locally with an in-process Rust image pipeline.",
     "linux": {
       "deb": {
         "section": "graphics",

@@ -11,10 +11,11 @@
       "minimumWebview2Version": "109.0.1518.0",
       "wix": {
         "upgradeCode": "ba075ad0-d952-596d-89cd-74db50d2c403",
-        "language": "en-US"
+        "language": ["en-US", "zh-CN"]
       },
       "nsis": {
         "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
         "displayLanguageSelector": false,
         "compression": "lzma"
       }

@@ -16,6 +16,8 @@ pub struct NativePickOptions {
     pub title: Option<String>,
     #[serde(default)]
     pub extensions: Vec<String>,
+    pub filter_name: Option<String>,
+    pub all_files_name: Option<String>,
 }
 
 const HOST_DIALOG_ENV_REMOVE: &[&str] = &[
@@ -95,10 +97,13 @@ fn run_zenity(command: &str, options: &NativePickOptions) -> Result<Vec<String>,
             .arg(format!("--separator={separator}"));
     }
     if !options.directory {
-        if let Some(filter) = zenity_image_filter(&options.extensions) {
+        if let Some(filter) =
+            zenity_image_filter(&options.extensions, options.filter_name.as_deref())
+        {
             cmd.arg(filter);
         }
-        cmd.arg("--file-filter=全部文件 | *");
+        let all_files = sanitized_filter_label(options.all_files_name.as_deref(), "All files");
+        cmd.arg(format!("--file-filter={all_files} | *"));
     }
     run_dialog_command(cmd, "zenity")
 }
@@ -112,7 +117,9 @@ fn run_kdialog(command: &str, options: &NativePickOptions) -> Result<Vec<String>
         cmd.arg("--getexistingdirectory").arg(".");
     } else {
         cmd.arg("--getopenfilename").arg(".");
-        if let Some(filter) = kdialog_image_filter(&options.extensions) {
+        if let Some(filter) =
+            kdialog_image_filter(&options.extensions, options.filter_name.as_deref())
+        {
             cmd.arg(filter);
         }
         if options.multiple {
@@ -151,14 +158,30 @@ fn is_cancelled(status: ExitStatus) -> bool {
     matches!(status.code(), Some(1))
 }
 
-fn zenity_image_filter(extensions: &[String]) -> Option<String> {
+fn zenity_image_filter(extensions: &[String], filter_name: Option<&str>) -> Option<String> {
     let patterns = extension_patterns(extensions);
-    (!patterns.is_empty()).then(|| format!("--file-filter=图片 | {}", patterns.join(" ")))
+    let label = sanitized_filter_label(filter_name, "Images");
+    (!patterns.is_empty()).then(|| format!("--file-filter={label} | {}", patterns.join(" ")))
 }
 
-fn kdialog_image_filter(extensions: &[String]) -> Option<String> {
+fn kdialog_image_filter(extensions: &[String], filter_name: Option<&str>) -> Option<String> {
     let patterns = extension_patterns(extensions);
-    (!patterns.is_empty()).then(|| format!("{}|图片", patterns.join(" ")))
+    let label = sanitized_filter_label(filter_name, "Images");
+    (!patterns.is_empty()).then(|| format!("{}|{label}", patterns.join(" ")))
+}
+
+fn sanitized_filter_label(value: Option<&str>, fallback: &str) -> String {
+    let sanitized = value
+        .unwrap_or_default()
+        .chars()
+        .filter(|character| !matches!(character, '|' | '\r' | '\n'))
+        .collect::<String>();
+    let trimmed = sanitized.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 fn extension_patterns(extensions: &[String]) -> Vec<String> {
@@ -240,12 +263,16 @@ mod tests {
         ];
 
         assert_eq!(
-            zenity_image_filter(&extensions),
-            Some("--file-filter=图片 | *.png *.PNG *.webp *.WEBP".into())
+            zenity_image_filter(&extensions, Some("Images")),
+            Some("--file-filter=Images | *.png *.PNG *.webp *.WEBP".into())
         );
         assert_eq!(
-            kdialog_image_filter(&extensions),
+            kdialog_image_filter(&extensions, Some("图片")),
             Some("*.png *.PNG *.webp *.WEBP|图片".into())
+        );
+        assert_eq!(
+            sanitized_filter_label(Some("Images|unsafe\n"), "fallback"),
+            "Imagesunsafe"
         );
     }
 

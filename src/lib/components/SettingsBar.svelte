@@ -3,7 +3,12 @@
   import { FolderOpen, ArrowsClockwise, WarningCircle } from "phosphor-svelte";
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
-  import { formatCommandError } from "$lib/command-error";
+  import {
+    commandErrorMessage,
+    formatLocalizedMessage,
+    translationMessage,
+    type LocalizedMessage,
+  } from "$lib/localized-message";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
@@ -28,7 +33,7 @@
   import { cn } from "$lib/utils.js";
 
   let { variant = "bar" }: { variant?: "bar" | "panel" } = $props();
-  let outputMessage = $state("");
+  let outputMessage = $state<LocalizedMessage | null>(null);
   let activeSwitchHelp = $state<SwitchHelpKey | null>(null);
   const busy = $derived(ui.converting || ui.importing);
   const isPanel = $derived(variant === "panel");
@@ -100,9 +105,6 @@
       ? `${settings.quality} -> ${effectiveQuality}`
       : `${settings.quality}`,
   );
-  const concurrencyLabel = $derived(
-    settings.concurrency > 0 ? `${settings.concurrency}` : "settings.concurrencyAuto",
-  );
   const autoQualityScoreLabel = $derived(`${settings.autoQualityScore}`);
   const overwriteLabelKey = $derived(
     settings.overwrite === "overwrite"
@@ -125,7 +127,7 @@
     if (busy) return;
 
     if (!isTauriRuntime()) {
-      outputMessage = get(t)("settings.webOutputDirUnsupported") as string;
+      outputMessage = translationMessage("settings.webOutputDirUnsupported");
       return;
     }
 
@@ -137,10 +139,10 @@
       });
       if (busy || !paths[0]) return;
       settings.outDir = paths[0];
-      outputMessage = "";
+      outputMessage = null;
       persistSettings();
     } catch (error) {
-      outputMessage = formatCommandError(error);
+      outputMessage = commandErrorMessage(error);
     }
   }
 
@@ -148,7 +150,7 @@
     if (busy) return;
 
     settings.outDir = null;
-    outputMessage = "";
+    outputMessage = null;
     persistSettings();
   }
 
@@ -157,6 +159,11 @@
 
     settings.format = value;
     persistSettings();
+  }
+
+  function localizedText(message: LocalizedMessage, currentTranslation: unknown): string {
+    void currentTranslation;
+    return formatLocalizedMessage(message);
   }
 
   function setOverwrite(value: string) {
@@ -296,7 +303,7 @@
         "size-7 rounded-md text-muted-foreground hover:text-foreground",
         activeSwitchHelp === key && "bg-background text-foreground",
       )}
-      aria-label={$t("settings.descriptionAria", { values: { label } } as any)}
+      aria-label={$t("settings.descriptionAria", { values: { label } })}
       aria-pressed={activeSwitchHelp === key}
       onclick={() => toggleSwitchHelp(key)}
     >
@@ -431,7 +438,9 @@
           <span class="font-medium text-foreground">
             {$t(activeSwitchHelpContent.labelKey)}
           </span>
-          <span>：{$t(activeSwitchHelpContent.descriptionKey)}</span>
+          <span
+            >{$t("settings.descriptionSeparator")}{$t(activeSwitchHelpContent.descriptionKey)}</span
+          >
         </div>
       {/if}
 
@@ -547,7 +556,7 @@
         {settings.outDir ?? $t("settings.sameAsSource")}
       </button>
       {#if outputMessage}
-        <span class="text-xs text-muted-foreground">{outputMessage}</span>
+        <span class="text-xs text-muted-foreground">{localizedText(outputMessage, $t)}</span>
       {/if}
     </div>
 
@@ -556,14 +565,20 @@
         <Label class="text-xs text-muted-foreground">{$t("settings.formatParameters")}</Label>
         {#if settings.format === "jpeg"}
           <span class="text-xs text-muted-foreground">
-            {settings.jpegProgressive ? "Progressive" : "Baseline"}
+            {settings.jpegProgressive
+              ? $t("settings.jpegProgressiveMode")
+              : $t("settings.jpegBaselineMode")}
           </span>
         {:else if settings.format === "png"}
           <span class="text-xs text-muted-foreground">oxipng {settings.pngOxipngLevel}</span>
         {:else if settings.format === "webp"}
-          <span class="text-xs text-muted-foreground">method {settings.webpMethod}</span>
+          <span class="text-xs text-muted-foreground"
+            >{$t("settings.webpMethod")} {settings.webpMethod}</span
+          >
         {:else if settings.format === "avif"}
-          <span class="text-xs text-muted-foreground">speed {settings.avifSpeed}</span>
+          <span class="text-xs text-muted-foreground"
+            >{$t("settings.avifSpeed")} {settings.avifSpeed}</span
+          >
         {/if}
       </div>
 
@@ -575,7 +590,7 @@
               disabled={busy}
               onCheckedChange={persistSettings}
             />
-            <Label class="text-sm">Progressive JPEG</Label>
+            <Label class="text-sm">{$t("settings.progressiveJpeg")}</Label>
           </div>
           <div class="flex items-center gap-2">
             <Switch
@@ -583,7 +598,7 @@
               disabled={busy}
               onCheckedChange={persistSettings}
             />
-            <Label class="text-sm">Trellis scans</Label>
+            <Label class="text-sm">{$t("settings.trellisScans")}</Label>
           </div>
         </div>
       {:else if settings.format === "png"}
@@ -641,7 +656,7 @@
         </div>
         <div class="grid gap-2 pt-1 md:grid-cols-[120px_minmax(0,1fr)]" class:opacity-40={busy}>
           <div class="flex items-center justify-between gap-3 md:block">
-            <Label class="text-sm text-muted-foreground">near-lossless</Label>
+            <Label class="text-sm text-muted-foreground">{$t("settings.nearLossless")}</Label>
             <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
               {settings.webpNearLossless === 100
                 ? $t("settings.nearLosslessOff")
@@ -666,7 +681,7 @@
             disabled={busy}
             onCheckedChange={persistSettings}
           />
-          <Label class="text-sm">Sharp YUV</Label>
+          <Label class="text-sm">{$t("settings.sharpYuv")}</Label>
         </div>
       {:else if settings.format === "avif"}
         <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
