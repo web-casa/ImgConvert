@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Immutable app release tag to build, for example v0.2.0.
+        description: Immutable app release tag to build, for example v0.2.1.
         required: true
         type: string
       store_version:
