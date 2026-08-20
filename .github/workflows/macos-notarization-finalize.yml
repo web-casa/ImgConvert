@@ -1,0 +1,204 @@
+name: macOS Notarization Finalize
+run-name: Finalize macOS notarization from run ${{ inputs.source_run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful macOS submission workflow run ID containing the pending DMG.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: macos-notarization-finalize-${{ inputs.source_run_id }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  finalize:
+    name: Check and finalize macOS notarization
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Validate source workflow run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          case "$SOURCE_RUN_ID" in
+            ''|*[!0-9]*) echo "source_run_id must contain only digits"; exit 1 ;;
+          esac
+
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          test "$(jq -r '.status' <<< "$run_json")" = "completed" || { echo "source run is not completed"; exit 1; }
+          test "$(jq -r '.conclusion' <<< "$run_json")" = "success" || { echo "source run did not succeed"; exit 1; }
+          test "$(jq -r '.event' <<< "$run_json")" = "workflow_dispatch" || { echo "source run was not manually dispatched"; exit 1; }
+          test "$(jq -r '.head_repository.full_name' <<< "$run_json")" = "$GITHUB_REPOSITORY" || { echo "source repository mismatch"; exit 1; }
+
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.default_branch')"
+          test "$GITHUB_REF" = "refs/heads/$default_branch" || { echo "finalizer must run from the default branch"; exit 1; }
+          test "$(jq -r '.head_branch' <<< "$run_json")" = "$default_branch" || { echo "source run must use the default branch"; exit 1; }
+
+          head_sha="$(jq -r '.head_sha' <<< "$run_json")"
+          workflow_name="$(jq -r '.name' <<< "$run_json")"
+          workflow_id="$(jq -r '.workflow_id' <<< "$run_json")"
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid source head SHA"; exit 1; }
+          [[ "$workflow_id" =~ ^[0-9]+$ ]] || { echo "invalid source workflow ID"; exit 1; }
+
+          workflow_path="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id" --jq '.path')"
+          case "$workflow_path" in
+            .github/workflows/macos-smoke.yml)
+              test "$workflow_name" = "macOS Smoke" || { echo "source workflow name mismatch"; exit 1; }
+              allow_release=false
+              ;;
+            .github/workflows/macos-release.yml)
+              test "$workflow_name" = "macOS DMG Release" || { echo "source workflow name mismatch"; exit 1; }
+              allow_release=true
+              ;;
+            *)
+              echo "unsupported source workflow: $workflow_path"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "head_sha=$head_sha"
+            echo "workflow_name=$workflow_name"
+            echo "allow_release=$allow_release"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check notarization credentials
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
+            test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required with API notarization"; exit 1; }
+            test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required with API notarization"; exit 1; }
+            test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required with API notarization"; exit 1; }
+          else
+            test -n "$APPLE_ID" || { echo "APPLE_ID secret is required without API notarization"; exit 1; }
+            test -n "$APPLE_PASSWORD" || { echo "APPLE_PASSWORD secret is required without API notarization"; exit 1; }
+            test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required without API notarization"; exit 1; }
+          fi
+
+      - name: Prepare App Store Connect API key
+        id: api_key
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_KEY_BASE64" ]; then
+            key_path="$RUNNER_TEMP/imgconvert-notary-api-key.p8"
+            if ! printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path" 2>/dev/null; then
+              printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$key_path"
+            fi
+            test -s "$key_path" || { echo "decoded API key is empty"; exit 1; }
+            echo "path=$key_path" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download pending DMG and receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          artifact_dir="$GITHUB_WORKSPACE/src-tauri/target/release/bundle/dmg"
+          mkdir -p "$artifact_dir"
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name imgconvert-macos-arm64-dmg-pending \
+            --dir "$artifact_dir"
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name imgconvert-macos-notarization-receipt \
+            --dir "$artifact_dir"
+
+          dmgs=()
+          while IFS= read -r -d '' file; do dmgs+=("$file"); done < <(find "$artifact_dir" -type f -name '*.dmg' -print0)
+          receipts=()
+          while IFS= read -r -d '' file; do receipts+=("$file"); done < <(find "$artifact_dir" -type f -name 'notarization.json' -print0)
+          test "${#dmgs[@]}" -eq 1 || { echo "expected exactly one DMG, found ${#dmgs[@]}"; exit 1; }
+          test "${#receipts[@]}" -eq 1 || { echo "expected exactly one receipt, found ${#receipts[@]}"; exit 1; }
+          case "${dmgs[0]}${receipts[0]}" in *$'\n'*|*$'\r'*) echo "artifact path contains a newline"; exit 1 ;; esac
+          {
+            echo "IMGCONVERT_MACOS_DMG=${dmgs[0]}"
+            echo "IMGCONVERT_NOTARY_RECEIPT=${receipts[0]}"
+          } >> "$GITHUB_ENV"
+
+      - name: Check Apple status and staple accepted DMG
+        id: notarization
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_PATH: ${{ steps.api_key.outputs.path }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IMGCONVERT_NOTARY_EXPECTED_REPOSITORY: ${{ github.repository }}
+          IMGCONVERT_NOTARY_EXPECTED_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          IMGCONVERT_NOTARY_EXPECTED_WORKFLOW: ${{ steps.source.outputs.workflow_name }}
+          IMGCONVERT_NOTARY_EXPECTED_WORKFLOW_SHA: ${{ steps.source.outputs.head_sha }}
+          IMGCONVERT_NOTARY_ALLOW_RELEASE: ${{ steps.source.outputs.allow_release }}
+        run: |
+          node scripts/notarize-macos-dmg.mjs \
+            --profile=release \
+            --finalize \
+            --dmg="$IMGCONVERT_MACOS_DMG" \
+            --receipt="$IMGCONVERT_NOTARY_RECEIPT"
+
+      - name: Report pending Apple status
+        if: ${{ steps.notarization.outputs.notarization_status == 'In Progress' }}
+        env:
+          SUBMISSION_ID: ${{ steps.notarization.outputs.submission_id }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          {
+            echo "Apple notarization is still in progress."
+            echo "Submission: $SUBMISSION_ID"
+            echo "Run this workflow again later with source_run_id=$SOURCE_RUN_ID."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' }}
+        with:
+          name: imgconvert-macos-arm64-dmg-notarized-${{ inputs.source_run_id }}
+          if-no-files-found: error
+          retention-days: 14
+          path: ${{ env.IMGCONVERT_MACOS_DMG }}
+
+      - name: Verify release source and existing GitHub Release
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+          IMGCONVERT_SOURCE_SHA: ${{ steps.notarization.outputs.source_sha }}
+        run: |
+          tag_sha="$(git rev-parse "$IMGCONVERT_RELEASE_TAG^{commit}")"
+          test "$tag_sha" = "$IMGCONVERT_SOURCE_SHA" || { echo "release tag does not match receipt source SHA"; exit 1; }
+          gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
+
+      - name: Attach verified DMG to existing GitHub Release
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+        run: gh release upload "$IMGCONVERT_RELEASE_TAG" "$IMGCONVERT_MACOS_DMG" --repo "$GITHUB_REPOSITORY"

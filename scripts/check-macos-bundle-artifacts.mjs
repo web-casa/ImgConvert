@@ -22,6 +22,7 @@ const options = {
   requireSigned: false,
   requireNotarized: false,
   requireMas: false,
+  artifacts: [],
 };
 
 for (const arg of process.argv.slice(2)) {
@@ -41,6 +42,8 @@ for (const arg of process.argv.slice(2)) {
     options.requireNotarized = true;
   } else if (arg === "--require-mas") {
     options.requireMas = true;
+  } else if (arg.startsWith("--artifact=")) {
+    options.artifacts.push(path.resolve(arg.slice("--artifact=".length)));
   } else {
     fail(`unknown argument: ${arg}`);
   }
@@ -55,6 +58,9 @@ for (const bundle of options.bundles) {
     fail(`unsupported macOS bundle: ${bundle}`);
   }
 }
+if (options.artifacts.length > 0 && options.bundles.length !== 1) {
+  fail("--artifact requires exactly one --bundles value");
+}
 
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const tauriConfig = JSON.parse(
@@ -67,16 +73,28 @@ const verified = [];
 
 for (const bundle of options.bundles) {
   const bundleDir = path.join(bundleRoot, bundle === "app" ? "macos" : bundle);
-  const artifacts = collectFiles(bundleDir).filter((file) => {
-    if (bundle === "dmg") return file.toLowerCase().endsWith(".dmg");
-    return file.toLowerCase().endsWith(".app");
-  });
+  const artifacts =
+    options.artifacts.length > 0
+      ? options.artifacts
+      : collectFiles(bundleDir).filter((file) => {
+          if (bundle === "dmg") return file.toLowerCase().endsWith(".dmg");
+          return file.toLowerCase().endsWith(".app");
+        });
   if (artifacts.length === 0) {
     failures.push(`missing ${bundle} artifact under ${path.relative(repoRoot, bundleDir)}`);
     continue;
   }
 
   for (const artifact of artifacts) {
+    const expectedExtension = bundle === "dmg" ? ".dmg" : ".app";
+    if (!artifact.toLowerCase().endsWith(expectedExtension)) {
+      failures.push(`explicit artifact does not match ${bundle}: ${artifact}`);
+      continue;
+    }
+    if (!existsSync(artifact)) {
+      failures.push(`explicit artifact does not exist: ${artifact}`);
+      continue;
+    }
     verifyArtifact(bundle, artifact, expectedName, packageJson.version);
   }
 }

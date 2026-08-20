@@ -15,6 +15,7 @@ const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const macosRelease = readWorkflow("macos-release.yml");
+const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
 const pages = readWorkflow("pages.yml");
@@ -26,6 +27,7 @@ const allWorkflows = [
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
   ["macos-release.yml", macosRelease],
+  ["macos-notarization-finalize.yml", macosNotarizationFinalize],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
   ["pages.yml", pages],
@@ -42,6 +44,7 @@ checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
 checkManualWorkflow("macos-release.yml", macosRelease);
+checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
 checkUpdaterReleaseWorkflow();
@@ -49,6 +52,13 @@ checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkMacosDmgReleaseWorkflow();
 checkStandardPlatformWorkflow("macos-release.yml", macosRelease, "macOS DMG Release", "macos-15");
+checkMacosNotarizationFinalizeWorkflow();
+checkStandardPlatformWorkflow(
+  "macos-notarization-finalize.yml",
+  macosNotarizationFinalize,
+  "macOS notarization finalizer",
+  "macos-15",
+);
 checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
 checkWindowsStoreReleaseWorkflow();
 checkStandardPlatformWorkflow(
@@ -271,17 +281,18 @@ function checkMacosDmgReleaseWorkflow() {
   requireBooleanInputDefault(macosRelease, "publish_release", false, "macos-release.yml");
 
   for (const marker of [
-    "contents: write",
+    "contents: read",
     "ref: ${{ inputs.tag }}",
     "fetch-depth: 0",
     "verify-release-tag.mjs",
     "IMGCONVERT_RELEASE_TAG",
     "APPLE_DIRECT_CERTIFICATE",
     "release:macos:notarize",
-    "imgconvert-macos-arm64-dmg-release",
-    "GH_TOKEN",
-    "gh release view",
-    "gh release upload",
+    "--submit-only",
+    "notarization.json",
+    "imgconvert-macos-arm64-dmg-pending",
+    "imgconvert-macos-notarization-receipt",
+    "retention-days: 7",
     "inputs.publish_release",
   ]) {
     if (!macosRelease.includes(marker)) {
@@ -290,6 +301,44 @@ function checkMacosDmgReleaseWorkflow() {
   }
   if (/^\s+draft:\s*/m.test(macosRelease)) {
     failures.push("macos-release.yml must not create or change a GitHub Release draft state");
+  }
+  if (macosRelease.includes("gh release upload")) {
+    failures.push("macos-release.yml must defer release attachment to the notarization finalizer");
+  }
+}
+
+function checkMacosNotarizationFinalizeWorkflow() {
+  requireStringInput(macosNotarizationFinalize, "source_run_id", "macos-notarization-finalize.yml");
+  for (const marker of [
+    "actions: read",
+    "contents: write",
+    "timeout-minutes: 15",
+    "Validate source workflow run",
+    "macos-smoke.yml",
+    "macos-release.yml",
+    "source run must use the default branch",
+    "finalizer must run from the default branch",
+    "gh run download",
+    "imgconvert-macos-arm64-dmg-pending",
+    "imgconvert-macos-notarization-receipt",
+    "--finalize",
+    "notarization_status == 'Accepted'",
+    "imgconvert-macos-arm64-dmg-notarized",
+    "gh release view",
+    "gh release upload",
+  ]) {
+    if (!macosNotarizationFinalize.includes(marker)) {
+      failures.push(`macos-notarization-finalize.yml missing marker: ${marker}`);
+    }
+  }
+  if (macosNotarizationFinalize.includes("ref: ${{ steps.source.outputs.head_sha }}")) {
+    failures.push("macOS notarization finalizer must not execute code from the source build run");
+  }
+  if (macosNotarizationFinalize.includes("git checkout --detach")) {
+    failures.push("macOS notarization finalizer must not execute code from a release tag");
+  }
+  if (macosNotarizationFinalize.includes("APPLE_API_KEY_PATH=$key_path")) {
+    failures.push("macOS notarization finalizer must not persist the API key path job-wide");
   }
 }
 

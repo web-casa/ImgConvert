@@ -8,13 +8,13 @@ on:
         required: true
         type: string
       publish_release:
-        description: Attach the verified DMG to an existing same-tag GitHub Release.
+        description: Let the finalizer attach the verified DMG to an existing same-tag release.
         required: true
         default: false
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: macos-dmg-release-${{ inputs.tag }}
@@ -40,6 +40,13 @@ jobs:
         env:
           IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
         run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
+
+      - name: Require existing GitHub Release before requested attachment
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
 
       - name: Verify macOS runner architecture
         run: |
@@ -138,10 +145,11 @@ jobs:
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
         run: |
           if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_KEY_BASE64" ]; then
-            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            key_path="$RUNNER_TEMP/imgconvert-notary-api-key.p8"
             if ! printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path" 2>/dev/null; then
               printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$key_path"
             fi
+            test -s "$key_path" || { echo "decoded API key is empty"; exit 1; }
             echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
           fi
 
@@ -161,39 +169,31 @@ jobs:
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
         run: APPLE_SIGNING_IDENTITY="$IMGCONVERT_DIRECT_EFFECTIVE_SIGNING_IDENTITY" pnpm run release:macos
 
-      - name: Notarize and verify direct DMG
+      - uses: actions/upload-artifact@v7
+        with:
+          name: imgconvert-macos-arm64-dmg-pending
+          if-no-files-found: error
+          retention-days: 7
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Submit direct DMG for notarization
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm run release:macos:notarize
+          IMGCONVERT_NOTARY_RELEASE_TAG: ${{ inputs.tag }}
+          IMGCONVERT_NOTARY_PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: |
+          IMGCONVERT_NOTARY_SOURCE_SHA="$(git rev-parse HEAD)" \
+            pnpm run release:macos:notarize -- \
+              --submit-only \
+              --receipt=src-tauri/target/release/bundle/dmg/notarization.json
 
       - uses: actions/upload-artifact@v7
         with:
-          name: imgconvert-macos-arm64-dmg-release-${{ inputs.tag }}
+          name: imgconvert-macos-notarization-receipt
           if-no-files-found: error
-          retention-days: 14
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-
-      - name: Require existing GitHub Release before attachment
-        if: ${{ inputs.publish_release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
-        run: gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
-
-      - name: Attach verified DMG to existing GitHub Release
-        if: ${{ inputs.publish_release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          shopt -s nullglob
-          dmgs=(src-tauri/target/release/bundle/dmg/*.dmg)
-          if [ "${#dmgs[@]}" -ne 1 ]; then
-            echo "expected exactly one verified DMG, found ${#dmgs[@]}"
-            exit 1
-          fi
-          gh release upload "$IMGCONVERT_RELEASE_TAG" "${dmgs[@]}" --repo "$GITHUB_REPOSITORY"
+          retention-days: 7
+          path: src-tauri/target/release/bundle/dmg/notarization.json

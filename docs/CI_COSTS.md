@@ -29,12 +29,17 @@ Default behavior:
   smoke as explicit opt-ins.
 - `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
   runner. It retains the Apple Silicon AVIF benchmark JSON artifact for 14
-  days; signing, notarization, DMG, and MAS candidate steps remain opt-in
-  because they require Apple secrets.
+  days; signing, asynchronous notarization submission, DMG, and MAS candidate
+  steps remain opt-in because they require Apple secrets. A submitted DMG and
+  its SHA-256-bound receipt are retained for seven days without holding the
+  runner open while Apple processes the request.
 - `macOS DMG Release` is a manual-only `macos-15` arm64 release job. It accepts
   only an exact application tag, requires Apple signing/notarization secrets,
-  retains the verified DMG for 14 days, and only uploads it to an already
-  existing same-tag GitHub Release when `publish_release=true`. It never uses
+  and saves the submitted DMG plus receipt for seven days. `macOS Notarization
+  Finalize` is a separate manual `macos-15` job that validates the source run,
+  checks Apple once, staples an accepted DMG, retains the result for 14 days,
+  and only uploads it to an already existing same-tag GitHub Release when the
+  original release run recorded `publish_release=true`. It never uses
   `--clobber`, creates a Release, or changes a Release draft state.
 - `Windows Smoke` is manual-only and runs on the free public
   `windows-latest` x64 runner. Installer signing and Store MSIX packaging

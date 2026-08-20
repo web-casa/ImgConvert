@@ -941,6 +941,10 @@ function checkMacos() {
 
 function checkMacosRuntimeGuardrails() {
   const packageScripts = packageJson.scripts ?? {};
+  const bundleArtifactScript = readText(
+    path.join(repoRoot, "scripts", "check-macos-bundle-artifacts.mjs"),
+  );
+  const notarizationScript = readText(path.join(repoRoot, "scripts", "notarize-macos-dmg.mjs"));
   if (!packageScripts["release:tag:check"]?.includes("verify-release-tag.mjs")) {
     failures.push("package.json must expose release:tag:check for immutable release verification");
   }
@@ -989,9 +993,18 @@ function checkMacosRuntimeGuardrails() {
       failures.push(`${script} is required for macOS runtime/build smoke`);
     }
   }
+  if (!bundleArtifactScript.includes('arg.startsWith("--artifact=")')) {
+    failures.push("macOS bundle artifact verification must accept an exact artifact path");
+  }
+  if (!notarizationScript.includes("`--artifact=${dmg}`")) {
+    failures.push("macOS notarization must verify the exact DMG submitted to Apple");
+  }
   const macosWorkflow = readText(path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"));
   const macosReleaseWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "macos-release.yml"),
+  );
+  const macosNotarizationFinalizeWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "macos-notarization-finalize.yml"),
   );
   for (const expected of ["Verify macOS runner architecture", "uname -m", "arm64"]) {
     if (!macosWorkflow.includes(expected)) {
@@ -1017,12 +1030,52 @@ function checkMacosRuntimeGuardrails() {
     "verify-release-tag.mjs",
     "APPLE_DIRECT_CERTIFICATE",
     "release:macos:notarize",
-    "imgconvert-macos-arm64-dmg-release",
-    "gh release view",
-    "gh release upload",
+    "--submit-only",
+    "notarization.json",
+    "imgconvert-macos-arm64-dmg-pending",
+    "imgconvert-macos-notarization-receipt",
   ]) {
     if (!macosReleaseWorkflow.includes(expected)) {
       failures.push(`macOS DMG Release workflow must preserve ${expected}`);
+    }
+  }
+  for (const expected of [
+    "source_run_id",
+    "actions: read",
+    "contents: write",
+    "runs-on: macos-15",
+    "timeout-minutes: 15",
+    "source run must use the default branch",
+    "finalizer must run from the default branch",
+    "gh run download",
+    "imgconvert-macos-notarization-receipt",
+    "--finalize",
+    "IMGCONVERT_NOTARY_EXPECTED_SOURCE_RUN_ID",
+    "notarization_status == 'Accepted'",
+    "gh release view",
+    "gh release upload",
+  ]) {
+    if (!macosNotarizationFinalizeWorkflow.includes(expected)) {
+      failures.push(`macOS notarization finalizer must preserve ${expected}`);
+    }
+  }
+  if (macosNotarizationFinalizeWorkflow.includes("ref: ${{ steps.source.outputs.head_sha }}")) {
+    failures.push("macOS notarization finalizer must not execute code from the source build run");
+  }
+  if (macosNotarizationFinalizeWorkflow.includes("git checkout --detach")) {
+    failures.push("macOS notarization finalizer must not execute code from a release tag");
+  }
+  if (macosNotarizationFinalizeWorkflow.includes("APPLE_API_KEY_PATH=$key_path")) {
+    failures.push("macOS notarization finalizer must not persist the API key path job-wide");
+  }
+  for (const expected of [
+    "--submit-only",
+    "notarization.json",
+    "imgconvert-macos-arm64-dmg-pending",
+    "imgconvert-macos-notarization-receipt",
+  ]) {
+    if (!macosWorkflow.includes(expected)) {
+      failures.push(`macOS Smoke workflow must preserve async notarization marker: ${expected}`);
     }
   }
   for (const expected of [
