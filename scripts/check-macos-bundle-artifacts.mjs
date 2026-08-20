@@ -208,6 +208,8 @@ function verifyAppsInsideMountedDmg(dmgPath) {
     {
       cwd: repoRoot,
       encoding: "utf8",
+      env: { ...process.env, PAGER: "/bin/cat" },
+      input: "Y\n",
     },
   );
   if (attach.status !== 0) {

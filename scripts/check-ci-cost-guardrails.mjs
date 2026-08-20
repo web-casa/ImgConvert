@@ -50,6 +50,7 @@ checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
+checkMacosSmokeWorkflow();
 checkMacosDmgReleaseWorkflow();
 checkStandardPlatformWorkflow("macos-release.yml", macosRelease, "macOS DMG Release", "macos-15");
 checkMacosNotarizationFinalizeWorkflow();
@@ -273,6 +274,27 @@ function checkUpdaterUpgradeSmokeWorkflow() {
 function checkStandardPlatformWorkflow(name, text, label, runner) {
   if (!text.includes(`runs-on: ${runner}`)) {
     failures.push(`${name} must keep ${label} standard runner explicit`);
+  }
+}
+
+function checkMacosSmokeWorkflow() {
+  for (const marker of [
+    "actions: read",
+    "retry_signed_dmg_run_id",
+    "inputs.retry_signed_dmg_run_id == ''",
+    "inputs.retry_signed_dmg_run_id != ''",
+    "Retry saved signed DMG submission",
+    "timeout-minutes: 15",
+    "source run must have failed",
+    "retry must run from the default branch",
+    "source run must contain exactly one live pending DMG artifact",
+    "source run already contains a notarization receipt",
+    "imgconvert-macos-arm64-dmg-pending",
+    "imgconvert-macos-notarization-receipt",
+  ]) {
+    if (!macosSmoke.includes(marker)) {
+      failures.push(`macos-smoke.yml missing bounded notarization retry marker: ${marker}`);
+    }
   }
 }
 

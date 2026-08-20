@@ -996,7 +996,13 @@ function checkMacosRuntimeGuardrails() {
   if (!bundleArtifactScript.includes('arg.startsWith("--artifact=")')) {
     failures.push("macOS bundle artifact verification must accept an exact artifact path");
   }
-  for (const marker of ["mkdtempSync", "imgconvert-dmg-mount-", '"-noautoopen"']) {
+  for (const marker of [
+    "mkdtempSync",
+    "imgconvert-dmg-mount-",
+    '"-noautoopen"',
+    'PAGER: "/bin/cat"',
+    'input: "Y\\n"',
+  ]) {
     if (!bundleArtifactScript.includes(marker)) {
       failures.push(`macOS DMG verification must use a prepared temporary mount point: ${marker}`);
     }
@@ -1078,6 +1084,10 @@ function checkMacosRuntimeGuardrails() {
     "notarization.json",
     "imgconvert-macos-arm64-dmg-pending",
     "imgconvert-macos-notarization-receipt",
+    "retry_signed_dmg_run_id",
+    "source run must contain exactly one live pending DMG artifact",
+    "source run already contains a notarization receipt",
+    "Retry saved signed DMG submission",
   ]) {
     if (!macosWorkflow.includes(expected)) {
       failures.push(`macOS Smoke workflow must preserve async notarization marker: ${expected}`);
