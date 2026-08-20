@@ -23,7 +23,7 @@ const pkgPath = path.join(pkgDir, `ImgConvert_${packageJson.version}_mas.pkg`);
 
 mkdirSync(pkgDir, { recursive: true });
 run("xcrun", ["productbuild", "--sign", identity, "--component", app, "/Applications", pkgPath]);
-run("pkgutil", ["--check-signature", pkgPath]);
+verifyInstallerSignature(pkgPath);
 
 console.log(`ok ${path.relative(repoRoot, pkgPath)} (${statSync(pkgPath).size} bytes)`);
 
@@ -64,6 +64,24 @@ function run(command, args) {
   }
   if (result.status !== 0) {
     fail(`${command} failed with exit code ${result.status ?? 1}`);
+  }
+}
+
+function verifyInstallerSignature(pkgPath) {
+  const result = spawnSync("pkgutil", ["--check-signature", pkgPath], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+  if (output) console.log(output);
+  if (result.error) {
+    fail(`pkgutil failed to start: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    fail(`pkgutil failed with exit code ${result.status ?? 1}`);
+  }
+  if (!/(Mac Installer Distribution|3rd Party Mac Developer Installer):/.test(output)) {
+    fail("MAS .pkg is not signed by a Mac Installer Distribution certificate");
   }
 }
 

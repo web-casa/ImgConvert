@@ -967,6 +967,7 @@ function checkMacosRuntimeGuardrails() {
   if (
     !packageScripts["release:macos:mas"]?.includes("release:macos:mas:prepare") ||
     !packageScripts["release:macos:mas"]?.includes("check-macos-bundle-artifacts.mjs") ||
+    !packageScripts["release:macos:mas"]?.includes("--require-mas") ||
     !packageScripts["release:macos:mas"]?.includes("IMGCONVERT_DISABLE_EXTERNAL_CODECS=1")
   ) {
     failures.push(
@@ -1014,7 +1015,7 @@ function checkMacosRuntimeGuardrails() {
     "ref: ${{ inputs.tag }}",
     "fetch-depth: 0",
     "verify-release-tag.mjs",
-    "APPLE_CERTIFICATE",
+    "APPLE_DIRECT_CERTIFICATE",
     "release:macos:notarize",
     "imgconvert-macos-arm64-dmg-release",
     "gh release view",
@@ -1022,6 +1023,17 @@ function checkMacosRuntimeGuardrails() {
   ]) {
     if (!macosReleaseWorkflow.includes(expected)) {
       failures.push(`macOS DMG Release workflow must preserve ${expected}`);
+    }
+  }
+  for (const expected of [
+    "APPLE_DIRECT_CERTIFICATE",
+    "APPLE_MAS_CERTIFICATE",
+    "APPLE_MAS_INSTALLER_CERTIFICATE",
+    "IMGCONVERT_MAS_PROVISION_PROFILE_BASE64",
+    "Mac Installer Distribution",
+  ]) {
+    if (!macosWorkflow.includes(expected)) {
+      failures.push(`macOS Smoke workflow must preserve ${expected}`);
     }
   }
   if (/^\s+draft:\s*/m.test(macosReleaseWorkflow)) {

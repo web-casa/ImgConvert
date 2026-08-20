@@ -43,7 +43,7 @@ export APPLE_TEAM_ID="<TEAMID>"
 export APPLE_SIGNING_IDENTITY="Apple Distribution: <name> (<TEAMID>)"
 export IMGCONVERT_MAS_PROVISION_PROFILE=/path/to/embedded.provisionprofile
 pnpm run release:macos:mas  # sets IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 and IMGCONVERT_DISABLE_UPDATER=1
-export IMGCONVERT_MAS_INSTALLER_IDENTITY="3rd Party Mac Developer Installer: <name> (<TEAMID>)"
+export IMGCONVERT_MAS_INSTALLER_IDENTITY="Mac Installer Distribution: <name> (<TEAMID>)"
 pnpm run release:macos:mas:pkg
 ```
 
@@ -75,14 +75,14 @@ GitHub Actions:
 - Manual `macOS Smoke` runs on `macos-15` arm64, including the Apple Silicon AVIF benchmark and, by default, generated HEIC fixture import through ImageIO.
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
-- Manual `build_mas_candidate=true` imports Apple signing secrets, generates MAS entitlements/provisioning config, builds a signed `.app`, and optionally produces a `.pkg` when `IMGCONVERT_MAS_INSTALLER_IDENTITY` is set.
+- Manual `build_mas_candidate=true` imports separate Apple Distribution and Mac Installer Distribution certificates, verifies the embedded provisioning profile and signed entitlements, builds a signed `.app`, and requires a signed `.pkg` artifact.
 - The manual `macOS DMG Release` workflow is the v0.2.0 publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, builds/signs/notarizes an arm64 DMG, and retains it as an Actions artifact. `publish_release=true` only attaches the verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
 
 Required GitHub secrets:
 
-- Direct signed/notarized DMG: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, plus either `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or `APPLE_API_KEY`/`APPLE_API_ISSUER`/`APPLE_API_KEY_BASE64`.
-- Optional direct overrides: `IMGCONVERT_DIRECT_SIGNING_IDENTITY` or `APPLE_SIGNING_IDENTITY`, and `APPLE_PROVIDER_SHORT_NAME`.
-- MAS candidate: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, `IMGCONVERT_MAS_PROVISION_PROFILE_BASE64`, and optionally `IMGCONVERT_MAS_SIGNING_IDENTITY` / `IMGCONVERT_MAS_INSTALLER_IDENTITY`.
+- Direct signed/notarized DMG: `APPLE_DIRECT_CERTIFICATE`, `APPLE_DIRECT_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, plus either `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or `APPLE_API_KEY`/`APPLE_API_ISSUER`/`APPLE_API_KEY_BASE64`.
+- Optional direct overrides: `IMGCONVERT_DIRECT_SIGNING_IDENTITY` and `APPLE_PROVIDER_SHORT_NAME`.
+- MAS candidate: `APPLE_MAS_CERTIFICATE`, `APPLE_MAS_CERTIFICATE_PASSWORD`, `APPLE_MAS_INSTALLER_CERTIFICATE`, `APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, and `IMGCONVERT_MAS_PROVISION_PROFILE_BASE64`. The workflow auto-selects both MAS identities; `IMGCONVERT_MAS_SIGNING_IDENTITY` and `IMGCONVERT_MAS_INSTALLER_IDENTITY` are optional overrides.
 
 macOS release acceptance still requires a real machine pass:
 

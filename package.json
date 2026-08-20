@@ -94,7 +94,7 @@
     "release:macos:verify": "node scripts/check-macos-bundle-artifacts.mjs --profile=release --bundles=dmg",
     "release:macos:notarize": "node scripts/notarize-macos-dmg.mjs --profile=release",
     "release:macos:mas:prepare": "node scripts/prepare-macos-mas-release.mjs",
-    "release:macos:mas": "pnpm run toolchain:check && IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 pnpm run release:macos:mas:prepare && node scripts/clean-macos-bundles.mjs --profile=release --bundles=app && IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 pnpm tauri build --ci --bundles app --config src-tauri/target/macos-mas/tauri.macos.mas.generated.conf.json && node scripts/check-macos-bundle-artifacts.mjs --profile=release --bundles=app --require-signed",
+    "release:macos:mas": "pnpm run toolchain:check && IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 pnpm run release:macos:mas:prepare && node scripts/clean-macos-bundles.mjs --profile=release --bundles=app && IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 pnpm tauri build --ci --bundles app --config src-tauri/target/macos-mas/tauri.macos.mas.generated.conf.json && node scripts/check-macos-bundle-artifacts.mjs --profile=release --bundles=app --require-signed --require-mas",
     "release:macos:mas:pkg": "node scripts/package-macos-mas-pkg.mjs",
     "release:windows:check": "node scripts/check-platform-release-guardrails.mjs --platform=windows --channel=direct,store",
     "release:windows:direct:check": "node scripts/check-platform-release-guardrails.mjs --platform=windows --channel=direct",

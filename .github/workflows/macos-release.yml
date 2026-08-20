@@ -52,8 +52,8 @@ jobs:
 
       - name: Check direct signing/notarization secrets
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
+          APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -62,8 +62,8 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          test -n "$APPLE_CERTIFICATE" || { echo "APPLE_CERTIFICATE secret is required"; exit 1; }
-          test -n "$APPLE_CERTIFICATE_PASSWORD" || { echo "APPLE_CERTIFICATE_PASSWORD secret is required"; exit 1; }
+          test -n "$APPLE_DIRECT_CERTIFICATE" || { echo "APPLE_DIRECT_CERTIFICATE secret is required"; exit 1; }
+          test -n "$APPLE_DIRECT_CERTIFICATE_PASSWORD" || { echo "APPLE_DIRECT_CERTIFICATE_PASSWORD secret is required"; exit 1; }
           test -n "$KEYCHAIN_PASSWORD" || { echo "KEYCHAIN_PASSWORD secret is required"; exit 1; }
           if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
             test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required with API notarization"; exit 1; }
@@ -110,22 +110,23 @@ jobs:
       - name: Tauri backend macOS tests
         run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
 
-      - name: Import Apple signing certificate
+      - name: Import Apple direct signing certificate
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
+          APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          if ! printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/imgconvert-signing.p12" 2>/dev/null; then
-            printf '%s' "$APPLE_CERTIFICATE" | base64 -D > "$RUNNER_TEMP/imgconvert-signing.p12"
+          if ! printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/imgconvert-direct-signing.p12" 2>/dev/null; then
+            printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 -D > "$RUNNER_TEMP/imgconvert-direct-signing.p12"
           fi
+          test -s "$RUNNER_TEMP/imgconvert-direct-signing.p12" || { echo "decoded direct certificate is empty"; exit 1; }
           security create-keychain -p "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
           security default-keychain -s imgconvert-build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
           security set-keychain-settings -t 3600 -u imgconvert-build.keychain
-          security import "$RUNNER_TEMP/imgconvert-signing.p12" \
+          security import "$RUNNER_TEMP/imgconvert-direct-signing.p12" \
             -k imgconvert-build.keychain \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -P "$APPLE_DIRECT_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/productbuild
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" imgconvert-build.keychain
@@ -147,9 +148,8 @@ jobs:
       - name: Select direct signing identity
         env:
           IMGCONVERT_DIRECT_SIGNING_IDENTITY: ${{ secrets.IMGCONVERT_DIRECT_SIGNING_IDENTITY }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
-          identity="${IMGCONVERT_DIRECT_SIGNING_IDENTITY:-$APPLE_SIGNING_IDENTITY}"
+          identity="$IMGCONVERT_DIRECT_SIGNING_IDENTITY"
           if [ -z "$identity" ]; then
             identity="$(security find-identity -v -p codesigning imgconvert-build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
           fi

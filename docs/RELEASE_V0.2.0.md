@@ -53,7 +53,7 @@ Partner Center 中确认它高于该 identity 已有的任何版本；当前 `1.
 1. checkout 指定 `tag`，执行版本/tag 校验；
 2. 在 `macos-15` arm64 runner 上完成现有类型、Rust、平台 guardrail 和 DMG 构建检查；
 3. 导入 Developer ID Application 证书，构建签名 DMG；
-4. 用 `notarytool submit --wait` 完成公证，staple DMG，并用 Gatekeeper 与
+4. 用 `notarytool submit` 上传后轮询到 `Accepted`，staple DMG，并用 Gatekeeper 与
    `check-macos-bundle-artifacts --require-signed --require-notarized` 验收；
 5. 将已验收 DMG 保留为 Actions artifact；仅在显式 `publish_release=true` 时，才把它
    附加到**已经存在**的同 tag GitHub Release。
@@ -66,12 +66,11 @@ macOS 工作流。上传步骤必须先查询目标 Release 是否存在，并�
 
 所需 GitHub Secrets：
 
-- `APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`KEYCHAIN_PASSWORD`
+- `APPLE_DIRECT_CERTIFICATE`、`APPLE_DIRECT_CERTIFICATE_PASSWORD`、`KEYCHAIN_PASSWORD`
 - 二选一的 notarization 凭据：
   - `APPLE_ID`、`APPLE_PASSWORD`、`APPLE_TEAM_ID`；或
   - `APPLE_API_KEY`、`APPLE_API_ISSUER`、`APPLE_API_KEY_BASE64`
-- 可选的 `IMGCONVERT_DIRECT_SIGNING_IDENTITY` / `APPLE_SIGNING_IDENTITY` 与
-  `APPLE_PROVIDER_SHORT_NAME`
+- 可选的 `IMGCONVERT_DIRECT_SIGNING_IDENTITY` 与 `APPLE_PROVIDER_SHORT_NAME`
 
 缺任何必需凭据都必须明确失败，不能退化为 unsigned 发布。签名、notarization、staple
 和 Gatekeeper 通过不替代后续人工 GUI 验收；用户选择文件/输出目录的 security-scoped

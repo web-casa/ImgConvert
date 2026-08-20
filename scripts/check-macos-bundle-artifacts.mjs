@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -12,6 +21,7 @@ const options = {
   bundles: ["dmg"],
   requireSigned: false,
   requireNotarized: false,
+  requireMas: false,
 };
 
 for (const arg of process.argv.slice(2)) {
@@ -29,6 +39,8 @@ for (const arg of process.argv.slice(2)) {
     options.requireSigned = true;
   } else if (arg === "--require-notarized") {
     options.requireNotarized = true;
+  } else if (arg === "--require-mas") {
+    options.requireMas = true;
   } else {
     fail(`unknown argument: ${arg}`);
   }
@@ -107,6 +119,9 @@ function verifyArtifact(bundle, artifact, expectedName, expectedVersion) {
   }
   if (options.requireSigned) {
     verifyCodesign(artifact);
+  }
+  if (options.requireMas && bundle === "app") {
+    verifyMasAppBundle(artifact, tauriConfig.identifier);
   }
   if (options.requireNotarized) {
     verifyGatekeeper(artifact);
@@ -212,6 +227,95 @@ function verifyCodesignTarget(artifact) {
     failures.push(
       `codesign verification failed for ${path.relative(repoRoot, artifact)}: ${result.stderr.trim()}`,
     );
+  }
+}
+
+function verifyMasAppBundle(appPath, identifier) {
+  if (process.platform !== "darwin") {
+    failures.push("--require-mas can only be verified on macOS");
+    return;
+  }
+
+  const profile = path.join(appPath, "Contents", "embedded.provisionprofile");
+  if (!existsSync(profile)) {
+    failures.push(`missing MAS provisioning profile: ${path.relative(repoRoot, profile)}`);
+    return;
+  }
+
+  const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "imgconvert-mas-check-"));
+  try {
+    verifyMasSigningAuthority(appPath);
+    verifyMasPlists(appPath, profile, identifier, temporaryRoot);
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+function verifyMasSigningAuthority(appPath) {
+  const result = spawnSync("codesign", ["-d", "--verbose=4", appPath], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  const details = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (result.status !== 0) {
+    failures.push(`unable to inspect MAS signing authority: ${details.trim()}`);
+  } else if (!/Authority=(Apple Distribution|3rd Party Mac Developer Application):/.test(details)) {
+    failures.push("MAS app is not signed by an Apple Distribution certificate");
+  }
+}
+
+function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
+  const entitlementsPath = path.join(temporaryRoot, "entitlements.plist");
+  const profilePath = path.join(temporaryRoot, "profile.plist");
+  if (!writeCodesignEntitlements(appPath, entitlementsPath)) return;
+  if (!decodeProvisioningProfile(profile, profilePath)) return;
+
+  const teamId = readPlistValue(profilePath, "TeamIdentifier:0");
+  const expectedApplicationId = teamId ? `${teamId}.${identifier}` : null;
+  requirePlistValue(entitlementsPath, "com.apple.security.app-sandbox", "true");
+  requirePlistValue(entitlementsPath, "com.apple.security.files.user-selected.read-write", "true");
+  requirePlistValue(entitlementsPath, "com.apple.security.files.bookmarks.app-scope", "true");
+  requirePlistValue(entitlementsPath, "com.apple.developer.team-identifier", teamId);
+  requirePlistValue(entitlementsPath, "com.apple.application-identifier", expectedApplicationId);
+  requirePlistValue(
+    profilePath,
+    "Entitlements:com.apple.application-identifier",
+    expectedApplicationId,
+  );
+  if (readPlistValue(entitlementsPath, "com.apple.security.get-task-allow") === "true") {
+    failures.push("MAS app must not enable com.apple.security.get-task-allow");
+  }
+}
+
+function writeCodesignEntitlements(appPath, destination) {
+  const result = spawnSync("codesign", ["-d", "--entitlements", ":-", appPath], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0 || !result.stdout.trim()) {
+    failures.push(`unable to read MAS entitlements: ${result.stderr.trim()}`);
+    return false;
+  }
+  writeFileSync(destination, result.stdout);
+  return true;
+}
+
+function decodeProvisioningProfile(profile, destination) {
+  const result = spawnSync("security", ["cms", "-D", "-i", profile, "-o", destination], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0 || !existsSync(destination)) {
+    failures.push(`unable to decode MAS provisioning profile: ${result.stderr.trim()}`);
+    return false;
+  }
+  return true;
+}
+
+function requirePlistValue(plistPath, key, expected) {
+  const value = readPlistValue(plistPath, key);
+  if (!expected || value !== expected) {
+    failures.push(`unexpected ${key}: ${value ?? "<missing>"}, expected ${expected ?? "<value>"}`);
   }
 }
 

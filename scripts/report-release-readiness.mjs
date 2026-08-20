@@ -391,7 +391,7 @@ function macosDirectPrerequisite() {
   ];
   const hasNotarization = notarizationModes.some((mode) => envSet(mode));
   const hasSigningIdentity =
-    envIsSet("APPLE_SIGNING_IDENTITY") || envIsSet("APPLE_CERTIFICATE_BASE64");
+    envIsSet("APPLE_SIGNING_IDENTITY") || envIsSet("APPLE_DIRECT_CERTIFICATE");
   return {
     id: "macos-direct-notarization",
     label: "macOS direct signing/notarization",
@@ -403,7 +403,7 @@ function macosDirectPrerequisite() {
       process.platform === "darwin"
         ? envDetail([
             "APPLE_SIGNING_IDENTITY",
-            "APPLE_CERTIFICATE_BASE64",
+            "APPLE_DIRECT_CERTIFICATE",
             ...notarizationModes.flat(),
           ])
         : "requires macOS runner or real macOS machine",

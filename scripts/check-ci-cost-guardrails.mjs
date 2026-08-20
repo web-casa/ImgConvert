@@ -276,7 +276,7 @@ function checkMacosDmgReleaseWorkflow() {
     "fetch-depth: 0",
     "verify-release-tag.mjs",
     "IMGCONVERT_RELEASE_TAG",
-    "APPLE_CERTIFICATE",
+    "APPLE_DIRECT_CERTIFICATE",
     "release:macos:notarize",
     "imgconvert-macos-arm64-dmg-release",
     "GH_TOKEN",

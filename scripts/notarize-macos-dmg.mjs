@@ -17,6 +17,8 @@ const options = {
   apiKey: process.env.APPLE_API_KEY ?? null,
   apiIssuer: process.env.APPLE_API_ISSUER ?? null,
   apiKeyPath: process.env.APPLE_API_KEY_PATH ?? null,
+  timeoutMinutes: positiveInteger(process.env.IMGCONVERT_NOTARY_TIMEOUT_MINUTES, 60),
+  pollSeconds: positiveInteger(process.env.IMGCONVERT_NOTARY_POLL_SECONDS, 20),
 };
 
 for (const arg of process.argv.slice(2)) {
@@ -40,6 +42,13 @@ for (const arg of process.argv.slice(2)) {
     options.apiIssuer = arg.slice("--api-issuer=".length);
   } else if (arg.startsWith("--api-key-path=")) {
     options.apiKeyPath = arg.slice("--api-key-path=".length);
+  } else if (arg.startsWith("--timeout-minutes=")) {
+    options.timeoutMinutes = positiveInteger(
+      arg.slice("--timeout-minutes=".length),
+      options.timeoutMinutes,
+    );
+  } else if (arg.startsWith("--poll-seconds=")) {
+    options.pollSeconds = positiveInteger(arg.slice("--poll-seconds=".length), options.pollSeconds);
   } else if (arg === "--help" || arg === "-h") {
     printHelp();
     process.exit(0);
@@ -60,7 +69,9 @@ if (!existsSync(dmg)) {
   fail(`DMG does not exist: ${dmg}`);
 }
 
-run("xcrun", ["notarytool", "submit", dmg, ...notaryCredentials(), "--wait"], "notarytool submit");
+const credentials = notaryCredentials();
+const submissionId = submitForNotarization(dmg, credentials);
+await waitForNotarization(submissionId, credentials);
 run("xcrun", ["stapler", "staple", dmg], "stapler staple");
 run(
   "spctl",
@@ -80,6 +91,64 @@ run(
 );
 
 console.log(`ok ${path.relative(repoRoot, dmg)} notarized and stapled`);
+
+function submitForNotarization(dmgPath, credentials) {
+  const response = runJson(
+    "xcrun",
+    ["notarytool", "submit", dmgPath, ...credentials, "--output-format", "json"],
+    "notarytool submit",
+    false,
+    10 * 60_000,
+  );
+  const submissionId = response.value?.id;
+  if (!response.ok || typeof submissionId !== "string" || !submissionId.trim()) {
+    fail(`notarytool submit did not return a submission ID${formatCommandError(response)}`);
+  }
+  console.log(`notarytool submission id: ${submissionId}`);
+  return submissionId;
+}
+
+async function waitForNotarization(submissionId, credentials) {
+  const deadline = Date.now() + options.timeoutMinutes * 60_000;
+  let consecutiveErrors = 0;
+  while (Date.now() < deadline) {
+    const response = runJson(
+      "xcrun",
+      ["notarytool", "info", submissionId, ...credentials, "--output-format", "json"],
+      "notarytool info",
+      true,
+      2 * 60_000,
+    );
+    if (!response.ok) {
+      consecutiveErrors += 1;
+      console.warn(
+        `notarytool info failed (${consecutiveErrors}/5); retrying${formatCommandError(response)}`,
+      );
+      if (consecutiveErrors >= 5) fail("notarytool info failed five consecutive times");
+    } else {
+      consecutiveErrors = 0;
+      const status = String(response.value?.status ?? "").trim();
+      console.log(`notarytool status: ${status || "<missing>"}`);
+      if (status === "Accepted") return;
+      if (["Invalid", "Rejected"].includes(status)) {
+        printNotarizationLog(submissionId, credentials);
+        fail(`Apple notarization finished with status ${status}`);
+      }
+      if (status !== "In Progress") fail(`unexpected Apple notarization status: ${status}`);
+    }
+    await delay(options.pollSeconds * 1_000);
+  }
+  fail(`Apple notarization did not finish within ${options.timeoutMinutes} minutes`);
+}
+
+function printNotarizationLog(submissionId, credentials) {
+  const result = spawnSync("xcrun", ["notarytool", "log", submissionId, ...credentials], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+  if (output) console.error(output);
+}
 
 function notaryCredentials() {
   if (options.keychainProfile) {
@@ -146,6 +215,45 @@ function run(command, args, label) {
   }
 }
 
+function runJson(command, args, label, allowFailure = false, timeout = 2 * 60_000) {
+  console.log(`\n> ${label}`);
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout,
+  });
+  if (result.error) {
+    const response = { ok: false, error: result.error.message, value: null };
+    if (allowFailure) return response;
+    fail(`${label} failed to start: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    const response = { ok: false, error: result.stderr.trim(), value: null };
+    if (allowFailure) return response;
+    fail(`${label} failed with exit code ${result.status ?? 1}${formatCommandError(response)}`);
+  }
+  try {
+    return { ok: true, error: "", value: JSON.parse(result.stdout.replace(/^\uFEFF/, "")) };
+  } catch (error) {
+    const response = { ok: false, error: `invalid JSON: ${error.message}`, value: null };
+    if (allowFailure) return response;
+    fail(`${label} returned invalid JSON`);
+  }
+}
+
+function formatCommandError(response) {
+  return response.error ? `: ${response.error}` : "";
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function positiveInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function cargoTargetRoot() {
   return process.env.CARGO_TARGET_DIR
     ? path.resolve(process.env.CARGO_TARGET_DIR)
@@ -165,6 +273,8 @@ Options:
   --api-key=<KEYID>               App Store Connect API key ID.
   --api-issuer=<ISSUERID>         App Store Connect issuer ID.
   --api-key-path=<path>           App Store Connect private key path.
+  --timeout-minutes=<minutes>     Maximum notarization wait, defaults to 60.
+  --poll-seconds=<seconds>        Status polling interval, defaults to 20.
 `);
 }
 
