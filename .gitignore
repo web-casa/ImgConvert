@@ -23,6 +23,7 @@ fuzz/artifacts
 .flatpak-builder
 test-results
 playwright-report
+/artifacts/
 *.local
 *.tsbuildinfo
 

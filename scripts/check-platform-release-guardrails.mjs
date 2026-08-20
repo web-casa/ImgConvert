@@ -1223,6 +1223,28 @@ function checkWindowsRuntimeGuardrails() {
       );
     }
   }
+  for (const expected of [
+    "verifyPackageSignature(smokePackagePath)",
+    "exportSignedSmokeBundle(smokePackagePath, version, identityName, publisher)",
+    'identityName !== "ImgConvert.DevSmoke"',
+    'publisher !== "CN=ImgConvertDevSmoke"',
+    ".AddDays(7)",
+    "ImgConvert.DevSmoke.cer",
+    "SHA256SUMS.txt",
+  ]) {
+    if (!msixSmoke.includes(expected)) {
+      failures.push(`MSIX smoke must support a verifiable signed DevSmoke export: ${expected}`);
+    }
+  }
+  for (const expected of [
+    "--export-signed-dir=src-tauri/target/windows-msix/devsmoke",
+    "imgconvert-windows-x64-msix-devsmoke",
+    "src-tauri/target/windows-msix/devsmoke/*",
+  ]) {
+    if (!windowsWorkflow.includes(expected)) {
+      failures.push(`Windows Smoke must upload the tested signed DevSmoke bundle: ${expected}`);
+    }
+  }
   const windowsSystemCodecs = readText(
     path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),
   );

@@ -6,6 +6,7 @@ import {
   closeSync,
   copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
@@ -13,6 +14,7 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -26,6 +28,7 @@ let smokePassword = null;
 
 const options = {
   allowNonWindows: false,
+  exportSignedDir: null,
   keepInstalled: false,
 };
 
@@ -34,6 +37,13 @@ for (const arg of process.argv.slice(2)) {
     continue;
   } else if (arg === "--allow-non-windows") {
     options.allowNonWindows = true;
+  } else if (arg.startsWith("--export-signed-dir=")) {
+    const value = arg.slice("--export-signed-dir=".length).trim();
+    if (!value) {
+      console.error("--export-signed-dir requires a non-empty path");
+      process.exit(1);
+    }
+    options.exportSignedDir = path.resolve(repoRoot, value);
   } else if (arg === "--keep-installed") {
     options.keepInstalled = true;
   } else if (arg === "--help" || arg === "-h") {
@@ -95,10 +105,12 @@ function main() {
     certificateThumbprint = createSmokeCertificate(publisher);
     signPackage(smokePackagePath);
     trustSmokeCertificate(certificateThumbprint);
+    verifyPackageSignature(smokePackagePath);
     installPackage(smokePackagePath);
     packageInstalled = true;
     runInstalledSmoke(identityName);
     assertSourceArtifactUnchanged(sourcePackagePath, sourceArtifactSha256);
+    exportSignedSmokeBundle(smokePackagePath, version, identityName, publisher);
     console.log(
       "Windows MSIX install smoke completed; source submission artifact was not modified (SHA-256 verified).",
     );
@@ -219,7 +231,7 @@ function createSmokeCertificate(publisher) {
   const create = runPowerShell(
     [
       "$sec = ConvertTo-SecureString -String $env:MSIX_SMOKE_PASSWORD -Force -AsPlainText",
-      "$cert = New-SelfSignedCertificate -Type Custom -Subject $env:MSIX_SMOKE_SUBJECT -KeyUsage DigitalSignature -FriendlyName 'ImgConvert MSIX smoke' -CertStoreLocation 'Cert:\\CurrentUser\\My' -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3')",
+      "$cert = New-SelfSignedCertificate -Type Custom -Subject $env:MSIX_SMOKE_SUBJECT -KeyUsage DigitalSignature -FriendlyName 'ImgConvert MSIX smoke' -CertStoreLocation 'Cert:\\CurrentUser\\My' -NotAfter (Get-Date).AddDays(7) -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3')",
       "Export-PfxCertificate -Cert $cert -FilePath $env:MSIX_SMOKE_PFX -Password $sec | Out-Null",
       "$cert.Thumbprint",
     ].join("; "),
@@ -274,6 +286,77 @@ function trustSmokeCertificate(thumbprint) {
       },
     },
   );
+}
+
+function verifyPackageSignature(packagePath) {
+  const signtool = findWindowsSdkTool("signtool.exe");
+  if (!signtool) {
+    fail("signtool.exe was not found; install the Windows 10/11 SDK before MSIX verification");
+  }
+  run(signtool, ["verify", "/pa", "/all", packagePath], "verify signed MSIX smoke package");
+}
+
+function exportSignedSmokeBundle(packagePath, version, identityName, publisher) {
+  const outputDir = options.exportSignedDir;
+  if (!outputDir) return;
+
+  if (identityName !== "ImgConvert.DevSmoke" || publisher !== "CN=ImgConvertDevSmoke") {
+    fail(
+      `signed export is restricted to the isolated DevSmoke identity; got ${identityName} / ${publisher}`,
+    );
+  }
+
+  mkdirSync(outputDir, { recursive: true });
+  const packageName = `ImgConvert_${version}_x64_DevSmoke.msix`;
+  const certificateName = "ImgConvert.DevSmoke.cer";
+  const outputPackagePath = path.join(outputDir, packageName);
+  const outputCertificatePath = path.join(outputDir, certificateName);
+  const outputReadmePath = path.join(outputDir, "INSTALL.txt");
+  const outputChecksumsPath = path.join(outputDir, "SHA256SUMS.txt");
+  for (const outputPath of [
+    outputPackagePath,
+    outputCertificatePath,
+    outputReadmePath,
+    outputChecksumsPath,
+  ]) {
+    if (existsSync(outputPath)) {
+      fail(`refusing to overwrite existing DevSmoke export: ${outputPath}`);
+    }
+  }
+
+  copyFileSync(packagePath, outputPackagePath);
+  copyFileSync(path.join(requiredTmpRoot(), "msix-smoke.cer"), outputCertificatePath);
+  writeFileSync(
+    outputReadmePath,
+    [
+      "ImgConvert DevSmoke MSIX (development testing only)",
+      "",
+      "This package uses a temporary self-signed certificate. Do not redistribute it as a production release.",
+      "",
+      "Install from an elevated Windows PowerShell prompt:",
+      `  Import-Certificate -FilePath .\\${certificateName} -CertStoreLocation Cert:\\LocalMachine\\TrustedPeople`,
+      `  Add-AppxPackage -Path .\\${packageName}`,
+      "",
+      "Remove the package and development certificate after testing:",
+      `  Get-AppxPackage -Name ${powerShellSingleQuoted(identityName)} | Remove-AppxPackage`,
+      `  $thumbprint = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new((Resolve-Path ${powerShellSingleQuoted(`.\\${certificateName}`)})).Thumbprint`,
+      "  Get-ChildItem Cert:\\LocalMachine\\TrustedPeople | Where-Object Thumbprint -eq $thumbprint | Remove-Item",
+      "",
+    ].join("\r\n"),
+  );
+  writeFileSync(
+    outputChecksumsPath,
+    [
+      `${sha256File(outputPackagePath)} *${packageName}`,
+      `${sha256File(outputCertificatePath)} *${certificateName}`,
+      "",
+    ].join("\n"),
+  );
+  console.log(`Signed DevSmoke MSIX bundle exported to ${path.relative(repoRoot, outputDir)}`);
+}
+
+function powerShellSingleQuoted(value) {
+  return `'${String(value).replaceAll("'", "''")}'`;
 }
 
 function installPackage(packagePath) {
@@ -420,6 +503,7 @@ user.
 
 Options:
   --allow-non-windows     Allow non-Windows artifact preflight.
+  --export-signed-dir=DIR Export the tested signed MSIX, public .cer, checksums, and install guide.
   --keep-installed        Leave the package, certificate, and temp directory in place.
 `);
 }

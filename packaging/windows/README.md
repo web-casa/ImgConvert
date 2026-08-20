@@ -113,8 +113,13 @@ For a real hosted-runner install smoke, manually dispatch `Windows Smoke` with
 `store_msix=true`. That path uses the isolated `ImgConvert.DevSmoke` identity,
 keeps `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` and
 `IMGCONVERT_DISABLE_UPDATER=1`, builds the MSIX, then runs
-`release:windows:msix:smoke`. It does not publish the artifact or create a
-Partner Center submission.
+`release:windows:msix:smoke`. After the signed temporary copy passes its
+install/conversion smoke, the workflow uploads a three-day
+`imgconvert-windows-x64-msix-devsmoke` artifact containing that signed MSIX,
+its seven-day public `.cer`, SHA-256 checksums, and installation instructions.
+The export is restricted to the isolated DevSmoke package identity. The PFX and
+private key remain temporary and are never uploaded. This development artifact
+does not create a Partner Center submission and is not a production release.
 
 The Microsoft Store signs accepted submissions with its own trusted
 certificate, so no purchased code-signing certificate is needed for the Store
