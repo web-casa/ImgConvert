@@ -996,6 +996,11 @@ function checkMacosRuntimeGuardrails() {
   if (!bundleArtifactScript.includes('arg.startsWith("--artifact=")')) {
     failures.push("macOS bundle artifact verification must accept an exact artifact path");
   }
+  for (const marker of ["mkdtempSync", "imgconvert-dmg-mount-", '"-noautoopen"']) {
+    if (!bundleArtifactScript.includes(marker)) {
+      failures.push(`macOS DMG verification must use a prepared temporary mount point: ${marker}`);
+    }
+  }
   if (!notarizationScript.includes("`--artifact=${dmg}`")) {
     failures.push("macOS notarization must verify the exact DMG submitted to Apple");
   }

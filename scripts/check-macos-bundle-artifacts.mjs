@@ -201,20 +201,18 @@ function verifyCodesign(artifact) {
 }
 
 function verifyAppsInsideMountedDmg(dmgPath) {
-  const mountPoint = path.join(
-    "/Volumes",
-    `imgconvert-verify-${process.pid}-${Date.now().toString(16)}`,
-  );
+  const mountPoint = mkdtempSync(path.join(os.tmpdir(), "imgconvert-dmg-mount-"));
   const attach = spawnSync(
     "hdiutil",
-    ["attach", dmgPath, "-nobrowse", "-readonly", "-mountpoint", mountPoint],
+    ["attach", dmgPath, "-nobrowse", "-noautoopen", "-readonly", "-mountpoint", mountPoint],
     {
       cwd: repoRoot,
       encoding: "utf8",
     },
   );
   if (attach.status !== 0) {
-    failures.push(`failed to mount DMG for codesign verification: ${attach.stderr.trim()}`);
+    const details = `${attach.stdout ?? ""}\n${attach.stderr ?? ""}`.trim();
+    failures.push(`failed to mount DMG for codesign verification: ${details || "unknown error"}`);
     return [];
   }
   try {
@@ -228,7 +226,15 @@ function verifyAppsInsideMountedDmg(dmgPath) {
       verifyCodesignTarget(app);
     }
   } finally {
-    spawnSync("hdiutil", ["detach", mountPoint, "-quiet"], { cwd: repoRoot });
+    const detach = spawnSync("hdiutil", ["detach", mountPoint, "-quiet"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    if (detach.status === 0) {
+      rmSync(mountPoint, { recursive: true, force: true });
+    } else {
+      failures.push(`failed to detach verified DMG: ${detach.stderr.trim() || "unknown error"}`);
+    }
   }
 }
 
