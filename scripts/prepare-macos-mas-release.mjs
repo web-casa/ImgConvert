@@ -73,7 +73,7 @@ writeFileSync(
           infoPlist: "Info.macos.mas.plist",
           files: generatedProfile
             ? {
-                [generatedProfile]: "embedded.provisionprofile",
+                "embedded.provisionprofile": generatedProfile,
               }
             : {},
         },

@@ -1076,6 +1076,11 @@ function checkMacosRuntimeGuardrails() {
       failures.push(`prepare-macos-mas-release.mjs must handle ${expected}`);
     }
   }
+  if (!masPrepare.includes('"embedded.provisionprofile": generatedProfile')) {
+    failures.push(
+      "prepare-macos-mas-release.mjs must map the MAS profile source into Contents/embedded.provisionprofile",
+    );
+  }
 
   const systemCodecs = readText(path.join(repoRoot, "src-tauri", "src", "macos_system_codecs.rs"));
   if (!systemCodecs.includes("ImageIO.framework")) {
