@@ -8,6 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const failures = [];
 
 const readme = readText("README.md");
+const readmeZhCn = readText("README.zh-CN.md");
 const roadmap = readText("docs/ROADMAP.md");
 const packageJson = JSON.parse(readText("package.json"));
 
@@ -35,8 +36,24 @@ function checkReadmeIsCurrent() {
     "并发批量 + 进度/取消(Rust 端,Channel 上报)",
     "高级压缩(自动质量、多候选取最小、ICC/EXIF 保真)",
   ]) {
-    if (readme.includes(staleText)) {
-      failures.push(`README still contains stale status text: ${staleText}`);
+    if (readmeZhCn.includes(staleText)) {
+      failures.push(`Chinese README still contains stale status text: ${staleText}`);
+    }
+  }
+
+  for (const expected of [
+    "Rust batch conversion",
+    "skip-if-larger",
+    "true lossless AVIF",
+    "color pipeline v2",
+    "Tauri updater",
+    "Real release validation",
+    "External validation",
+    "real-image corpus",
+    "Windows benchmark",
+  ]) {
+    if (!readme.includes(expected)) {
+      failures.push(`English README must describe current project status marker: ${expected}`);
     }
   }
 
@@ -51,9 +68,16 @@ function checkReadmeIsCurrent() {
     "真实图片 corpus",
     "Windows benchmark",
   ]) {
-    if (!readme.includes(expected)) {
-      failures.push(`README must describe current project status marker: ${expected}`);
+    if (!readmeZhCn.includes(expected)) {
+      failures.push(`Chinese README must describe current project status marker: ${expected}`);
     }
+  }
+
+  if (!readme.includes('href="README.zh-CN.md"')) {
+    failures.push("English README must link to README.zh-CN.md");
+  }
+  if (!readmeZhCn.includes('href="README.md"')) {
+    failures.push("Chinese README must link back to README.md");
   }
 }
 
@@ -66,8 +90,13 @@ function checkReadmeDocumentsReleaseEntrypoints() {
     "docs/ENGINE.md",
     "docs/LEGAL.md",
   ]) {
-    if (!readme.includes(expected)) {
-      failures.push(`README must document release/status entrypoint: ${expected}`);
+    for (const [label, content] of [
+      ["English README", readme],
+      ["Chinese README", readmeZhCn],
+    ]) {
+      if (!content.includes(expected)) {
+        failures.push(`${label} must document release/status entrypoint: ${expected}`);
+      }
     }
   }
 
