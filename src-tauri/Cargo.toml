@@ -1,6 +1,6 @@
 [package]
 name = "imgconvert"
-version = "0.2.1"
+version = "0.2.2"
 description = "Local-first cross-platform batch image converter"
 authors = ["ImgConvert"]
 license = "Apache-2.0"

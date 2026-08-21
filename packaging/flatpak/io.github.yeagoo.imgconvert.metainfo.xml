@@ -29,6 +29,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.2" date="2026-08-22">
+      <description>
+        <p>Raises the arm64 Mac App Store deployment target to macOS 12 and supplies the required 1024-pixel application icon while retaining the existing sandbox and local-processing boundaries.</p>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-08-21">
       <description>
         <p>Adds Chinese and English interface localization, structured localized conversion errors, and release-channel hardening while retaining the Flatpak main package's external-codec boundary.</p>

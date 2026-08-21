@@ -34,6 +34,7 @@ const packageJson = readJson(path.join(repoRoot, "package.json"));
 const tauriConfigPath = path.join(repoRoot, "src-tauri", "tauri.conf.json");
 const tauriConfig = readJson(tauriConfigPath);
 const srcTauriRoot = path.join(repoRoot, "src-tauri");
+const macosMasMinimumSystemVersion = "12.0";
 const failures = [];
 
 checkCommonBundleMetadata();
@@ -209,10 +210,10 @@ function checkReadmeStatusGuardrails() {
     }
   }
   for (const expected of [
-    "Rust 端批量转换",
-    "AVIF 真无损",
+    "Rust batch conversion",
+    "true lossless AVIF",
     "Tauri updater",
-    "外部验收",
+    "External validation",
     "pnpm run release:readiness",
   ]) {
     if (!readme.includes(expected)) {
@@ -1437,6 +1438,17 @@ function checkMacosStoreConfig() {
   if (macos.hardenedRuntime !== true) {
     failures.push("macOS MAS config must enable hardenedRuntime");
   }
+  if (macos.minimumSystemVersion !== macosMasMinimumSystemVersion) {
+    failures.push(
+      `macOS MAS config must set minimumSystemVersion=${macosMasMinimumSystemVersion} for the arm64-only Store build`,
+    );
+  }
+  if (!prepare.includes(`minimumSystemVersion: "${macosMasMinimumSystemVersion}"`)) {
+    failures.push(
+      `prepare-macos-mas-release.mjs must generate minimumSystemVersion=${macosMasMinimumSystemVersion} for the arm64-only Store build`,
+    );
+  }
+  requireIcnsChunk("ic10", "macOS MAS 512pt@2x");
   if (macos.entitlements !== "entitlements.macos.mas.plist") {
     failures.push("macOS MAS config must use entitlements.macos.mas.plist");
   }
@@ -1586,6 +1598,61 @@ function requireBundleIcon(extension, platform) {
   if (!existsSync(path.resolve(repoRoot, "src-tauri", icon))) {
     failures.push(`${platform} icon does not exist: ${icon}`);
   }
+}
+
+function requireIcnsChunk(chunkType, label) {
+  const icon = (tauriConfig.bundle?.icon ?? []).find((item) => item.endsWith(".icns"));
+  if (!icon) {
+    return;
+  }
+  const file = path.resolve(srcTauriRoot, icon);
+  if (!existsSync(file)) {
+    return;
+  }
+
+  const chunkTypes = readIcnsChunkTypes(file, icon, label);
+  if (chunkTypes && !chunkTypes.has(chunkType)) {
+    failures.push(`${label} icon must include the ${chunkType} ICNS chunk: ${icon}`);
+  }
+}
+
+function readIcnsChunkTypes(file, icon, label) {
+  let data;
+  try {
+    data = readFileSync(file);
+  } catch (error) {
+    failures.push(`failed to read ${label} icon ${icon}: ${error.message}`);
+    return;
+  }
+  if (data.length < 8 || data.toString("ascii", 0, 4) !== "icns") {
+    failures.push(`${label} icon is not a valid ICNS file: ${icon}`);
+    return;
+  }
+
+  const declaredSize = data.readUInt32BE(4);
+  if (declaredSize !== data.length) {
+    failures.push(
+      `${label} icon has an invalid ICNS size: declared ${declaredSize}, actual ${data.length}`,
+    );
+    return;
+  }
+
+  const chunkTypes = new Set();
+  for (let offset = 8; offset < declaredSize;) {
+    if (offset + 8 > declaredSize) {
+      failures.push(`${label} icon has a truncated ICNS chunk header: ${icon}`);
+      return;
+    }
+    const type = data.toString("ascii", offset, offset + 4);
+    const size = data.readUInt32BE(offset + 4);
+    if (size < 8 || offset + size > declaredSize) {
+      failures.push(`${label} icon has an invalid ${type} ICNS chunk: ${icon}`);
+      return;
+    }
+    chunkTypes.add(type);
+    offset += size;
+  }
+  return chunkTypes;
 }
 
 function readEntitlements(fileName) {

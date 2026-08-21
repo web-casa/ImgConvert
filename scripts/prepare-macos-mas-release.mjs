@@ -67,7 +67,7 @@ writeFileSync(
       },
       bundle: {
         macOS: {
-          minimumSystemVersion: "10.13",
+          minimumSystemVersion: "12.0",
           hardenedRuntime: true,
           entitlements: "target/macos-mas/entitlements.macos.mas.generated.plist",
           infoPlist: "Info.macos.mas.plist",
