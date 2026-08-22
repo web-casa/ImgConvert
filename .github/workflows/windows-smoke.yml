@@ -241,8 +241,9 @@ jobs:
             $cc = "clang-cl"
             $cxx = "clang-cl"
             # mozjpeg-sys enables the MSVC bit-scan intrinsic without defining the
-            # corresponding header probe that upstream CMake normally supplies.
-            $arm64CFlags = "/DHAVE_INTRIN_H=1"
+            # corresponding header probe that upstream CMake normally supplies. Use
+            # Clang's -D spelling because other native crates invoke clang directly.
+            $arm64CFlags = "-DHAVE_INTRIN_H=1"
             Add-Content -Path $env:GITHUB_ENV -Value "CFLAGS_aarch64_pc_windows_msvc=$arm64CFlags"
           } else {
             $cc = "cl"

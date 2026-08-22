@@ -464,7 +464,7 @@ function checkWindowsStoreReleaseWorkflow() {
     '$cc = "clang-cl"',
     "CC=$cc CXX=$cxx",
     "CFLAGS_aarch64_pc_windows_msvc=$arm64CFlags",
-    "/DHAVE_INTRIN_H=1",
+    "-DHAVE_INTRIN_H=1",
     "aarch64-.*-windows-msvc",
     "Verify ARM64-aware Store packaging source",
     "imgconvert-windows-${{ matrix.arch }}-msix-submission",
