@@ -69,8 +69,10 @@ try {
   } else {
     vendorPnpm();
   }
+  removeTransientBuildArtifacts();
   writeFlatpakBuildNotes();
   createArchive();
+  assertArchiveExcludesTransientBuildArtifacts();
   updateManifest();
 } finally {
   rmSync(stagingRoot, { force: true, recursive: true });
@@ -220,6 +222,21 @@ function restorePnpmStore() {
   }
 }
 
+function removeTransientBuildArtifacts() {
+  for (const relativePath of [
+    "node_modules",
+    "dist",
+    "target",
+    "src-tauri/target",
+    "docs-site/.next",
+    "docs-site/.source",
+    "docs-site/node_modules",
+    "docs-site/out",
+  ]) {
+    rmSync(path.join(stagingDir, relativePath), { force: true, recursive: true });
+  }
+}
+
 function writeFlatpakBuildNotes() {
   writeFileSync(
     path.join(stagingDir, ".flatpak-vendor", "README.md"),
@@ -252,6 +269,35 @@ function createArchive() {
     ".",
   ]);
   writeFileSync(`${archivePath}.sha256`, `${sha256File(archivePath)}  ${archiveName}\n`);
+}
+
+function assertArchiveExcludesTransientBuildArtifacts() {
+  const result = spawnSync("tar", ["-tzf", archivePath], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    process.stdout.write(result.stdout);
+    process.stderr.write(result.stderr);
+    fail(`failed to inspect Flatpak source archive (exit code ${result.status})`);
+  }
+
+  const transientPrefixes = [
+    "./node_modules/",
+    "./dist/",
+    "./target/",
+    "./src-tauri/target/",
+    "./docs-site/.next/",
+    "./docs-site/.source/",
+    "./docs-site/node_modules/",
+    "./docs-site/out/",
+  ];
+  const unexpected = result.stdout
+    .split(/\r?\n/)
+    .find((entry) => transientPrefixes.some((prefix) => entry.startsWith(prefix)));
+  if (unexpected) {
+    fail(`Flatpak source archive contains a transient build artifact: ${unexpected}`);
+  }
 }
 
 function updateManifest() {
