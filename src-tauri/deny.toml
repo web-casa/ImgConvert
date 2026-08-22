@@ -40,6 +40,9 @@ allow = [
 # 临时例外(2026-07-02):
 # - Tauri 2.11.x 的 Linux WebKitGTK/GTK3 栈仍依赖 gtk-rs GTK3 0.18,上游已标记
 #   unmaintained,但当前 Tauri Linux GUI 没有可用的 gtk4-rs 替代切换路径。
+# - glib 0.18.5 由同一 GTK3 栈引入。RUSTSEC-2024-0429 的修复需要 glib >=0.20,
+#   目前不能在不升级 Tauri/wry GTK 栈的前提下单独升级；项目没有直接调用
+#   VariantStrIter，用户图片处理路径也不使用该 API。
 # - quick-xml 0.39.4 由 Tauri -> plist -> tauri-utils 引入,只在 Tauri 配置/plist
 #   处理链上,不处理用户图片输入。plist 1.9.0 / tauri-utils 2.9.3 当前仍未把
 #   quick-xml 升到 patched >=0.41.0。
@@ -58,6 +61,7 @@ ignore = [
   "RUSTSEC-2024-0418",
   "RUSTSEC-2024-0419",
   "RUSTSEC-2024-0420",
+  "RUSTSEC-2024-0429",
   "RUSTSEC-2024-0436",
   "RUSTSEC-2025-0075",
   "RUSTSEC-2025-0080",

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,7 @@ const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
+const snapStoreMetadata = readWorkflow("snap-store-metadata.yml");
 const snapStoreRelease = readWorkflow("snap-store-release.yml");
 const pages = readWorkflow("pages.yml");
 
@@ -33,12 +34,18 @@ const allWorkflows = [
   ["macos-notarization-finalize.yml", macosNotarizationFinalize],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
+  ["snap-store-metadata.yml", snapStoreMetadata],
   ["snap-store-release.yml", snapStoreRelease],
   ["pages.yml", pages],
 ];
 
 for (const [name, text] of allWorkflows) {
   checkPublicFreeRunnerPolicy(name, text);
+}
+for (const name of readdirSync(workflowsDir)
+  .filter((entry) => entry.endsWith(".yml"))
+  .sort()) {
+  checkGitHubActionsAreCommitPinned(name, readWorkflow(name));
 }
 
 checkAutomaticLinuxCiWorkflow();
@@ -52,9 +59,11 @@ checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
 checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
+checkManualWorkflow("snap-store-metadata.yml", snapStoreMetadata);
 checkManualWorkflow("snap-store-release.yml", snapStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
+checkWindowsSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkMacosSmokeWorkflow();
 checkMacosDmgReleaseWorkflow();
@@ -85,6 +94,7 @@ checkStandardPlatformWorkflow(
   "${{ matrix.runner }}",
 );
 checkWindowsStoreReleaseWorkflow();
+checkSnapStoreMetadataWorkflow();
 checkSnapStoreReleaseWorkflow();
 checkStandardPlatformWorkflow(
   "windows-store-release.yml",
@@ -136,6 +146,19 @@ function checkPublicFreeRunnerPolicy(name, text) {
   }
 }
 
+function checkGitHubActionsAreCommitPinned(name, text) {
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    const match = line.match(/^\s*(?:-\s+)?uses:\s*([^@\s]+)@([^\s#]+)/u);
+    if (!match) {
+      continue;
+    }
+    const [, action, ref] = match;
+    if (!/^[a-f0-9]{40}$/iu.test(ref)) {
+      failures.push(`${name}:${index + 1} must pin ${action} to a full commit SHA`);
+    }
+  }
+}
+
 function isAllowedRunner(runner) {
   return [
     "ubuntu-24.04",
@@ -163,6 +186,15 @@ function checkAutomaticLinuxCiWorkflow() {
   }
   if (!ci.includes("name: Fuzz Corpus Replay")) {
     failures.push("ci.yml must expose a fuzz corpus replay job");
+  }
+  for (const marker of [
+    "pnpm run ci:cost:check",
+    "pnpm run release:flatpak:verify",
+    "cargo deny --manifest-path Cargo.toml --config src-tauri/deny.toml check bans sources advisories",
+  ]) {
+    if (!ci.includes(marker)) {
+      failures.push(`ci.yml security job must include ${marker}`);
+    }
   }
   if (!ci.includes("github.event_name != 'workflow_dispatch' || inputs.fuzz_corpus")) {
     failures.push("ci.yml fuzz corpus job must run automatically and stay toggleable on dispatch");
@@ -213,6 +245,7 @@ function checkUbuntuAptBootstrap() {
     ["release-linux.yml", linuxRelease, 1],
     ["release-updater.yml", updaterRelease, 1],
     ["updater-upgrade-smoke.yml", updaterUpgradeSmoke, 1],
+    ["snap-store-metadata.yml", snapStoreMetadata, 1],
   ]) {
     const invocationCount = workflow.split(invocation).length - 1;
     if (invocationCount !== expectedCount) {
@@ -306,8 +339,8 @@ function checkSnapStoreReleaseWorkflow() {
     "ref: ${{ inputs.tag }}",
     "fetch-depth: 0",
     "verify-release-tag.mjs",
-    "snapcore/action-build@v1",
-    "snapcore/action-publish@v1",
+    "snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79",
+    "snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40",
     "SNAP_STORE_LOGIN",
     "inputs.publish_snap",
     "retention-days: 7",
@@ -457,7 +490,7 @@ function checkWindowsStoreReleaseWorkflow() {
     'IMGCONVERT_DISABLE_UPDATER: "1"',
     "runner: windows-latest",
     "runner: windows-11-arm",
-    "actions/setup-python@v7",
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     'python-version: "3.12.10"',
     "nasm-2.16.03-win64.zip",
     "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
@@ -475,12 +508,79 @@ function checkWindowsStoreReleaseWorkflow() {
   }
 }
 
+function checkWindowsSmokeWorkflow() {
+  for (const marker of [
+    "type: choice",
+    "- msi,nsis",
+    "- msi",
+    "- nsis",
+    "SMOKE_BUNDLES: ${{ inputs.bundles }}",
+    "SMOKE_SIGN_DIRECT: ${{ inputs.sign_direct }}",
+    "SMOKE_INSTALL_SMOKE: ${{ inputs.install_smoke }}",
+    "$env:SMOKE_BUNDLES -notin $allowedBundles",
+    "WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}",
+    "WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}",
+    "WINDOWS_CERTIFICATE_SHA1: ${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}",
+    "$env:WINDOWS_CERTIFICATE_BASE64",
+    "$env:WINDOWS_CERTIFICATE_PASSWORD",
+    "$env:WINDOWS_CERTIFICATE_SHA1",
+  ]) {
+    if (!windowsSmoke.includes(marker)) {
+      failures.push(`windows-smoke.yml missing safe direct-build marker: ${marker}`);
+    }
+  }
+
+  for (const forbidden of [
+    '"${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}"',
+    '"${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}"',
+    '"${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}"',
+    '"--bundles=${{ inputs.bundles }}"',
+    '"${{ inputs.sign_direct }}"',
+    '"${{ inputs.install_smoke }}"',
+  ]) {
+    if (windowsSmoke.includes(forbidden)) {
+      failures.push(`windows-smoke.yml must not interpolate ${forbidden} into PowerShell`);
+    }
+  }
+
+  for (const marker of [
+    "IMGCONVERT_UPDATER_REPOSITORY: ${{ github.repository }}",
+    "IMGCONVERT_UPDATER_FROM_TAG: ${{ inputs.from_tag }}",
+    "IMGCONVERT_UPDATER_TO_TAG: ${{ inputs.to_tag }}",
+    '--repo="$IMGCONVERT_UPDATER_REPOSITORY"',
+    '--from-tag="$IMGCONVERT_UPDATER_FROM_TAG"',
+    '--to-tag="$IMGCONVERT_UPDATER_TO_TAG"',
+  ]) {
+    if (!updaterUpgradeSmoke.includes(marker)) {
+      failures.push(`updater-upgrade-smoke.yml missing safe input marker: ${marker}`);
+    }
+  }
+  for (const forbidden of [
+    '--repo="${{ github.repository }}"',
+    '--from-tag="${{ inputs.from_tag }}"',
+    '--to-tag="${{ inputs.to_tag }}"',
+  ]) {
+    if (updaterUpgradeSmoke.includes(forbidden)) {
+      failures.push(`updater-upgrade-smoke.yml must not interpolate ${forbidden} into shell`);
+    }
+  }
+}
+
+function checkSnapStoreMetadataWorkflow() {
+  if (!snapStoreMetadata.includes("scripts/ci-install-apt-packages.sh python3-pymacaroons")) {
+    failures.push("snap-store-metadata.yml must use the bounded Ubuntu dependency bootstrap");
+  }
+  if (snapStoreMetadata.includes("sudo apt-get update")) {
+    failures.push("snap-store-metadata.yml must not retain an unbounded sudo apt-get update");
+  }
+}
+
 function checkPagesWorkflow() {
   for (const marker of [
     "github.event.repository.has_pages == true",
-    "actions/configure-pages@v5",
-    "actions/upload-pages-artifact@v4",
-    "actions/deploy-pages@v4",
+    "actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b",
+    "actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b",
+    "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e",
     "path: pages",
     "name: github-pages",
   ]) {

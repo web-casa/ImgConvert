@@ -250,6 +250,7 @@ export const zhCN = {
     sourcePlatform: "当前平台",
     sourceFlatpakExtension: "Flatpak 扩展",
     messages: {
+      detailsHidden: "详细信息仅在开发构建中显示。",
       externalCodecsBuildDisabled: "此构建已禁用外部 codec/helper 自动发现。",
       externalCodecsBuildDisabledFlatpakEnabled:
         "此构建已禁用外部 codec/helper 自动发现；Flatpak codec 扩展仍然启用。",

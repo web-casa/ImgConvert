@@ -18,17 +18,42 @@
     <category>Graphics</category>
     <category>Photography</category>
   </categories>
-  <url type="homepage">https://github.com/web-casa/ImgConvert</url>
+  <url type="homepage">https://imgconvert.web.casa/</url>
   <url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>
   <url type="bugtracker">https://github.com/web-casa/ImgConvert/issues</url>
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.1.2/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.8/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.8" date="2026-08-22">
+      <description>
+        <p>Normalizes AppImage launcher permissions for sandboxed catalog validation.</p>
+      </description>
+    </release>
+    <release version="0.2.7" date="2026-08-22">
+      <description>
+        <p>Includes complete AUR submission metadata in the downloadable release artifact.</p>
+      </description>
+    </release>
+    <release version="0.2.6" date="2026-08-22">
+      <description>
+        <p>Fixes Snap builds by sanitizing the GNOME SDK environment and enabling Tauri's embedded production frontend.</p>
+      </description>
+    </release>
+    <release version="0.2.5" date="2026-08-22">
+      <description>
+        <p>Provides the Rustup build dependency required by the Snapcraft Rust plugin on all supported architectures.</p>
+      </description>
+    </release>
+    <release version="0.2.4" date="2026-08-22">
+      <description>
+        <p>Aligns all Linux package builders with the Ubuntu 22.04 compatibility baseline and fixes tool detection on that baseline.</p>
+      </description>
+    </release>
     <release version="0.2.3" date="2026-08-22">
       <description>
         <p>Adds strict Snap packaging, an Ubuntu 22.04 AppImageHub compatibility baseline, and reproducible AUR package metadata.</p>

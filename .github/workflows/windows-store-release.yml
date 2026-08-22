@@ -60,7 +60,7 @@ jobs:
     env:
       WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.release_tag }}
           fetch-depth: 0
@@ -93,7 +93,7 @@ jobs:
           }
 
       # libdav1d-sys 0.7.1 passes --prefix=/, which Python 3.13 no longer treats as absolute on Windows.
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12.10"
           architecture: ${{ matrix.python_arch }}
@@ -123,18 +123,18 @@ jobs:
             $env:Path = "$nasmBin;$env:Path"
             nasm -v
           }
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 10.34.4
           run_install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
           components: rustfmt, clippy
 
@@ -293,7 +293,7 @@ jobs:
       - name: Sideload production MSIX and run conversion smoke
         run: pnpm run release:windows:msix:smoke
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-windows-${{ matrix.arch }}-msix-submission
           if-no-files-found: error

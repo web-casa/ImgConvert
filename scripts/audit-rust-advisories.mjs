@@ -11,6 +11,8 @@ const tauriDir = path.join(repoRoot, "src-tauri");
 //
 // These are explicit upstream exceptions, not a broad RustSec bypass:
 // - Tauri 2.11.x still uses the GTK3/WebKitGTK Linux stack.
+// - glib 0.18.5 is pinned by that GTK3 stack; the project does not call the
+//   affected VariantStrIter API, and updating it requires a Tauri/wry GTK upgrade.
 // - plist 1.9.0 still pins quick-xml 0.39.x via tauri-utils; quick-xml is not on
 //   the user image decoding path in ImgConvert.
 // - rav1e/libavif and Tauri build-time macro chains currently carry a few
@@ -28,6 +30,7 @@ const ignoredAdvisories = [
   "RUSTSEC-2024-0418",
   "RUSTSEC-2024-0419",
   "RUSTSEC-2024-0420",
+  "RUSTSEC-2024-0429",
   "RUSTSEC-2024-0436",
   "RUSTSEC-2025-0075",
   "RUSTSEC-2025-0080",
@@ -39,15 +42,27 @@ const ignoredAdvisories = [
   "RUSTSEC-2025-0141",
 ];
 
-const args = ["audit", ...ignoredAdvisories.flatMap((id) => ["--ignore", id])];
-const result = spawnSync("cargo", args, {
-  cwd: tauriDir,
-  stdio: "inherit",
-});
+const auditTargets = [
+  ["core workspace", path.join(repoRoot, "Cargo.lock")],
+  ["Tauri desktop", path.join(tauriDir, "Cargo.lock")],
+];
 
-if (result.error) {
-  console.error(result.error.message);
-  process.exit(1);
+for (const [label, lockfile] of auditTargets) {
+  console.log(`Auditing ${label}: ${path.relative(repoRoot, lockfile)}`);
+  const result = spawnSync(
+    "cargo",
+    ["audit", "--file", lockfile, ...ignoredAdvisories.flatMap((id) => ["--ignore", id])],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+    },
+  );
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
 }
-
-process.exit(result.status ?? 1);

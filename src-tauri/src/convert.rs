@@ -36,6 +36,14 @@ const CONVERT_WALL_CLOCK_TIMEOUT_ENV: &str = "IMGCONVERT_CONVERT_TIMEOUT_SECONDS
 const DEFAULT_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 180;
 const MIN_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 5;
 const MAX_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 900;
+const INPUT_FILE_NOT_FOUND_PREFIX: &str = "输入文件不存在:";
+const INPUT_PERMISSION_DENIED_PREFIX: &str = "没有权限访问输入文件:";
+const UNSUPPORTED_TARGET_FORMAT_PREFIX: &str = "不支持的目标格式:";
+const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";
+const TIFF_OUTPUT_UNSUPPORTED_PREFIX: &str = "TIFF 暂未纳入";
+const OUTPUT_EXISTS_PREFIX: &str = "输出已存在";
+const OUTPUT_NOT_SMALLER_PREFIX: &str = "候选输出不小于源文件";
+const GENERATION_LOSS_GUARD_PREFIX: &str = "代际损失防护:";
 
 enum WriteMode {
     Replace,
@@ -452,9 +460,11 @@ fn parse_format(format: &str) -> Result<Format, String> {
         "png" => Ok(Format::Png),
         "webp" => Ok(Format::WebP),
         "avif" => Ok(Format::Avif),
-        "heic" | "heif" => Err("HEIC 输出暂未启用;当前仅作为可选导入格式".to_string()),
-        "tiff" | "tif" => Err("TIFF 暂未纳入 v1 可写格式".to_string()),
-        other => Err(format!("不支持的目标格式: {other}")),
+        "heic" | "heif" => Err(format!(
+            "{HEIC_OUTPUT_DISABLED_PREFIX};当前仅作为可选导入格式"
+        )),
+        "tiff" | "tif" => Err(format!("{TIFF_OUTPUT_UNSUPPORTED_PREFIX} v1 可写格式")),
+        other => Err(format!("{UNSUPPORTED_TARGET_FORMAT_PREFIX} {other}")),
     }
 }
 
@@ -612,22 +622,23 @@ pub fn command_error_for_conversion(
             .unwrap_or_else(|_| options.input.clone())
     };
 
-    if detail.starts_with("输入文件不存在:") {
+    if detail.starts_with(INPUT_FILE_NOT_FOUND_PREFIX) {
         return CommandError::file_not_found(options.input.clone(), detail);
     }
-    if detail.starts_with("没有权限访问输入文件:") {
+    if detail.starts_with(INPUT_PERMISSION_DENIED_PREFIX) {
         return CommandError::permission_denied(options.input.clone(), detail);
     }
-    if detail.starts_with("不支持的目标格式:")
-        || detail.starts_with("HEIC 输出暂未启用")
-        || detail.starts_with("TIFF 暂未纳入")
+    if detail.starts_with(UNSUPPORTED_TARGET_FORMAT_PREFIX)
+        || detail.starts_with(HEIC_OUTPUT_DISABLED_PREFIX)
+        || detail.starts_with(TIFF_OUTPUT_UNSUPPORTED_PREFIX)
     {
         return CommandError::unsupported_format(options.format.clone(), detail);
     }
-    if detail.starts_with("输出已存在") {
+    if detail.starts_with(OUTPUT_EXISTS_PREFIX) {
         return CommandError::output_exists(output(), detail);
     }
-    if detail.starts_with("候选输出不小于源文件") || detail.starts_with("代际损失防护:")
+    if detail.starts_with(OUTPUT_NOT_SMALLER_PREFIX)
+        || detail.starts_with(GENERATION_LOSS_GUARD_PREFIX)
     {
         return CommandError::output_not_smaller(output(), detail);
     }
@@ -715,7 +726,7 @@ fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), String> {
         .open(out)
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
-                format!("输出已存在(未开启覆盖): {}", out.display())
+                format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {}", out.display())
             } else {
                 format!("无法创建输出文件 {}: {e}", out.display())
             }
@@ -745,9 +756,11 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
     let input = Path::new(&opts.input);
     let _input_scope = access::scoped_path_access(input);
     let input_metadata = fs::metadata(input).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => format!("输入文件不存在: {}", input.display()),
+        std::io::ErrorKind::NotFound => {
+            format!("{INPUT_FILE_NOT_FOUND_PREFIX} {}", input.display())
+        }
         std::io::ErrorKind::PermissionDenied => {
-            format!("没有权限访问输入文件: {}", input.display())
+            format!("{INPUT_PERMISSION_DENIED_PREFIX} {}", input.display())
         }
         _ => format!("无法访问输入文件 {}: {error}", input.display()),
     })?;
@@ -768,9 +781,15 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
     };
     if out.exists() && overwrite_mode != "overwrite" {
         if overwrite_mode == "ask" {
-            return Err(format!("输出已存在(需要确认覆盖): {}", out.display()));
+            return Err(format!(
+                "{OUTPUT_EXISTS_PREFIX}(需要确认覆盖): {}",
+                out.display()
+            ));
         }
-        return Err(format!("输出已存在(未开启覆盖): {}", out.display()));
+        return Err(format!(
+            "{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {}",
+            out.display()
+        ));
     }
 
     let target = parse_format(&opts.format)?;
@@ -1703,11 +1722,11 @@ fn generation_loss_message(
 ) -> String {
     let required = required_generation_savings_basis_points(source_size, dimensions) as f64 / 100.0;
     let actual = savings_basis_points(source_size, candidate_size) as f64 / 100.0;
-    format!("代际损失防护:有损源再次压缩收益不足(需 {required:.1}%, 实际 {actual:.1}%)")
+    format!("{GENERATION_LOSS_GUARD_PREFIX}有损源再次压缩收益不足(需 {required:.1}%, 实际 {actual:.1}%)")
 }
 
 fn skip_larger_message(source_size: u64, candidate_size: u64) -> String {
-    format!("候选输出不小于源文件(源 {source_size} B, 输出 {candidate_size} B)")
+    format!("{OUTPUT_NOT_SMALLER_PREFIX}(源 {source_size} B, 输出 {candidate_size} B)")
 }
 
 fn result_cache_key(
@@ -1897,9 +1916,9 @@ fn should_count_as_skipped(opts: &ConvertOptions, message: &str) -> bool {
         None => !opts.overwrite,
         _ => false,
     };
-    (skip_mode && message.contains("已存在"))
-        || (opts.skip_if_larger && message.contains("不小于源文件"))
-        || (opts.generation_loss_protection && message.contains("代际损失防护"))
+    (skip_mode && message.starts_with(OUTPUT_EXISTS_PREFIX))
+        || (opts.skip_if_larger && message.starts_with(OUTPUT_NOT_SMALLER_PREFIX))
+        || (opts.generation_loss_protection && message.starts_with(GENERATION_LOSS_GUARD_PREFIX))
 }
 
 #[cfg(test)]
@@ -2023,7 +2042,10 @@ mod tests {
     fn command_error_mapping_keeps_conversion_details_out_of_the_ipc_code() {
         let mut options = test_convert_options("/images/source.png".to_string());
 
-        let missing = command_error_for_conversion(&options, "输入文件不存在: /images/source.png");
+        let missing = command_error_for_conversion(
+            &options,
+            format!("{INPUT_FILE_NOT_FOUND_PREFIX} /images/source.png"),
+        );
         assert_eq!(missing.code, crate::command_error::ErrorCode::FileNotFound);
         assert_eq!(
             missing.params,
@@ -2031,7 +2053,10 @@ mod tests {
         );
 
         options.format = "tiff".to_string();
-        let unsupported = command_error_for_conversion(&options, "TIFF 暂未纳入 v1 可写格式");
+        let unsupported = command_error_for_conversion(
+            &options,
+            format!("{TIFF_OUTPUT_UNSUPPORTED_PREFIX} v1 可写格式"),
+        );
         assert_eq!(
             unsupported.code,
             crate::command_error::ErrorCode::UnsupportedFormat
@@ -2043,6 +2068,33 @@ mod tests {
         assert_eq!(
             unsupported.detail.as_deref(),
             Some("TIFF 暂未纳入 v1 可写格式")
+        );
+
+        let denied = command_error_for_conversion(
+            &options,
+            format!("{INPUT_PERMISSION_DENIED_PREFIX} /images/source.png"),
+        );
+        assert_eq!(
+            denied.code,
+            crate::command_error::ErrorCode::PermissionDenied
+        );
+
+        let output_exists = command_error_for_conversion(
+            &options,
+            format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): /images/source.jpg"),
+        );
+        assert_eq!(
+            output_exists.code,
+            crate::command_error::ErrorCode::OutputExists
+        );
+
+        let not_smaller = command_error_for_conversion(
+            &options,
+            format!("{OUTPUT_NOT_SMALLER_PREFIX}(源 10 B, 输出 11 B)"),
+        );
+        assert_eq!(
+            not_smaller.code,
+            crate::command_error::ErrorCode::OutputNotSmaller
         );
 
         let fallback = command_error_for_conversion(&options, "codec backend failed");

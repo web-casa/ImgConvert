@@ -137,7 +137,7 @@ function inspectMetainfo(text) {
     "<metadata_license>CC0-1.0</metadata_license>",
     "<project_license>LGPL-3.0-or-later</project_license>",
     '<developer id="io.github.yeagoo">',
-    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="homepage">https://imgconvert.web.casa/</url>',
     '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     "decode-only",
   ]) {

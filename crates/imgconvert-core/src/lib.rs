@@ -2209,7 +2209,7 @@ fn parse_exif_dpi(exif: &[u8]) -> Option<Dpi> {
     let unit = entries
         .iter()
         .find(|entry| entry.tag == 0x0128)
-        .and_then(|entry| tiff_entry_short_value(entry, endian, exif))?;
+        .and_then(|entry| tiff_entry_short_value(entry, endian))?;
     let x = entries
         .iter()
         .find(|entry| entry.tag == 0x011a)
@@ -2414,7 +2414,7 @@ fn inspect_exif_semantics(exif: &[u8]) -> Option<ExifSemanticProbe> {
     let orientation = entries
         .iter()
         .find(|entry| entry.tag == 0x0112)
-        .and_then(|entry| tiff_entry_short_value(entry, tiff.0, exif));
+        .and_then(|entry| tiff_entry_short_value(entry, tiff.0));
     let exif_ifd_offset = entries
         .iter()
         .find(|entry| entry.tag == 0x8769)
@@ -2486,7 +2486,7 @@ fn read_tiff_u32(bytes: &[u8], endian: TiffEndian) -> Option<u32> {
     }
 }
 
-fn tiff_entry_short_value(entry: &TiffEntry, endian: TiffEndian, bytes: &[u8]) -> Option<u16> {
+fn tiff_entry_short_value(entry: &TiffEntry, endian: TiffEndian) -> Option<u16> {
     if entry.field_type != 3 || entry.count != 1 {
         return None;
     }
@@ -2495,10 +2495,6 @@ fn tiff_entry_short_value(entry: &TiffEntry, endian: TiffEndian, bytes: &[u8]) -
         TiffEndian::Little => Some(entry.value_or_offset as u16),
         TiffEndian::Big => be_u16(&inline[0..2]),
     }
-    .or_else(|| {
-        let offset = tiff_entry_offset(entry, bytes)?;
-        read_tiff_u16(bytes.get(offset..offset + 2)?, endian)
-    })
 }
 
 fn tiff_entry_rational_value(entry: &TiffEntry, endian: TiffEndian, bytes: &[u8]) -> Option<f64> {

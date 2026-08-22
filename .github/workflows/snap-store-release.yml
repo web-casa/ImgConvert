@@ -44,7 +44,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.build_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
@@ -56,7 +56,7 @@ jobs:
         run: node scripts/check-snap-package.mjs
       - name: Build strict snap
         id: snapcraft
-        uses: snapcore/action-build@v1
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         with:
           snapcraft-args: --platform=${{ matrix.arch }}
       - name: Inspect built snap
@@ -78,7 +78,7 @@ jobs:
           code=$?
           set -e
           test "$code" = 0 || test "$code" = 124
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-snap-${{ inputs.tag }}-${{ matrix.arch }}
           if-no-files-found: error
@@ -96,7 +96,7 @@ jobs:
       matrix:
         arch: ${{ fromJSON(inputs.build_arm64 && '["amd64","arm64"]' || '["amd64"]') }}
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: imgconvert-snap-${{ inputs.tag }}-${{ matrix.arch }}
           path: snap-artifact
@@ -111,7 +111,7 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
         run: test -n "$SNAPCRAFT_STORE_CREDENTIALS"
       - name: Publish to Snap Store
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
         with:

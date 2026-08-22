@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: |
           scripts/ci-install-apt-packages.sh \
             xvfb \
@@ -41,18 +41,22 @@ jobs:
             libayatana-appindicator3-1 \
             librsvg2-2 \
             libasound2t64
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Real in-app updater smoke
+        env:
+          IMGCONVERT_UPDATER_REPOSITORY: ${{ github.repository }}
+          IMGCONVERT_UPDATER_FROM_TAG: ${{ inputs.from_tag }}
+          IMGCONVERT_UPDATER_TO_TAG: ${{ inputs.to_tag }}
         run: |
           node scripts/smoke-tauri-in-app-updater.mjs \
-            --repo="${{ github.repository }}" \
-            --from-tag="${{ inputs.from_tag }}" \
-            --to-tag="${{ inputs.to_tag }}" \
+            --repo="$IMGCONVERT_UPDATER_REPOSITORY" \
+            --from-tag="$IMGCONVERT_UPDATER_FROM_TAG" \
+            --to-tag="$IMGCONVERT_UPDATER_TO_TAG" \
             --platform=linux-x86_64 \
             --require-gui
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: updater-upgrade-smoke-${{ inputs.from_tag }}-${{ inputs.to_tag }}

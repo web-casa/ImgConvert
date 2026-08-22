@@ -84,7 +84,7 @@ function inspectMainMetainfo(text) {
     "<project_license>Apache-2.0</project_license>",
     '<developer id="io.github.yeagoo">',
     "<name>ImgConvert contributors</name>",
-    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="homepage">https://imgconvert.web.casa/</url>',
     '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     '<url type="bugtracker">https://github.com/web-casa/ImgConvert/issues</url>',
     '<launchable type="desktop-id">io.github.yeagoo.imgconvert.desktop</launchable>',
@@ -116,7 +116,7 @@ function inspectHeicMetainfo(text) {
     "<project_license>LGPL-3.0-or-later</project_license>",
     '<developer id="io.github.yeagoo">',
     "<name>ImgConvert contributors</name>",
-    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="homepage">https://imgconvert.web.casa/</url>',
     '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     "decode-only",
     "does not provide HEIC",
@@ -141,6 +141,14 @@ function inspectScreenshots(text) {
         `screenshot URL must be rewritten to a release tag or commit before Flathub PR: ${url}`,
       );
     }
+    const expectedReleaseScreenshot =
+      `https://raw.githubusercontent.com/web-casa/ImgConvert/v${packageJson.version}/` +
+      "packaging/flatpak/screenshots/main.png";
+    if (url !== expectedReleaseScreenshot) {
+      failures.push(
+        `screenshot URL must use the current ImgConvert release tag: ${expectedReleaseScreenshot}`,
+      );
+    }
     const localPath = localScreenshotPath(url);
     if (localPath && !existsSync(localPath)) {
       failures.push(`screenshot URL has no matching local file: ${url}`);
@@ -151,7 +159,7 @@ function inspectScreenshots(text) {
 function localScreenshotPath(url) {
   const parsed = new URL(url);
   const match = parsed.pathname.match(
-    /^\/yeagoo\/imgconvert\/[^/]+\/(packaging\/flatpak\/screenshots\/[^/]+)$/u,
+    /^\/web-casa\/ImgConvert\/[^/]+\/(packaging\/flatpak\/screenshots\/[^/]+)$/u,
   );
   if (!match) {
     return null;

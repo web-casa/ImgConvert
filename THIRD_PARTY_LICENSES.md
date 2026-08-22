@@ -5230,7 +5230,7 @@ Used by:
 - equivalent 1.0.2 — https://github.com/indexmap-rs/equivalent
 - errno 0.3.14 — https://github.com/lambda-fairy/rust-errno
 - event-listener-strategy 0.5.4 — https://github.com/smol-rs/event-listener-strategy
-- event-listener 5.4.1 — https://github.com/smol-rs/event-listener
+- event-listener 5.4.2 — https://github.com/smol-rs/event-listener
 - fastrand 2.4.1 — https://github.com/smol-rs/fastrand
 - filetime 0.2.29 — https://github.com/alexcrichton/filetime
 - find-msvc-tools 0.1.9 — https://github.com/rust-lang/cc-rs

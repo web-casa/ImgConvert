@@ -84,11 +84,11 @@ jobs:
             echo "allow_release=$allow_release"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -188,7 +188,7 @@ jobs:
             echo "Run this workflow again later with source_run_id=$SOURCE_RUN_ID."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' }}
         with:
           name: imgconvert-macos-${{ inputs.architecture }}-dmg-notarized-${{ inputs.source_run_id }}

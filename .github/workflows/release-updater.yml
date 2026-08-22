@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
@@ -67,16 +67,16 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 10.34.4
           run_install: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm run release:platform:check
       - name: Build signed updater AppImage
@@ -109,7 +109,7 @@ jobs:
           test -n "$appimage"
           chmod +x "$appimage"
           "$appimage"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-updater-linux-${{ inputs.tag }}
           if-no-files-found: error
@@ -126,7 +126,7 @@ jobs:
             src-tauri/target/release/bundle/SHA256SUMS
       - name: Publish GitHub Release assets
         if: ${{ inputs.publish_release }}
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ inputs.tag }}
           draft: ${{ inputs.draft_release }}

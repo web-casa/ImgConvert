@@ -113,12 +113,20 @@ function inspectManifest(text) {
 
 function inspectPrepareScript(text) {
   for (const expected of [
+    '"git",',
+    '"archive", "--format=tar", "--output", sourceTreeArchive, "HEAD"',
+    'run("tar", ["-xf", sourceTreeArchive, "-C", stagingDir])',
     "patchVendoredDav1dAarch64Meson",
     "aarch64-unknown-linux-gnu.meson",
     ".cargo-checksum.json",
     "aarch64-linux-gnu-gcc",
   ]) {
     requireText(text, expected, `Flatpak prepare script must include ${expected}`);
+  }
+  if (text.includes('run("rsync"')) {
+    failures.push(
+      "Flatpak prepare script must archive tracked source instead of rsyncing ignored files",
+    );
   }
 }
 

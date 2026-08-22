@@ -102,6 +102,21 @@ function checkCommonBundleMetadata() {
   if (!Array.isArray(tauriConfig.bundle?.icon) || tauriConfig.bundle.icon.length === 0) {
     failures.push("tauri.conf.json bundle.icon must include platform icons");
   }
+
+  const productionCsp = tauriConfig.app?.security?.csp;
+  const developmentCsp = tauriConfig.app?.security?.devCsp;
+  if (typeof productionCsp !== "string" || !productionCsp.includes("connect-src 'self' ipc:")) {
+    failures.push("tauri.conf.json must define a restrictive production connect-src CSP");
+  } else if (/\b(?:https?|wss?):\/\/localhost(?::\d+)?/iu.test(productionCsp)) {
+    failures.push("production CSP must not allow localhost network connections");
+  }
+  if (
+    typeof developmentCsp !== "string" ||
+    !developmentCsp.includes("http://localhost:1420") ||
+    !developmentCsp.includes("ws://localhost:1420")
+  ) {
+    failures.push("tauri.conf.json must retain localhost CSP access only in devCsp for Vite HMR");
+  }
 }
 
 function checkArchitectureGuardrailWiring() {
@@ -842,7 +857,7 @@ function checkFlathubReleaseGuardrails() {
 
   for (const expected of [
     '<developer id="io.github.yeagoo">',
-    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="homepage">https://imgconvert.web.casa/</url>',
     '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     '<url type="bugtracker">https://github.com/web-casa/ImgConvert/issues</url>',
     "<screenshots>",
@@ -858,7 +873,7 @@ function checkFlathubReleaseGuardrails() {
   }
   for (const expected of [
     '<developer id="io.github.yeagoo">',
-    '<url type="homepage">https://github.com/web-casa/ImgConvert</url>',
+    '<url type="homepage">https://imgconvert.web.casa/</url>',
     '<url type="vcs-browser">https://github.com/web-casa/ImgConvert</url>',
     "<project_license>LGPL-3.0-or-later</project_license>",
   ]) {
@@ -1299,7 +1314,7 @@ function checkWindowsRuntimeGuardrails() {
     "runs-on: ${{ matrix.runner }}",
     "windows-latest",
     "windows-11-arm",
-    "actions/setup-python@v7",
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     'python-version: "3.12.10"',
     "nasm-2.16.03-win64.zip",
     "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
@@ -1326,7 +1341,7 @@ function checkWindowsRuntimeGuardrails() {
     "runs-on: ${{ matrix.runner }}",
     "runner: windows-latest",
     "runner: windows-11-arm",
-    "actions/setup-python@v7",
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     'python-version: "3.12.10"',
     "nasm-2.16.03-win64.zip",
     "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",

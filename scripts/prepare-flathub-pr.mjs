@@ -69,7 +69,7 @@ function prepareMainSubmission() {
   const manifest = readFileSync(manifestPath, "utf8")
     .replace(/(type:\s+archive\s*\n\s+)(?:path|url):\s+\S+/, `$1url: ${options.sourceUrl}`)
     .replace(
-      /https:\/\/raw\.githubusercontent\.com\/yeagoo\/imgconvert\/[^/]+\/packaging\/flatpak\/screenshots\//g,
+      /https:\/\/raw\.githubusercontent\.com\/web-casa\/ImgConvert\/[^/]+\/packaging\/flatpak\/screenshots\//g,
       rawGithubBase("packaging/flatpak/screenshots/"),
     );
 

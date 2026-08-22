@@ -261,6 +261,7 @@ export const enUS = {
     sourcePlatform: "Current platform",
     sourceFlatpakExtension: "Flatpak extension",
     messages: {
+      detailsHidden: "Details are available only in development builds.",
       externalCodecsBuildDisabled: "External codec/helper discovery is disabled in this build.",
       externalCodecsBuildDisabledFlatpakEnabled:
         "External codec/helper discovery is disabled in this build; the Flatpak codec extension remains enabled.",

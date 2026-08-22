@@ -79,17 +79,27 @@ try {
 console.log(`Flatpak source archive prepared: ${path.relative(repoRoot, archivePath)}`);
 
 function copySourceTree() {
-  const excludes = [
-    "--exclude=.git",
-    "--exclude=node_modules",
-    "--exclude=dist",
-    "--exclude=target",
-    "--exclude=src-tauri/target",
-    "--exclude=test-results",
-    "--exclude=playwright-report",
-    "--exclude=packaging/flatpak/io.github.yeagoo.imgconvert.yml",
-  ];
-  run("rsync", ["-a", "--delete", ...excludes, `${repoRoot}/`, `${stagingDir}/`]);
+  const sourceTreeArchive = path.join(stagingRoot, "source-tree.tar");
+  const result = spawnSync(
+    "git",
+    ["archive", "--format=tar", "--output", sourceTreeArchive, "HEAD"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  if (result.status !== 0) {
+    process.stdout.write(result.stdout);
+    process.stderr.write(result.stderr);
+    fail(`git archive failed with exit code ${result.status}`);
+  }
+
+  run("tar", ["-xf", sourceTreeArchive, "-C", stagingDir]);
+  rmSync(sourceTreeArchive, { force: true });
+  rmSync(path.join(stagingDir, "packaging", "flatpak", "io.github.yeagoo.imgconvert.yml"), {
+    force: true,
+  });
 }
 
 function vendorCargo() {

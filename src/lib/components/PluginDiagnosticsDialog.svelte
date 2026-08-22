@@ -13,6 +13,7 @@
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
+  import { diagnosticDetailForDisplay } from "$lib/diagnostic-message";
   import {
     commandErrorMessage,
     formatLocalizedMessage,
@@ -199,7 +200,11 @@
     return $t(key, {
       values: {
         code: message.code,
-        detail: message.detail ?? "",
+        detail: diagnosticDetailForDisplay(
+          message.detail,
+          import.meta.env.DEV,
+          $t("diagnostics.messages.detailsHidden") as string,
+        ),
       },
     }) as string;
   }

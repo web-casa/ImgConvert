@@ -41,7 +41,7 @@ jobs:
             runner: macos-15-intel
             uname_arch: x86_64
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
@@ -106,18 +106,18 @@ jobs:
             nasm -v
           fi
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 10.34.4
           run_install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
           components: rustfmt, clippy
 
@@ -190,7 +190,7 @@ jobs:
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
         run: APPLE_SIGNING_IDENTITY="$IMGCONVERT_DIRECT_EFFECTIVE_SIGNING_IDENTITY" pnpm run release:macos
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-macos-${{ matrix.arch }}-dmg-pending
           if-no-files-found: error
@@ -212,7 +212,7 @@ jobs:
               --submit-only \
               --receipt=src-tauri/target/release/bundle/dmg/notarization.json
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-macos-${{ matrix.arch }}-notarization-receipt
           if-no-files-found: error

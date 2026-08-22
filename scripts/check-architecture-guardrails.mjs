@@ -151,7 +151,17 @@ function checkCoreFormatBoundary() {
 function checkHeicBoundary() {
   requireText(
     tauriConvert,
-    '"heic" | "heif" => Err("HEIC 输出暂未启用;当前仅作为可选导入格式".to_string())',
+    'const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";',
+    "Tauri output parser must keep a stable HEIC/HEIF rejection prefix",
+  );
+  requireText(
+    tauriConvert,
+    '"heic" | "heif" => Err(format!(',
+    "Tauri output parser must reject HEIC/HEIF targets",
+  );
+  requireText(
+    tauriConvert,
+    '"{HEIC_OUTPUT_DISABLED_PREFIX};当前仅作为可选导入格式"',
     "Tauri output parser must reject HEIC/HEIF targets",
   );
   requireText(

@@ -151,12 +151,13 @@ mod platform {
     }
 
     struct TempPng {
+        directory: PathBuf,
         path: PathBuf,
     }
 
     impl Drop for TempPng {
         fn drop(&mut self) {
-            let _ = fs::remove_file(&self.path);
+            let _ = fs::remove_dir_all(&self.directory);
         }
     }
 
@@ -179,9 +180,7 @@ mod platform {
 
     pub fn decode_heic_to_png(input: &Path) -> Result<Vec<u8>, String> {
         validate_heic_header(input)?;
-        let temp = TempPng {
-            path: temp_png_path()?,
-        };
+        let temp = create_temp_png()?;
         decode_heic_to_png_file(input, &temp.path)?;
         read_limited_png(&temp.path)
     }
@@ -431,7 +430,7 @@ mod platform {
         })
     }
 
-    fn temp_png_path() -> Result<PathBuf, String> {
+    fn create_temp_png() -> Result<TempPng, String> {
         let root = std::env::temp_dir().join("ImgConvert").join("wic-heic");
         fs::create_dir_all(&root).map_err(|error| {
             format!("无法创建 Windows WIC 临时目录 {}: {error}", root.display())
@@ -443,12 +442,24 @@ mod platform {
                 .duration_since(UNIX_EPOCH)
                 .map(|duration| duration.as_nanos())
                 .unwrap_or(0);
-            let candidate = root.join(format!("imgconvert-wic-{pid}-{nanos}-{counter}.png"));
-            if !candidate.exists() {
-                return Ok(candidate);
+            let directory = root.join(format!("imgconvert-wic-{pid}-{nanos}-{counter}"));
+            match fs::create_dir(&directory) {
+                Ok(()) => {
+                    return Ok(TempPng {
+                        path: directory.join("decoded.png"),
+                        directory,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(format!(
+                        "无法创建 Windows WIC 临时目录 {}: {error}",
+                        directory.display()
+                    ));
+                }
             }
         }
-        Err("无法创建唯一 Windows WIC 临时 PNG 路径".to_string())
+        Err("无法创建唯一 Windows WIC 临时输出目录".to_string())
     }
 
     fn wide_path(path: &Path) -> Vec<u16> {
@@ -464,6 +475,24 @@ mod platform {
             .encode_wide()
             .chain(std::iter::once(0))
             .collect()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn wic_png_uses_an_atomically_created_unique_directory() {
+            let temp = create_temp_png().unwrap();
+            let directory = temp.directory.clone();
+
+            assert!(directory.is_dir());
+            assert_eq!(temp.path.parent(), Some(directory.as_path()));
+            assert!(!temp.path.exists());
+
+            drop(temp);
+            assert!(!directory.exists());
+        }
     }
 }
 

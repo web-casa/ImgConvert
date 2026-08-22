@@ -38,7 +38,7 @@ jobs:
       matrix:
         include: ${{ fromJSON((github.event_name != 'workflow_dispatch' || inputs.build_arm64) && '[{"arch":"amd64","runner":"ubuntu-22.04"},{"arch":"arm64","runner":"ubuntu-22.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-22.04"}]') }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Verify pushed release tag and source version
@@ -65,22 +65,22 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 10.34.4
           run_install: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm run release:linux
       - run: pnpm run release:linux:smoke:deb -- --convert-smoke
       - run: pnpm run release:linux:smoke:docker
         if: github.event_name != 'workflow_dispatch' || inputs.docker_smoke
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: imgconvert-linux-${{ matrix.arch }}-release
           if-no-files-found: error

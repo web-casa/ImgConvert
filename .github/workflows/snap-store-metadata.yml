@@ -16,13 +16,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Validate listing metadata
         run: python3 scripts/update-snap-store-metadata.py --dry-run
       - name: Install macaroon binding support
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends python3-pymacaroons
+        run: scripts/ci-install-apt-packages.sh python3-pymacaroons
       - name: Update Snap Store listing
         env:
           IMGCONVERT_SNAP_ID: x2qV8qufxm4Pui1UBr99TZPGy6edaSKS
