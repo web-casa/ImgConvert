@@ -38,7 +38,7 @@ def main() -> None:
     authorization = create_authorization_header(credentials)
     updated = update_store_metadata(snap_id, listing, authorization)
     for field, expected in listing.items():
-        if updated.get(field) != expected:
+        if not response_contains(updated.get(field), expected):
             raise RuntimeError(f"Snap Store returned an unexpected {field} value")
     print(f"Snap Store metadata updated for {listing['title']}.")
 
@@ -122,6 +122,17 @@ def require_environment(name: str) -> str:
     if not value:
         raise ValueError(f"{name} is required")
     return value
+
+
+def response_contains(actual: Any, expected: str) -> bool:
+    """Accept plain or localized values returned by the Store metadata API."""
+    if actual == expected:
+        return True
+    if isinstance(actual, dict):
+        return any(response_contains(value, expected) for value in actual.values())
+    if isinstance(actual, list):
+        return any(response_contains(value, expected) for value in actual)
+    return False
 
 
 if __name__ == "__main__":
