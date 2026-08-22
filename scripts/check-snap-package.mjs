@@ -33,11 +33,9 @@ for (const marker of [
   "base: core24",
   "grade: stable",
   "confinement: strict",
-  "plugin: rust",
-  'rust-channel: "1.96.0"',
-  "rust-path:",
-  "- src-tauri",
+  "plugin: nil",
   "- rustup/latest/stable",
+  "- node/24/stable",
   "extensions:",
   "- gnome",
   "- home",
@@ -45,8 +43,9 @@ for (const marker of [
   "IMGCONVERT_DISABLE_EXTERNAL_CODECS=1",
   "IMGCONVERT_DISABLE_UPDATER=1",
   "unset LD_LIBRARY_PATH",
-  "craftctl default",
-  "bin/imgconvert: usr/bin/imgconvert",
+  "rustup toolchain install 1.96.0 --profile minimal",
+  "cargo +1.96.0 build --release --locked --manifest-path src-tauri/Cargo.toml",
+  "install -Dm755 src-tauri/target/release/imgconvert",
 ]) {
   if (!snapcraft.includes(marker)) {
     failures.push(`snap/snapcraft.yaml missing marker: ${marker}`);
@@ -61,11 +60,26 @@ for (const denied of [
   "- system-files",
   "- personal-files",
   "daemon:",
-  "cargo +1.96.0 build",
+  "plugin: rust",
+  "rust-channel:",
+  "craftctl default",
 ]) {
   if (snapcraft.includes(denied)) {
     failures.push(`snap/snapcraft.yaml contains denied marker: ${denied}`);
   }
+}
+
+const unsetLibraryPathIndex = snapcraft.indexOf("unset LD_LIBRARY_PATH");
+const rustupInstallIndex = snapcraft.indexOf("rustup toolchain install 1.96.0");
+const cargoBuildIndex = snapcraft.indexOf("cargo +1.96.0 build");
+if (
+  unsetLibraryPathIndex < 0 ||
+  rustupInstallIndex < 0 ||
+  cargoBuildIndex < 0 ||
+  unsetLibraryPathIndex > rustupInstallIndex ||
+  rustupInstallIndex > cargoBuildIndex
+) {
+  failures.push("Snap build must clear LD_LIBRARY_PATH before pinned Rustup and Cargo commands");
 }
 
 for (const marker of [

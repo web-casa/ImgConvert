@@ -30,6 +30,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.6" date="2026-08-22">
+      <description>
+        <p>Fixes Snap builds by sanitizing the GNOME SDK environment before running the pinned Rust toolchain.</p>
+      </description>
+    </release>
     <release version="0.2.5" date="2026-08-22">
       <description>
         <p>Provides the Rustup build dependency required by the Snapcraft Rust plugin on all supported architectures.</p>

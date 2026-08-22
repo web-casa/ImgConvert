@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: imgconvert
-version: "0.2.5"
+version: "0.2.6"
 summary: Local-first batch image converter
 description: |
   Convert JPEG, PNG, WebP, and AVIF images in batches without uploading
@@ -34,11 +34,11 @@ apps:
 
 parts:
   imgconvert:
-    plugin: rust
+    # The GNOME extension's build environment conflicts with the Rustup snap's
+    # host-linked libc. Keep this a custom lifecycle so LD_LIBRARY_PATH can be
+    # sanitized before Rustup or Cargo starts.
+    plugin: nil
     source: .
-    rust-channel: "1.96.0"
-    rust-path:
-      - src-tauri
     build-snaps:
       - rustup/latest/stable
       - node/24/stable
@@ -58,14 +58,17 @@ parts:
       # GNOME's SDK injects its libc through LD_LIBRARY_PATH. Build tools from
       # the Node and Rust snaps must use the managed core24 instance's libc.
       unset LD_LIBRARY_PATH
+      rustup toolchain install 1.96.0 --profile minimal
       npm install --global --prefix "$CRAFT_PART_BUILD/.pnpm" pnpm@10.34.4
       export PATH="$CRAFT_PART_BUILD/.pnpm/bin:$PATH"
       pnpm install --frozen-lockfile
       export IMGCONVERT_DISABLE_EXTERNAL_CODECS=1
       export IMGCONVERT_DISABLE_UPDATER=1
       pnpm run build
-      craftctl default
+      cargo +1.96.0 build --release --locked --manifest-path src-tauri/Cargo.toml
 
+      install -Dm755 src-tauri/target/release/imgconvert \
+        "$CRAFT_PART_INSTALL/usr/bin/imgconvert"
       install -Dm644 packaging/appimagehub/com.ivmm.imgconvert.metainfo.xml \
         "$CRAFT_PART_INSTALL/usr/share/metainfo/com.ivmm.imgconvert.metainfo.xml"
       install -Dm644 src-tauri/icons/128x128@2x.png \
@@ -76,5 +79,3 @@ parts:
         "$CRAFT_PART_INSTALL/usr/share/doc/imgconvert/NOTICE"
       install -Dm644 THIRD_PARTY_LICENSES.md \
         "$CRAFT_PART_INSTALL/usr/share/doc/imgconvert/THIRD_PARTY_LICENSES.md"
-    organize:
-      bin/imgconvert: usr/bin/imgconvert
