@@ -32,7 +32,7 @@
   <releases>
     <release version="0.2.6" date="2026-08-22">
       <description>
-        <p>Fixes Snap builds by sanitizing the GNOME SDK environment before running the pinned Rust toolchain.</p>
+        <p>Fixes Snap builds by sanitizing the GNOME SDK environment and enabling Tauri's embedded production frontend.</p>
       </description>
     </release>
     <release version="0.2.5" date="2026-08-22">

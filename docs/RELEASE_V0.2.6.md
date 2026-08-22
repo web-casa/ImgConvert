@@ -19,7 +19,8 @@ Snap Store, AppImageHub, and AUR.
    and limited to the GNOME extension plus `home` and optional
    `removable-media` access.
 6. Snapcraft must use a custom lifecycle, clear the GNOME SDK library path
-   before running Rustup, and compile with the pinned Rust 1.96.0 toolchain.
+   before running Rustup, compile with the pinned Rust 1.96.0 toolchain, and
+   enable Tauri's production custom protocol so the embedded frontend loads.
 7. General CI and Linux release workflows must not run or publish unrelated
    Flatpak work. Its existing `0.2.3` metadata remains outside this release.
 

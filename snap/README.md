@@ -10,8 +10,10 @@ background-service, or system-control interfaces.
 
 The Store build uses Snapcraft's custom lifecycle with Rustup pinned to Rust
 1.96.0. The custom lifecycle clears the GNOME SDK library path before invoking
-host-linked build tools. It compiles out both the Tauri updater and host
-external-codec discovery. Snap Store refreshes deliver application updates.
+host-linked build tools and enables Tauri's production custom protocol so the
+embedded frontend is loaded instead of the development URL. It compiles out
+both the Tauri updater and host external-codec discovery. Snap Store refreshes
+deliver application updates.
 
 Build and validate from a clean checkout:
 

@@ -44,7 +44,9 @@ for (const marker of [
   "IMGCONVERT_DISABLE_UPDATER=1",
   "unset LD_LIBRARY_PATH",
   "rustup toolchain install 1.96.0 --profile minimal",
-  "cargo +1.96.0 build --release --locked --manifest-path src-tauri/Cargo.toml",
+  "cargo +1.96.0 build --release --locked",
+  "--features tauri/custom-protocol",
+  "--manifest-path src-tauri/Cargo.toml",
   "install -Dm755 src-tauri/target/release/imgconvert",
 ]) {
   if (!snapcraft.includes(marker)) {
@@ -72,14 +74,22 @@ for (const denied of [
 const unsetLibraryPathIndex = snapcraft.indexOf("unset LD_LIBRARY_PATH");
 const rustupInstallIndex = snapcraft.indexOf("rustup toolchain install 1.96.0");
 const cargoBuildIndex = snapcraft.indexOf("cargo +1.96.0 build");
+const productionProtocolIndex = snapcraft.indexOf("--features tauri/custom-protocol");
+const cargoManifestIndex = snapcraft.indexOf("--manifest-path src-tauri/Cargo.toml");
 if (
   unsetLibraryPathIndex < 0 ||
   rustupInstallIndex < 0 ||
   cargoBuildIndex < 0 ||
+  productionProtocolIndex < 0 ||
+  cargoManifestIndex < 0 ||
   unsetLibraryPathIndex > rustupInstallIndex ||
-  rustupInstallIndex > cargoBuildIndex
+  rustupInstallIndex > cargoBuildIndex ||
+  cargoBuildIndex > productionProtocolIndex ||
+  productionProtocolIndex > cargoManifestIndex
 ) {
-  failures.push("Snap build must clear LD_LIBRARY_PATH before pinned Rustup and Cargo commands");
+  failures.push(
+    "Snap build must clear LD_LIBRARY_PATH, pin Rustup, and enable Tauri's production protocol",
+  );
 }
 
 for (const marker of [

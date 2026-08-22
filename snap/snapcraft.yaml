@@ -65,7 +65,9 @@ parts:
       export IMGCONVERT_DISABLE_EXTERNAL_CODECS=1
       export IMGCONVERT_DISABLE_UPDATER=1
       pnpm run build
-      cargo +1.96.0 build --release --locked --manifest-path src-tauri/Cargo.toml
+      cargo +1.96.0 build --release --locked \
+        --features tauri/custom-protocol \
+        --manifest-path src-tauri/Cargo.toml
 
       install -Dm755 src-tauri/target/release/imgconvert \
         "$CRAFT_PART_INSTALL/usr/bin/imgconvert"
