@@ -113,6 +113,7 @@ jobs:
         with:
           name: imgconvert-updater-linux-${{ inputs.tag }}
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 14
           path: |
             target/updater/latest.json

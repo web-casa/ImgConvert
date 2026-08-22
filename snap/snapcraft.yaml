@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: imgconvert
-version: "0.2.6"
+version: "0.2.7"
 summary: Local-first batch image converter
 description: |
   Convert JPEG, PNG, WebP, and AVIF images in batches without uploading

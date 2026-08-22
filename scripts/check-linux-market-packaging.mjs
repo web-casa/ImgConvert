@@ -84,6 +84,13 @@ for (const marker of [
     failures.push(`Updater workflow missing Linux market marker: ${marker}`);
   }
 }
+if (
+  !/uses:\s*actions\/upload-artifact@v7[\s\S]*?include-hidden-files:\s*true[\s\S]*?target\/aur\/imgconvert-bin/u.test(
+    updaterWorkflow,
+  )
+) {
+  failures.push("Updater workflow must include hidden AUR files in its downloadable artifact");
+}
 
 runCheck("node", ["scripts/check-snap-package.mjs"], "Snap source check");
 if (commandExists("appstreamcli")) {

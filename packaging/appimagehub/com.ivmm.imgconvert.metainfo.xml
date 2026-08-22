@@ -30,6 +30,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.7" date="2026-08-22">
+      <description>
+        <p>Includes complete AUR submission metadata in the downloadable release artifact.</p>
+      </description>
+    </release>
     <release version="0.2.6" date="2026-08-22">
       <description>
         <p>Fixes Snap builds by sanitizing the GNOME SDK environment and enabling Tauri's embedded production frontend.</p>
