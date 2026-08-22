@@ -67,6 +67,7 @@ if (removed.length === 0) {
 }
 
 injectAppStreamMetadata(appDir);
+normalizeLauncherPermissions(appDir);
 repackAppImage(appDir, artifacts[0]);
 
 function bundleDir(bundle) {
@@ -121,12 +122,24 @@ function injectAppStreamMetadata(root) {
   console.log(`AppImage AppStream metadata injected: ${path.relative(repoRoot, source)}`);
 }
 
+function normalizeLauncherPermissions(root) {
+  for (const relative of ["AppRun", "AppRun.wrapped", path.join("usr", "bin", "imgconvert")]) {
+    const launcher = path.join(root, relative);
+    if (!existsSync(launcher)) {
+      fail(`missing AppImage launcher: ${path.relative(repoRoot, launcher)}`);
+    }
+    chmodSync(launcher, 0o755);
+  }
+  console.log("AppImage launcher permissions normalized to 0755.");
+}
+
 function repackAppImage(root, artifact) {
   const plugin = resolveAppImagePlugin();
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "imgconvert-appimage-repack-"));
   const appDirCopy = path.join(tempDir, "ImgConvert.AppDir");
   const outputName = `ImgConvert-${appImageArch(artifact)}.AppImage`;
   const outputPath = path.join(tempDir, outputName);
+  let repackError;
 
   try {
     copyDir(root, appDirCopy);
@@ -145,20 +158,26 @@ function repackAppImage(root, artifact) {
     if (result.status !== 0) {
       process.stdout.write(result.stdout);
       process.stderr.write(result.stderr);
-      fail(`linuxdeploy appimage plugin failed with exit code ${result.status}`);
+      throw new Error(`linuxdeploy appimage plugin failed with exit code ${result.status}`);
     }
     if (!existsSync(outputPath)) {
       process.stdout.write(result.stdout);
       process.stderr.write(result.stderr);
-      fail(`linuxdeploy appimage plugin did not create ${outputName}`);
+      throw new Error(`linuxdeploy appimage plugin did not create ${outputName}`);
     }
 
     copyFileSync(outputPath, artifact);
     rmSync(outputPath, { force: true });
     chmodSync(artifact, statSync(artifact).mode | 0o111);
     console.log(`AppImage repacked: ${path.relative(repoRoot, artifact)}`);
+  } catch (error) {
+    repackError = error;
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
+  }
+
+  if (repackError) {
+    fail(repackError instanceof Error ? repackError.message : String(repackError));
   }
 }
 

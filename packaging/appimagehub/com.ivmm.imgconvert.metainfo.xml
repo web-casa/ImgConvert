@@ -30,6 +30,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.8" date="2026-08-22">
+      <description>
+        <p>Normalizes AppImage launcher permissions for sandboxed catalog validation.</p>
+      </description>
+    </release>
     <release version="0.2.7" date="2026-08-22">
       <description>
         <p>Includes complete AUR submission metadata in the downloadable release artifact.</p>

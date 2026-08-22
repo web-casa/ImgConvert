@@ -248,6 +248,16 @@ function inspectAppImageContents(artifact) {
 function inspectExtractedAppImage(root) {
   const failures = inspectExtractedLinuxBundle(root, "AppImage");
   failures.push(...inspectGlibcTree(root, "AppImage"));
+  for (const relative of ["AppRun", "AppRun.wrapped", path.join("usr", "bin", "imgconvert")]) {
+    const launcher = path.join(root, relative);
+    if (!existsSync(launcher)) {
+      failures.push(`AppImage missing launcher ${relative}`);
+      continue;
+    }
+    if ((statSync(launcher).mode & 0o005) !== 0o005) {
+      failures.push(`AppImage launcher ${relative} must be world-readable and executable`);
+    }
+  }
   const deniedLibraries = ["libgcrypt.so.20"];
   const libDir = path.join(root, "usr", "lib");
   for (const library of deniedLibraries) {

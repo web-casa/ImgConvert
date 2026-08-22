@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Immutable release tag to build, for example v0.2.7.
+        description: Immutable release tag to build, for example v0.2.8.
         required: true
         type: string
       build_arm64:

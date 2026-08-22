@@ -19,8 +19,8 @@ Build and validate from a clean checkout:
 
 ```bash
 snapcraft pack
-pnpm run release:snap:verify -- --artifact=imgconvert_0.2.7_amd64.snap
-sudo snap install --dangerous ./imgconvert_0.2.7_amd64.snap
+pnpm run release:snap:verify -- --artifact=imgconvert_0.2.8_amd64.snap
+sudo snap install --dangerous ./imgconvert_0.2.8_amd64.snap
 ```
 
 Publishing is intentionally manual. Reserve `imgconvert` in the Snap Store,
