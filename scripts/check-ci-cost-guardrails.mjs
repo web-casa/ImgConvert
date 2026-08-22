@@ -461,6 +461,7 @@ function checkWindowsStoreReleaseWorkflow() {
     'python-version: "3.12.10"',
     "nasm-2.16.03-win64.zip",
     "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6",
+    '$cc = "clang-cl"',
     "CC=$cc CXX=$cxx",
     "aarch64-.*-windows-msvc",
     "Verify ARM64-aware Store packaging source",

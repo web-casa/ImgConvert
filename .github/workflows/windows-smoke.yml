@@ -224,24 +224,22 @@ jobs:
         shell: pwsh
         run: |
           if ("${{ matrix.arch }}" -eq "arm64") {
-            clang --version
+            $compilerVersion = & clang-cl --version
             if ($LASTEXITCODE -ne 0) {
-              throw "The Windows ARM64 runner does not provide a working clang compiler"
+              throw "The Windows ARM64 runner does not provide a working clang-cl compiler"
             }
-            clang++ --version
-            if ($LASTEXITCODE -ne 0) {
-              throw "The Windows ARM64 runner does not provide a working clang++ compiler"
-            }
-            $nativeTarget = (& clang -dumpmachine).Trim()
+            $compilerVersion | Write-Host
+            $nativeTargetLine = $compilerVersion |
+              Where-Object { $_ -match "^Target:\s*" } |
+              Select-Object -First 1
+            $nativeTarget = $nativeTargetLine -replace "^Target:\s*", ""
             if ($nativeTarget -notmatch "^aarch64-.*-windows-msvc$") {
-              throw "Expected native Windows ARM64 clang, got target $nativeTarget"
+              throw "Expected native Windows ARM64 clang-cl, got target $nativeTarget"
             }
-            $nativeCxxTarget = (& clang++ -dumpmachine).Trim()
-            if ($nativeCxxTarget -ne $nativeTarget) {
-              throw "Expected matching native Windows ARM64 clang targets, got $nativeTarget and $nativeCxxTarget"
-            }
-            $cc = "clang"
-            $cxx = "clang++"
+            # clang-cl keeps MSVC-compatible flags while its integrated assembler handles
+            # the AArch64 .S files used by rav1e and dav1d.
+            $cc = "clang-cl"
+            $cxx = "clang-cl"
           } else {
             $cc = "cl"
             $cxx = "cl"
