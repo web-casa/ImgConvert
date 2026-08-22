@@ -123,6 +123,23 @@ jobs:
             $env:Path = "$nasmBin;$env:Path"
             nasm -v
           }
+          if ("${{ matrix.arch }}" -eq "arm64") {
+            # Native MSVC ARM64 dav1d assembly is translated through FFmpeg's gas-preprocessor.
+            $gasPreprocessorCommit = "ac1836309c2e77023c228b7184485597286289d3"
+            $gasPreprocessorRoot = Join-Path $env:RUNNER_TEMP "imgconvert-gas-preprocessor"
+            $gasPreprocessorPath = Join-Path $gasPreprocessorRoot "gas-preprocessor.pl"
+            New-Item -ItemType Directory -Path $gasPreprocessorRoot | Out-Null
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/FFmpeg/gas-preprocessor/ac1836309c2e77023c228b7184485597286289d3/gas-preprocessor.pl" -OutFile $gasPreprocessorPath
+            $actualHash = (Get-FileHash -Algorithm SHA256 $gasPreprocessorPath).Hash.ToLowerInvariant()
+            $expectedHash = "7124d70cdecba7c5612f9a71fbf3f28514dd9c2ca3022f58ad793f88bb925fcf"
+            if ($actualHash -ne $expectedHash) {
+              throw "gas-preprocessor checksum mismatch: expected $expectedHash, got $actualHash"
+            }
+            Add-Content -Path $env:GITHUB_PATH -Value $gasPreprocessorRoot
+            $env:Path = "$gasPreprocessorRoot;$env:Path"
+            perl -v
+            Write-Host "Using gas-preprocessor commit $gasPreprocessorCommit"
+          }
 
       - uses: pnpm/action-setup@v6
         with:

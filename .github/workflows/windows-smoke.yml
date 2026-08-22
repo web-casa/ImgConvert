@@ -28,6 +28,15 @@ on:
         required: true
         default: msi,nsis
         type: string
+      architecture:
+        description: Native architecture to validate.
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - x64
+          - arm64
 
 permissions:
   contents: read
@@ -54,25 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-            python_arch: x64
-            processor_architecture: AMD64
-            msvc_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
-            msvc_arch: x64
-            msvc_host_arch: x64
-            linker_relative_path: bin/Hostx64/x64/link.exe
-            rust_linker_env: CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER
-          - arch: arm64
-            runner: windows-11-arm
-            python_arch: arm64
-            processor_architecture: ARM64
-            msvc_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
-            msvc_arch: arm64
-            msvc_host_arch: arm64
-            linker_relative_path: bin/Hostarm64/arm64/link.exe
-            rust_linker_env: CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER
+        include: ${{ fromJSON(inputs.architecture == 'x64' && '[{"arch":"x64","runner":"windows-latest"}]' || inputs.architecture == 'arm64' && '[{"arch":"arm64","runner":"windows-11-arm"}]' || '[{"arch":"x64","runner":"windows-latest"},{"arch":"arm64","runner":"windows-11-arm"}]') }}
     env:
       WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${{ matrix.arch }}
     steps:
@@ -81,7 +72,7 @@ jobs:
       - name: Verify Windows runner architecture
         shell: pwsh
         run: |
-          $expected = "${{ matrix.processor_architecture }}"
+          $expected = if ("${{ matrix.arch }}" -eq "arm64") { "ARM64" } else { "AMD64" }
           if ($env:PROCESSOR_ARCHITECTURE -ne $expected) {
             throw "Windows Smoke (${{ matrix.arch }}) expects $expected runner, got $env:PROCESSOR_ARCHITECTURE"
           }
@@ -90,7 +81,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
-          architecture: ${{ matrix.python_arch }}
+          architecture: ${{ matrix.arch }}
 
       - name: Install native codec build tools
         shell: pwsh
@@ -117,6 +108,23 @@ jobs:
             $env:Path = "$nasmBin;$env:Path"
             nasm -v
           }
+          if ("${{ matrix.arch }}" -eq "arm64") {
+            # Native MSVC ARM64 dav1d assembly is translated through FFmpeg's gas-preprocessor.
+            $gasPreprocessorCommit = "ac1836309c2e77023c228b7184485597286289d3"
+            $gasPreprocessorRoot = Join-Path $env:RUNNER_TEMP "imgconvert-gas-preprocessor"
+            $gasPreprocessorPath = Join-Path $gasPreprocessorRoot "gas-preprocessor.pl"
+            New-Item -ItemType Directory -Path $gasPreprocessorRoot | Out-Null
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/FFmpeg/gas-preprocessor/ac1836309c2e77023c228b7184485597286289d3/gas-preprocessor.pl" -OutFile $gasPreprocessorPath
+            $actualHash = (Get-FileHash -Algorithm SHA256 $gasPreprocessorPath).Hash.ToLowerInvariant()
+            $expectedHash = "7124d70cdecba7c5612f9a71fbf3f28514dd9c2ca3022f58ad793f88bb925fcf"
+            if ($actualHash -ne $expectedHash) {
+              throw "gas-preprocessor checksum mismatch: expected $expectedHash, got $actualHash"
+            }
+            Add-Content -Path $env:GITHUB_PATH -Value $gasPreprocessorRoot
+            $env:Path = "$gasPreprocessorRoot;$env:Path"
+            perl -v
+            Write-Host "Using gas-preprocessor commit $gasPreprocessorCommit"
+          }
 
       - uses: pnpm/action-setup@v6
         with:
@@ -136,8 +144,17 @@ jobs:
       - name: Configure MSVC build environment
         shell: pwsh
         run: |
+          $buildArch = "${{ matrix.arch }}"
+          if ($buildArch -eq "arm64") {
+            $msvcComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+            $linkerRelativePath = "bin/Hostarm64/arm64/link.exe"
+            $linkerEnvironment = "CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER"
+          } else {
+            $msvcComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+            $linkerRelativePath = "bin/Hostx64/x64/link.exe"
+            $linkerEnvironment = "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"
+          }
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $msvcComponent = "${{ matrix.msvc_component }}"
           $vsPath = & $vswhere -latest -products * -requires $msvcComponent -property installationPath
           if (-not $vsPath) {
             throw "Visual Studio Build Tools with $msvcComponent were not found"
@@ -174,9 +191,7 @@ jobs:
             "WindowsSDKVersion",
             "WindowsSdkVerBinPath"
           )
-          $msvcArch = "${{ matrix.msvc_arch }}"
-          $msvcHostArch = "${{ matrix.msvc_host_arch }}"
-          cmd /c "`"$vsDevCmd`" -arch=$msvcArch -host_arch=$msvcHostArch && set" | ForEach-Object {
+          cmd /c "`"$vsDevCmd`" -arch=$buildArch -host_arch=$buildArch && set" | ForEach-Object {
             if ($_ -match "^(.*?)=(.*)$") {
               $name = $matches[1]
               $value = $matches[2]
@@ -209,11 +224,10 @@ jobs:
                   Add-Content -Path $env:GITHUB_ENV -Value "$name=$value"
                 }
                 if ($name -ieq "VCToolsInstallDir") {
-                  $linker = Join-Path $value "${{ matrix.linker_relative_path }}"
+                  $linker = Join-Path $value $linkerRelativePath
                   if (-not (Test-Path $linker)) {
                     throw "MSVC linker was not found at $linker"
                   }
-                  $linkerEnvironment = "${{ matrix.rust_linker_env }}"
                   Add-Content -Path $env:GITHUB_ENV -Value "$linkerEnvironment=$linker"
                   Set-Item -Path "Env:$linkerEnvironment" -Value $linker
                 }
@@ -221,7 +235,8 @@ jobs:
             }
           }
           cl
-          Write-Host "Using Rust MSVC linker: $((Get-Item -Path 'Env:${{ matrix.rust_linker_env }}').Value)"
+          $linkerValue = (Get-Item -Path "Env:$linkerEnvironment").Value
+          Write-Host "Using Rust MSVC linker: $linkerValue"
 
       - run: pnpm install --frozen-lockfile
 
