@@ -1943,7 +1943,7 @@ dependencies = [
 
 [[package]]
 name = "imgconvert"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "blake3",
  "imgconvert-core",

@@ -33,13 +33,19 @@ for (const marker of [
   "base: core24",
   "grade: stable",
   "confinement: strict",
+  "plugin: rust",
+  'rust-channel: "1.96.0"',
+  "rust-path:",
+  "- src-tauri",
   "extensions:",
   "- gnome",
   "- home",
   "- removable-media",
   "IMGCONVERT_DISABLE_EXTERNAL_CODECS=1",
   "IMGCONVERT_DISABLE_UPDATER=1",
-  "cargo +1.96.0 build --release --locked",
+  "unset LD_LIBRARY_PATH",
+  "craftctl default",
+  "bin/imgconvert: usr/bin/imgconvert",
 ]) {
   if (!snapcraft.includes(marker)) {
     failures.push(`snap/snapcraft.yaml missing marker: ${marker}`);
@@ -54,6 +60,8 @@ for (const denied of [
   "- system-files",
   "- personal-files",
   "daemon:",
+  "rustup/latest/stable",
+  "cargo +1.96.0 build",
 ]) {
   if (snapcraft.includes(denied)) {
     failures.push(`snap/snapcraft.yaml contains denied marker: ${denied}`);

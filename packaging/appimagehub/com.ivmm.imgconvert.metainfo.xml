@@ -30,6 +30,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.4" date="2026-08-22">
+      <description>
+        <p>Aligns all Linux package builders with the Ubuntu 22.04 compatibility baseline and fixes tool detection on that baseline.</p>
+      </description>
+    </release>
     <release version="0.2.3" date="2026-08-22">
       <description>
         <p>Adds strict Snap packaging, an Ubuntu 22.04 AppImageHub compatibility baseline, and reproducible AUR package metadata.</p>

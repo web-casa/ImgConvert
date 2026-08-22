@@ -2,6 +2,9 @@
 
 # v0.2.3 Linux distribution release checklist
 
+> Superseded by v0.2.4. The immutable v0.2.3 tag exposed Ubuntu 22.04
+> compatibility-check failures before any public release or Store publication.
+
 `v0.2.3` adds the three selected Linux distribution channels only: Snap Store,
 AppImageHub, and AUR. Existing Flatpak files remain in the repository for
 compatibility checks but are not a publication target for this release.

@@ -8,15 +8,16 @@ the user's home directory; `removable-media` is optional and may require a
 manual connection. The snap does not request classic confinement, network,
 background-service, or system-control interfaces.
 
-The Store build compiles out both the Tauri updater and host external-codec
-discovery. Snap Store refreshes deliver application updates.
+The Store build uses Snapcraft's Rust plugin with the pinned Rust channel and
+compiles out both the Tauri updater and host external-codec discovery. Snap
+Store refreshes deliver application updates.
 
 Build and validate from a clean checkout:
 
 ```bash
 snapcraft pack
-pnpm run release:snap:verify -- --artifact=imgconvert_0.2.3_amd64.snap
-sudo snap install --dangerous ./imgconvert_0.2.3_amd64.snap
+pnpm run release:snap:verify -- --artifact=imgconvert_0.2.4_amd64.snap
+sudo snap install --dangerous ./imgconvert_0.2.4_amd64.snap
 ```
 
 Publishing is intentionally manual. Reserve `imgconvert` in the Snap Store,

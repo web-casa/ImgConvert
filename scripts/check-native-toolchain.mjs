@@ -136,7 +136,7 @@ function addLinuxBundleChecks(bundles) {
       },
       {
         name: "desktop-file-validate",
-        commands: [["desktop-file-validate", ["--version"]]],
+        commands: [["desktop-file-validate", ["--help"]]],
         reason: "Linux desktop entry validation",
       },
       {

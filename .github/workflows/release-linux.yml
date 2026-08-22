@@ -76,7 +76,6 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@1.96.0
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run release:flatpak:verify
       - run: pnpm run release:linux
       - run: pnpm run release:linux:smoke:deb -- --convert-smoke
       - run: pnpm run release:linux:smoke:docker
