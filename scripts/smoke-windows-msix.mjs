@@ -12,10 +12,10 @@ import {
   readFileSync,
   readSync,
   readdirSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
+import { rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,13 +56,13 @@ for (const arg of process.argv.slice(2)) {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 
-function main() {
+async function main() {
   if (!isWindows && !options.allowNonWindows) {
     fail(
       "Windows MSIX install smoke must run on Windows. Pass --allow-non-windows only for preflight.",
@@ -126,10 +126,15 @@ function main() {
       removeCertificate(certificateThumbprint);
     }
     if (!options.keepInstalled) {
-      // Appx cleanup can briefly retain a handle after package removal on Windows.
-      rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      await removeTemporaryRoot(tmpRoot);
     }
   }
+}
+
+async function removeTemporaryRoot(directory) {
+  // AppX can briefly retain a handle after package removal on Windows.
+  // The promise API schedules retry delays for Windows EPERM/EBUSY cleanup.
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 function readPreparedManifest() {

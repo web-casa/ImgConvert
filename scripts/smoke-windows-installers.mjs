@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readdirSync, statSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -75,12 +76,16 @@ for (const artifact of artifacts) {
 }
 
 if (!options.keepInstalled) {
-  // NSIS can leave a short-lived handle behind after its uninstaller exits.
-  // Node retries the Windows-specific EPERM/EBUSY cases when recursive is set.
-  rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  await removeTemporaryRoot(tmpRoot);
 }
 
 console.log(`Windows installer install smoke completed (${artifacts.length} artifact(s)).`);
+
+async function removeTemporaryRoot(directory) {
+  // NSIS can leave a short-lived handle behind after its uninstaller exits.
+  // The promise API schedules retry delays for Windows EPERM/EBUSY cleanup.
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+}
 
 function smokeNsisInstaller(installer) {
   const installDir = path.join(requiredTmpRoot(), "nsis-install");
