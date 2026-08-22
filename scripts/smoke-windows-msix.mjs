@@ -126,7 +126,8 @@ function main() {
       removeCertificate(certificateThumbprint);
     }
     if (!options.keepInstalled) {
-      rmSync(tmpRoot, { recursive: true, force: true });
+      // Appx cleanup can briefly retain a handle after package removal on Windows.
+      rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   }
 }

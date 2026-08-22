@@ -75,7 +75,9 @@ for (const artifact of artifacts) {
 }
 
 if (!options.keepInstalled) {
-  rmSync(tmpRoot, { recursive: true, force: true });
+  // NSIS can leave a short-lived handle behind after its uninstaller exits.
+  // Node retries the Windows-specific EPERM/EBUSY cases when recursive is set.
+  rmSync(tmpRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 console.log(`Windows installer install smoke completed (${artifacts.length} artifact(s)).`);
