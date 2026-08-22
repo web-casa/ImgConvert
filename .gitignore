@@ -24,6 +24,8 @@ fuzz/artifacts
 test-results
 playwright-report
 /artifacts/
+output/imagegen/
+tmp/imagegen/
 *.local
 *.tsbuildinfo
 

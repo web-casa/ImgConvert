@@ -1,0 +1,196 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="ubuntu-webp-lossless-compression" />
+    <meta
+      name="description"
+      content="Ubuntu 上使用 ImgConvert 为 WebP 图片进行本地无损压缩：保持 WebP 输出、开启无损模式，并在输出更大时跳过写入。"
+    />
+    <meta
+      name="keywords"
+      content="Ubuntu WebP 无损压缩, Linux WebP 压缩工具, WebP 本地压缩, WebP 无损重新编码"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/" />
+    <link
+      rel="alternate"
+      hreflang="zh-CN"
+      href="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="en"
+      href="https://imgconvert.web.casa/en/ubuntu/webp-lossless-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="Ubuntu WebP 本地无损压缩工具 | ImgConvert" />
+    <meta
+      property="og:description"
+      content="在 Ubuntu 本机重新编码 WebP，开启无损模式并避免写入更大的候选输出。"
+    />
+    <meta
+      property="og:url"
+      content="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/"
+    />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ubuntu WebP 本地无损压缩工具 | ImgConvert" />
+    <meta name="twitter:description" content="Ubuntu 本机 WebP 无损重新编码，原图不上传。" />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "Ubuntu 上如何为 WebP 图片进行本地无损压缩？",
+            "url": "https://imgconvert.web.casa/ubuntu/webp-lossless-compression/",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://imgconvert.web.casa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "实用指南",
+                "item": "https://imgconvert.web.casa/#guides"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Ubuntu WebP 无损压缩"
+              }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Ubuntu 上为 WebP 图片进行本地无损压缩",
+            "description": "使用 ImgConvert 在 Ubuntu 上以无损模式重新编码 WebP 图片。",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "导入 WebP 图片",
+                "text": "将 WebP 文件或文件夹加入任务队列。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "把目标格式保持为 WebP",
+                "text": "在输出设置中选择 WebP。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "开启无损并保留跳过更大输出",
+                "text": "启用无损压缩，并在不想写入更大文件时保留跳过选项。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "选择目录并开始处理",
+                "text": "确认输出目录后开始任务。"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "为什么有些 WebP 没有生成更小的输出？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "无损重新编码不能保证更小。若已开启跳过更大输出，候选输出与源文件相同或更大时可以被跳过。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "把质量设为 100 就是真无损吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不是。质量设置与无损模式是不同的编码选择；需要可逆的像素结果时，应开启无损模式。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Ubuntu 上压缩 WebP 时会上传图片吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。ImgConvert 在本机处理你主动选择的文件和输出目录。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>Ubuntu WebP 本地无损压缩工具 | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>UBUNTU · WEBP → WEBP</p>
+        <h1>Ubuntu 上如何为 WebP 图片进行本地无损压缩？</h1>
+        <p>
+          使用 ImgConvert 可将 WebP 保持为输出格式并开启无损模式，在 Ubuntu
+          本机重新编码图片而不上传到在线压缩器。
+        </p>
+        <h2>操作步骤</h2>
+        <ol>
+          <li>导入 WebP 文件或文件夹。</li>
+          <li>把目标格式保持为 WebP。</li>
+          <li>开启无损，并保留跳过更大输出。</li>
+          <li>选择输出目录并开始处理。</li>
+        </ol>
+        <h2>使用提示</h2>
+        <p>无损 WebP 的目标是像素可逆，不保证每张图片都更小。</p>
+        <h2>常见问题</h2>
+        <p>质量 100 不等于真无损；如果候选输出更大，可使用跳过选项避免写入。</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest">获取 Linux 版</a>
+          · <a href="/">返回 ImgConvert 首页</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

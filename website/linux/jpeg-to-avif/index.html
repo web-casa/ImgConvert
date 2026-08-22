@@ -1,0 +1,183 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="linux-jpeg-to-avif" />
+    <meta
+      name="description"
+      content="Linux 下使用 ImgConvert 在本机将 JPEG/JPG 批量转换为 AVIF：说明质量设置、JPEG 有损来源的边界，以及无需上传图片的操作步骤。"
+    />
+    <meta
+      name="keywords"
+      content="Linux JPEG 转 AVIF, Linux JPG 转 AVIF, JPEG 转 AVIF 本地工具, AVIF 图片转换"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/linux/jpeg-to-avif/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/linux/jpeg-to-avif/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/linux/jpeg-to-avif/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/linux/jpeg-to-avif/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="Linux 下如何在本地将 JPEG 转成 AVIF | ImgConvert" />
+    <meta
+      property="og:description"
+      content="在 Linux 本机将 JPEG/JPG 批量转为 AVIF，并了解质量与兼容性的真实边界。"
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/linux/jpeg-to-avif/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Linux 下 JPEG 转 AVIF | ImgConvert" />
+    <meta name="twitter:description" content="在 Linux 本机将 JPEG/JPG 转 AVIF，原图不上传。" />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "Linux 下如何在本地将 JPEG 转成 AVIF？",
+            "url": "https://imgconvert.web.casa/linux/jpeg-to-avif/",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://imgconvert.web.casa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "实用指南",
+                "item": "https://imgconvert.web.casa/#guides"
+              },
+              { "@type": "ListItem", "position": 3, "name": "Linux JPEG 转 AVIF" }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Linux 下将 JPEG 转为 AVIF",
+            "description": "使用 ImgConvert 在 Linux 本机将主动选择的 JPEG/JPG 输出为 AVIF。",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "导入 JPEG 或 JPG",
+                "text": "把图片或文件夹加入任务队列。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "选择 AVIF",
+                "text": "在输出设置中选择 AVIF。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "调整质量",
+                "text": "根据用途调整质量；JPEG 已是有损来源。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "确认目录并处理",
+                "text": "选择输出目录，按需开启跳过更大输出后开始转换。"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Linux 版可以批量将 JPG 转为 AVIF 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "可以。将多张 JPEG/JPG 或其所在的文件夹加入任务队列，再选择 AVIF 输出。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "无损 AVIF 能恢复 JPEG 的原始质量吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不能。JPEG 已是有损格式；无损 AVIF 最多保留当前解码后的像素。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Linux 上转换 JPEG 时会上传到云端吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。ImgConvert 在本机完成转换和输出。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>Linux 下如何在本地将 JPEG 转成 AVIF | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>LINUX · JPEG → AVIF</p>
+        <h1>Linux 下如何在本地将 JPEG 转成 AVIF？</h1>
+        <p>
+          ImgConvert 在 Linux 本机将你主动选择的 JPEG/JPG 文件或文件夹输出为
+          AVIF，不需要在线转换服务。
+        </p>
+        <h2>操作步骤</h2>
+        <ol>
+          <li>导入 JPEG/JPG 文件或文件夹。</li>
+          <li>将输出格式设为 AVIF。</li>
+          <li>根据用途调整质量。</li>
+          <li>确认目录，并按需启用跳过更大输出。</li>
+        </ol>
+        <h2>使用提示</h2>
+        <p>JPEG 已是有损来源；转成无损 AVIF 无法恢复过去编码中丢失的细节。</p>
+        <h2>常见问题</h2>
+        <p>可批量转换 JPEG/JPG；处理只在本机完成。</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest"
+            >从 GitHub Releases 获取 Linux 版</a
+          >
+          · <a href="/">返回 ImgConvert 首页</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

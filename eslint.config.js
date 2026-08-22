@@ -10,7 +10,7 @@ export default [
     ignores: [
       ".svelte-kit/**",
       "**/.flatpak-builder/**",
-      "dist/**",
+      "**/dist/**",
       "node_modules/**",
       "fuzz/target/**",
       "fuzz/artifacts/**",

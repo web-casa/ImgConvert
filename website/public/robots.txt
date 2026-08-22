@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://imgconvert.web.casa/sitemap.xml

@@ -1,0 +1,185 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="macos-heic-to-jpg" />
+    <meta
+      name="description"
+      content="macOS 下使用 ImgConvert 在本机将 HEIC 或 HEIF 转为 JPEG/JPG：说明系统 ImageIO 读取、批量转换、质量与元数据设置。"
+    />
+    <meta
+      name="keywords"
+      content="macOS HEIC 转 JPG, HEIC 转 JPEG 本地工具, Mac HEIC 图片转换, HEIF 转 JPG"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/macos/heic-to-jpg/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/macos/heic-to-jpg/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/macos/heic-to-jpg/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/macos/heic-to-jpg/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="macOS 下如何将 HEIC 转成 JPG？ | ImgConvert" />
+    <meta
+      property="og:description"
+      content="使用 macOS 本机系统能力读取支持的 HEIC 文件，并通过 ImgConvert 输出 JPEG/JPG。"
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/macos/heic-to-jpg/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="macOS 下如何将 HEIC 转成 JPG？ | ImgConvert" />
+    <meta name="twitter:description" content="macOS 本机 HEIC/HEIF 转 JPEG/JPG，原图不上传。" />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "macOS 下如何将 HEIC 转成 JPG？",
+            "url": "https://imgconvert.web.casa/macos/heic-to-jpg/",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://imgconvert.web.casa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "实用指南",
+                "item": "https://imgconvert.web.casa/#guides"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "macOS HEIC 转 JPG"
+              }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "macOS 下将 HEIC 转为 JPG",
+            "description": "使用 ImgConvert 在 macOS 本机将支持读取的 HEIC 或 HEIF 文件转换为 JPEG/JPG。",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "导入 HEIC 或 HEIF 图片",
+                "text": "把要处理的图片或文件夹加入队列。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "将目标格式设为 JPEG",
+                "text": "在输出设置中选择 JPEG。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "选择质量与元数据选项",
+                "text": "按用途调整 JPEG 质量，需要时明确开启保留元数据。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "选择目录并开始转换",
+                "text": "确认输出目录后开始任务。"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "在 macOS 上转换 HEIC 需要网页上传吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不需要。支持的 HEIC 文件由 macOS 系统能力在本机读取，ImgConvert 在本机完成 JPEG 输出。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "可以把多个 HEIC 文件一次转成 JPG 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "可以。把多张图片或整个文件夹加入任务队列，统一设置 JPEG 输出即可。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "ImgConvert 可以输出 HEIC 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不能。HEIC 目前是只读导入格式；此页面介绍的是将 HEIC 转为 JPEG/JPG。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>macOS 下如何将 HEIC 转成 JPG？ | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>MACOS · HEIC → JPEG</p>
+        <h1>macOS 下如何将 HEIC 转成 JPG？</h1>
+        <p>
+          如果 macOS 能通过系统 ImageIO 读取该 HEIC 或 HEIF 文件，ImgConvert 可在本机将它转换为
+          JPEG/JPG。
+        </p>
+        <h2>操作步骤</h2>
+        <ol>
+          <li>导入 HEIC 或 HEIF 图片。</li>
+          <li>将目标格式设为 JPEG。</li>
+          <li>按用途选择 JPEG 质量与元数据选项。</li>
+          <li>选择输出目录并开始转换。</li>
+        </ol>
+        <h2>使用提示</h2>
+        <p>HEIC 是平台能力支持的只读导入，ImgConvert 当前不导出 HEIC。</p>
+        <h2>常见问题</h2>
+        <p>可将多个 HEIC 文件放入同一队列，支持的文件会在 macOS 本机读取。</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest">获取 macOS 版</a>
+          · <a href="/">返回 ImgConvert 首页</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

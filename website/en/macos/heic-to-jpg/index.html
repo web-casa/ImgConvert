@@ -1,0 +1,192 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="macos-heic-to-jpg" />
+    <meta
+      name="description"
+      content="Convert supported HEIC or HEIF files to JPEG/JPG locally on macOS with ImgConvert. Learn the local ImageIO input path, batch conversion, quality, and metadata choices."
+    />
+    <meta
+      name="keywords"
+      content="macOS HEIC to JPG converter, local HEIC to JPEG, Mac HEIF converter, HEIC batch conversion"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/en/macos/heic-to-jpg/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/macos/heic-to-jpg/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/macos/heic-to-jpg/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/macos/heic-to-jpg/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="How to convert HEIC to JPG on macOS | ImgConvert" />
+    <meta
+      property="og:description"
+      content="Read supported HEIC locally with macOS system support and write JPEG/JPG with ImgConvert."
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/en/macos/heic-to-jpg/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to convert HEIC to JPG on macOS | ImgConvert" />
+    <meta
+      name="twitter:description"
+      content="Convert supported HEIC and HEIF images to JPEG/JPG on macOS without uploading originals."
+    />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "How to convert HEIC to JPG on macOS",
+            "url": "https://imgconvert.web.casa/en/macos/heic-to-jpg/",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://imgconvert.web.casa/en/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Guides",
+                "item": "https://imgconvert.web.casa/en/#guides"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "macOS HEIC to JPG"
+              }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Convert HEIC to JPG on macOS",
+            "description": "Use ImgConvert to convert HEIC or HEIF files that macOS can read to JPEG/JPG locally.",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Import HEIC or HEIF images",
+                "text": "Add images or a folder to the queue."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "Choose JPEG as the output format",
+                "text": "Select JPEG in the output settings."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Set quality and metadata choices",
+                "text": "Adjust JPEG quality and explicitly preserve metadata only when needed."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "Choose a folder and start conversion",
+                "text": "Confirm the output directory and start the task."
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Do I need to upload HEIC files to a website on macOS?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Supported HEIC files are read through macOS system support and ImgConvert writes JPEG output locally."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I convert a batch of HEIC files to JPG?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Add multiple images or a folder to the task queue, then use JPEG as the output format for the batch."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can ImgConvert export HEIC?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. HEIC is currently read-only input. This guide covers converting HEIC to JPEG/JPG."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>How to convert HEIC to JPG on macOS | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>MACOS · HEIC → JPEG</p>
+        <h1>How to convert HEIC to JPG on macOS</h1>
+        <p>
+          When macOS can read a HEIC or HEIF file through its system ImageIO support, ImgConvert can
+          convert it to JPEG/JPG locally.
+        </p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Import HEIC or HEIF images.</li>
+          <li>Choose JPEG as the output format.</li>
+          <li>Set JPEG quality and metadata choices for the intended use.</li>
+          <li>Choose the output directory and start conversion.</li>
+        </ol>
+        <h2>Notes</h2>
+        <p>
+          HEIC is a platform-capability read-only import. ImgConvert does not currently export HEIC.
+        </p>
+        <h2>Common questions</h2>
+        <p>
+          Multiple HEIC files can share one queue, and supported files are read locally by macOS.
+        </p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest">Get the macOS app</a>
+          · <a href="/en/">Back to ImgConvert home</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

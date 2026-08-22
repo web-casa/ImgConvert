@@ -1,0 +1,189 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="macos-png-to-webp" />
+    <meta
+      name="description"
+      content="Convert PNG to WebP locally on macOS with ImgConvert: batch import, WebP lossless-mode boundaries, a local output directory, and no image upload."
+    />
+    <meta
+      name="keywords"
+      content="macOS PNG to WebP, Mac PNG to WebP converter, local PNG to WebP, lossless WebP conversion"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/en/macos/png-to-webp/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/macos/png-to-webp/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/macos/png-to-webp/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/macos/png-to-webp/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="How to convert PNG to WebP locally on macOS | ImgConvert" />
+    <meta
+      property="og:description"
+      content="Batch-convert PNG to WebP on macOS locally, with clear lossless-mode and compatibility boundaries."
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/en/macos/png-to-webp/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to convert PNG to WebP locally on macOS | ImgConvert" />
+    <meta
+      name="twitter:description"
+      content="Turn PNG into WebP locally on macOS; originals are not uploaded."
+    />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "How to convert PNG to WebP locally on macOS",
+            "url": "https://imgconvert.web.casa/en/macos/png-to-webp/",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://imgconvert.web.casa/en/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Guides",
+                "item": "https://imgconvert.web.casa/en/#guides"
+              },
+              { "@type": "ListItem", "position": 3, "name": "macOS PNG to WebP" }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Convert PNG to WebP on macOS",
+            "description": "Use ImgConvert to convert PNG images or folders intentionally selected on macOS.",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Import PNG",
+                "text": "Add PNG files or a folder to the task queue."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "Choose WebP",
+                "text": "Choose WebP in output settings."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Choose encoding settings",
+                "text": "Adjust settings for the job; use lossless mode when pixels must remain reversible."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "Choose a directory and convert",
+                "text": "Confirm the output directory and start the task."
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Can macOS batch-convert PNG images to WebP?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Add multiple PNG files or a folder containing them to the task queue, then choose WebP as the target format."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is lossless WebP always smaller than PNG?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Lossless mode is about reversible pixels. File size still depends on image content and encoder output."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does PNG-to-WebP conversion use a web server?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. ImgConvert is a desktop app and processes conversion locally."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>How to convert PNG to WebP locally on macOS | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>MACOS · PNG → WEBP</p>
+        <h1>How to convert PNG to WebP locally on macOS</h1>
+        <p>
+          ImgConvert reads the PNG files or folders you intentionally select on macOS and writes
+          WebP to a directory you choose.
+        </p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Import PNG files or a folder.</li>
+          <li>Set WebP as the output format.</li>
+          <li>Choose quality or lossless mode for the delivery need.</li>
+          <li>Confirm the directory and convert.</li>
+        </ol>
+        <h2>Notes</h2>
+        <p>
+          Lossless WebP targets reversible pixels; it does not promise that every PNG will be
+          smaller than its source.
+        </p>
+        <h2>Common question</h2>
+        <p>Multiple PNG images can be processed in one queue, with no original-image upload.</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest"
+            >Get the macOS app from GitHub Releases</a
+          >
+          · <a href="/en/">Back to ImgConvert</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

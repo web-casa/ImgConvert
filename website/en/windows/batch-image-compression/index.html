@@ -1,0 +1,200 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="windows-batch-image-compression" />
+    <meta
+      name="description"
+      content="Batch-compress JPEG, PNG, WebP, and AVIF images locally on Windows with ImgConvert: choose the target format, quality or lossless mode, and avoid writing larger candidates."
+    />
+    <meta
+      name="keywords"
+      content="Windows batch image compression, batch image compressor Windows, local image compression, JPEG PNG WebP AVIF compression"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/en/windows/batch-image-compression/" />
+    <link
+      rel="alternate"
+      hreflang="zh-CN"
+      href="https://imgconvert.web.casa/windows/batch-image-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="en"
+      href="https://imgconvert.web.casa/en/windows/batch-image-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/windows/batch-image-compression/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="How to batch-compress images on Windows | ImgConvert" />
+    <meta
+      property="og:description"
+      content="Batch-process images locally on Windows with clear limits for target format, lossless mode, and larger-output skipping."
+    />
+    <meta
+      property="og:url"
+      content="https://imgconvert.web.casa/en/windows/batch-image-compression/"
+    />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to batch-compress images on Windows | ImgConvert" />
+    <meta
+      name="twitter:description"
+      content="Process JPEG, PNG, WebP, and AVIF locally on Windows; originals are not uploaded."
+    />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "How to batch-compress images on Windows",
+            "url": "https://imgconvert.web.casa/en/windows/batch-image-compression/",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://imgconvert.web.casa/en/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Guides",
+                "item": "https://imgconvert.web.casa/en/#guides"
+              },
+              { "@type": "ListItem", "position": 3, "name": "Windows batch image compression" }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Batch-process images locally on Windows",
+            "description": "Use ImgConvert to batch-process files or folders intentionally selected on Windows.",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Add files or a folder",
+                "text": "Put intentionally selected images or a folder in the task queue."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "Choose the output format",
+                "text": "Choose JPEG, PNG, WebP, or AVIF; individual images can override the format."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Adjust quality or lossless mode",
+                "text": "Choose settings for the delivery need; quality and true lossless are different."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "Process and skip larger outputs",
+                "text": "Confirm the directory and keep Skip larger outputs on when useful."
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Can the Windows app process a folder at once?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Add intentionally selected files or a folder to one task queue, then set shared format and processing choices."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Why might a compressed image not be smaller?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Image content, existing encoding, and target settings affect the result. With Skip larger outputs on, a candidate that is not smaller can be left unwritten."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Are images uploaded during batch processing?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Import, conversion, compression, and output happen locally."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>How to batch-compress images on Windows | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>WINDOWS · BATCH COMPRESSION</p>
+        <h1>How to batch-compress images on Windows</h1>
+        <p>
+          ImgConvert processes the images or folders you intentionally choose on your Windows device
+          instead of uploading them to a web service.
+        </p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Add files or a folder to the task queue.</li>
+          <li>Choose JPEG, PNG, WebP, or AVIF as the output format.</li>
+          <li>Adjust quality or lossless mode for the job.</li>
+          <li>Confirm the directory and keep Skip larger outputs on when useful.</li>
+        </ol>
+        <h2>Notes</h2>
+        <p>
+          Results depend on image content, target format, and encoder settings; no setting can
+          guarantee every image will be smaller.
+        </p>
+        <h2>Common question</h2>
+        <p>You can process intentionally selected files or folders in a batch, entirely locally.</p>
+        <p>
+          <a href="https://apps.microsoft.com/store/detail/9P1BWD965DBX?cid=DevShareMCLPCS"
+            >Get the Windows app from Microsoft Store</a
+          >
+          · <a href="/en/">Back to ImgConvert</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

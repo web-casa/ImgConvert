@@ -1,0 +1,205 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="ubuntu-webp-lossless-compression" />
+    <meta
+      name="description"
+      content="Compress WebP images losslessly on Ubuntu with ImgConvert: keep WebP as output, enable true lossless mode, and skip candidate files that are larger than the source."
+    />
+    <meta
+      name="keywords"
+      content="Ubuntu lossless WebP compression, Linux WebP compressor, local WebP compression, lossless WebP re-encoding"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/en/ubuntu/webp-lossless-compression/" />
+    <link
+      rel="alternate"
+      hreflang="zh-CN"
+      href="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="en"
+      href="https://imgconvert.web.casa/en/ubuntu/webp-lossless-compression/"
+    />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/ubuntu/webp-lossless-compression/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="How to compress WebP losslessly on Ubuntu | ImgConvert" />
+    <meta
+      property="og:description"
+      content="Re-encode WebP losslessly on Ubuntu and avoid writing candidates that are larger than the source."
+    />
+    <meta
+      property="og:url"
+      content="https://imgconvert.web.casa/en/ubuntu/webp-lossless-compression/"
+    />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="How to compress WebP losslessly on Ubuntu | ImgConvert" />
+    <meta
+      name="twitter:description"
+      content="Local, lossless WebP re-encoding on Ubuntu. Original images are not uploaded."
+    />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "How to compress WebP losslessly on Ubuntu",
+            "url": "https://imgconvert.web.casa/en/ubuntu/webp-lossless-compression/",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://imgconvert.web.casa/en/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Guides",
+                "item": "https://imgconvert.web.casa/en/#guides"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Ubuntu lossless WebP compression"
+              }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Compress WebP losslessly on Ubuntu",
+            "description": "Use ImgConvert to re-encode WebP images in lossless mode on an Ubuntu device.",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Import the WebP images",
+                "text": "Add WebP files or a folder to the task queue."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "Keep WebP as the output format",
+                "text": "Choose WebP in the output settings."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Enable lossless and keep Skip larger outputs on",
+                "text": "Enable lossless compression and keep the skip option on when you do not want larger files written."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "Choose a directory and process the batch",
+                "text": "Confirm the destination and start the task."
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Why did some WebP images not produce a smaller output?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Lossless re-encoding cannot guarantee a smaller file. If Skip larger outputs is enabled, candidates equal to or larger than the source can be skipped."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is quality 100 the same as true lossless WebP?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Quality and lossless mode are separate encoding choices. Enable lossless mode when you need reversible pixel output."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Are WebP images uploaded while compressing on Ubuntu?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. ImgConvert processes the files and output directory you actively select on your device."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>How to compress WebP losslessly on Ubuntu | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>UBUNTU · WEBP → WEBP</p>
+        <h1>How to compress WebP losslessly on Ubuntu</h1>
+        <p>
+          Keep WebP as the output format, enable lossless mode, and re-encode images locally on
+          Ubuntu instead of sending them to an online compressor.
+        </p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Import WebP files or a folder.</li>
+          <li>Keep WebP as the output format.</li>
+          <li>Enable lossless and keep Skip larger outputs on.</li>
+          <li>Choose the output directory and process the batch.</li>
+        </ol>
+        <h2>Notes</h2>
+        <p>
+          Lossless WebP targets reversible pixels and cannot guarantee a smaller result for every
+          image.
+        </p>
+        <h2>Common questions</h2>
+        <p>
+          Quality 100 is not true lossless mode. The skip option can avoid writing a larger
+          candidate output.
+        </p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest">Get the Linux app</a>
+          · <a href="/en/">Back to ImgConvert home</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

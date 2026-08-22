@@ -1,0 +1,182 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="macos-png-to-webp" />
+    <meta
+      name="description"
+      content="macOS 下使用 ImgConvert 在本机将 PNG 批量转换为 WebP：说明 WebP 无损模式、输出目录和无需上传图片的操作方法。"
+    />
+    <meta
+      name="keywords"
+      content="macOS PNG 转 WebP, Mac PNG 转 WebP, PNG 转 WebP 本地工具, WebP 无损转换"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/macos/png-to-webp/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/macos/png-to-webp/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/macos/png-to-webp/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/macos/png-to-webp/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="macOS 下如何在本地将 PNG 转成 WebP | ImgConvert" />
+    <meta
+      property="og:description"
+      content="在 macOS 本机把 PNG 批量转为 WebP，并了解无损模式和兼容性边界。"
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/macos/png-to-webp/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="macOS 下 PNG 转 WebP | ImgConvert" />
+    <meta name="twitter:description" content="在 macOS 本机将 PNG 转 WebP，原图不上传。" />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "macOS 下如何在本地将 PNG 转成 WebP？",
+            "url": "https://imgconvert.web.casa/macos/png-to-webp/",
+            "inLanguage": "zh-CN",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "首页",
+                "item": "https://imgconvert.web.casa/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "实用指南",
+                "item": "https://imgconvert.web.casa/#guides"
+              },
+              { "@type": "ListItem", "position": 3, "name": "macOS PNG 转 WebP" }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "macOS 下将 PNG 转为 WebP",
+            "description": "使用 ImgConvert 在 macOS 本机处理主动选择的 PNG 图片或文件夹。",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "导入 PNG",
+                "text": "把 PNG 文件或文件夹加入任务队列。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "选择 WebP",
+                "text": "在输出设置中选择 WebP。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "选择编码方式",
+                "text": "按需求调整参数；需要可逆像素时使用无损模式。"
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "选择目录并转换",
+                "text": "确认输出目录后开始任务。"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "macOS 上可以批量把 PNG 转成 WebP 吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "可以。将多张 PNG 或包含它们的文件夹加入任务队列，再将目标格式设为 WebP。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "WebP 无损一定比 PNG 小吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不一定。无损模式关注像素可逆，文件大小仍由图片内容和编码结果决定。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "PNG 转 WebP 时会使用网页服务器吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不会。ImgConvert 是桌面应用，处理发生在本机。"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>macOS 下如何在本地将 PNG 转成 WebP | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>MACOS · PNG → WEBP</p>
+        <h1>macOS 下如何在本地将 PNG 转成 WebP？</h1>
+        <p>
+          ImgConvert 在 macOS 本机读取你主动选择的 PNG 文件或文件夹，并把 WebP 写入你选择的目录。
+        </p>
+        <h2>操作步骤</h2>
+        <ol>
+          <li>导入 PNG 文件或文件夹。</li>
+          <li>将输出格式设为 WebP。</li>
+          <li>按交付需求选择质量或无损模式。</li>
+          <li>确认目录并开始转换。</li>
+        </ol>
+        <h2>使用提示</h2>
+        <p>无损 WebP 关注可逆像素，并不保证每张 PNG 都比原图小。</p>
+        <h2>常见问题</h2>
+        <p>多张 PNG 可在一个队列中处理；转换不需要上传原图。</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest"
+            >从 GitHub Releases 获取 macOS 版</a
+          >
+          · <a href="/">返回 ImgConvert 首页</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

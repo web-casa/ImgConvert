@@ -6,7 +6,7 @@ pkgver=@VERSION@
 pkgrel=1
 pkgdesc='Local-first batch image converter (prebuilt AppImage)'
 arch=('x86_64')
-url='https://github.com/web-casa/ImgConvert'
+url='https://imgconvert.web.casa/'
 license=('Apache-2.0')
 depends=('bash' 'glibc')
 provides=("imgconvert=${pkgver}")

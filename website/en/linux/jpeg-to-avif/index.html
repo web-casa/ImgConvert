@@ -1,0 +1,192 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright (C) 2026 ImgConvert contributors -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17563d" />
+    <meta name="page-kind" content="guide" />
+    <meta name="guide-id" content="linux-jpeg-to-avif" />
+    <meta
+      name="description"
+      content="Convert JPEG/JPG to AVIF locally on Linux with ImgConvert: batch import, quality-setting guidance for a lossy source, local output, and no image upload."
+    />
+    <meta
+      name="keywords"
+      content="Linux JPEG to AVIF, Linux JPG to AVIF, local JPEG to AVIF converter, AVIF image conversion"
+    />
+    <meta
+      name="robots"
+      content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
+    />
+    <link rel="canonical" href="https://imgconvert.web.casa/en/linux/jpeg-to-avif/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/linux/jpeg-to-avif/" />
+    <link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/linux/jpeg-to-avif/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://imgconvert.web.casa/linux/jpeg-to-avif/"
+    />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+    <meta property="og:site_name" content="ImgConvert" />
+    <meta property="og:title" content="How to convert JPEG to AVIF locally on Linux | ImgConvert" />
+    <meta
+      property="og:description"
+      content="Batch-convert JPEG/JPG to AVIF on Linux locally, with accurate quality and compatibility boundaries."
+    />
+    <meta property="og:url" content="https://imgconvert.web.casa/en/linux/jpeg-to-avif/" />
+    <meta
+      property="og:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="How to convert JPEG to AVIF locally on Linux | ImgConvert"
+    />
+    <meta
+      name="twitter:description"
+      content="Turn JPEG/JPG into AVIF locally on Linux; images are not uploaded."
+    />
+    <meta
+      name="twitter:image"
+      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+    />
+    <link rel="icon" type="image/png" href="/images/product/app-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "name": "How to convert JPEG to AVIF locally on Linux",
+            "url": "https://imgconvert.web.casa/en/linux/jpeg-to-avif/",
+            "inLanguage": "en",
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "ImgConvert",
+              "url": "https://imgconvert.web.casa/"
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://imgconvert.web.casa/en/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Guides",
+                "item": "https://imgconvert.web.casa/en/#guides"
+              },
+              { "@type": "ListItem", "position": 3, "name": "Linux JPEG to AVIF" }
+            ]
+          },
+          {
+            "@type": "HowTo",
+            "name": "Convert JPEG to AVIF on Linux",
+            "description": "Use ImgConvert to write AVIF from JPEG/JPG files intentionally selected on Linux.",
+            "step": [
+              {
+                "@type": "HowToStep",
+                "position": 1,
+                "name": "Import JPEG or JPG",
+                "text": "Add images or a folder to the task queue."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 2,
+                "name": "Choose AVIF",
+                "text": "Choose AVIF in output settings."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 3,
+                "name": "Adjust quality",
+                "text": "Adjust quality for the job; JPEG is already a lossy source."
+              },
+              {
+                "@type": "HowToStep",
+                "position": 4,
+                "name": "Confirm directory and process",
+                "text": "Choose the output directory and enable Skip larger outputs when useful."
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Can the Linux app batch-convert JPG to AVIF?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Add multiple JPEG/JPG files or a folder containing them to the task queue, then choose AVIF output."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can lossless AVIF recover the original JPEG quality?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. JPEG is already lossy. Lossless AVIF can preserve current decoded pixels, not information removed by an earlier encoding step."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Are JPEG images uploaded from Linux during conversion?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. ImgConvert completes conversion and output locally."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>How to convert JPEG to AVIF locally on Linux | ImgConvert</title>
+  </head>
+  <body>
+    <div id="app">
+      <main class="seo-fallback">
+        <p>LINUX · JPEG → AVIF</p>
+        <h1>How to convert JPEG to AVIF locally on Linux</h1>
+        <p>
+          ImgConvert writes AVIF from JPEG/JPG files or folders you intentionally select on Linux,
+          without an online conversion service.
+        </p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Import JPEG/JPG files or a folder.</li>
+          <li>Set AVIF as the output format.</li>
+          <li>Adjust quality for the delivery need.</li>
+          <li>Confirm the directory and enable Skip larger outputs when useful.</li>
+        </ol>
+        <h2>Notes</h2>
+        <p>
+          JPEG is already lossy. Converting it to lossless AVIF cannot recover detail lost in an
+          earlier encoding step.
+        </p>
+        <h2>Common question</h2>
+        <p>JPEG/JPG can be batch-converted, entirely on your device.</p>
+        <p>
+          <a href="https://github.com/web-casa/ImgConvert/releases/latest"
+            >Get the Linux app from GitHub Releases</a
+          >
+          · <a href="/en/">Back to ImgConvert</a>
+        </p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

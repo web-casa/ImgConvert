@@ -1,6 +1,7 @@
 packages:
   - .
   - docs-site
+  - website
 
 overrides:
   svelte-i18n>esbuild: ^0.25.0

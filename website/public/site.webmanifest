@@ -1,0 +1,16 @@
+{
+  "name": "ImgConvert",
+  "short_name": "ImgConvert",
+  "description": "A local-first desktop app for batch image conversion and compression.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#f7f6f0",
+  "theme_color": "#17563d",
+  "icons": [
+    {
+      "src": "/images/product/app-icon.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}

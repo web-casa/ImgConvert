@@ -1,0 +1,989 @@
+{
+  "zh": {
+    "common": {
+      "home": "首页",
+      "blog": "Blog",
+      "docs": "文档",
+      "guides": "实用指南",
+      "privacy": "隐私政策",
+      "language": "语言",
+      "navigation": "资源导航",
+      "skip": "跳至正文",
+      "breadcrumbHome": "首页",
+      "read": "阅读全文",
+      "open": "打开文档",
+      "takeaways": "先记住这些",
+      "faq": "常见问题",
+      "related": "继续阅读",
+      "download": "获取 ImgConvert",
+      "localNote": "图片在设备上处理，不上传到网页服务。",
+      "formatVisualAlt": "ImgConvert 真实的输出格式选择界面，显示 AVIF、WebP、JPEG 与 PNG",
+      "formatVisualCaption": "真实格式选择界面；选项会随应用版本与系统能力变化。",
+      "workspaceVisualAlt": "ImgConvert 真实运行中的本地图片转换工作区",
+      "workspaceVisualCaption": "真实运行界面；导入、输出设置与任务状态在同一处。",
+      "privacyVisualAlt": "纸张上的照片联络表和外置硬盘，象征文件在本地处理",
+      "privacyVisualCaption": "编辑插图：文件留在身边，处理留在设备上。"
+    },
+    "hubs": {
+      "blog": {
+        "kind": "blog",
+        "eyebrow": "IMGCONVERT JOURNAL",
+        "title": "把格式、压缩与隐私，\n讲清楚一点。",
+        "lede": "围绕真实的图片交付问题写短而具体的文章：该选什么格式、何时需要无损、何时不该把文件交给在线工具。",
+        "description": "ImgConvert Blog：关于 AVIF、WebP、PNG、图片压缩与本地图片处理的实用文章。",
+        "keywords": ["图片格式博客", "AVIF WebP PNG", "本地图片处理", "图片压缩知识"],
+        "indexTitle": "最近文章",
+        "indexBody": "每篇都从一个可验证的处理决策开始，不用关键词堆砌来替代答案。"
+      },
+      "docs": {
+        "kind": "docs",
+        "eyebrow": "PRODUCT DOCUMENTATION",
+        "title": "知道应用会做什么，\n也知道它不会做什么。",
+        "lede": "这里记录 ImgConvert 当前的格式边界、批量工作流和本地处理方式。内容随真实产品能力维护，而不是承诺尚未存在的功能。",
+        "description": "ImgConvert 产品文档：支持格式、批量转换工作流与本地处理和隐私边界。",
+        "keywords": ["ImgConvert 文档", "图片格式支持", "本地图片转换", "批量转换工作流"],
+        "indexTitle": "产品文档",
+        "indexBody": "从格式选择、任务队列到本地缓存，先看清边界，再决定是否适合你的工作。"
+      }
+    },
+    "pages": {
+      "avif-vs-webp-vs-png": {
+        "id": "avif-vs-webp-vs-png",
+        "kind": "blog",
+        "slug": "avif-vs-webp-vs-png",
+        "eyebrow": "FORMAT DECISIONS",
+        "label": "格式选择",
+        "title": "AVIF、WebP 与 PNG：\n网页图片应该怎么选？",
+        "lede": "没有一种格式适合所有图片。把“体积、可逆像素、接收端兼容性”拆开看，选择会比只追求最小文件更可靠。",
+        "description": "AVIF、WebP 与 PNG 的区别：从体积、无损模式和交付兼容性出发，选择适合网页图片的格式。",
+        "keywords": ["AVIF vs WebP vs PNG", "WebP 和 PNG 区别", "网页图片格式", "AVIF 图片格式"],
+        "readingTime": "约 5 分钟",
+        "takeaways": [
+          "AVIF、WebP 和 PNG 是不同的交付取舍，不是单纯的大小排行。",
+          "质量数值与真无损是不同概念；高质量不等于可逆像素。",
+          "先确认图片会在哪些软件或浏览器中被打开，再决定是否需要备用格式。"
+        ],
+        "sections": [
+          {
+            "heading": "先问图片要去哪里，而不是先问哪种格式更小",
+            "paragraphs": [
+              "图片的接收端决定了可接受的格式范围。面向现代网页时，AVIF 或 WebP 往往值得评估；要交付给未知版本的软件、旧浏览器或外部客户时，保留兼容格式通常比单一压缩数字更重要。",
+              "同一张图也可能需要两套输出：一套用于现代 Web 交付，另一套作为更广泛兼容的备份。这样做不是浪费，而是把兼容性风险放在发布前处理。"
+            ]
+          },
+          {
+            "heading": "三种格式各自解决什么问题",
+            "paragraphs": [
+              "AVIF 适合需要高效编码的现代交付场景，并支持真无损输出。它不是保证每张图都最小的按钮；不同内容和设置会得到不同结果。",
+              "WebP 同时覆盖现代 Web 常见的有损与无损需求，适合需要在体积、质量与浏览器支持之间做平衡的任务。PNG 则是常见的通用无损选择，当对方明确要求 PNG 或兼容性优先时仍然合理。"
+            ],
+            "list": [
+              "需要可逆像素：检查目标格式的无损模式，而不是只把质量拉高。",
+              "需要现代网页交付：先在目标浏览器和发布链路中测试 AVIF 或 WebP。",
+              "需要广泛兼容或已有 PNG 工作流：保留 PNG，或把它作为备用交付。"
+            ]
+          },
+          {
+            "heading": "把选择放进可复现的批量工作流",
+            "paragraphs": [
+              "把源图、目标格式和输出目录明确下来，再批量处理。ImgConvert 允许任务使用统一输出格式，并在确有例外时为单张图片覆盖格式；这比把异常图片另开一套流程更容易复查。",
+              "对体积敏感的任务，可以保留“跳过更大输出”。它不会承诺更小文件，但能避免把更大的候选结果写入输出目录。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "一个实用的默认值",
+          "body": "如果接收端还不明确，先保留原始文件，再生成一种现代交付格式。等目标环境确定后，再决定是否删除兼容备用。"
+        },
+        "questions": [
+          {
+            "question": "AVIF 一定比 WebP 或 PNG 更小吗？",
+            "answer": "不一定。文件大小取决于图片内容、编码器和设置。AVIF 的优势是高效编码能力，而不是对每张图片的体积保证。"
+          },
+          {
+            "question": "把质量设为 100 就是无损吗？",
+            "answer": "不是。质量设置和无损模式是不同的编码选择。需要像素可逆时，应明确开启目标格式支持的无损模式。"
+          },
+          {
+            "question": "应该保留哪一种备用格式？",
+            "answer": "取决于接收端。若兼容范围未知，保留原始 PNG 或 JPEG 是更稳妥的做法；不要只依据文件大小做决定。"
+          }
+        ],
+        "related": ["docs-supported-formats", "compression-quality-vs-lossless"]
+      },
+      "local-vs-online-image-converter": {
+        "id": "local-vs-online-image-converter",
+        "kind": "blog",
+        "slug": "local-vs-online-image-converter",
+        "eyebrow": "LOCAL-FIRST WORKFLOW",
+        "label": "本地处理",
+        "title": "本地图片转换和在线转换：\n差别不只在上传按钮。",
+        "lede": "在线工具方便，但它把文件、路径和等待时间交给了网络链路。本地桌面工具的价值，是把批量处理和文件控制权留在你自己的设备上。",
+        "description": "本地图片转换与在线图片转换有什么差别？从上传、隐私、批量工作和输出控制理解本地优先的图片处理方式。",
+        "keywords": ["本地图片转换", "在线图片转换对比", "图片不上传", "离线图片压缩"],
+        "readingTime": "约 4 分钟",
+        "takeaways": [
+          "本地与在线的核心区别是数据路径，而不只是界面形式。",
+          "大批量、敏感素材和重复任务更需要可见的本地队列与输出目录。",
+          "选择工具时应阅读它实际访问、缓存和上传哪些数据。"
+        ],
+        "sections": [
+          {
+            "heading": "先看文件会经过哪里",
+            "paragraphs": [
+              "在线转换通常要求浏览器把文件传到远端服务，再把结果下载回来。即使服务可靠，文件大小、网络环境和服务端保留策略也会进入你的工作流程。",
+              "ImgConvert 的转换、压缩、缩略图和队列管理在本机完成。它只访问你主动选择的文件、目录，或你明确使用剪贴板导入时提供的图片。"
+            ]
+          },
+          {
+            "heading": "本地工作流何时更合适",
+            "paragraphs": [
+              "当一批图片很大、网络不稳定、素材尚未公开，或你需要重复使用同一套输出设置时，本地任务队列能减少等待和重复上传。输出目录、取消操作和处理结果也能在同一个工作区里查看。",
+              "本地不等于没有任何本机数据。偏好、临时文件、缩略图缓存和结果缓存可能保存在设备上；好的工具应该说明这些数据是什么，并允许你清理或关闭不需要的复用。"
+            ]
+          },
+          {
+            "heading": "不要把“隐私”当成模糊的营销词",
+            "paragraphs": [
+              "判断一款图片工具时，查看它是否说明了上传行为、账号系统、第三方分析、元数据默认值与本地缓存。一个清晰的边界比泛泛的“安全”标签更有用。",
+              "ImgConvert 不包含账号、广告 SDK、行为统计 SDK 或第三方埋点；默认不上传图片，也不会自动保留源图元数据到输出文件。需要保留元数据时，必须由你明确开启。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "本地优先不是反对网络",
+          "body": "下载应用和获取更新仍会使用网络；这里说的是图片处理本身不需要把你的原图交给网页服务。"
+        },
+        "questions": [
+          {
+            "question": "本地处理是否意味着应用完全不会联网？",
+            "answer": "图片转换本身在本机完成。下载安装、查看发布说明等动作会访问相应的网络服务，但不会把待处理图片上传到 ImgConvert 的服务器。"
+          },
+          {
+            "question": "本地应用会保存什么？",
+            "answer": "转换偏好、临时文件、缩略图缓存和结果缓存记录可能保存在本机。结果缓存只包含用于校验或复用的哈希值和文件大小，不包含图片字节或文件路径。"
+          },
+          {
+            "question": "在线工具一定不安全吗？",
+            "answer": "不能一概而论。关键是理解它的数据路径和条款；如果素材敏感或工作量大，本地工具通常提供更直接的文件控制。"
+          }
+        ],
+        "related": ["docs-local-processing-and-privacy", "docs-batch-workflow"]
+      },
+      "compression-quality-vs-lossless": {
+        "id": "compression-quality-vs-lossless",
+        "kind": "blog",
+        "slug": "compression-quality-vs-lossless",
+        "eyebrow": "COMPRESSION BASICS",
+        "label": "压缩原理",
+        "title": "图片压缩里的“质量”与“无损”，\n不是一回事。",
+        "lede": "把质量滑块推到很高，并不会自动得到真无损结果。理解有损、无损和“跳过更大输出”的区别，才能避免对文件体积和画质做出错误预期。",
+        "description": "图片压缩中质量和无损的区别：如何理解有损编码、真无损、JPEG 来源限制和跳过更大输出。",
+        "keywords": ["图片压缩质量和无损区别", "无损图片压缩", "跳过更大输出", "JPEG 转无损"],
+        "readingTime": "约 5 分钟",
+        "takeaways": [
+          "质量是有损编码的取舍参数；无损表示可逆像素，两者不能互换。",
+          "无损重新编码不保证更小文件。",
+          "从 JPEG 生成无损输出，无法找回早已丢失的细节。"
+        ],
+        "sections": [
+          {
+            "heading": "质量滑块在控制什么",
+            "paragraphs": [
+              "有损编码会在体积与视觉保真之间取舍。质量设置通常影响这种取舍的程度，但不同格式和不同图片内容对同一个数字的反应并不相同。",
+              "因此，质量 80、90 或 100 不是跨格式的统一标准。它们更适合作为同一项目内的起点，之后仍应在真实的接收场景中查看结果。"
+            ]
+          },
+          {
+            "heading": "真无损解决的是可逆，而不是体积承诺",
+            "paragraphs": [
+              "真无损编码的目标是让解码后的像素可逆。它适合像素必须保持一致的工作，但不会保证输出一定比源文件更小。已经高效编码过的文件，重新无损编码后甚至可能更大。",
+              "这也是为什么 ImgConvert 提供“跳过更大输出”：当候选结果不比源文件小，你可以避免把它写入输出目录。它是一个保护条件，不是压缩率承诺。"
+            ]
+          },
+          {
+            "heading": "有损来源不能被无损模式修复",
+            "paragraphs": [
+              "JPEG 本身是有损来源。把 JPEG 转成无损 AVIF 或 WebP，最多能保留当前解码后的像素，不能恢复过去编码已经删除的信息。",
+              "如果目标是减少二次损失，保留原始文件、谨慎选择质量、避免重复有损转码，通常比事后切换到无损容器更有效。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "先定义“成功”",
+          "body": "如果成功意味着像素可逆，就选择无损并接受体积可能不变；如果成功意味着更小交付，就在目标环境中比较体积与视觉结果。"
+        },
+        "questions": [
+          {
+            "question": "质量 100 等于无损吗？",
+            "answer": "不等于。质量和无损是不同的编码选择；需要可逆像素时，应使用格式提供的无损模式。"
+          },
+          {
+            "question": "无损压缩为什么有时更大？",
+            "answer": "无损模式优先保证像素可逆，而不是最小体积。源图内容和已有编码都会影响结果。"
+          },
+          {
+            "question": "JPEG 转成无损格式会恢复画质吗？",
+            "answer": "不会。无损输出无法恢复 JPEG 之前有损编码已经去掉的细节。"
+          }
+        ],
+        "related": ["docs-quality-lossless-and-larger-outputs", "avif-vs-webp-vs-png"]
+      },
+      "docs-supported-formats": {
+        "id": "docs-supported-formats",
+        "kind": "docs",
+        "slug": "supported-formats",
+        "eyebrow": "FORMAT SUPPORT",
+        "label": "格式支持",
+        "title": "支持格式与能力边界",
+        "lede": "ImgConvert 为 AVIF、WebP、JPEG 与 PNG 提供输出选择。HEIC/HEIF 是依赖系统能力的只读导入，而不是输出格式。",
+        "description": "ImgConvert 支持的图片格式：AVIF、WebP、JPEG、PNG 输出，以及由系统能力支持的 HEIC/HEIF 只读导入。",
+        "keywords": [
+          "ImgConvert 支持格式",
+          "AVIF WebP JPEG PNG 转换",
+          "HEIC 导入",
+          "图片格式转换工具"
+        ],
+        "readingTime": "文档 · 4 分钟",
+        "visual": "format-picker",
+        "takeaways": [
+          "AVIF、WebP、JPEG 和 PNG 是当前可选的输出格式。",
+          "HEIC/HEIF 只作为平台能力支持的输入，不作为输出格式。",
+          "个别图片可跟随全局格式，也可以按需覆盖输出格式。"
+        ],
+        "sections": [
+          {
+            "heading": "输出格式：AVIF、WebP、JPEG 与 PNG",
+            "paragraphs": [
+              "在输出设置中，可以为任务选择 AVIF、WebP、JPEG 或 PNG。它们适合不同的交付目标：AVIF 和 WebP 面向现代编码，JPEG 注重广泛兼容，PNG 是常见的通用无损选择。",
+              "格式名称不等于结果承诺。是否启用无损、质量如何设置、是否保留元数据，都会影响输出文件。应把它们作为独立设置检查。"
+            ]
+          },
+          {
+            "heading": "HEIC/HEIF：只读导入，取决于系统能力",
+            "paragraphs": [
+              "ImgConvert 不导出 HEIC。支持的 HEIC/HEIF 文件可以作为输入读取，具体可用性由平台系统能力决定；在 Windows 上，这可能依赖已安装的系统扩展或可选 helper。",
+              "如果任务是把 HEIC 转成 JPG，可以将 JPEG 设为输出格式。macOS 上的读取会使用本机系统 ImageIO 支持，而不是把图片提交给在线转换器。"
+            ]
+          },
+          {
+            "heading": "为一张图片单独选择格式",
+            "paragraphs": [
+              "批量任务可以使用同一套全局输出设置。当队列中有一个例外时，可以为该图片选择不同格式，而不必拆分整个任务。",
+              "单张设置的实际可选项仍取决于当前应用版本与系统能力；在开始任务前检查格式选择界面，是最直接的确认方式。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "HEIC 不是输出承诺",
+          "body": "将 HEIC 看作由平台能力支持的输入格式。需要交付时，请选择 AVIF、WebP、JPEG 或 PNG 之一作为输出。"
+        },
+        "questions": [
+          {
+            "question": "ImgConvert 可以导出 HEIC 吗？",
+            "answer": "不能。HEIC/HEIF 是由平台能力支持的只读导入格式；当前输出选择包括 AVIF、WebP、JPEG 和 PNG。"
+          },
+          {
+            "question": "可以在同一任务中为单张图片选择不同格式吗？",
+            "answer": "可以。个别图片可以跟随全局设置，也可以按需覆盖输出格式。"
+          },
+          {
+            "question": "所有系统都能读取 HEIC 吗？",
+            "answer": "不保证。HEIC 的读取取决于平台系统能力；Windows 上可能需要系统扩展或可选 helper。"
+          }
+        ],
+        "related": ["avif-vs-webp-vs-png", "docs-batch-workflow"]
+      },
+      "docs-batch-workflow": {
+        "id": "docs-batch-workflow",
+        "kind": "docs",
+        "slug": "batch-workflow",
+        "eyebrow": "BATCH WORKFLOW",
+        "label": "批量工作流",
+        "title": "从导入到输出：\n一批图片如何处理",
+        "lede": "任务队列把导入、输出格式、压缩设置、进度和结果放在一个桌面工作区中。你可以统一处理一批图片，也可以为个别项保留例外。",
+        "description": "ImgConvert 批量图片处理工作流：导入文件或文件夹、选择输出格式、设置压缩参数、查看进度和结果。",
+        "keywords": ["图片批量转换工作流", "批量图片压缩", "文件夹图片转换", "ImgConvert 使用方法"],
+        "readingTime": "文档 · 5 分钟",
+        "visual": "live-workspace",
+        "takeaways": [
+          "文件、文件夹和主动粘贴的剪贴板图片可以进入同一个任务队列。",
+          "全局设置适合大多数项目，单张覆盖适合明确的例外。",
+          "进度、取消和输出结果在本地工作区中可见。"
+        ],
+        "sections": [
+          {
+            "heading": "1. 导入你主动选择的输入",
+            "paragraphs": [
+              "可以选择文件、文件夹，或使用主动的剪贴板导入。它们会进入同一个任务队列，便于对一批图片使用相同的输出策略。",
+              "应用不会在后台扫描相册、硬盘或网络位置。输入范围始终由你的选择决定。"
+            ]
+          },
+          {
+            "heading": "2. 设置全局输出，再处理例外",
+            "paragraphs": [
+              "为任务选择目标格式，再根据用途调整质量、无损模式、并发、已存在文件处理方式和文件名模板。不是每项都必须修改；先从一套清晰的默认值开始更容易复查。",
+              "某张图片需要不同交付格式时，可以为它单独覆盖输出格式，不必重新建立整个批次。"
+            ]
+          },
+          {
+            "heading": "3. 选择输出目录并查看结果",
+            "paragraphs": [
+              "确认可写入的输出目录后开始处理。进度、取消和输出结果都在同一个本地工作区显示，让批处理不再是不可见的等待。",
+              "如果目标是避免更大的候选文件，启用“跳过更大输出”。这会在候选不比源文件小时避免写入，而不是承诺每张图都会被压小。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "批量前先做一个小样本",
+          "body": "对陌生素材，先用几张有代表性的图片测试输出格式和质量，再把相同设置应用到整个文件夹。"
+        },
+        "questions": [
+          {
+            "question": "可以直接导入一个文件夹吗？",
+            "answer": "可以。文件夹可以作为你主动选择的输入加入任务队列，适合批量处理。"
+          },
+          {
+            "question": "单张图片可以不同于全局格式吗？",
+            "answer": "可以。为个别图片覆盖输出格式时，不需要重新建立整批任务。"
+          },
+          {
+            "question": "可以取消正在进行的任务吗？",
+            "answer": "可以。进度与取消操作都在同一个本地工作区中提供。"
+          }
+        ],
+        "related": ["docs-supported-formats", "docs-quality-lossless-and-larger-outputs"]
+      },
+      "docs-local-processing-and-privacy": {
+        "id": "docs-local-processing-and-privacy",
+        "kind": "docs",
+        "slug": "local-processing-and-privacy",
+        "eyebrow": "LOCAL PROCESSING",
+        "label": "本地处理与隐私",
+        "title": "本地处理、缓存与元数据：\n应用实际如何处理数据",
+        "lede": "ImgConvert 是桌面应用。图片转换、压缩、缩略图和队列管理在设备上完成；了解本机缓存、元数据和访问范围，才能正确评估隐私边界。",
+        "description": "ImgConvert 的本地处理与隐私说明：图片不上传、主动选择的文件访问、本机缓存和元数据默认值。",
+        "keywords": ["图片不上传", "本地图片处理", "离线图片转换隐私", "ImgConvert 隐私"],
+        "readingTime": "文档 · 5 分钟",
+        "visual": "privacy-editorial",
+        "takeaways": [
+          "图片转换、压缩、缩略图和队列管理在你的设备上完成。",
+          "应用只在需要时访问你主动选择的输入、输出目录和剪贴板图片。",
+          "默认不自动保留源图元数据；本机缓存和偏好可以由你清理。"
+        ],
+        "sections": [
+          {
+            "heading": "图片处理留在设备上",
+            "paragraphs": [
+              "ImgConvert 不把图片内容、路径、剪贴板内容或转换结果上传、收集或发送给我们或第三方。格式转换、压缩、缩略图生成和队列管理均在本机完成。",
+              "这不等于应用不会使用网络做任何事：例如下载应用或查看发布说明需要网络。但待处理的图片不需要交给网页服务。"
+            ]
+          },
+          {
+            "heading": "访问范围由你的操作决定",
+            "paragraphs": [
+              "应用只在必要时访问你主动选择的输入文件、输出目录，以及你主动使用剪贴板导入时提供的图片。它不会在后台扫描相册、硬盘或网络位置。",
+              "输出目录由你选择。对重要素材，建议先复制到独立输出目录，避免把原图与结果混在一起。"
+            ]
+          },
+          {
+            "heading": "元数据和本机缓存",
+            "paragraphs": [
+              "输出默认不自动保留原图元数据。只有在你明确开启保留元数据时，受支持的 ICC、EXIF、XMP 等信息才会写入输出文件。",
+              "转换偏好、临时文件、缩略图缓存和结果缓存记录可能保存在本机。结果缓存只包含用于校验或复用的哈希值和文件大小，不包含图片字节或文件路径。你可以关闭结果复用并清理本机应用数据或缓存。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "本地优先也需要读清楚本机数据",
+          "body": "隐私不是只问“是否上传”。也要了解工具在本机保存什么、何时保留元数据，以及怎样清理缓存。"
+        },
+        "questions": [
+          {
+            "question": "图片会上传到服务器吗？",
+            "answer": "不会。图片转换、压缩、缩略图和队列管理在你的设备上完成。"
+          },
+          {
+            "question": "默认会保留 EXIF 吗？",
+            "answer": "不会自动保留。只有在你明确开启保留元数据时，受支持的元数据才会写入输出文件。"
+          },
+          {
+            "question": "结果缓存里有图片或路径吗？",
+            "answer": "没有。结果缓存记录只包含用于校验或复用的哈希值和文件大小，不包含图片字节或文件路径。"
+          }
+        ],
+        "related": ["local-vs-online-image-converter", "docs-batch-workflow"]
+      },
+      "docs-quality-lossless-and-larger-outputs": {
+        "id": "docs-quality-lossless-and-larger-outputs",
+        "kind": "docs",
+        "slug": "quality-lossless-and-larger-outputs",
+        "eyebrow": "OUTPUT SETTINGS",
+        "label": "输出设置",
+        "title": "质量、无损与“跳过更大输出”",
+        "lede": "这些设置各自解决不同问题：质量控制有损编码取舍，无损关注像素可逆，“跳过更大输出”避免不划算的候选文件写入磁盘。",
+        "description": "ImgConvert 输出设置文档：质量、真无损、跳过更大输出以及有损来源转码的实际边界。",
+        "keywords": ["ImgConvert 无损压缩", "跳过更大输出", "图片质量设置", "AVIF WebP 无损"],
+        "readingTime": "文档 · 4 分钟",
+        "takeaways": [
+          "质量与无损是独立设置，不能互相替代。",
+          "无损输出不保证更小；跳过更大输出可避免不划算的写入。",
+          "对 JPEG 等有损来源，无损容器不能恢复已丢失的细节。"
+        ],
+        "sections": [
+          {
+            "heading": "质量：为有损输出设定取舍",
+            "paragraphs": [
+              "质量设置用于有损编码的输出取舍。它不代表跨格式可比的等级，也不代表真无损。选择时应以真实素材和实际发布环境为准，而不是只比较单一数字。",
+              "如果你从 JPEG 继续生成有损输出，额外损失是否可见取决于图片内容和设置；先做小样本测试通常更可靠。"
+            ]
+          },
+          {
+            "heading": "无损：为可逆像素而设",
+            "paragraphs": [
+              "启用无损模式时，目标是让解码后的像素可逆。无损适合像素一致性比文件体积更重要的工作，但不会保证输出比源文件小。",
+              "将 JPEG 这样的有损来源写入无损 AVIF 或 WebP，只会保留当前解码得到的像素，不能恢复之前压缩已经删除的信息。"
+            ]
+          },
+          {
+            "heading": "跳过更大输出：避免无意义的替换",
+            "paragraphs": [
+              "当候选输出与源文件相同大小或更大时，开启该选项可以不把它写入输出目录。这对无损重新编码或已经优化过的素材尤其有用。",
+              "它不是压缩率保证。候选是否更小仍由素材、目标格式和编码设置决定。"
+            ]
+          }
+        ],
+        "callout": {
+          "title": "设置建议",
+          "body": "先决定你要的是可逆像素还是更小交付，再决定无损或质量；最后用“跳过更大输出”保护输出目录。"
+        },
+        "questions": [
+          {
+            "question": "质量 100 与无损模式有什么区别？",
+            "answer": "质量 100 仍是质量设置；无损模式才是可逆像素的编码选择。两者不能视为同一件事。"
+          },
+          {
+            "question": "为什么无损输出会被跳过？",
+            "answer": "因为候选文件可能不比源文件小。开启跳过更大输出时，应用可以不写入这种候选结果。"
+          },
+          {
+            "question": "无损 AVIF 能恢复 JPEG 的细节吗？",
+            "answer": "不能。JPEG 之前有损编码删除的信息无法通过更换无损容器恢复。"
+          }
+        ],
+        "related": ["compression-quality-vs-lossless", "docs-supported-formats"]
+      }
+    }
+  },
+  "en": {
+    "common": {
+      "home": "Home",
+      "blog": "Blog",
+      "docs": "Docs",
+      "guides": "Guides",
+      "privacy": "Privacy",
+      "language": "Language",
+      "navigation": "Resource navigation",
+      "skip": "Skip to article",
+      "breadcrumbHome": "Home",
+      "read": "Read article",
+      "open": "Open doc",
+      "takeaways": "Key points",
+      "faq": "Common questions",
+      "related": "Keep reading",
+      "download": "Get ImgConvert",
+      "localNote": "Images are processed on your device, not uploaded to a web service.",
+      "formatVisualAlt": "The real ImgConvert output-format picker showing AVIF, WebP, JPEG, and PNG",
+      "formatVisualCaption": "The real format picker; options vary by app version and system capability.",
+      "workspaceVisualAlt": "The real local image conversion workspace running in ImgConvert",
+      "workspaceVisualCaption": "The real running interface; import, output settings, and task status stay together.",
+      "privacyVisualAlt": "A photo contact sheet and external drive on paper, representing files processed locally",
+      "privacyVisualCaption": "Editorial illustration: files stay close and the work stays on your device."
+    },
+    "hubs": {
+      "blog": {
+        "kind": "blog",
+        "eyebrow": "IMGCONVERT JOURNAL",
+        "title": "Make formats, compression,\nand privacy clearer.",
+        "lede": "Short, specific articles about real image-delivery decisions: which format to choose, when lossless matters, and when a file should not leave your device.",
+        "description": "ImgConvert Blog: practical articles about AVIF, WebP, PNG, image compression, and local image processing.",
+        "keywords": [
+          "image format blog",
+          "AVIF WebP PNG",
+          "local image processing",
+          "image compression guide"
+        ],
+        "indexTitle": "Latest articles",
+        "indexBody": "Each article starts with a verifiable processing decision instead of using keyword repetition as a substitute for an answer."
+      },
+      "docs": {
+        "kind": "docs",
+        "eyebrow": "PRODUCT DOCUMENTATION",
+        "title": "Know what the app does.\nKnow what it does not.",
+        "lede": "Current product boundaries for formats, batch workflow, and local processing. These pages are maintained against real capability, not promises about features that do not exist.",
+        "description": "ImgConvert documentation: supported formats, batch conversion workflow, and local processing and privacy boundaries.",
+        "keywords": [
+          "ImgConvert documentation",
+          "image format support",
+          "local image conversion",
+          "batch conversion workflow"
+        ],
+        "indexTitle": "Product documentation",
+        "indexBody": "Check the format boundary, task queue, and local-data behavior before deciding whether the workflow fits your work."
+      }
+    },
+    "pages": {
+      "avif-vs-webp-vs-png": {
+        "id": "avif-vs-webp-vs-png",
+        "kind": "blog",
+        "slug": "avif-vs-webp-vs-png",
+        "eyebrow": "FORMAT DECISIONS",
+        "label": "Format choice",
+        "title": "AVIF vs WebP vs PNG:\nwhich should a web image use?",
+        "lede": "No single format fits every image. Separate file size, reversible pixels, and recipient compatibility before you decide; it is more reliable than chasing the smallest file alone.",
+        "description": "AVIF vs WebP vs PNG: choose a web-image format through file size, lossless mode, and delivery compatibility.",
+        "keywords": ["AVIF vs WebP vs PNG", "WebP vs PNG", "web image format", "AVIF image format"],
+        "readingTime": "5 min read",
+        "takeaways": [
+          "AVIF, WebP, and PNG are delivery tradeoffs, not a simple size ranking.",
+          "A quality value and true lossless are different concepts; high quality does not mean reversible pixels.",
+          "Confirm where an image will open before deciding whether a fallback format is necessary."
+        ],
+        "sections": [
+          {
+            "heading": "Start with where the image is going, not with which format is smallest",
+            "paragraphs": [
+              "The recipient determines the useful format range. For modern web delivery, AVIF or WebP may be worth evaluating. When images go to unknown software versions, older browsers, or external clients, keeping a compatible format matters more than one compression number.",
+              "One source image can reasonably produce two outputs: a modern web delivery and a broader fallback. That is not waste; it moves compatibility risk before publication."
+            ]
+          },
+          {
+            "heading": "What each format is solving for",
+            "paragraphs": [
+              "AVIF suits modern delivery that benefits from efficient encoding and supports true lossless output. It is not a button that guarantees the smallest result for every image; content and settings still matter.",
+              "WebP covers common modern web needs in lossy and lossless modes, making it useful when balancing size, quality, and browser support. PNG remains a practical everyday lossless choice when a recipient requires PNG or compatibility comes first."
+            ],
+            "list": [
+              "Need reversible pixels: check the target format's lossless mode instead of only increasing quality.",
+              "Need modern web delivery: test AVIF or WebP in the target browser and publishing path.",
+              "Need broad compatibility or an existing PNG workflow: keep PNG, or use it as the fallback delivery."
+            ]
+          },
+          {
+            "heading": "Put the choice in a repeatable batch workflow",
+            "paragraphs": [
+              "Set the source set, target format, and output directory clearly, then batch-process. ImgConvert lets a task use one shared format while an individual image can override it when there is a real exception.",
+              "For size-sensitive work, keep Skip larger outputs enabled. It does not promise a smaller file, but it avoids writing a larger candidate into the output directory."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "A practical default",
+          "body": "When the recipient is not yet known, keep the original and generate one modern delivery format. Decide whether to remove the compatibility fallback after the target environment is clear."
+        },
+        "questions": [
+          {
+            "question": "Is AVIF always smaller than WebP or PNG?",
+            "answer": "No. File size depends on image content, encoder, and settings. AVIF offers efficient encoding capability, not a size guarantee for every image."
+          },
+          {
+            "question": "Does quality 100 mean lossless?",
+            "answer": "No. Quality and lossless mode are separate encoding choices. Use a target format's lossless mode when pixels need to remain reversible."
+          },
+          {
+            "question": "Which fallback format should I keep?",
+            "answer": "It depends on the recipient. When compatibility is unknown, keeping the original PNG or JPEG is safer than deciding from file size alone."
+          }
+        ],
+        "related": ["docs-supported-formats", "compression-quality-vs-lossless"]
+      },
+      "local-vs-online-image-converter": {
+        "id": "local-vs-online-image-converter",
+        "kind": "blog",
+        "slug": "local-vs-online-image-converter",
+        "eyebrow": "LOCAL-FIRST WORKFLOW",
+        "label": "Local processing",
+        "title": "Local vs online image conversion:\nthe difference is more than an upload button.",
+        "lede": "Online tools are convenient, but they place files, paths, and waiting time on a network path. A local desktop app keeps batch work and file control on your own device.",
+        "description": "Local image conversion vs online conversion: understand upload paths, privacy, batch work, and output control in a local-first workflow.",
+        "keywords": [
+          "local image converter",
+          "online image converter comparison",
+          "no upload image converter",
+          "offline image compression"
+        ],
+        "readingTime": "4 min read",
+        "takeaways": [
+          "The essential difference between local and online is the data path, not only the interface.",
+          "Large batches, sensitive assets, and repeatable work benefit from a visible local queue and output directory.",
+          "Choose a tool by reading what it accesses, caches, and uploads in practice."
+        ],
+        "sections": [
+          {
+            "heading": "Start with where the file travels",
+            "paragraphs": [
+              "Online conversion commonly sends a file from the browser to a remote service and then downloads the result. Even with a trustworthy service, file size, network conditions, and retention policy become part of the workflow.",
+              "ImgConvert performs conversion, compression, thumbnails, and queue management locally. It accesses only the files and directories you actively choose, or clipboard images you explicitly import."
+            ]
+          },
+          {
+            "heading": "When a local workflow fits better",
+            "paragraphs": [
+              "When a batch is large, a connection is unreliable, material is not public, or the same output settings will be reused, a local queue removes repeated upload and keeps output, cancellation, and results in one workspace.",
+              "Local does not mean no local data. Preferences, temporary files, thumbnail cache, and result-cache records may live on the device. A clear tool explains what those records are and lets you clear or disable reuse you do not need."
+            ]
+          },
+          {
+            "heading": "Do not treat privacy as a vague marketing word",
+            "paragraphs": [
+              "Evaluate an image tool by its upload behavior, accounts, third-party analytics, default metadata policy, and local cache. A precise boundary is more useful than a generic security label.",
+              "ImgConvert has no account system, ad SDK, behavioral-analytics SDK, or third-party tracking. It does not upload images by default and does not automatically preserve source metadata in output files. Metadata preservation is an explicit choice."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "Local-first is not anti-network",
+          "body": "Downloading the app or viewing release notes still uses the network. The point is that image processing itself does not require handing originals to a web service."
+        },
+        "questions": [
+          {
+            "question": "Does local processing mean the app never connects to the internet?",
+            "answer": "Image conversion runs locally. Downloading the app or viewing releases uses the relevant network service, but selected images are not uploaded to ImgConvert servers."
+          },
+          {
+            "question": "What can a local app store?",
+            "answer": "Conversion preferences, temporary files, thumbnail cache, and result-cache records may be stored locally. Result-cache records contain hashes and file sizes for verification or reuse, not image bytes or file paths."
+          },
+          {
+            "question": "Are online tools always unsafe?",
+            "answer": "No broad claim is possible. The important question is the data path and terms. For sensitive material or large batches, local tools usually offer more direct file control."
+          }
+        ],
+        "related": ["docs-local-processing-and-privacy", "docs-batch-workflow"]
+      },
+      "compression-quality-vs-lossless": {
+        "id": "compression-quality-vs-lossless",
+        "kind": "blog",
+        "slug": "image-compression-quality-vs-lossless",
+        "eyebrow": "COMPRESSION BASICS",
+        "label": "Compression basics",
+        "title": "Image compression quality and lossless mode\nare not the same thing.",
+        "lede": "Moving a quality slider very high does not automatically create true lossless output. Understand lossy encoding, lossless mode, and Skip larger outputs before expecting a specific size or quality result.",
+        "description": "Image compression quality vs lossless: understand lossy encoding, true lossless output, JPEG-source limits, and Skip larger outputs.",
+        "keywords": [
+          "image compression quality vs lossless",
+          "lossless image compression",
+          "skip larger outputs",
+          "JPEG to lossless"
+        ],
+        "readingTime": "5 min read",
+        "takeaways": [
+          "Quality is a lossy-encoding tradeoff; lossless means reversible pixels, and the two are not interchangeable.",
+          "Lossless re-encoding does not guarantee a smaller file.",
+          "A lossless output cannot restore detail already lost from a JPEG source."
+        ],
+        "sections": [
+          {
+            "heading": "What a quality slider is controlling",
+            "paragraphs": [
+              "Lossy encoding trades file size against visual fidelity. A quality setting influences that tradeoff, but formats and image contents do not respond to the same number in the same way.",
+              "Quality 80, 90, or 100 is not a cross-format standard. Treat a number as a starting point within one project, then inspect the result in the real delivery context."
+            ]
+          },
+          {
+            "heading": "True lossless is about reversibility, not a size promise",
+            "paragraphs": [
+              "True lossless encoding aims to make decoded pixels reversible. It is useful when pixel identity matters, but it cannot promise a smaller result. A source that is already efficiently encoded can become larger after a lossless re-encode.",
+              "That is why ImgConvert offers Skip larger outputs: when a candidate is not smaller than the source, the app can avoid writing it to the output directory. It is a guardrail, not a compression-rate promise."
+            ]
+          },
+          {
+            "heading": "A lossy source cannot be repaired by a lossless container",
+            "paragraphs": [
+              "JPEG is already lossy. Writing a JPEG to lossless AVIF or WebP can preserve the currently decoded pixels, but it cannot restore information removed by an earlier JPEG encoding.",
+              "When the goal is to reduce further loss, retaining the original, selecting quality carefully, and avoiding repeated lossy transcodes is usually more effective than switching to a lossless container afterward."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "Define success first",
+          "body": "If success means reversible pixels, choose lossless and accept that size may not improve. If success means smaller delivery, compare file size and visual result in the target environment."
+        },
+        "questions": [
+          {
+            "question": "Does quality 100 equal lossless?",
+            "answer": "No. Quality and lossless mode are different encoding choices. Use a format's lossless mode when you need reversible pixels."
+          },
+          {
+            "question": "Why can lossless compression be larger?",
+            "answer": "Lossless mode prioritizes reversible pixels, not minimum size. Source content and existing encoding affect the result."
+          },
+          {
+            "question": "Can a JPEG regain quality by converting to a lossless format?",
+            "answer": "No. A lossless output cannot recover detail removed by an earlier lossy JPEG encoding."
+          }
+        ],
+        "related": ["docs-quality-lossless-and-larger-outputs", "avif-vs-webp-vs-png"]
+      },
+      "docs-supported-formats": {
+        "id": "docs-supported-formats",
+        "kind": "docs",
+        "slug": "supported-formats",
+        "eyebrow": "FORMAT SUPPORT",
+        "label": "Format support",
+        "title": "Supported formats and\ncapability boundaries",
+        "lede": "ImgConvert offers AVIF, WebP, JPEG, and PNG as output choices. HEIC/HEIF is a system-capability, read-only import rather than an output format.",
+        "description": "ImgConvert supported image formats: AVIF, WebP, JPEG, and PNG output, plus system-capability HEIC/HEIF read-only import.",
+        "keywords": [
+          "ImgConvert supported formats",
+          "AVIF WebP JPEG PNG converter",
+          "HEIC import",
+          "image format converter"
+        ],
+        "readingTime": "Docs · 4 min",
+        "visual": "format-picker",
+        "takeaways": [
+          "AVIF, WebP, JPEG, and PNG are the current output choices.",
+          "HEIC/HEIF is platform-capability input only, not an output format.",
+          "An individual image can follow the shared format or override its output when needed."
+        ],
+        "sections": [
+          {
+            "heading": "Output formats: AVIF, WebP, JPEG, and PNG",
+            "paragraphs": [
+              "Choose AVIF, WebP, JPEG, or PNG in output settings. They suit different delivery goals: AVIF and WebP for modern encoding, JPEG for broad compatibility, and PNG as an everyday lossless choice.",
+              "A format name is not a result promise. Lossless mode, quality, and metadata preservation are separate settings that can affect the output file."
+            ]
+          },
+          {
+            "heading": "HEIC/HEIF: read-only import through system capability",
+            "paragraphs": [
+              "ImgConvert does not export HEIC. Supported HEIC/HEIF files can be read as inputs, and availability depends on platform system capability. On Windows, that can depend on installed system extensions or an optional helper.",
+              "To turn HEIC into JPG, set JPEG as the output format. On macOS, supported HEIC reading uses local system ImageIO support rather than sending an image to an online converter."
+            ]
+          },
+          {
+            "heading": "Choose a different format for one image",
+            "paragraphs": [
+              "A batch can use one global output setting. When one item is an exception, choose a different format for that image without splitting the whole task.",
+              "The exact options still depend on the current app version and system capability. The format picker is the most direct place to confirm them before processing."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "HEIC is not an output promise",
+          "body": "Treat HEIC as a system-capability input. For delivery, choose AVIF, WebP, JPEG, or PNG as the output."
+        },
+        "questions": [
+          {
+            "question": "Can ImgConvert export HEIC?",
+            "answer": "No. HEIC/HEIF is a system-capability, read-only import format. Current output choices are AVIF, WebP, JPEG, and PNG."
+          },
+          {
+            "question": "Can one image use a different format from the global setting?",
+            "answer": "Yes. An individual image can follow the shared setting or override the output format when needed."
+          },
+          {
+            "question": "Can every system read HEIC?",
+            "answer": "No guarantee applies. HEIC reading depends on platform capability; Windows may need a system extension or optional helper."
+          }
+        ],
+        "related": ["avif-vs-webp-vs-png", "docs-batch-workflow"]
+      },
+      "docs-batch-workflow": {
+        "id": "docs-batch-workflow",
+        "kind": "docs",
+        "slug": "batch-workflow",
+        "eyebrow": "BATCH WORKFLOW",
+        "label": "Batch workflow",
+        "title": "From import to output:\nhow one batch is handled",
+        "lede": "The task queue keeps import, output format, compression settings, progress, and results in one desktop workspace. Handle one batch consistently while retaining a path for individual exceptions.",
+        "description": "ImgConvert batch image workflow: import files or folders, choose output format, set compression options, and review progress and results.",
+        "keywords": [
+          "batch image conversion workflow",
+          "batch image compression",
+          "folder image converter",
+          "how to use ImgConvert"
+        ],
+        "readingTime": "Docs · 5 min",
+        "visual": "live-workspace",
+        "takeaways": [
+          "Files, folders, and intentionally pasted clipboard images can join one task queue.",
+          "Global settings suit most items; individual overrides handle an explicit exception.",
+          "Progress, cancellation, and output remain visible in the local workspace."
+        ],
+        "sections": [
+          {
+            "heading": "1. Import inputs you intentionally choose",
+            "paragraphs": [
+              "Choose files, a folder, or intentional clipboard import. They join one task queue so a group of images can share an output strategy.",
+              "The app does not scan photo libraries, disks, or network locations in the background. The input scope comes from your choice."
+            ]
+          },
+          {
+            "heading": "2. Set a shared output, then handle exceptions",
+            "paragraphs": [
+              "Choose a target format for the task, then adjust quality, lossless mode, concurrency, existing-file behavior, and filename template for the use case. Starting from one clear set of defaults is easier to review than changing everything.",
+              "When one image has a different delivery need, override its output format without rebuilding the entire batch."
+            ]
+          },
+          {
+            "heading": "3. Choose the output directory and review results",
+            "paragraphs": [
+              "Confirm a writable output directory and start processing. Progress, cancellation, and output results remain visible in the same local workspace.",
+              "Enable Skip larger outputs when you want to avoid writing a candidate that is not smaller than the source. It does not promise every image will shrink."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "Test a small representative set first",
+          "body": "For unfamiliar material, test formats and quality on a few representative images before applying the same settings to a whole folder."
+        },
+        "questions": [
+          {
+            "question": "Can I import a folder directly?",
+            "answer": "Yes. A folder you intentionally select can join the task queue for batch work."
+          },
+          {
+            "question": "Can one image use a format different from the global setting?",
+            "answer": "Yes. Override an individual image's output format without rebuilding the whole task."
+          },
+          {
+            "question": "Can an active task be cancelled?",
+            "answer": "Yes. Progress and cancellation are available in the same local workspace."
+          }
+        ],
+        "related": ["docs-supported-formats", "docs-quality-lossless-and-larger-outputs"]
+      },
+      "docs-local-processing-and-privacy": {
+        "id": "docs-local-processing-and-privacy",
+        "kind": "docs",
+        "slug": "local-processing-and-privacy",
+        "eyebrow": "LOCAL PROCESSING",
+        "label": "Local processing & privacy",
+        "title": "Local processing, cache, and metadata:\nhow data is actually handled",
+        "lede": "ImgConvert is a desktop app. Conversion, compression, thumbnails, and queue management happen on the device. Understand local cache, metadata, and access scope to evaluate the privacy boundary correctly.",
+        "description": "ImgConvert local processing and privacy: no image upload, intentionally selected file access, local cache, and default metadata behavior.",
+        "keywords": [
+          "no upload image converter",
+          "local image processing",
+          "offline image conversion privacy",
+          "ImgConvert privacy"
+        ],
+        "readingTime": "Docs · 5 min",
+        "visual": "privacy-editorial",
+        "takeaways": [
+          "Image conversion, compression, thumbnails, and queue management happen on your device.",
+          "The app accesses only inputs, output locations, and clipboard images you actively choose when needed.",
+          "Source metadata is not preserved by default; local cache and preferences can be cleared."
+        ],
+        "sections": [
+          {
+            "heading": "Image processing stays on the device",
+            "paragraphs": [
+              "ImgConvert does not upload, collect, or send image contents, paths, clipboard contents, or conversion results to us or a third party. Format conversion, compression, thumbnail creation, and queue management run locally.",
+              "That does not mean the app never uses the network. Downloading the app or viewing releases needs a network service, but processing an image does not require handing it to a web service."
+            ]
+          },
+          {
+            "heading": "Access scope follows your actions",
+            "paragraphs": [
+              "The app accesses only input files, output directories, and clipboard images you actively choose when needed. It does not scan photo libraries, disks, or network locations in the background.",
+              "You choose the output directory. For important material, using a dedicated output location makes it easier to keep sources and results separate."
+            ]
+          },
+          {
+            "heading": "Metadata and local cache",
+            "paragraphs": [
+              "Source metadata is not preserved automatically. Only when you explicitly enable preservation does ImgConvert write supported ICC, EXIF, XMP, and related metadata to output files.",
+              "Conversion preferences, temporary files, thumbnail cache, and result-cache records may be local. Result-cache records contain hashes and file sizes for verification or reuse, not image bytes or file paths. You can disable reuse and clear local app data or cache records."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "Local-first still needs a clear local-data policy",
+          "body": "Privacy is not only asking whether files upload. It also means knowing what is stored locally, when metadata is retained, and how cache can be cleared."
+        },
+        "questions": [
+          {
+            "question": "Are images uploaded to a server?",
+            "answer": "No. Image conversion, compression, thumbnails, and queue management happen on your device."
+          },
+          {
+            "question": "Is EXIF preserved by default?",
+            "answer": "No. Supported metadata is written to output only when you explicitly enable metadata preservation."
+          },
+          {
+            "question": "Does result cache contain images or paths?",
+            "answer": "No. Result-cache records contain only hashes and file sizes for verification or reuse, not image bytes or file paths."
+          }
+        ],
+        "related": ["local-vs-online-image-converter", "docs-batch-workflow"]
+      },
+      "docs-quality-lossless-and-larger-outputs": {
+        "id": "docs-quality-lossless-and-larger-outputs",
+        "kind": "docs",
+        "slug": "quality-lossless-and-larger-outputs",
+        "eyebrow": "OUTPUT SETTINGS",
+        "label": "Output settings",
+        "title": "Quality, lossless mode,\nand Skip larger outputs",
+        "lede": "Each setting solves a different problem: quality controls a lossy-encoding tradeoff, lossless targets reversible pixels, and Skip larger outputs avoids writing uneconomical candidates to disk.",
+        "description": "ImgConvert output settings: quality, true lossless mode, Skip larger outputs, and the practical boundary of transcoding a lossy source.",
+        "keywords": [
+          "ImgConvert lossless compression",
+          "skip larger outputs",
+          "image quality setting",
+          "AVIF WebP lossless"
+        ],
+        "readingTime": "Docs · 4 min",
+        "takeaways": [
+          "Quality and lossless mode are independent settings, not substitutes.",
+          "Lossless output does not guarantee a smaller result; Skip larger outputs avoids wasteful writes.",
+          "For a lossy source such as JPEG, a lossless container cannot restore removed detail."
+        ],
+        "sections": [
+          {
+            "heading": "Quality: set the lossy-output tradeoff",
+            "paragraphs": [
+              "Quality controls a tradeoff for lossy output. It is not a comparable grade across formats and it is not true lossless. Choose it against real material and the actual delivery environment rather than one isolated number.",
+              "When continuing from JPEG into another lossy output, visible extra loss depends on image content and settings. Testing a small representative set is more reliable."
+            ]
+          },
+          {
+            "heading": "Lossless: choose it for reversible pixels",
+            "paragraphs": [
+              "Lossless mode aims for reversible decoded pixels. Use it when pixel identity matters more than file size, while accepting that the result may not be smaller than the source.",
+              "Writing a lossy source such as JPEG to lossless AVIF or WebP only preserves the pixels currently decoded from JPEG; it cannot restore information removed by earlier compression."
+            ]
+          },
+          {
+            "heading": "Skip larger outputs: avoid pointless replacement",
+            "paragraphs": [
+              "When a candidate output is the same size as or larger than the source, enabling this option can leave it unwritten. It is especially useful for lossless re-encoding or material that has already been optimized.",
+              "It is not a compression-rate promise. Source content, target format, and encoding choices still determine whether a candidate is smaller."
+            ]
+          }
+        ],
+        "callout": {
+          "title": "Recommended decision order",
+          "body": "Decide whether you need reversible pixels or smaller delivery first, choose lossless or quality second, then use Skip larger outputs to protect the output directory."
+        },
+        "questions": [
+          {
+            "question": "What is the difference between quality 100 and lossless mode?",
+            "answer": "Quality 100 is still a quality setting. Lossless mode is the encoding choice for reversible pixels; they are not the same."
+          },
+          {
+            "question": "Why was a lossless output skipped?",
+            "answer": "The candidate may not have been smaller than the source. With Skip larger outputs enabled, the app can leave it unwritten."
+          },
+          {
+            "question": "Can lossless AVIF recover JPEG detail?",
+            "answer": "No. Information removed by earlier lossy JPEG encoding cannot be restored by changing to a lossless container."
+          }
+        ],
+        "related": ["compression-quality-vs-lossless", "docs-supported-formats"]
+      }
+    }
+  }
+}

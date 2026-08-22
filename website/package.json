@@ -1,0 +1,24 @@
+{
+  "name": "@imgconvert/website",
+  "private": true,
+  "version": "0.2.8",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build && node ./scripts/generate-resource-pages.mjs",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json && pnpm run build"
+  },
+  "dependencies": {
+    "@lucide/svelte": "^1.22.0",
+    "svelte": "^5.56.4"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tsconfig/svelte": "^5.0.8",
+    "svelte-check": "^4.7.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0"
+  }
+}
