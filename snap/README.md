@@ -39,3 +39,8 @@ Run the `Snap Store Release` workflow with an immutable tag. Keep
 `publish_snap=false` for a build-only smoke run. Publish to `edge` first; move
 to `candidate` or `stable` only after the installed snap passes the conversion
 smoke test.
+
+Store-facing title, description, website, and contact values are mirrored in
+`snap/store-listing.json` and checked against `snap/snapcraft.yaml`. After an
+approved copy-only change, run the `Snap Store Metadata` workflow to update the
+public listing without publishing another binary revision.

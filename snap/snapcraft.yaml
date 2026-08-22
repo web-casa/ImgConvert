@@ -5,11 +5,15 @@ title: ImgConvert
 version: "0.2.8"
 summary: Local-first batch image converter
 description: |
-  Convert JPEG, PNG, WebP, and AVIF images in batches without uploading
-  files. ImgConvert processes selected images locally and writes results only
-  to a destination chosen by the user.
+  ImgConvert is a local-first desktop app for batch image conversion and compression. Add files or folders, choose JPEG, PNG, WebP, or AVIF output, then adjust quality, true lossless mode, and the destination for the queue. Individual images can override the shared format when needed.
+
+  Safeguards can skip outputs that would be larger than their source and preserve supported metadata only when explicitly enabled. Conversion, thumbnails, queue management, and file writing stay on your device. No account, ads, analytics, or image uploads are required.
+
+  Website: https://imgconvert.web.casa/
+  Documentation: https://imgconvert.web.casa/en/docs/
+  Privacy: https://imgconvert.web.casa/en/privacy/
 license: Apache-2.0
-website: https://github.com/web-casa/ImgConvert
+website: https://imgconvert.web.casa/
 source-code: https://github.com/web-casa/ImgConvert
 issues: https://github.com/web-casa/ImgConvert/issues
 contact: https://github.com/web-casa/ImgConvert/issues

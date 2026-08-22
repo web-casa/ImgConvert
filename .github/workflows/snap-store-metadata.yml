@@ -1,0 +1,26 @@
+name: Snap Store Metadata
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snap-store-metadata
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update Snap Store metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate listing metadata
+        run: node scripts/update-snap-store-metadata.mjs --dry-run
+      - name: Update Snap Store listing
+        env:
+          IMGCONVERT_SNAP_ID: x2qV8qufxm4Pui1UBr99TZPGy6edaSKS
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+        run: node scripts/update-snap-store-metadata.mjs

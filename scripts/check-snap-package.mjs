@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = readJson("package.json");
+const storeListing = readJson("snap/store-listing.json");
 const snapcraftPath = path.join(repoRoot, "snap", "snapcraft.yaml");
 const desktopPath = path.join(repoRoot, "snap", "gui", "imgconvert.desktop");
 let artifact = "";
@@ -26,6 +27,17 @@ for (const arg of process.argv.slice(2)) {
 const snapcraft = readText(snapcraftPath);
 const desktop = readText(desktopPath);
 const failures = [];
+
+for (const field of ["title", "summary", "license", "website", "contact"]) {
+  if (!snapcraft.includes(`${field}: ${storeListing[field]}`)) {
+    failures.push(`snap/snapcraft.yaml ${field} does not match snap/store-listing.json`);
+  }
+}
+
+const snapDescription = readYamlLiteralBlock(snapcraft, "description");
+if (snapDescription !== storeListing.description) {
+  failures.push("snap/snapcraft.yaml description does not match snap/store-listing.json");
+}
 
 for (const marker of [
   "name: imgconvert",
@@ -198,6 +210,31 @@ function readText(file) {
     fail(`missing file: ${path.relative(repoRoot, file)}`);
   }
   return readFileSync(file, "utf8");
+}
+
+function readYamlLiteralBlock(document, key) {
+  const lines = document.split(/\r?\n/u);
+  const headerIndex = lines.findIndex((line) => line === `${key}: |`);
+  if (headerIndex < 0) {
+    return "";
+  }
+
+  const valueLines = [];
+  for (const line of lines.slice(headerIndex + 1)) {
+    if (line.startsWith("  ")) {
+      valueLines.push(line.slice(2));
+      continue;
+    }
+    if (line === "") {
+      valueLines.push("");
+      continue;
+    }
+    break;
+  }
+  while (valueLines.at(-1) === "") {
+    valueLines.pop();
+  }
+  return valueLines.join("\n");
 }
 
 function commandExists(command) {
