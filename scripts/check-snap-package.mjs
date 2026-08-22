@@ -29,6 +29,7 @@ const failures = [];
 
 for (const marker of [
   "name: imgconvert",
+  "title: ImgConvert",
   `version: "${packageJson.version}"`,
   "base: core24",
   "grade: stable",
@@ -167,6 +168,7 @@ function inspectArtifact(file, artifactFailures) {
   }
   for (const marker of [
     "name: imgconvert",
+    "title: ImgConvert",
     `version: ${packageJson.version}`,
     "base: core24",
     "confinement: strict",

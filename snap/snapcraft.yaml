@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: imgconvert
+title: ImgConvert
 version: "0.2.8"
 summary: Local-first batch image converter
 description: |
