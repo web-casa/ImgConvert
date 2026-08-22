@@ -8,7 +8,7 @@ description = "ImgConvert 的进程内图像编解码核心(纯库,无 UI/IO 框
 [dependencies]
 # 解码/容器:default-features=false 避免带回 AVIF/ravif/rayon/nasm(Codex 修正)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-# JPEG 编码(底层 mozjpeg-sys:arm64 用 gas,x86 用 nasm)
+# JPEG 编码(底层 mozjpeg-sys:Unix ARM64 用 gas,x86 用 NASM；Windows ARM64 使用 clang-cl 标量路径)
 mozjpeg = "0.10"
 # PNG 无损优化(纯 Rust)
 oxipng = { version = "9", default-features = false, features = ["parallel"] }
