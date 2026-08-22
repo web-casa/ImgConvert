@@ -2,9 +2,11 @@
 
 import { createHash } from "node:crypto";
 import {
+  closeSync,
   existsSync,
   mkdtempSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -33,29 +35,30 @@ const options = {
   sourceUrl: "",
 };
 
-for (const arg of process.argv.slice(2)) {
-  if (arg === "--") {
-    continue;
-  } else if (arg === "--skip-fetch") {
-    options.skipFetch = true;
-  } else if (arg.startsWith("--source-url=")) {
-    options.sourceUrl = arg.slice("--source-url=".length).trim();
-  } else {
-    fail(`unknown argument: ${arg}`);
-  }
-}
-
-if (!existsSync(manifestPath)) {
-  fail(`missing ${path.relative(repoRoot, manifestPath)}`);
-}
-if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager ?? "")) {
-  fail("package.json packageManager must pin pnpm as pnpm@x.y.z");
-}
-if (options.sourceUrl) {
-  validateSourceUrl(options.sourceUrl);
-}
-
+let prepared = false;
 try {
+  for (const arg of process.argv.slice(2)) {
+    if (arg === "--") {
+      continue;
+    } else if (arg === "--skip-fetch") {
+      options.skipFetch = true;
+    } else if (arg.startsWith("--source-url=")) {
+      options.sourceUrl = arg.slice("--source-url=".length).trim();
+    } else {
+      fail(`unknown argument: ${arg}`);
+    }
+  }
+
+  if (!existsSync(manifestPath)) {
+    fail(`missing ${path.relative(repoRoot, manifestPath)}`);
+  }
+  if (!/^pnpm@\d+\.\d+\.\d+$/.test(packageManager ?? "")) {
+    fail("package.json packageManager must pin pnpm as pnpm@x.y.z");
+  }
+  if (options.sourceUrl) {
+    validateSourceUrl(options.sourceUrl);
+  }
+
   rmSync(stagingDir, { force: true, recursive: true });
   mkdirSync(stagingDir, { recursive: true });
   mkdirSync(sourceDir, { recursive: true });
@@ -74,11 +77,17 @@ try {
   createArchive();
   assertArchiveExcludesTransientBuildArtifacts();
   updateManifest();
+  prepared = true;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
 } finally {
   rmSync(stagingRoot, { force: true, recursive: true });
 }
 
-console.log(`Flatpak source archive prepared: ${path.relative(repoRoot, archivePath)}`);
+if (prepared) {
+  console.log(`Flatpak source archive prepared: ${path.relative(repoRoot, archivePath)}`);
+}
 
 function copySourceTree() {
   const sourceTreeArchive = path.join(stagingRoot, "source-tree.tar");
@@ -272,12 +281,17 @@ function createArchive() {
 }
 
 function assertArchiveExcludesTransientBuildArtifacts() {
+  const listingPath = path.join(stagingRoot, "archive-contents.txt");
+  const listingFd = openSync(listingPath, "w");
   const result = spawnSync("tar", ["-tzf", archivePath], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", listingFd, "pipe"],
   });
+  closeSync(listingFd);
+  if (result.error) {
+    fail(`failed to inspect Flatpak source archive: ${result.error.message}`);
+  }
   if (result.status !== 0) {
-    process.stdout.write(result.stdout);
     process.stderr.write(result.stderr);
     fail(`failed to inspect Flatpak source archive (exit code ${result.status})`);
   }
@@ -292,9 +306,10 @@ function assertArchiveExcludesTransientBuildArtifacts() {
     "./docs-site/node_modules/",
     "./docs-site/out/",
   ];
-  const unexpected = result.stdout
+  const unexpected = readFileSync(listingPath, "utf8")
     .split(/\r?\n/)
     .find((entry) => transientPrefixes.some((prefix) => entry.startsWith(prefix)));
+  rmSync(listingPath, { force: true });
   if (unexpected) {
     fail(`Flatpak source archive contains a transient build artifact: ${unexpected}`);
   }
@@ -363,6 +378,5 @@ function run(command, args) {
 }
 
 function fail(message) {
-  console.error(message);
-  process.exit(1);
+  throw new Error(message);
 }
