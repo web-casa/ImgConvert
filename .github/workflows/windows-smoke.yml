@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-smoke-${{ github.ref }}
+  group: windows-smoke-${{ github.ref }}-${{ inputs.architecture }}
   cancel-in-progress: true
 
 env:

@@ -1295,6 +1295,7 @@ function checkWindowsRuntimeGuardrails() {
     "store_msix",
     "architecture:",
     "default: both",
+    "windows-smoke-${{ github.ref }}-${{ inputs.architecture }}",
     "runs-on: ${{ matrix.runner }}",
     "windows-latest",
     "windows-11-arm",
