@@ -697,7 +697,7 @@ pub struct EncodeOptions {
     pub avif_speed: u8,
     /// AVIF 色度采样。默认 4:4:4 保持当前保真语义。
     pub avif_subsample: AvifSubsample,
-    /// WebP near-lossless 0..=100。100 表示关闭 near-lossless 预处理。
+    /// WebP near-lossless 0..=100。100 表示关闭;仅在无损模式生效。
     pub webp_near_lossless: u8,
     /// WebP 使用更慢但更锐利的 RGB→YUV 转换。
     pub webp_sharp_yuv: bool,
@@ -3784,7 +3784,13 @@ impl Codec for WebpCodec {
         config.alpha_compression = if opts.lossless { 0 } else { 1 };
         config.quality = opts.quality_clamped();
         config.method = opts.webp_method_clamped();
-        config.near_lossless = opts.webp_near_lossless_clamped();
+        // libwebp applies near-lossless preprocessing only in its lossless mode.
+        // Keep lossy encodes explicitly neutral even for direct core API callers.
+        config.near_lossless = if opts.lossless {
+            opts.webp_near_lossless_clamped()
+        } else {
+            100
+        };
         config.use_sharp_yuv = i32::from(opts.webp_sharp_yuv);
         // encode_advanced 返回 Result(避免 encode()/encode_lossless() 内部 unwrap 直接 panic)。
         let mem = encoder
@@ -5401,6 +5407,23 @@ mod tests {
         let back = WebpCodec.decode(&wp).unwrap();
         assert_eq!((back.width, back.height), (64, 48));
         assert_eq!(back.rgba8().unwrap(), img.rgba8().unwrap()); // libwebp 无损
+    }
+
+    #[test]
+    fn webp_lossy_ignores_near_lossless_setting() {
+        let img = synth(64, 48);
+        let mut options = EncodeOptions {
+            quality: 75,
+            lossless: false,
+            webp_near_lossless: 0,
+            ..EncodeOptions::default()
+        };
+        let with_near_lossless = WebpCodec.encode(&img, &options).unwrap();
+
+        options.webp_near_lossless = 100;
+        let without_near_lossless = WebpCodec.encode(&img, &options).unwrap();
+
+        assert_eq!(with_near_lossless, without_near_lossless);
     }
 
     #[test]

@@ -1674,7 +1674,7 @@ function buildConvertRequest(item: QueueItem, format: string): ConvertRequest {
     webpMethod: settings.webpMethod,
     avifSpeed: settings.avifSpeed,
     avifSubsample: settings.avifSubsample,
-    webpNearLossless: settings.webpNearLossless,
+    webpNearLossless: format === "webp" && settings.lossless ? settings.webpNearLossless : 100,
     webpSharpYuv: settings.webpSharpYuv,
     jpegTrellis: settings.jpegTrellis,
     autoQuality: settings.autoQuality,

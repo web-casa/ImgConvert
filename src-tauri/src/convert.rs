@@ -522,6 +522,15 @@ fn apply_file_name_template(template: Option<&str>, source_stem: &str, ext: &str
     sanitize_file_stem(&rendered)
 }
 
+fn output_file_name(output_stem: String, ext: &str) -> String {
+    let extension = format!(".{ext}");
+    if output_stem.to_ascii_lowercase().ends_with(&extension) {
+        output_stem
+    } else {
+        format!("{output_stem}{extension}")
+    }
+}
+
 /// 根据输入路径与目标格式计算输出路径。
 fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
     let input = Path::new(&opts.input);
@@ -531,6 +540,7 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
     let ext = ext_for_format(&opts.format)?;
     let stem = stem.to_string_lossy();
     let output_stem = apply_file_name_template(opts.file_name_template.as_deref(), &stem, ext);
+    let output_name = output_file_name(output_stem, ext);
 
     let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref()) {
         Some(grant) => {
@@ -546,9 +556,7 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
             .unwrap_or_else(|| PathBuf::from(".")),
     };
 
-    let mut out = dir.join(output_stem);
-    out.set_extension(ext);
-    Ok(out)
+    Ok(dir.join(output_name))
 }
 
 fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, String> {
@@ -1020,7 +1028,13 @@ fn encode_options_for(opts: &ConvertOptions, target: Format) -> EncodeOptions {
         webp_method: opts.webp_method,
         avif_speed: opts.avif_speed,
         avif_subsample: parse_avif_subsample(&opts.avif_subsample),
-        webp_near_lossless: opts.webp_near_lossless,
+        // libwebp only applies near-lossless preprocessing in WebP lossless mode.
+        // Normalize inactive values so they do not split candidates or result-cache keys.
+        webp_near_lossless: if target == Format::WebP && lossless {
+            opts.webp_near_lossless
+        } else {
+            default_webp_near_lossless()
+        },
         webp_sharp_yuv: opts.webp_sharp_yuv,
         jpeg_trellis: opts.jpeg_trellis,
         preserve_metadata: opts.preserve_metadata.unwrap_or(false),
@@ -2272,11 +2286,17 @@ mod tests {
 
         let jpeg = encode_options_for(&options, Format::Jpeg);
         assert!(!jpeg.lossless);
+        assert_eq!(jpeg.webp_near_lossless, default_webp_near_lossless());
 
         let avif = encode_options_for(&options, Format::Avif);
         assert!(avif.lossless);
         assert_eq!(avif.quality, 100);
         assert_eq!(avif.avif_subsample, AvifSubsample::Yuv420);
+
+        options.lossless = false;
+        let lossy_webp = encode_options_for(&options, Format::WebP);
+        assert!(!lossy_webp.lossless);
+        assert_eq!(lossy_webp.webp_near_lossless, default_webp_near_lossless());
     }
 
     #[test]
@@ -2499,6 +2519,64 @@ mod tests {
         assert_eq!(key_a.len(), 64);
         assert_ne!(key_a, key_b);
         assert_ne!(key_a, key_c);
+    }
+
+    #[test]
+    fn result_cache_key_ignores_inactive_webp_near_lossless() {
+        let mut options = test_convert_options("/tmp/input.png".to_string());
+        options.result_cache = true;
+        options.webp_near_lossless = 20;
+        let lossy_a = encode_options_for(&options, Format::WebP);
+        let key_a = result_cache_key(
+            &options,
+            Format::WebP,
+            &lossy_a,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            None,
+        );
+
+        options.webp_near_lossless = 80;
+        let lossy_b = encode_options_for(&options, Format::WebP);
+        let key_b = result_cache_key(
+            &options,
+            Format::WebP,
+            &lossy_b,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            None,
+        );
+
+        assert_eq!(lossy_a.webp_near_lossless, default_webp_near_lossless());
+        assert_eq!(lossy_b.webp_near_lossless, default_webp_near_lossless());
+        assert_eq!(key_a, key_b);
+
+        options.lossless = true;
+        options.webp_near_lossless = 20;
+        let lossless_a = encode_options_for(&options, Format::WebP);
+        let key_lossless_a = result_cache_key(
+            &options,
+            Format::WebP,
+            &lossless_a,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            None,
+        );
+
+        options.webp_near_lossless = 80;
+        let lossless_b = encode_options_for(&options, Format::WebP);
+        let key_lossless_b = result_cache_key(
+            &options,
+            Format::WebP,
+            &lossless_b,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            None,
+        );
+
+        assert_eq!(lossless_a.webp_near_lossless, 20);
+        assert_eq!(lossless_b.webp_near_lossless, 80);
+        assert_ne!(key_lossless_a, key_lossless_b);
     }
 
     #[test]
@@ -2943,6 +3021,48 @@ mod tests {
         );
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn output_path_preserves_dotted_stems_and_template_suffixes() {
+        let mut options = test_convert_options("holiday.2026.01.png".to_string());
+        options.out_dir = Some("out".to_string());
+
+        assert_eq!(
+            output_path(&options).unwrap(),
+            PathBuf::from("out").join("holiday.2026.01.jpg")
+        );
+
+        options.file_name_template = Some("%name%-imgconvert-smoke".to_string());
+        assert_eq!(
+            output_path(&options).unwrap(),
+            PathBuf::from("out").join("holiday.2026.01-imgconvert-smoke.jpg")
+        );
+
+        options.file_name_template = Some("%name%-%date%".to_string());
+        let dated_output = output_path(&options).unwrap();
+        let dated_name = dated_output.file_name().unwrap().to_string_lossy();
+        assert!(dated_name.starts_with("holiday.2026.01-"));
+        assert!(dated_name.ends_with(".jpg"));
+
+        options.file_name_template = Some("%name%.%extension%".to_string());
+        assert_eq!(
+            output_path(&options).unwrap(),
+            PathBuf::from("out").join("holiday.2026.01.jpg")
+        );
+    }
+
+    #[test]
+    fn batch_preflight_keeps_distinct_dotted_source_stems() {
+        let mut first = test_convert_options("holiday.2026.01.png".to_string());
+        first.out_dir = Some("out".to_string());
+        let mut second = first.clone();
+        second.input = "holiday.2026.02.png".to_string();
+
+        let (jobs, preflight_events) = prepare_batch_work(vec![first, second]);
+
+        assert_eq!(jobs.len(), 2);
+        assert!(preflight_events.is_empty());
     }
 
     #[test]

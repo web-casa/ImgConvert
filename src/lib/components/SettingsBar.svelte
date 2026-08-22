@@ -654,27 +654,29 @@
             onValueCommit={commitWebpMethod}
           />
         </div>
-        <div class="grid gap-2 pt-1 md:grid-cols-[120px_minmax(0,1fr)]" class:opacity-40={busy}>
-          <div class="flex items-center justify-between gap-3 md:block">
-            <Label class="text-sm text-muted-foreground">{$t("settings.nearLossless")}</Label>
-            <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
-              {settings.webpNearLossless === 100
-                ? $t("settings.nearLosslessOff")
-                : settings.webpNearLossless}
-            </span>
+        {#if canLossless && settings.lossless}
+          <div class="grid gap-2 pt-1 md:grid-cols-[120px_minmax(0,1fr)]" class:opacity-40={busy}>
+            <div class="flex items-center justify-between gap-3 md:block">
+              <Label class="text-sm text-muted-foreground">{$t("settings.nearLossless")}</Label>
+              <span class="tabular-nums text-xs text-muted-foreground md:mt-1 md:block">
+                {settings.webpNearLossless === 100
+                  ? $t("settings.nearLosslessOff")
+                  : settings.webpNearLossless}
+              </span>
+            </div>
+            <div class="flex h-8 min-w-0 items-center">
+              <Slider
+                type="single"
+                bind:value={settings.webpNearLossless}
+                min={0}
+                max={100}
+                step={1}
+                disabled={busy}
+                onValueCommit={commitWebpNearLossless}
+              />
+            </div>
           </div>
-          <div class="flex h-8 min-w-0 items-center">
-            <Slider
-              type="single"
-              bind:value={settings.webpNearLossless}
-              min={0}
-              max={100}
-              step={1}
-              disabled={busy}
-              onValueCommit={commitWebpNearLossless}
-            />
-          </div>
-        </div>
+        {/if}
         <div class="flex h-8 items-center gap-2" class:opacity-40={busy}>
           <Switch
             bind:checked={settings.webpSharpYuv}

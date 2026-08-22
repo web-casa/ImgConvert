@@ -639,10 +639,19 @@ function checkTauriUpdaterGuardrails() {
       failures.push(`check-tauri-updater-manifest missing marker: ${expected}`);
     }
   }
-  for (const expected of ["TAURI_SIGNING_PRIVATE_KEY", "tauri", "signer", "sign", "--password"]) {
+  for (const expected of [
+    "TAURI_SIGNING_PRIVATE_KEY",
+    "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+    "tauri",
+    "signer",
+    "sign",
+  ]) {
     if (!signScript.includes(expected)) {
       failures.push(`sign-tauri-updater-artifacts missing marker: ${expected}`);
     }
+  }
+  if (signScript.includes("--password")) {
+    failures.push("sign-tauri-updater-artifacts must not expose a signing password in argv");
   }
   for (const expected of [
     "TAURI_SIGNING_PRIVATE_KEY_PATH",

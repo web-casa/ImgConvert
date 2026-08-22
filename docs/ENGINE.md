@@ -40,7 +40,7 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 |---|---|---|---|---|
 | **JPEG** | `mozjpeg::Decompress`(保留 APP1/APP2) | `mozjpeg`(trellis 默认开,progressive) | `mozjpeg`(IJG/BSD) | quality 0–100;progressive(默认开,通常略小、更慢);高级参数已接 MozJPEG trellis scans。⚠️ **「JPEG→JPEG 无损系数转码(jpegtran 式)」走 DCT 系数域、绕过 RGBA8 管线**——`mozjpeg` crate 是否暴露该 transform API **需核实**;v1 暂不承诺 |
 | **PNG** | `image` | `image` 编码 → **`oxipng`** 优化 | `oxipng`(MIT)、`image`(MIT/Apache)、`color_quant`(MIT,实验性限色) | 默认无损 level 0–6(**甜点 4**);实验性有损限色默认关闭,用 NeuQuant 映射 RGBA 后仍输出普通 PNG 再走 oxipng |
-| **WebP** | `image` | **`webp`**(libwebp) | `webp`(Apache/MIT;底层 libwebp BSD) | quality(有损);**无损=独立 lossless 模式**(`WebPConfig.lossless`,**不是 q100**);method 0–6(**甜点 4**);near_lossless 0–100(100=关闭);sharp_yuv 可选;alpha |
+| **WebP** | `image` | **`webp`**(libwebp) | `webp`(Apache/MIT;底层 libwebp BSD) | quality(有损);**无损=独立 lossless 模式**(`WebPConfig.lossless`,**不是 q100**);method 0–6(**甜点 4**);near_lossless 0–100(100=关闭,仅无损模式生效);sharp_yuv 可选;alpha |
 | **AVIF** | `libavif-sys`(dav1d 默认) | **`libavif-sys`(rav1e 有损 + aom 无损)** | `libavif-sys`(**BSD-2,以 cargo-about 实测为准**)、libavif(BSD-2)、rav1e(BSD-2)、libaom(BSD,以 cargo-about 实测为准) | quality、speed 0–10(甜点 8),subsample 4:4:4/4:2:0;`lossless=true` 强制 AOM 后端 + identity matrix + full range + quantizer 0 + YUV444,并以像素级 round-trip 测试守住。采 DropWebP 路线。⚠️ **弃用裸 `ravif`/`image::AvifEncoder` 的真因(Codex 修正)不是「丢 alpha」**(它们都能处理 RGBA8 alpha),而是 **ICC/EXIF/nclx 等容器元数据控制弱 + 后端不可插拔 + 解码一致性**;libavif 容器层能正确写 ICC/nclx/alpha/EXIF。后端可插拔:rav1e(默认有损,构建稳)/aom(真无损)/svt |
 | **TIFF**(推后) | `image` | `image`(tiff feature) | `image` | v1 不做;无损 deflate/lzw |
 | **GIF/BMP**(读) | `image` | — | `image` | 解码用 |

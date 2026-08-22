@@ -47,13 +47,15 @@ for (const artifact of artifacts) {
   const signaturePath = `${artifact}.sig`;
   rmSync(signaturePath, { force: true });
 
-  const args = ["tauri", "signer", "sign", "--password", signingPassword(), artifact];
+  const args = ["tauri", "signer", "sign", artifact];
   const result = spawnSync("pnpm", args, {
     cwd: repoRoot,
     encoding: "utf8",
     env: {
       ...process.env,
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
+      // Tauri CLI reads the optional passphrase from the environment, avoiding argv exposure.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -121,10 +123,6 @@ function validateSigningEnvironment() {
   ) {
     fail("TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH is required");
   }
-}
-
-function signingPassword() {
-  return process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? "";
 }
 
 function fail(message) {
