@@ -175,7 +175,9 @@ jobs:
       - run: cargo install cargo-audit --locked
       - run: cargo install cargo-about --version ${{ env.CARGO_ABOUT_VERSION }} --locked --features cli
       - run: pnpm run license:check
-      - run: cargo deny --manifest-path Cargo.toml --config src-tauri/deny.toml check bans sources advisories
+      # cargo-deny 0.19 keeps --config on `check`; running from src-tauri works with
+      # both that pinned CI version and newer local cargo-deny releases.
+      - run: cd src-tauri && cargo deny --manifest-path ../Cargo.toml check bans sources advisories
       - run: cd src-tauri && cargo deny check bans sources advisories
       - run: pnpm run audit:rust
       - run: pnpm audit --prod

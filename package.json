@@ -123,7 +123,7 @@
     "release:store-env:check": "node scripts/check-platform-release-guardrails.mjs --platform=all --channel=store --require-store-env",
     "quality:frontend": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm deadcode && pnpm test && pnpm build && pnpm check:ui-i18n && pnpm run docs:web:check",
     "quality:rust": "pnpm run toolchain:check && cargo fmt --check && cargo clippy -p imgconvert-core -- -D warnings && cargo test -p imgconvert-core && cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check && cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml",
-    "quality:security": "pnpm run docs:check && pnpm run architecture:check && pnpm run ci:cost:check && pnpm run release:linux:markets:check && pnpm run release:flatpak:verify && pnpm run license:check && cargo deny --manifest-path Cargo.toml --config src-tauri/deny.toml check bans sources && cd src-tauri && cargo deny check bans sources",
+    "quality:security": "pnpm run docs:check && pnpm run architecture:check && pnpm run ci:cost:check && pnpm run release:linux:markets:check && pnpm run release:flatpak:verify && pnpm run license:check && cd src-tauri && cargo deny --manifest-path ../Cargo.toml check bans sources && cargo deny check bans sources",
     "tauri": "tauri",
     "check:ui-i18n": "node scripts/check-ui-hardcoded-strings.mjs"
   },

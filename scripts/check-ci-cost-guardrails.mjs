@@ -190,7 +190,7 @@ function checkAutomaticLinuxCiWorkflow() {
   for (const marker of [
     "pnpm run ci:cost:check",
     "pnpm run release:flatpak:verify",
-    "cargo deny --manifest-path Cargo.toml --config src-tauri/deny.toml check bans sources advisories",
+    "cd src-tauri && cargo deny --manifest-path ../Cargo.toml check bans sources advisories",
   ]) {
     if (!ci.includes(marker)) {
       failures.push(`ci.yml security job must include ${marker}`);
