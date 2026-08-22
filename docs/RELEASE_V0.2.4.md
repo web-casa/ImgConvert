@@ -18,7 +18,8 @@ tag. It targets only Snap Store, AppImageHub, and AUR.
 5. Snap must remain `core24`, strict, updater-disabled, external-codec-disabled,
    and limited to the GNOME extension plus `home` and optional
    `removable-media` access.
-6. The Linux release workflow must not run or publish unrelated Flatpak work.
+6. General CI and Linux release workflows must not run or publish unrelated
+   Flatpak work. Its existing `0.2.3` metadata remains outside this release.
 
 ## External publication order
 
