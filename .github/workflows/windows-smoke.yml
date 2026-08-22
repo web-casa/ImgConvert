@@ -108,24 +108,6 @@ jobs:
             $env:Path = "$nasmBin;$env:Path"
             nasm -v
           }
-          if ("${{ matrix.arch }}" -eq "arm64") {
-            # Native MSVC ARM64 dav1d assembly is translated through FFmpeg's gas-preprocessor.
-            $gasPreprocessorCommit = "ac1836309c2e77023c228b7184485597286289d3"
-            $gasPreprocessorRoot = Join-Path $env:RUNNER_TEMP "imgconvert-gas-preprocessor"
-            $gasPreprocessorPath = Join-Path $gasPreprocessorRoot "gas-preprocessor.pl"
-            New-Item -ItemType Directory -Path $gasPreprocessorRoot | Out-Null
-            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/FFmpeg/gas-preprocessor/ac1836309c2e77023c228b7184485597286289d3/gas-preprocessor.pl" -OutFile $gasPreprocessorPath
-            $actualHash = (Get-FileHash -Algorithm SHA256 $gasPreprocessorPath).Hash.ToLowerInvariant()
-            $expectedHash = "7124d70cdecba7c5612f9a71fbf3f28514dd9c2ca3022f58ad793f88bb925fcf"
-            if ($actualHash -ne $expectedHash) {
-              throw "gas-preprocessor checksum mismatch: expected $expectedHash, got $actualHash"
-            }
-            Add-Content -Path $env:GITHUB_PATH -Value $gasPreprocessorRoot
-            $env:Path = "$gasPreprocessorRoot;$env:Path"
-            perl -v
-            Write-Host "Using gas-preprocessor commit $gasPreprocessorCommit"
-          }
-
       - uses: pnpm/action-setup@v6
         with:
           version: 10.34.4
@@ -237,6 +219,38 @@ jobs:
           cl
           $linkerValue = (Get-Item -Path "Env:$linkerEnvironment").Value
           Write-Host "Using Rust MSVC linker: $linkerValue"
+
+      - name: Select native codec compiler
+        shell: pwsh
+        run: |
+          if ("${{ matrix.arch }}" -eq "arm64") {
+            clang --version
+            if ($LASTEXITCODE -ne 0) {
+              throw "The Windows ARM64 runner does not provide a working clang compiler"
+            }
+            clang++ --version
+            if ($LASTEXITCODE -ne 0) {
+              throw "The Windows ARM64 runner does not provide a working clang++ compiler"
+            }
+            $nativeTarget = (& clang -dumpmachine).Trim()
+            if ($nativeTarget -notmatch "^aarch64-.*-windows-msvc$") {
+              throw "Expected native Windows ARM64 clang, got target $nativeTarget"
+            }
+            $nativeCxxTarget = (& clang++ -dumpmachine).Trim()
+            if ($nativeCxxTarget -ne $nativeTarget) {
+              throw "Expected matching native Windows ARM64 clang targets, got $nativeTarget and $nativeCxxTarget"
+            }
+            $cc = "clang"
+            $cxx = "clang++"
+          } else {
+            $cc = "cl"
+            $cxx = "cl"
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "CC=$cc"
+          Add-Content -Path $env:GITHUB_ENV -Value "CXX=$cxx"
+          Set-Item -Path Env:CC -Value $cc
+          Set-Item -Path Env:CXX -Value $cxx
+          Write-Host "Native codec compiler: CC=$cc CXX=$cxx"
 
       - run: pnpm install --frozen-lockfile
 
