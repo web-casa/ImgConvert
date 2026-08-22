@@ -37,6 +37,7 @@ for (const marker of [
   'rust-channel: "1.96.0"',
   "rust-path:",
   "- src-tauri",
+  "- rustup/latest/stable",
   "extensions:",
   "- gnome",
   "- home",
@@ -60,7 +61,6 @@ for (const denied of [
   "- system-files",
   "- personal-files",
   "daemon:",
-  "rustup/latest/stable",
   "cargo +1.96.0 build",
 ]) {
   if (snapcraft.includes(denied)) {
