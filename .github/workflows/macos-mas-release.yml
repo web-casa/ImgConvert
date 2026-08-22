@@ -87,7 +87,7 @@ jobs:
           test -n "$KEYCHAIN_PASSWORD" || { echo "KEYCHAIN_PASSWORD secret is required"; exit 1; }
 
       - name: Install native codec build tools
-        run: brew install cmake meson ninja nasm
+        run: brew install cmake meson ninja
 
       - uses: pnpm/action-setup@v6
         with:

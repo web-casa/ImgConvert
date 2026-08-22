@@ -61,7 +61,7 @@ jobs:
           fi
 
       - name: Install native codec build tools
-        run: brew install cmake meson ninja nasm
+        run: brew install cmake meson ninja
 
       - uses: pnpm/action-setup@v6
         with:

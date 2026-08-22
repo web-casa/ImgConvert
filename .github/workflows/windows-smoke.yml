@@ -57,6 +57,7 @@ jobs:
         include:
           - arch: x64
             runner: windows-latest
+            python_arch: x64
             processor_architecture: AMD64
             msvc_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
             msvc_arch: x64
@@ -65,6 +66,7 @@ jobs:
             rust_linker_env: CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER
           - arch: arm64
             runner: windows-11-arm
+            python_arch: arm64
             processor_architecture: ARM64
             msvc_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
             msvc_arch: arm64
@@ -84,6 +86,12 @@ jobs:
             throw "Windows Smoke (${{ matrix.arch }}) expects $expected runner, got $env:PROCESSOR_ARCHITECTURE"
           }
 
+      # libdav1d-sys 0.7.1 passes --prefix=/, which Python 3.13 no longer treats as absolute on Windows.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+          architecture: ${{ matrix.python_arch }}
+
       - name: Install native codec build tools
         shell: pwsh
         run: |
@@ -92,11 +100,21 @@ jobs:
           python -m pip install --disable-pip-version-check meson==1.10.1
           meson --version
           if ("${{ matrix.arch }}" -eq "x64") {
-            if (-not (Get-Command nasm -ErrorAction SilentlyContinue)) {
-              choco install -y nasm
-              Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\NASM"
-              $env:Path = "C:\Program Files\NASM;$env:Path"
+            # libaom 3.11 checks NASM help using a flag that changed in NASM 3.
+            $nasmVersion = "2.16.03"
+            $nasmArchive = Join-Path $env:RUNNER_TEMP "nasm-$nasmVersion-win64.zip"
+            $nasmRoot = Join-Path $env:RUNNER_TEMP "imgconvert-nasm-$nasmVersion"
+            Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip" -OutFile $nasmArchive
+            $actualHash = (Get-FileHash -Algorithm SHA256 $nasmArchive).Hash.ToLowerInvariant()
+            $expectedHash = "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6"
+            if ($actualHash -ne $expectedHash) {
+              throw "NASM archive checksum mismatch: expected $expectedHash, got $actualHash"
             }
+            New-Item -ItemType Directory -Path $nasmRoot | Out-Null
+            Expand-Archive -LiteralPath $nasmArchive -DestinationPath $nasmRoot
+            $nasmBin = Join-Path $nasmRoot "nasm-$nasmVersion"
+            Add-Content -Path $env:GITHUB_PATH -Value $nasmBin
+            $env:Path = "$nasmBin;$env:Path"
             nasm -v
           }
 

@@ -86,7 +86,25 @@ jobs:
           fi
 
       - name: Install native codec build tools
-        run: brew install cmake meson ninja nasm
+        run: |
+          brew install cmake meson ninja
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            # libaom 3.11 checks NASM help using a flag that changed in NASM 3.
+            nasm_version="2.16.03"
+            nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+            nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+            curl --fail --location --silent --show-error \
+              "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+              --output "$nasm_archive"
+            echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+              | shasum -a 256 -c -
+            mkdir "$nasm_root"
+            unzip -q "$nasm_archive" -d "$nasm_root"
+            nasm_bin="$nasm_root/nasm-$nasm_version"
+            echo "$nasm_bin" >> "$GITHUB_PATH"
+            export PATH="$nasm_bin:$PATH"
+            nasm -v
+          fi
 
       - uses: pnpm/action-setup@v6
         with:
