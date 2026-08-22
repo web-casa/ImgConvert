@@ -71,7 +71,11 @@ function main() {
 
   const preparedManifest = readPreparedManifest();
   const version = manifestValue(preparedManifest, "Version");
-  const sourcePackagePath = path.join(msixRoot, `ImgConvert_${version}_x64.msix`);
+  const architecture = manifestValue(preparedManifest, "ProcessorArchitecture");
+  if (!["x64", "arm64"].includes(architecture)) {
+    fail(`unsupported MSIX processor architecture: ${architecture}`);
+  }
+  const sourcePackagePath = path.join(msixRoot, `ImgConvert_${version}_${architecture}.msix`);
   if (!existsSync(sourcePackagePath)) {
     fail(
       `expected artifact ${path.relative(repoRoot, sourcePackagePath)} was not found; run pnpm run release:windows:msix first`,
@@ -110,7 +114,7 @@ function main() {
     packageInstalled = true;
     runInstalledSmoke(identityName);
     assertSourceArtifactUnchanged(sourcePackagePath, sourceArtifactSha256);
-    exportSignedSmokeBundle(smokePackagePath, version, identityName, publisher);
+    exportSignedSmokeBundle(smokePackagePath, version, architecture, identityName, publisher);
     console.log(
       "Windows MSIX install smoke completed; source submission artifact was not modified (SHA-256 verified).",
     );
@@ -296,7 +300,7 @@ function verifyPackageSignature(packagePath) {
   run(signtool, ["verify", "/pa", "/all", packagePath], "verify signed MSIX smoke package");
 }
 
-function exportSignedSmokeBundle(packagePath, version, identityName, publisher) {
+function exportSignedSmokeBundle(packagePath, version, architecture, identityName, publisher) {
   const outputDir = options.exportSignedDir;
   if (!outputDir) return;
 
@@ -307,7 +311,7 @@ function exportSignedSmokeBundle(packagePath, version, identityName, publisher) 
   }
 
   mkdirSync(outputDir, { recursive: true });
-  const packageName = `ImgConvert_${version}_x64_DevSmoke.msix`;
+  const packageName = `ImgConvert_${version}_${architecture}_DevSmoke.msix`;
   const certificateName = "ImgConvert.DevSmoke.cer";
   const outputPackagePath = path.join(outputDir, packageName);
   const outputCertificatePath = path.join(outputDir, certificateName);
@@ -426,10 +430,13 @@ function findWindowsSdkTool(tool) {
       .map((entry) => entry.name)
       .sort()
       .reverse();
+    const toolArchitectures = process.arch === "arm64" ? ["arm64", "x64"] : ["x64"];
     for (const version of versions) {
-      const candidate = path.join(kitsRoot, version, "x64", tool);
-      if (existsSync(candidate)) {
-        return candidate;
+      for (const architecture of toolArchitectures) {
+        const candidate = path.join(kitsRoot, version, architecture, tool);
+        if (existsSync(candidate)) {
+          return candidate;
+        }
       }
     }
   }

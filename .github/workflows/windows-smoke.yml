@@ -48,38 +48,57 @@ env:
 
 jobs:
   windows-smoke:
-    name: Windows Smoke (x64)
-    runs-on: windows-latest
+    name: Windows Smoke (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            processor_architecture: AMD64
+            msvc_component: Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+            msvc_arch: x64
+            msvc_host_arch: x64
+            linker_relative_path: bin/Hostx64/x64/link.exe
+            rust_linker_env: CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER
+          - arch: arm64
+            runner: windows-11-arm
+            processor_architecture: ARM64
+            msvc_component: Microsoft.VisualStudio.Component.VC.Tools.ARM64
+            msvc_arch: arm64
+            msvc_host_arch: arm64
+            linker_relative_path: bin/Hostarm64/arm64/link.exe
+            rust_linker_env: CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER
+    env:
+      WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Verify Windows runner architecture
         shell: pwsh
         run: |
-          if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
-            throw "Windows Smoke expects AMD64 runner, got $env:PROCESSOR_ARCHITECTURE"
+          $expected = "${{ matrix.processor_architecture }}"
+          if ($env:PROCESSOR_ARCHITECTURE -ne $expected) {
+            throw "Windows Smoke (${{ matrix.arch }}) expects $expected runner, got $env:PROCESSOR_ARCHITECTURE"
           }
 
       - name: Install native codec build tools
         shell: pwsh
         run: |
-          choco install -y cmake meson ninja nasm
-          $toolPaths = @(
-            "C:\ProgramData\chocolatey\bin",
-            "C:\Program Files\Meson",
-            "C:\Program Files\NASM"
-          )
-          foreach ($toolPath in $toolPaths) {
-            if (Test-Path $toolPath) {
-              Add-Content -Path $env:GITHUB_PATH -Value $toolPath
-              $env:Path = "$toolPath;$env:Path"
-            }
-          }
           cmake --version
-          meson --version
           ninja --version
-          nasm -v
+          python -m pip install --disable-pip-version-check meson==1.10.1
+          meson --version
+          if ("${{ matrix.arch }}" -eq "x64") {
+            if (-not (Get-Command nasm -ErrorAction SilentlyContinue)) {
+              choco install -y nasm
+              Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\NASM"
+              $env:Path = "C:\Program Files\NASM;$env:Path"
+            }
+            nasm -v
+          }
 
       - uses: pnpm/action-setup@v6
         with:
@@ -100,9 +119,10 @@ jobs:
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $msvcComponent = "${{ matrix.msvc_component }}"
+          $vsPath = & $vswhere -latest -products * -requires $msvcComponent -property installationPath
           if (-not $vsPath) {
-            throw "Visual Studio Build Tools with MSVC x64 tools were not found"
+            throw "Visual Studio Build Tools with $msvcComponent were not found"
           }
           $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
           if (-not (Test-Path $vsDevCmd)) {
@@ -136,7 +156,9 @@ jobs:
             "WindowsSDKVersion",
             "WindowsSdkVerBinPath"
           )
-          cmd /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 && set" | ForEach-Object {
+          $msvcArch = "${{ matrix.msvc_arch }}"
+          $msvcHostArch = "${{ matrix.msvc_host_arch }}"
+          cmd /c "`"$vsDevCmd`" -arch=$msvcArch -host_arch=$msvcHostArch && set" | ForEach-Object {
             if ($_ -match "^(.*?)=(.*)$") {
               $name = $matches[1]
               $value = $matches[2]
@@ -169,18 +191,19 @@ jobs:
                   Add-Content -Path $env:GITHUB_ENV -Value "$name=$value"
                 }
                 if ($name -ieq "VCToolsInstallDir") {
-                  $linker = Join-Path $value "bin\Hostx64\x64\link.exe"
+                  $linker = Join-Path $value "${{ matrix.linker_relative_path }}"
                   if (-not (Test-Path $linker)) {
                     throw "MSVC linker was not found at $linker"
                   }
-                  Add-Content -Path $env:GITHUB_ENV -Value "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=$linker"
-                  $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $linker
+                  $linkerEnvironment = "${{ matrix.rust_linker_env }}"
+                  Add-Content -Path $env:GITHUB_ENV -Value "$linkerEnvironment=$linker"
+                  Set-Item -Path "Env:$linkerEnvironment" -Value $linker
                 }
               }
             }
           }
           cl
-          Write-Host "Using Rust MSVC linker: $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"
+          Write-Host "Using Rust MSVC linker: $((Get-Item -Path 'Env:${{ matrix.rust_linker_env }}').Value)"
 
       - run: pnpm install --frozen-lockfile
 
@@ -235,7 +258,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_direct }}
         with:
-          name: imgconvert-windows-x64-installers
+          name: imgconvert-windows-${{ matrix.arch }}-installers
           if-no-files-found: error
           retention-days: 3
           path: |
@@ -258,7 +281,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.store_msix }}
         with:
-          name: imgconvert-windows-x64-msix-devsmoke
+          name: imgconvert-windows-${{ matrix.arch }}-msix-devsmoke
           if-no-files-found: error
           retention-days: 3
           path: src-tauri/target/windows-msix/devsmoke/*

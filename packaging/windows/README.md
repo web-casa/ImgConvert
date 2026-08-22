@@ -29,9 +29,10 @@ Direct distribution build on Windows:
 pnpm run release:windows
 ```
 
-GitHub Actions exposes the manual-only `Windows Smoke` workflow. This keeps
-runner cost predictable: the default run performs Windows guardrails, Rust
-backend checks, and a hidden real conversion smoke. Manual runs can enable
+GitHub Actions exposes the manual-only `Windows Smoke` workflow. It uses the
+free standard `windows-latest` and `windows-11-arm` runners to validate native
+x64 and arm64 builds. The default run performs Windows guardrails, Rust backend
+checks, and a hidden real conversion smoke. Manual runs can enable
 `build_direct` to build `.msi` and NSIS `.exe` artifacts. Add `install_smoke`
 to install each generated installer and run the hidden package smoke from the
 installed `ImgConvert.exe`.
@@ -85,10 +86,15 @@ $env:WINDOWS_STORE_VERSION = "1.0.0.0"
 pnpm run release:windows:msix
 ```
 
+`WINDOWS_STORE_PROCESSOR_ARCHITECTURE` defaults to the native host architecture
+and accepts only `x64` or `arm64`. The hosted workflows set it from their matrix
+and reject any mismatch between the manifest and the PE machine type of
+`ImgConvert.exe`.
+
 `release:windows:msix` prepares the Store manifest and a Store Tauri
 config, runs `tauri build --ci --no-bundle`, validates the Store assets in `src-tauri/icons`, stages
 `src-tauri/target/windows-msix/layout`, and packs
-`ImgConvert_<version>_x64.msix` with `makeappx.exe`. Use
+`ImgConvert_<version>_<x64|arm64>.msix` with `makeappx.exe`. Use
 `release:windows:msix:pack` to repack an already-built binary.
 
 Sideload install smoke first copies the MSIX into a temporary directory, then
@@ -101,12 +107,12 @@ unchanged. It requires an elevated shell:
 pnpm run release:windows:msix:smoke
 ```
 
-GitHub Actions provides a dedicated `Windows Store MSIX` production build
-workflow. Its required `release_tag` checks out and verifies the immutable app
-release tag before it uses the committed Partner Center identity defaults,
-builds the submission `.msix` with external codecs and Tauri updater disabled,
+GitHub Actions provides a dedicated x64/arm64 `Windows Store MSIX` production
+build matrix. Its required `release_tag` checks out and verifies the immutable
+app release tag before it uses the committed Partner Center identity defaults,
+builds each native submission `.msix` with external codecs and Tauri updater disabled,
 runs the sideload smoke against a temporary copy, then uploads the untouched
-`imgconvert-windows-x64-msix-submission` artifact. It never attaches MSIX to a
+architecture-specific `imgconvert-windows-<arch>-msix-submission` artifacts. It never attaches MSIX to a
 GitHub Release or creates a Partner Center submission.
 
 For a real hosted-runner install smoke, manually dispatch `Windows Smoke` with
@@ -115,7 +121,7 @@ keeps `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` and
 `IMGCONVERT_DISABLE_UPDATER=1`, builds the MSIX, then runs
 `release:windows:msix:smoke`. After the signed temporary copy passes its
 install/conversion smoke, the workflow uploads a three-day
-`imgconvert-windows-x64-msix-devsmoke` artifact containing that signed MSIX,
+architecture-specific `imgconvert-windows-<arch>-msix-devsmoke` artifacts containing the signed MSIX,
 its seven-day public `.cer`, SHA-256 checksums, and installation instructions.
 The export is restricted to the isolated DevSmoke package identity. The PFX and
 private key remain temporary and are never uploaded. This development artifact

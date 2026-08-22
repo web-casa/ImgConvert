@@ -62,24 +62,26 @@
 </p>
 
 > [!NOTE]
-> The current stable version is **v0.2.1**. GitHub Releases provides a notarized macOS
-> arm64 DMG, Windows x64 EXE/MSI installers, and Linux packages for both architectures.
-> Microsoft Store and Mac App Store distribution is still in preparation.
+> The current stable version is **v0.2.8**. Snap Store provides stable Linux builds for
+> amd64 and arm64. The GitHub Release currently carries the Linux x86_64 AppImage and
+> updater metadata; native macOS and Windows dual-architecture candidates are validated
+> in Actions before they are attached to a later release.
 
 ## Downloads
 
-| Platform            | Package                                         | Status                         |
-| ------------------- | ----------------------------------------------- | ------------------------------ |
-| macOS arm64         | [DMG][latest-release]                           | Signed and notarized           |
-| Windows x64         | [NSIS EXE, English/Chinese MSI][latest-release] | Published, currently unsigned  |
-| Linux amd64 / arm64 | [AppImage, deb, rpm][latest-release]            | Published with checksums       |
-| Microsoft Store     | MSIX                                            | Distributed via Partner Center |
-| Mac App Store       | MAS package                                     | Pending validation and review  |
+| Platform            | Package                                       | Status                               |
+| ------------------- | --------------------------------------------- | ------------------------------------ |
+| macOS arm64 / x64   | DMG                                           | Dual-architecture CI validation      |
+| Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                 | Dual-architecture CI validation      |
+| Linux amd64 / arm64 | [Snap Store](https://snapcraft.io/imgconvert) | Stable channel                       |
+| Linux x86_64        | [AppImage][latest-release]                    | Published with updater metadata      |
+| Microsoft Store     | MSIX                                          | x64 in Partner Center; arm64 pending |
+| Mac App Store       | MAS package                                   | Pending validation and review        |
 
 > [!WARNING]
-> Windows EXE/MSI installers distributed through GitHub are not currently
-> Authenticode-signed and may trigger Microsoft Defender SmartScreen. Verify them
-> against `SHA256SUMS-windows.txt` in the release before installation.
+> Windows EXE/MSI candidates produced by Actions are not currently Authenticode-signed
+> and may trigger Microsoft Defender SmartScreen. Do not treat them as published release
+> installers until a release includes the matching `SHA256SUMS-windows.txt`.
 
 ## Interface preview
 
@@ -126,8 +128,10 @@
 
 ## Release and project status
 
-- ✅ **GitHub v0.2.1**: macOS DMG, Windows EXE/MSI, and Linux AppImage/deb/rpm
-  packages are published with updater metadata, signatures, and checksums.
+- ✅ **Linux v0.2.8**: Snap Store stable serves amd64 and arm64; GitHub Releases
+  provides the x86_64 AppImage and updater metadata.
+- 🚧 **Direct desktop packages**: native macOS and Windows arm64/x64 workflows are
+  configured; release publication follows successful CI, signing, and notarization.
 - ✅ **Direct macOS distribution**: Developer ID Application signing, notarization,
   stapling, and Gatekeeper verification have passed.
 - ✅ **Core product**: the P0–P3 UI, Rust engine, batch processing, compression,

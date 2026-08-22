@@ -8,13 +8,21 @@ on:
         description: Successful macOS submission workflow run ID containing the pending DMG.
         required: true
         type: string
+      architecture:
+        description: Architecture of the submitted DMG to finalize.
+        required: true
+        default: arm64
+        type: choice
+        options:
+          - arm64
+          - x64
 
 permissions:
   actions: read
   contents: write
 
 concurrency:
-  group: macos-notarization-finalize-${{ inputs.source_run_id }}
+  group: macos-notarization-finalize-${{ inputs.source_run_id }}-${{ inputs.architecture }}
   cancel-in-progress: false
 
 env:
@@ -31,6 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          IMGCONVERT_DMG_ARCH: ${{ inputs.architecture }}
         run: |
           case "$SOURCE_RUN_ID" in
             ''|*[!0-9]*) echo "source_run_id must contain only digits"; exit 1 ;;
@@ -56,6 +65,7 @@ jobs:
           case "$workflow_path" in
             .github/workflows/macos-smoke.yml)
               test "$workflow_name" = "macOS Smoke" || { echo "source workflow name mismatch"; exit 1; }
+              test "$IMGCONVERT_DMG_ARCH" = "arm64" || { echo "macOS Smoke only produces an arm64 notarization artifact"; exit 1; }
               allow_release=false
               ;;
             .github/workflows/macos-release.yml)
@@ -120,16 +130,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          IMGCONVERT_DMG_ARCH: ${{ inputs.architecture }}
         run: |
           artifact_dir="$GITHUB_WORKSPACE/src-tauri/target/release/bundle/dmg"
           mkdir -p "$artifact_dir"
           gh run download "$SOURCE_RUN_ID" \
             --repo "$GITHUB_REPOSITORY" \
-            --name imgconvert-macos-arm64-dmg-pending \
+            --name "imgconvert-macos-${IMGCONVERT_DMG_ARCH}-dmg-pending" \
             --dir "$artifact_dir"
           gh run download "$SOURCE_RUN_ID" \
             --repo "$GITHUB_REPOSITORY" \
-            --name imgconvert-macos-notarization-receipt \
+            --name "imgconvert-macos-${IMGCONVERT_DMG_ARCH}-notarization-receipt" \
             --dir "$artifact_dir"
 
           dmgs=()
@@ -180,7 +191,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' }}
         with:
-          name: imgconvert-macos-arm64-dmg-notarized-${{ inputs.source_run_id }}
+          name: imgconvert-macos-${{ inputs.architecture }}-dmg-notarized-${{ inputs.source_run_id }}
           if-no-files-found: error
           retention-days: 14
           path: ${{ env.IMGCONVERT_MACOS_DMG }}

@@ -27,9 +27,19 @@ env:
 
 jobs:
   macos-dmg-release:
-    name: macOS DMG Release (arm64)
-    runs-on: macos-15
+    name: macOS DMG Release (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            uname_arch: arm64
+          - arch: x64
+            runner: macos-15-intel
+            uname_arch: x86_64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,8 +55,8 @@ jobs:
         run: |
           echo "macOS version: $(sw_vers -productVersion)"
           echo "Runner architecture: $(uname -m)"
-          if [ "$(uname -m)" != "arm64" ]; then
-            echo "macOS DMG Release expects arm64 runner, got $(uname -m)"
+          if [ "$(uname -m)" != "${{ matrix.uname_arch }}" ]; then
+            echo "macOS DMG Release (${{ matrix.arch }}) expects ${{ matrix.uname_arch }} runner, got $(uname -m)"
             exit 1
           fi
 
@@ -164,7 +174,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: imgconvert-macos-arm64-dmg-pending
+          name: imgconvert-macos-${{ matrix.arch }}-dmg-pending
           if-no-files-found: error
           retention-days: 7
           path: src-tauri/target/release/bundle/dmg/*.dmg
@@ -186,7 +196,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: imgconvert-macos-notarization-receipt
+          name: imgconvert-macos-${{ matrix.arch }}-notarization-receipt
           if-no-files-found: error
           retention-days: 7
           path: src-tauri/target/release/bundle/dmg/notarization.json

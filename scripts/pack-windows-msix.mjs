@@ -106,6 +106,20 @@ function stageLayout() {
     );
   }
 
+  const manifest = readFileSync(manifestPath, "utf8");
+  const manifestArchitecture = manifestIdentityValue(manifest, "ProcessorArchitecture");
+  if (!["x64", "arm64"].includes(manifestArchitecture)) {
+    fail(`unsupported MSIX manifest processor architecture: ${manifestArchitecture}`);
+  }
+  if (existsSync(executable)) {
+    const executableArchitecture = peProcessorArchitecture(executable);
+    if (executableArchitecture !== manifestArchitecture) {
+      fail(
+        `MSIX architecture mismatch: manifest is ${manifestArchitecture}, but ImgConvert.exe is ${executableArchitecture}`,
+      );
+    }
+  }
+
   rmSync(layoutDir, { recursive: true, force: true });
   mkdirSync(path.join(layoutDir, "Assets"), { recursive: true });
   copyFileSync(manifestPath, path.join(layoutDir, "AppxManifest.xml"));
@@ -138,12 +152,13 @@ function packMsix() {
     fail("makeappx.exe was not found; install the Windows 10/11 SDK before MSIX packaging");
   }
   const manifest = readFileSync(path.join(layoutDir, "AppxManifest.xml"), "utf8");
-  const version = manifest.match(/<Identity[^>]*\sVersion="([^"]+)"/)?.[1];
-  if (!version) {
-    fail("could not read the package version from the prepared AppxManifest.xml");
+  const version = manifestIdentityValue(manifest, "Version");
+  const architecture = manifestIdentityValue(manifest, "ProcessorArchitecture");
+  if (!["x64", "arm64"].includes(architecture)) {
+    fail(`unsupported MSIX manifest processor architecture: ${architecture}`);
   }
   mkdirSync(msixRoot, { recursive: true });
-  const output = path.join(msixRoot, `ImgConvert_${version}_x64.msix`);
+  const output = path.join(msixRoot, `ImgConvert_${version}_${architecture}.msix`);
   rmSync(output, { force: true });
   const result = spawnSync(makeappx, ["pack", "/o", "/d", layoutDir, "/p", output], {
     cwd: repoRoot,
@@ -160,6 +175,31 @@ function packMsix() {
     fail("makeappx.exe reported success but the .msix artifact is missing or empty");
   }
   console.log(`packed ${path.relative(repoRoot, output)}`);
+}
+
+function manifestIdentityValue(manifest, attribute) {
+  const value = manifest.match(new RegExp(`<Identity[^>]*\\s${attribute}="([^"]+)"`))?.[1];
+  if (!value) {
+    fail(`could not read Identity ${attribute} from AppxManifest.xml`);
+  }
+  return value;
+}
+
+function peProcessorArchitecture(file) {
+  const binary = readFileSync(file);
+  if (binary.length < 0x40 || binary.readUInt16LE(0) !== 0x5a4d) {
+    fail(`${path.relative(repoRoot, file)} is not a valid PE executable (missing MZ header)`);
+  }
+  const peOffset = binary.readUInt32LE(0x3c);
+  if (peOffset > binary.length - 6 || binary.readUInt32LE(peOffset) !== 0x00004550) {
+    fail(`${path.relative(repoRoot, file)} is not a valid PE executable (missing PE header)`);
+  }
+  const machine = binary.readUInt16LE(peOffset + 4);
+  if (machine === 0x8664) return "x64";
+  if (machine === 0xaa64) return "arm64";
+  fail(
+    `${path.relative(repoRoot, file)} uses unsupported PE machine type 0x${machine.toString(16).padStart(4, "0")}`,
+  );
 }
 
 function findWindowsSdkTool(tool) {
@@ -179,10 +219,13 @@ function findWindowsSdkTool(tool) {
       .map((entry) => entry.name)
       .sort()
       .reverse();
+    const toolArchitectures = process.arch === "arm64" ? ["arm64", "x64"] : ["x64"];
     for (const version of versions) {
-      const candidate = path.join(kitsRoot, version, "x64", tool);
-      if (existsSync(candidate)) {
-        return candidate;
+      for (const architecture of toolArchitectures) {
+        const candidate = path.join(kitsRoot, version, architecture, tool);
+        if (existsSync(candidate)) {
+          return candidate;
+        }
       }
     }
   }
@@ -229,6 +272,7 @@ Environment:
   WINDOWS_STORE_IDENTITY_NAME
   WINDOWS_STORE_PUBLISHER
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME
+  WINDOWS_STORE_PROCESSOR_ARCHITECTURE
   WINDOWS_STORE_VERSION
 `);
 }

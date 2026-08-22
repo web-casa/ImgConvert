@@ -56,6 +56,7 @@ if (missing.length > 0 && !options.allowMissingStoreEnv) {
 
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const version = storeVersion(envOverride("WINDOWS_STORE_VERSION") ?? packageJson.version);
+const processorArchitecture = windowsProcessorArchitecture();
 const replacements = {
   WINDOWS_STORE_IDENTITY_NAME:
     envOverride("WINDOWS_STORE_IDENTITY_NAME") ?? "53660AlanM.ImgConvert",
@@ -63,6 +64,7 @@ const replacements = {
     envOverride("WINDOWS_STORE_PUBLISHER") ?? "CN=84AC3716-04E0-4D67-8951-0D3E51674CA0",
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME:
     envOverride("WINDOWS_STORE_PUBLISHER_DISPLAY_NAME") ?? "AlanM.",
+  WINDOWS_STORE_PROCESSOR_ARCHITECTURE: processorArchitecture,
   WINDOWS_STORE_VERSION: version,
 };
 
@@ -84,7 +86,7 @@ for (const token of [
   "Windows.FullTrustApplication",
   "desktop:Extension",
   "TargetDeviceFamily",
-  'ProcessorArchitecture="x64"',
+  'ProcessorArchitecture="{{WINDOWS_STORE_PROCESSOR_ARCHITECTURE}}"',
 ]) {
   if (!template.includes(token)) {
     fail(`MSIX manifest template must include ${token}`);
@@ -150,6 +152,17 @@ function storeVersion(value) {
   return canonical.join(".");
 }
 
+function windowsProcessorArchitecture() {
+  const requested = envOverride("WINDOWS_STORE_PROCESSOR_ARCHITECTURE");
+  const architecture = (requested ?? os.arch()).toLowerCase();
+  if (!["x64", "arm64"].includes(architecture)) {
+    fail(
+      `unsupported Windows Store processor architecture: ${architecture} (expected x64 or arm64)`,
+    );
+  }
+  return architecture;
+}
+
 function toolExists(tool) {
   const paths = (process.env.Path ?? process.env.PATH ?? "").split(path.delimiter);
   return paths.some((dir) => existsSync(path.join(dir, tool)));
@@ -184,6 +197,7 @@ Environment:
   WINDOWS_STORE_IDENTITY_NAME           Optional override of the committed identity.
   WINDOWS_STORE_PUBLISHER               Optional override of the committed publisher.
   WINDOWS_STORE_PUBLISHER_DISPLAY_NAME  Optional override of the committed display name.
+  WINDOWS_STORE_PROCESSOR_ARCHITECTURE  Optional x64 or arm64 override; defaults to the host.
   WINDOWS_STORE_VERSION                 Optional four-part Store version override.
 `);
 }

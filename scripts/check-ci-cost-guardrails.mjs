@@ -58,7 +58,12 @@ checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkMacosSmokeWorkflow();
 checkMacosDmgReleaseWorkflow();
-checkStandardPlatformWorkflow("macos-release.yml", macosRelease, "macOS DMG Release", "macos-15");
+checkStandardPlatformWorkflow(
+  "macos-release.yml",
+  macosRelease,
+  "macOS DMG Release matrix",
+  "${{ matrix.runner }}",
+);
 checkMacosMasReleaseWorkflow();
 checkStandardPlatformWorkflow(
   "macos-mas-release.yml",
@@ -73,14 +78,19 @@ checkStandardPlatformWorkflow(
   "macOS notarization finalizer",
   "macos-15",
 );
-checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
+checkStandardPlatformWorkflow(
+  "windows-smoke.yml",
+  windowsSmoke,
+  "Windows matrix",
+  "${{ matrix.runner }}",
+);
 checkWindowsStoreReleaseWorkflow();
 checkSnapStoreReleaseWorkflow();
 checkStandardPlatformWorkflow(
   "windows-store-release.yml",
   windowsStoreRelease,
   "Windows Store",
-  "windows-latest",
+  "${{ matrix.runner }}",
 );
 checkPagesWorkflow();
 
@@ -133,7 +143,9 @@ function isAllowedRunner(runner) {
     "ubuntu-22.04",
     "ubuntu-22.04-arm",
     "windows-latest",
+    "windows-11-arm",
     "macos-15",
+    "macos-15-intel",
     "${{ matrix.runner }}",
   ].includes(runner);
 }
@@ -216,7 +228,7 @@ function checkUbuntuAptBootstrap() {
 
 function checkLinuxReleaseWorkflow() {
   requireBooleanInputDefault(linuxRelease, "docker_smoke", false, "release-linux.yml");
-  requireBooleanInputDefault(linuxRelease, "build_arm64", false, "release-linux.yml");
+  requireBooleanInputDefault(linuxRelease, "build_arm64", true, "release-linux.yml");
 
   if (!hasYamlKeyLine(linuxRelease, "push") || !linuxRelease.includes('tags: ["v*"]')) {
     failures.push("release-linux.yml must build automatically for v* tags");
@@ -350,8 +362,10 @@ function checkMacosDmgReleaseWorkflow() {
     "release:macos:notarize",
     "--submit-only",
     "notarization.json",
-    "imgconvert-macos-arm64-dmg-pending",
-    "imgconvert-macos-notarization-receipt",
+    "runner: macos-15",
+    "runner: macos-15-intel",
+    "imgconvert-macos-${{ matrix.arch }}-dmg-pending",
+    "imgconvert-macos-${{ matrix.arch }}-notarization-receipt",
     "retention-days: 7",
     "inputs.publish_release",
   ]) {
@@ -404,11 +418,12 @@ function checkMacosNotarizationFinalizeWorkflow() {
     "source run must use the default branch",
     "finalizer must run from the default branch",
     "gh run download",
-    "imgconvert-macos-arm64-dmg-pending",
-    "imgconvert-macos-notarization-receipt",
+    "architecture:",
+    "imgconvert-macos-${IMGCONVERT_DMG_ARCH}-dmg-pending",
+    "imgconvert-macos-${IMGCONVERT_DMG_ARCH}-notarization-receipt",
     "--finalize",
     "notarization_status == 'Accepted'",
-    "imgconvert-macos-arm64-dmg-notarized",
+    "imgconvert-macos-${{ inputs.architecture }}-dmg-notarized",
     "gh release view",
     "gh release upload",
   ]) {
@@ -438,7 +453,10 @@ function checkWindowsStoreReleaseWorkflow() {
     "release:windows:msix:smoke",
     'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
     'IMGCONVERT_DISABLE_UPDATER: "1"',
-    "imgconvert-windows-x64-msix-submission",
+    "runner: windows-latest",
+    "runner: windows-11-arm",
+    "Verify ARM64-aware Store packaging source",
+    "imgconvert-windows-${{ matrix.arch }}-msix-submission",
   ]) {
     if (!windowsStoreRelease.includes(marker)) {
       failures.push(`windows-store-release.yml missing marker: ${marker}`);

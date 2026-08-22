@@ -62,23 +62,25 @@
 </p>
 
 > [!NOTE]
-> 当前稳定版本为 **v0.2.1**。GitHub Release 已提供已公证的 macOS arm64 DMG、
-> Windows x64 EXE/MSI 和 Linux 双架构安装包；Microsoft Store 与 Mac App Store
-> 渠道仍在准备，并将通过各自商店分发。
+> 当前稳定版本为 **v0.2.8**。Snap Store 的 stable 渠道已提供 Linux amd64 与
+> arm64 版本。当前 GitHub Release 提供 Linux x86_64 AppImage 与 updater 元数据；
+> macOS 和 Windows 原生双架构候选包会先在 Actions 验证，再进入后续 Release。
 
 ## 下载
 
-| 平台                | 安装包                                    | 状态                |
-| ------------------- | ----------------------------------------- | ------------------- |
-| macOS arm64         | [DMG][latest-release]                     | 已签名、公证        |
-| Windows x64         | [NSIS EXE、中文/英文 MSI][latest-release] | 已发布，当前未签名  |
-| Linux amd64 / arm64 | [AppImage、deb、rpm][latest-release]      | 已发布，含校验和    |
-| Microsoft Store     | MSIX                                      | Partner Center 分发 |
-| Mac App Store       | MAS 包                                    | 等待验证与审核      |
+| 平台                | 安装包                                        | 状态                                  |
+| ------------------- | --------------------------------------------- | ------------------------------------- |
+| macOS arm64 / x64   | DMG                                           | 双架构 CI 验证中                      |
+| Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                       | 双架构 CI 验证中                      |
+| Linux amd64 / arm64 | [Snap Store](https://snapcraft.io/imgconvert) | stable 渠道已发布                     |
+| Linux x86_64        | [AppImage][latest-release]                    | 已发布，含 updater 元数据             |
+| Microsoft Store     | MSIX                                          | x64 已进 Partner Center，arm64 待提交 |
+| Mac App Store       | MAS 包                                        | 等待验证与审核                        |
 
 > [!WARNING]
-> GitHub 直发的 Windows EXE/MSI 当前没有 Authenticode 签名，可能触发 Microsoft
-> Defender SmartScreen。安装前请核对 Release 中的 `SHA256SUMS-windows.txt`。
+> Actions 生成的 Windows EXE/MSI 候选包当前没有 Authenticode 签名，可能触发
+> Microsoft Defender SmartScreen。在 Release 提供匹配的 `SHA256SUMS-windows.txt`
+> 之前，不应把这些候选包视为正式发布安装包。
 
 ## 界面预览
 
@@ -125,8 +127,10 @@
 
 ## 发布与项目状态
 
-- ✅ **GitHub v0.2.1**：macOS DMG、Windows EXE/MSI、Linux AppImage/deb/rpm
-  已发布；Updater 元数据、签名与校验和已就绪。
+- ✅ **Linux v0.2.8**：Snap Store stable 已提供 amd64 与 arm64；GitHub Release
+  提供 x86_64 AppImage 与 updater 元数据。
+- 🚧 **桌面直发安装包**：macOS 和 Windows 的 arm64/x64 原生工作流已配置；
+  成功通过 CI、签名与公证后再发布到 Release。
 - ✅ **macOS 直发**：Developer ID Application 签名、公证、staple 与 Gatekeeper
   验证已通过。
 - ✅ **核心能力**：P0–P3 的 UI、Rust 引擎、批处理、压缩、metadata、色彩、

@@ -1043,7 +1043,9 @@ function checkMacosRuntimeGuardrails() {
     "workflow_dispatch:",
     "tag:",
     "publish_release",
-    "runs-on: macos-15",
+    "runs-on: ${{ matrix.runner }}",
+    "runner: macos-15",
+    "runner: macos-15-intel",
     "ref: ${{ inputs.tag }}",
     "fetch-depth: 0",
     "verify-release-tag.mjs",
@@ -1051,8 +1053,8 @@ function checkMacosRuntimeGuardrails() {
     "release:macos:notarize",
     "--submit-only",
     "notarization.json",
-    "imgconvert-macos-arm64-dmg-pending",
-    "imgconvert-macos-notarization-receipt",
+    "imgconvert-macos-${{ matrix.arch }}-dmg-pending",
+    "imgconvert-macos-${{ matrix.arch }}-notarization-receipt",
   ]) {
     if (!macosReleaseWorkflow.includes(expected)) {
       failures.push(`macOS DMG Release workflow must preserve ${expected}`);
@@ -1067,7 +1069,8 @@ function checkMacosRuntimeGuardrails() {
     "source run must use the default branch",
     "finalizer must run from the default branch",
     "gh run download",
-    "imgconvert-macos-notarization-receipt",
+    "architecture:",
+    "imgconvert-macos-${IMGCONVERT_DMG_ARCH}-notarization-receipt",
     "--finalize",
     "IMGCONVERT_NOTARY_EXPECTED_SOURCE_RUN_ID",
     "notarization_status == 'Accepted'",
@@ -1288,7 +1291,9 @@ function checkWindowsRuntimeGuardrails() {
   }
   for (const expected of [
     "store_msix",
-    "runs-on: windows-latest",
+    "runs-on: ${{ matrix.runner }}",
+    "runner: windows-latest",
+    "runner: windows-11-arm",
     'IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"',
     'IMGCONVERT_DISABLE_UPDATER: "1"',
     "WINDOWS_STORE_IDENTITY_NAME: ImgConvert.DevSmoke",
@@ -1304,14 +1309,17 @@ function checkWindowsRuntimeGuardrails() {
     failures.push("Windows Smoke workflow must build an MSIX before its install smoke");
   }
   for (const expected of [
-    "runs-on: windows-latest",
+    "runs-on: ${{ matrix.runner }}",
+    "runner: windows-latest",
+    "runner: windows-11-arm",
+    "Verify ARM64-aware Store packaging source",
     "release_tag",
     "ref: ${{ inputs.release_tag }}",
     "fetch-depth: 0",
     "verify-release-tag.mjs",
     "pnpm run release:windows:msix",
     "pnpm run release:windows:msix:smoke",
-    "imgconvert-windows-x64-msix-submission",
+    "imgconvert-windows-${{ matrix.arch }}-msix-submission",
   ]) {
     if (!windowsStoreWorkflow.includes(expected)) {
       failures.push(
@@ -1334,7 +1342,8 @@ function checkWindowsRuntimeGuardrails() {
   }
   for (const expected of [
     "verifyPackageSignature(smokePackagePath)",
-    "exportSignedSmokeBundle(smokePackagePath, version, identityName, publisher)",
+    "exportSignedSmokeBundle(",
+    "architecture,",
     'identityName !== "ImgConvert.DevSmoke"',
     'publisher !== "CN=ImgConvertDevSmoke"',
     ".AddDays(7)",
@@ -1347,7 +1356,7 @@ function checkWindowsRuntimeGuardrails() {
   }
   for (const expected of [
     "--export-signed-dir=src-tauri/target/windows-msix/devsmoke",
-    "imgconvert-windows-x64-msix-devsmoke",
+    "imgconvert-windows-${{ matrix.arch }}-msix-devsmoke",
     "src-tauri/target/windows-msix/devsmoke/*",
   ]) {
     if (!windowsWorkflow.includes(expected)) {
@@ -1556,11 +1565,21 @@ function checkWindowsStoreDocs() {
     }
   }
   const msixPrepare = readText(path.join(repoRoot, "scripts", "prepare-windows-msix-release.mjs"));
-  for (const expected of ["IMGCONVERT_DISABLE_UPDATER", 'capabilities: ["default"]']) {
+  for (const expected of [
+    "IMGCONVERT_DISABLE_UPDATER",
+    'capabilities: ["default"]',
+    "WINDOWS_STORE_PROCESSOR_ARCHITECTURE",
+  ]) {
     if (!msixPrepare.includes(expected)) {
       failures.push(
         `prepare-windows-msix-release.mjs must enforce Store updater disable: ${expected}`,
       );
+    }
+  }
+  const msixPack = readText(path.join(repoRoot, "scripts", "pack-windows-msix.mjs"));
+  for (const expected of ["peProcessorArchitecture", "MSIX architecture mismatch"]) {
+    if (!msixPack.includes(expected)) {
+      failures.push(`pack-windows-msix.mjs must verify executable architecture: ${expected}`);
     }
   }
   const windowsWorkflow = readText(
@@ -1572,7 +1591,12 @@ function checkWindowsStoreDocs() {
   const msixTemplate = readText(
     path.join(repoRoot, "packaging", "windows", "msix", "AppxManifest.xml.template"),
   );
-  for (const expected of ["runFullTrust", "Windows.FullTrustApplication", "desktop:Extension"]) {
+  for (const expected of [
+    "runFullTrust",
+    "Windows.FullTrustApplication",
+    "desktop:Extension",
+    "{{WINDOWS_STORE_PROCESSOR_ARCHITECTURE}}",
+  ]) {
     if (!msixTemplate.includes(expected)) {
       failures.push(`MSIX manifest template must include ${expected}`);
     }
