@@ -22,7 +22,8 @@ Default behavior:
   frontend, Rust core, Tauri backend, security/license, fuzz corpus replay, and
   web preview E2E jobs run on `ubuntu-24.04`. The Windows HEIC check runs on
   `windows-latest` for `main` pushes. The Linux package build/install smoke
-  runs on both `ubuntu-24.04` and `ubuntu-24.04-arm` for `main` pushes.
+  runs on both `ubuntu-22.04` and `ubuntu-22.04-arm` for `main` pushes so the
+  compatibility check is performed on the same baseline as release builds.
   Manual dispatch keeps the Windows check, package smoke, fuzz replay, and
   arm64 package smoke optional with `false` defaults.
 - `Linux Release` builds `amd64` and `arm64` on Ubuntu 22.04 automatically when

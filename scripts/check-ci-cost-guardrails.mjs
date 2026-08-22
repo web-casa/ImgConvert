@@ -161,7 +161,7 @@ function checkAutomaticLinuxCiWorkflow() {
   if (!ci.includes("inputs.package_smoke_arm64")) {
     failures.push("ci.yml package smoke matrix must require package_smoke_arm64 on dispatch");
   }
-  if (!ci.includes("ubuntu-24.04-arm")) {
+  if (!ci.includes("ubuntu-22.04-arm")) {
     failures.push("ci.yml must keep the free public arm64 runner explicit when enabled");
   }
 }
