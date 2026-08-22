@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_arm64 || github.event_name != 'workflow_dispatch' && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.build_arm64 || github.event_name != 'workflow_dispatch' && '[{"arch":"amd64","runner":"ubuntu-22.04"},{"arch":"arm64","runner":"ubuntu-22.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-22.04"}]') }}
     steps:
       - uses: actions/checkout@v7
         with:

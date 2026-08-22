@@ -12,6 +12,8 @@ public/THIRD_PARTY_LICENSES.md
 docs
 packaging/flatpak/*.desktop
 packaging/flatpak/*.xml
+packaging/appimagehub/*.xml
+snap/gui/*.desktop
 src-tauri/about.hbs
 src-tauri/gen
 Cargo.lock

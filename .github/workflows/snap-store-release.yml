@@ -1,0 +1,119 @@
+name: Snap Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable release tag to build, for example v0.2.3.
+        required: true
+        type: string
+      build_arm64:
+        description: Build the arm64 snap on the free public arm64 runner.
+        required: true
+        default: true
+        type: boolean
+      publish_snap:
+        description: Upload and release each built snap to the selected channel.
+        required: true
+        default: false
+        type: boolean
+      channel:
+        description: Snap Store channel used only when publish_snap is enabled.
+        required: true
+        default: edge
+        type: choice
+        options:
+          - edge
+          - candidate
+          - stable
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snap-store-release-${{ inputs.tag }}-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  snap:
+    name: Snap (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.build_arm64 && '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"}]') }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Verify release tag and source version
+        env:
+          IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
+      - name: Verify Snap source guardrails
+        run: node scripts/check-snap-package.mjs
+      - name: Build strict snap
+        id: snapcraft
+        uses: snapcore/action-build@v1
+        with:
+          snapcraft-args: --platform=${{ matrix.arch }}
+      - name: Inspect built snap
+        env:
+          IMGCONVERT_SNAP: ${{ steps.snapcraft.outputs.snap }}
+        run: node scripts/check-snap-package.mjs --artifact="$IMGCONVERT_SNAP"
+      - name: Install and smoke built snap
+        env:
+          IMGCONVERT_SNAP: ${{ steps.snapcraft.outputs.snap }}
+        run: |
+          sudo snap install --dangerous "$IMGCONVERT_SNAP"
+          sudo snap connect imgconvert:removable-media || true
+          set +e
+          timeout 20s xvfb-run -a env \
+            IMGCONVERT_PACKAGE_CONVERT_SMOKE=1 \
+            IMGCONVERT_PACKAGE_CONVERT_SMOKE_FORMATS=jpeg,webp,png,avif \
+            WEBKIT_DISABLE_COMPOSITING_MODE=1 \
+            snap run imgconvert
+          code=$?
+          set -e
+          test "$code" = 0 || test "$code" = 124
+      - uses: actions/upload-artifact@v7
+        with:
+          name: imgconvert-snap-${{ inputs.tag }}-${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ steps.snapcraft.outputs.snap }}
+
+  publish:
+    name: Publish Snap (${{ matrix.arch }})
+    if: ${{ inputs.publish_snap }}
+    needs: snap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(inputs.build_arm64 && '["amd64","arm64"]' || '["amd64"]') }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: imgconvert-snap-${{ inputs.tag }}-${{ matrix.arch }}
+          path: snap-artifact
+      - name: Resolve built snap
+        id: artifact
+        run: |
+          snap="$(find snap-artifact -maxdepth 2 -type f -name '*.snap' -print -quit)"
+          test -n "$snap"
+          echo "path=$snap" >> "$GITHUB_OUTPUT"
+      - name: Require package-scoped Snap Store credentials
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+        run: test -n "$SNAPCRAFT_STORE_CREDENTIALS"
+      - name: Publish to Snap Store
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+        with:
+          snap: ${{ steps.artifact.outputs.path }}
+          release: ${{ inputs.channel }}

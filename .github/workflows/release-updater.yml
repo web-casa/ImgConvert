@@ -38,7 +38,7 @@ env:
 jobs:
   linux-updater:
     name: Linux AppImage Updater
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
@@ -94,6 +94,12 @@ jobs:
         env:
           TAURI_UPDATER_ARTIFACT_BASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}
         run: pnpm run release:updater:verify
+      - name: Prepare AppImageHub canonical asset
+        run: pnpm run release:appimagehub:prepare
+      - name: Prepare AUR imgconvert-bin sources
+        run: pnpm run release:aur:prepare
+      - name: Verify AUR metadata with Arch makepkg
+        run: pnpm run release:aur:verify:docker
       - name: Updater AppImage runtime smoke
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -110,6 +116,10 @@ jobs:
           retention-days: 14
           path: |
             target/updater/latest.json
+            target/appimagehub/*.AppImage
+            target/appimagehub/*.AppImage.sig
+            target/appimagehub/SHA256SUMS
+            target/aur/imgconvert-bin
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/release/bundle/SHA256SUMS
@@ -123,5 +133,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             target/updater/latest.json
+            target/appimagehub/*.AppImage
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/appimage/*.AppImage.sig

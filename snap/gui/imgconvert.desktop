@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[Desktop Entry]
+Type=Application
+Name=ImgConvert
+Comment=Local-first batch image converter
+Comment[zh_CN]=本地优先的批量图片转换工具
+Exec=imgconvert
+Icon=${SNAP}/usr/share/icons/hicolor/256x256/apps/imgconvert.png
+Terminal=false
+Categories=Graphics;Photography;
+StartupWMClass=imgconvert

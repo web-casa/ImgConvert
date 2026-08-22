@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readlinkSync,
+  readSync,
   readdirSync,
   rmSync,
   statSync,
@@ -67,7 +70,9 @@ const bundleRoot = path.join(repoRoot, ...targetParts);
 const verified = [];
 const failures = [];
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-const maxSupportedGlibc = "2.39";
+// AppImageHub requires the oldest supported Ubuntu LTS. Ubuntu 22.04 ships
+// GLIBC 2.35, so every ELF included in the AppImage must stay on that baseline.
+const maxSupportedGlibc = "2.35";
 
 for (const bundle of options.bundles) {
   const bundleDir = path.join(bundleRoot, bundle);
@@ -242,6 +247,7 @@ function inspectAppImageContents(artifact) {
 
 function inspectExtractedAppImage(root) {
   const failures = inspectExtractedLinuxBundle(root, "AppImage");
+  failures.push(...inspectGlibcTree(root, "AppImage"));
   const deniedLibraries = ["libgcrypt.so.20"];
   const libDir = path.join(root, "usr", "lib");
   for (const library of deniedLibraries) {
@@ -260,6 +266,27 @@ function inspectExtractedAppImage(root) {
     const stat = lstatSync(linkPath);
     if (stat.isSymbolicLink() && path.isAbsolute(readlinkSync(linkPath))) {
       failures.push(`AppImage root ${link} symlink must be relative, not host-absolute`);
+    }
+  }
+  const metainfoPath = path.join(
+    root,
+    "usr",
+    "share",
+    "metainfo",
+    "com.ivmm.imgconvert.metainfo.xml",
+  );
+  if (!existsSync(metainfoPath)) {
+    failures.push("AppImage missing usr/share/metainfo/com.ivmm.imgconvert.metainfo.xml");
+  } else {
+    const metainfo = readFileSync(metainfoPath, "utf8");
+    for (const marker of [
+      "<id>com.ivmm.imgconvert</id>",
+      '<launchable type="desktop-id">ImgConvert.desktop</launchable>',
+      `<release version="${packageJson.version}"`,
+    ]) {
+      if (!metainfo.includes(marker)) {
+        failures.push(`AppImage AppStream metadata missing marker: ${marker}`);
+      }
     }
   }
   return failures;
@@ -284,6 +311,8 @@ function inspectExtractedLinuxBundle(root, source) {
   const categories = desktop.Categories ?? "";
   if (!desktop.Name?.trim()) {
     failures.push(`${source} desktop entry missing Name`);
+  } else if (desktop.Name !== "ImgConvert") {
+    failures.push(`${source} desktop entry default Name must be ImgConvert`);
   }
   if (desktop.Type !== "Application") {
     failures.push(`${source} desktop entry Type must be Application`);
@@ -294,7 +323,62 @@ function inspectExtractedLinuxBundle(root, source) {
   if (!categories.trim()) {
     failures.push(`${source} desktop entry Categories must not be empty`);
   }
+  if (desktop.Comment && /[\u3400-\u9fff]/u.test(desktop.Comment)) {
+    failures.push(`${source} desktop entry default Comment must be English; use Comment[zh_CN]`);
+  }
   return failures;
+}
+
+function inspectGlibcTree(root, source) {
+  if (!commandExists("readelf")) {
+    return ["readelf is required to inspect Linux binary GLIBC baseline"];
+  }
+
+  let maximum = "0.0";
+  let maximumFile = "";
+  for (const file of collectFiles(root)) {
+    if (!isElf(file)) {
+      continue;
+    }
+    const result = commandOutput("readelf", ["--version-info", file]);
+    if (!result.ok) {
+      continue;
+    }
+    const versions = [...result.stdout.matchAll(/GLIBC_(\d+\.\d+)/g)].map((match) => match[1]);
+    const fileMaximum = versions.sort(compareVersions).at(-1);
+    if (fileMaximum && compareVersions(fileMaximum, maximum) > 0) {
+      maximum = fileMaximum;
+      maximumFile = path.relative(root, file);
+    }
+  }
+
+  if (maximum === "0.0") {
+    return [`${source} GLIBC version requirements were not found in bundled ELF files`];
+  }
+  if (compareVersions(maximum, maxSupportedGlibc) > 0) {
+    return [
+      `${source} contains ${maximumFile} requiring GLIBC_${maximum}; AppImageHub baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 22.04)`,
+    ];
+  }
+  return [];
+}
+
+function isElf(file) {
+  let descriptor;
+  try {
+    descriptor = openSync(file, "r");
+    const magic = Buffer.alloc(4);
+    return (
+      readSync(descriptor, magic, 0, magic.length, 0) === 4 &&
+      magic.equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46]))
+    );
+  } catch {
+    return false;
+  } finally {
+    if (descriptor !== undefined) {
+      closeSync(descriptor);
+    }
+  }
 }
 
 function inspectGlibcBaseline(binary, source) {
@@ -315,7 +399,7 @@ function inspectGlibcBaseline(binary, source) {
   const maxVersion = versions.sort(compareVersions).at(-1);
   if (compareVersions(maxVersion, maxSupportedGlibc) > 0) {
     return [
-      `${source} binary requires GLIBC_${maxVersion}; release baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 24.04 / Debian 13+)`,
+      `${source} binary requires GLIBC_${maxVersion}; release baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 22.04 LTS)`,
     ];
   }
   return [];

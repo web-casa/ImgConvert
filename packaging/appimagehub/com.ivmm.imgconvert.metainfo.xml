@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: CC0-1.0 -->
 <component type="desktop-application">
-  <id>io.github.yeagoo.imgconvert</id>
+  <id>com.ivmm.imgconvert</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>Apache-2.0</project_license>
   <name>ImgConvert</name>
-  <summary>Batch image conversion tool</summary>
-  <developer id="io.github.yeagoo">
+  <summary>Local-first batch image converter</summary>
+  <summary xml:lang="zh-CN">本地优先的批量图片转换工具</summary>
+  <developer id="io.github.web-casa">
     <name>ImgConvert contributors</name>
   </developer>
   <description>
-    <p>ImgConvert converts batches of JPEG, PNG, WebP, and AVIF images with a Rust in-process image pipeline.</p>
-    <p>The Flatpak main package disables optional external codec helpers by default. HEIC/HEIF helper plugins are intentionally not bundled.</p>
+    <p>Convert batches of JPEG, PNG, WebP, and AVIF images locally without uploading files.</p>
+    <p>Choose the input files, output format, and destination; ImgConvert performs the conversion on your device.</p>
   </description>
-  <launchable type="desktop-id">io.github.yeagoo.imgconvert.desktop</launchable>
+  <launchable type="desktop-id">ImgConvert.desktop</launchable>
   <categories>
     <category>Graphics</category>
     <category>Photography</category>
@@ -25,7 +26,7 @@
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.1.2/packaging/flatpak/screenshots/main.png</image>
-      <caption>Batch image conversion queue and output settings</caption>
+      <caption>Batch conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
@@ -36,17 +37,7 @@
     </release>
     <release version="0.2.2" date="2026-08-22">
       <description>
-        <p>Raises the arm64 Mac App Store deployment target to macOS 12 and supplies the required 1024-pixel application icon while retaining the existing sandbox and local-processing boundaries.</p>
-      </description>
-    </release>
-    <release version="0.2.1" date="2026-08-21">
-      <description>
-        <p>Adds Chinese and English interface localization, structured localized conversion errors, and release-channel hardening while retaining the Flatpak main package's external-codec boundary.</p>
-      </description>
-    </release>
-    <release version="0.1.2" date="2026-08-18">
-      <description>
-        <p>Initial Linux release candidate with JPEG, PNG, WebP, AVIF, and optional external HEIC import boundaries.</p>
+        <p>Improves release packaging and keeps image conversion local to the device.</p>
       </description>
     </release>
   </releases>

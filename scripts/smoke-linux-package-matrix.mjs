@@ -40,7 +40,7 @@ const matrix = [
   { bundle: "deb", image: "ubuntu:24.04" },
   { bundle: "deb", image: "debian:13" },
   { bundle: "rpm", image: "fedora:latest" },
-  { bundle: "appimage", image: "ubuntu:24.04" },
+  { bundle: "appimage", image: "ubuntu:22.04" },
 ];
 
 for (const item of matrix) {

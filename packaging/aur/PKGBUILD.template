@@ -1,0 +1,34 @@
+# Maintainer: ImgConvert contributors <https://github.com/web-casa/ImgConvert/issues>
+# SPDX-License-Identifier: Apache-2.0
+
+pkgname=imgconvert-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Local-first batch image converter (prebuilt AppImage)'
+arch=('x86_64')
+url='https://github.com/web-casa/ImgConvert'
+license=('Apache-2.0')
+depends=('bash' 'glibc')
+provides=("imgconvert=${pkgver}")
+conflicts=('imgconvert')
+options=('!strip')
+source=('imgconvert' 'LICENSE')
+source_x86_64=("ImgConvert-${pkgver}-x86_64.AppImage::https://github.com/web-casa/ImgConvert/releases/download/v${pkgver}/ImgConvert-${pkgver}-x86_64.AppImage")
+sha256sums=('@WRAPPER_SHA256@' '@LICENSE_SHA256@')
+sha256sums_x86_64=('@APPIMAGE_SHA256@')
+
+package() {
+  chmod 0755 "${srcdir}/ImgConvert-${pkgver}-x86_64.AppImage"
+  cd "${srcdir}"
+  "${srcdir}/ImgConvert-${pkgver}-x86_64.AppImage" --appimage-extract >/dev/null
+
+  install -d "${pkgdir}/opt/imgconvert"
+  cp -a "${srcdir}/squashfs-root/." "${pkgdir}/opt/imgconvert/"
+  install -Dm755 "${srcdir}/imgconvert" "${pkgdir}/usr/bin/imgconvert"
+  install -Dm644 "${srcdir}/squashfs-root/usr/share/applications/ImgConvert.desktop" \
+    "${pkgdir}/usr/share/applications/ImgConvert.desktop"
+  install -Dm644 "${srcdir}/squashfs-root/imgconvert.png" \
+    "${pkgdir}/usr/share/pixmaps/imgconvert.png"
+  install -Dm644 "${srcdir}/LICENSE" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

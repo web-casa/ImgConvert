@@ -6,6 +6,7 @@ import {
   cpSync,
   existsSync,
   mkdtempSync,
+  mkdirSync,
   readdirSync,
   rmSync,
   statSync,
@@ -65,6 +66,7 @@ if (removed.length === 0) {
   console.log(`AppImage AppDir scrub removed: ${removed.join(", ")}`);
 }
 
+injectAppStreamMetadata(appDir);
 repackAppImage(appDir, artifacts[0]);
 
 function bundleDir(bundle) {
@@ -94,6 +96,29 @@ function scrubAppDir(root) {
     removed.push(entry.name);
   }
   return removed;
+}
+
+function injectAppStreamMetadata(root) {
+  const source = path.join(
+    repoRoot,
+    "packaging",
+    "appimagehub",
+    "com.ivmm.imgconvert.metainfo.xml",
+  );
+  if (!existsSync(source)) {
+    fail(`missing AppImage AppStream metadata: ${path.relative(repoRoot, source)}`);
+  }
+
+  const destination = path.join(
+    root,
+    "usr",
+    "share",
+    "metainfo",
+    "com.ivmm.imgconvert.metainfo.xml",
+  );
+  mkdirSync(path.dirname(destination), { recursive: true });
+  copyFileSync(source, destination);
+  console.log(`AppImage AppStream metadata injected: ${path.relative(repoRoot, source)}`);
 }
 
 function repackAppImage(root, artifact) {

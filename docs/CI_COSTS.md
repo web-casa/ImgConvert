@@ -6,6 +6,8 @@ workflows are free. The policy is to use only those free standard labels:
 
 - `ubuntu-24.04` (x86_64)
 - `ubuntu-24.04-arm` (arm64)
+- `ubuntu-22.04` (x86_64 release compatibility baseline)
+- `ubuntu-22.04-arm` (arm64 release compatibility baseline)
 - `windows-latest`
 - `macos-15`
 
@@ -23,8 +25,10 @@ Default behavior:
   runs on both `ubuntu-24.04` and `ubuntu-24.04-arm` for `main` pushes.
   Manual dispatch keeps the Windows check, package smoke, fuzz replay, and
   arm64 package smoke optional with `false` defaults.
-- `Linux Release` builds `amd64` and `arm64` automatically when a `v*` tag is
-  pushed. The tag build also runs the Docker install/runtime smoke matrix.
+- `Linux Release` builds `amd64` and `arm64` on Ubuntu 22.04 automatically when
+  a `v*` tag is pushed. This keeps AppImageHub artifacts at or below the
+  `GLIBC_2.35` compatibility baseline. The tag build also runs the Docker
+  install/runtime smoke matrix.
   Manual dispatch defaults to `amd64` only, with free public arm64 and Docker
   smoke as explicit opt-ins.
 - `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
@@ -51,6 +55,10 @@ Default behavior:
   submission artifact for 14 days.
 - `Updater Release` and `Updater Upgrade Smoke` are manual-only because they
   publish or consume real GitHub Release artifacts.
+- `Snap Store Release` is manual-only, builds strict `core24` snaps on standard
+  x86_64/arm64 runners, retains build artifacts for seven days, and publishes
+  only when `publish_snap=true` and package-scoped `SNAP_STORE_LOGIN`
+  credentials are present.
 
 All Ubuntu CI and release jobs that need native build packages (`CI`, `Linux
 Release`, `Updater Release`, and `Updater Upgrade Smoke`) use the shared

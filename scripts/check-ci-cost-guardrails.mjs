@@ -19,6 +19,7 @@ const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
+const snapStoreRelease = readWorkflow("snap-store-release.yml");
 const pages = readWorkflow("pages.yml");
 
 const allWorkflows = [
@@ -32,6 +33,7 @@ const allWorkflows = [
   ["macos-notarization-finalize.yml", macosNotarizationFinalize],
   ["windows-smoke.yml", windowsSmoke],
   ["windows-store-release.yml", windowsStoreRelease],
+  ["snap-store-release.yml", snapStoreRelease],
   ["pages.yml", pages],
 ];
 
@@ -50,6 +52,7 @@ checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
 checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
+checkManualWorkflow("snap-store-release.yml", snapStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
@@ -72,6 +75,7 @@ checkStandardPlatformWorkflow(
 );
 checkStandardPlatformWorkflow("windows-smoke.yml", windowsSmoke, "Windows", "windows-latest");
 checkWindowsStoreReleaseWorkflow();
+checkSnapStoreReleaseWorkflow();
 checkStandardPlatformWorkflow(
   "windows-store-release.yml",
   windowsStoreRelease,
@@ -126,6 +130,8 @@ function isAllowedRunner(runner) {
   return [
     "ubuntu-24.04",
     "ubuntu-24.04-arm",
+    "ubuntu-22.04",
+    "ubuntu-22.04-arm",
     "windows-latest",
     "macos-15",
     "${{ matrix.runner }}",
@@ -218,7 +224,7 @@ function checkLinuxReleaseWorkflow() {
   if (!linuxRelease.includes("inputs.build_arm64")) {
     failures.push("release-linux.yml must require build_arm64 on dispatch");
   }
-  if (!linuxRelease.includes("ubuntu-24.04-arm")) {
+  if (!linuxRelease.includes("ubuntu-22.04-arm")) {
     failures.push("release-linux.yml must keep the free public arm64 runner explicit when enabled");
   }
   if (!linuxRelease.includes("inputs.docker_smoke")) {
@@ -278,6 +284,28 @@ function checkUpdaterUpgradeSmokeWorkflow() {
   }
   if (!updaterUpgradeSmoke.includes("xdotool") || !updaterUpgradeSmoke.includes("xvfb")) {
     failures.push("updater-upgrade-smoke.yml must install xdotool and xvfb");
+  }
+}
+
+function checkSnapStoreReleaseWorkflow() {
+  requireBooleanInputDefault(snapStoreRelease, "build_arm64", true, "snap-store-release.yml");
+  requireBooleanInputDefault(snapStoreRelease, "publish_snap", false, "snap-store-release.yml");
+  for (const marker of [
+    "ref: ${{ inputs.tag }}",
+    "fetch-depth: 0",
+    "verify-release-tag.mjs",
+    "snapcore/action-build@v1",
+    "snapcore/action-publish@v1",
+    "SNAP_STORE_LOGIN",
+    "inputs.publish_snap",
+    "retention-days: 7",
+  ]) {
+    if (!snapStoreRelease.includes(marker)) {
+      failures.push(`snap-store-release.yml missing marker: ${marker}`);
+    }
+  }
+  if (!snapStoreRelease.includes("ubuntu-24.04-arm")) {
+    failures.push("snap-store-release.yml must keep the free public arm64 runner explicit");
   }
 }
 
