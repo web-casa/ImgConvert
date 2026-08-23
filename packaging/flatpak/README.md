@@ -33,16 +33,18 @@ flatpak run --user --command=imgconvert --env=IMGCONVERT_DISABLE_EXTERNAL_CODECS
 For a Flathub PR, publish `target/flatpak/sources/imgconvert-<version>-source.tar.gz` to a release URL first, then rewrite the manifest source while keeping the generated `sha256`:
 
 ```bash
-pnpm run release:flatpak:prepare -- --source-url=https://github.com/web-casa/ImgConvert/releases/download/v0.2.8/imgconvert-0.2.8-source.tar.gz
+version="$(node -p 'require("./package.json").version')"
+pnpm run release:flatpak:prepare -- --source-url="https://github.com/web-casa/ImgConvert/releases/download/v${version}/imgconvert-${version}-source.tar.gz"
 pnpm run release:flatpak:verify
 ```
 
 Flathub-specific metadata/linter checks and PR workspace generation:
 
 ```bash
+version="$(node -p 'require("./package.json").version')"
 pnpm run release:flathub:metadata
 pnpm run release:flathub:metadata:lint
-pnpm run release:flathub:main-pr -- --source-url=https://github.com/web-casa/ImgConvert/releases/download/v0.2.8/imgconvert-0.2.8-source.tar.gz --release-ref=v0.2.8
+pnpm run release:flathub:main-pr -- --source-url="https://github.com/web-casa/ImgConvert/releases/download/v${version}/imgconvert-${version}-source.tar.gz" --release-ref="v${version}"
 ```
 
 `release:flathub:metadata:lint` runs `flatpak-builder-lint` only when
@@ -119,7 +121,8 @@ extension mount path inside the sandbox instead of only building the addon.
 Prepare the separate addon PR workspace:
 
 ```bash
-pnpm run release:flathub:heic-pr -- --release-ref=v0.2.8
+version="$(node -p 'require("./package.json").version')"
+pnpm run release:flathub:heic-pr -- --release-ref="v${version}"
 ```
 
 The generated workspace lands under `target/flathub/heic-extension/`. The addon

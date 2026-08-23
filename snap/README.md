@@ -18,9 +18,10 @@ deliver application updates.
 Build and validate from a clean checkout:
 
 ```bash
+version="$(node -p 'require("./package.json").version')"
 snapcraft pack
-pnpm run release:snap:verify -- --artifact=imgconvert_0.2.8_amd64.snap
-sudo snap install --dangerous ./imgconvert_0.2.8_amd64.snap
+pnpm run release:snap:verify -- --artifact="imgconvert_${version}_amd64.snap"
+sudo snap install --dangerous "./imgconvert_${version}_amd64.snap"
 ```
 
 Publishing is intentionally manual. Reserve `imgconvert` in the Snap Store,
