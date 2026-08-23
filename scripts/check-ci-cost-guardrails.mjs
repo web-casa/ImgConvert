@@ -599,38 +599,16 @@ function checkSnapStoreMetadataWorkflow() {
 }
 
 function checkPagesWorkflow() {
-  const requiredMarkers = [
+  for (const marker of [
     "github.event.repository.has_pages == true",
+    "actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d",
+    "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9",
+    "actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128",
     "path: pages",
     "name: github-pages",
-  ];
-  // Temporary during the coordinated Pages action upgrades. Each alternate is
-  // an exact, verified GitHub-owned commit SHA and is removed after the PRs land.
-  const acceptedActionPins = [
-    [
-      "actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b",
-      "actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d",
-    ],
-    [
-      "actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b",
-      "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9",
-    ],
-    [
-      "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e",
-      "actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128",
-    ],
-  ];
-
-  for (const marker of requiredMarkers) {
+  ]) {
     if (!pages.includes(marker)) {
       failures.push(`pages.yml missing marker: ${marker}`);
-    }
-  }
-  for (const acceptedPins of acceptedActionPins) {
-    if (!acceptedPins.some((pin) => pages.includes(pin))) {
-      failures.push(
-        `pages.yml must use one of the approved action pins: ${acceptedPins.join(", ")}`,
-      );
     }
   }
 }
