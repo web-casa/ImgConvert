@@ -980,6 +980,7 @@ function checkLinux() {
   for (const expected of [
     "inspectRpm",
     "rpm2cpio",
+    "produced no CPIO payload",
     "--no-absolute-filenames",
     "isSafeCpioMember",
     '"cpio", ["-it", "--quiet", "--no-absolute-filenames"]',

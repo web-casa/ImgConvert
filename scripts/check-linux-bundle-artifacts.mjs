@@ -229,11 +229,18 @@ function inspectRpm(artifact) {
     } finally {
       closeSync(cpioOutput);
     }
+    const cpioSize = statSync(cpioPath).size;
     if (cpioArchive.error) {
       failures.push(`rpm2cpio could not start: ${cpioArchive.error.message}`);
-    } else if (cpioArchive.status !== 0) {
-      failures.push(`rpm2cpio extract failed: ${cpioArchive.stderr.trim()}`);
+    } else if (!Number.isInteger(cpioArchive.status) || cpioSize === 0) {
+      failures.push(
+        `rpm2cpio produced no CPIO payload (exit ${cpioArchive.status ?? "unknown"}): ${cpioArchive.stderr.trim()}`,
+      );
     } else {
+      // Ubuntu 22.04's rpm2cpio can exit 1 after writing a complete payload
+      // for a valid gzip-compressed aarch64 RPM. Do not trust that exit code
+      // alone: the list and extraction operations below validate the exact
+      // CPIO stream before inspecting any files from it.
       const cpioListInput = openSync(cpioPath, "r");
       let listedMembers;
       try {
