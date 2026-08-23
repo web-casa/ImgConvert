@@ -180,7 +180,10 @@ function verifyNsisRecordedInstallLocation(installDir) {
     "$ErrorActionPreference = 'Stop'",
     `$value = (Get-Item -LiteralPath '${registryKey}').GetValue('')`,
     "if ([string]::IsNullOrWhiteSpace($value)) { throw 'missing default registry value' }",
-    "[Console]::Write($value)",
+    // PowerShell's redirected console encoding varies between Windows runner
+    // images. Return the UTF-16 registry string as ASCII-only Base64 so the
+    // non-ASCII test path remains an exact assertion rather than becoming `?`.
+    "[Console]::Write([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes([string]$value)))",
   ].join("; ");
   const result = spawnSync(
     "pwsh.exe",
@@ -190,7 +193,15 @@ function verifyNsisRecordedInstallLocation(installDir) {
   if (result.error || result.status !== 0) {
     fail("NSIS install did not record its current-user install location");
   }
-  const recorded = String(result.stdout ?? "").trim();
+  const encoded = String(result.stdout ?? "").trim();
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || encoded.length % 4 !== 0) {
+    fail("NSIS install location registry check returned invalid Base64");
+  }
+  const encodedBytes = Buffer.from(encoded, "base64");
+  if (encodedBytes.length === 0 || encodedBytes.length % 2 !== 0) {
+    fail("NSIS install location registry check returned invalid UTF-16 data");
+  }
+  const recorded = encodedBytes.toString("utf16le");
   if (normalizeWindowsPath(recorded) !== normalizeWindowsPath(installDir)) {
     fail(`NSIS recorded install location differs from custom path: ${recorded}`);
   }
