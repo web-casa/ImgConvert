@@ -65,5 +65,5 @@ modules:
       - install -Dm644 THIRD_PARTY_LICENSES.md /app/share/doc/imgconvert/THIRD_PARTY_LICENSES.md
     sources:
       - type: archive
-        path: ../../target/flatpak/sources/imgconvert-0.2.8-source.tar.gz
-        sha256: 390d6a44ed11ba5b4a09d8fe2b7fe04685c16c7db58e5c3f12b390f33c4c12a0
+        path: ../../target/flatpak/sources/imgconvert-0.2.9-source.tar.gz
+        sha256: bdb1d47de15fdf99e9aeb5fd6d14eb05ab3638a2b1e90381766d5934adc1f336
