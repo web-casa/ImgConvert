@@ -14,6 +14,23 @@ const styles = readRequired("pages/assets/privacy.css");
 const chinesePolicy = readRequired("PRIVACY.md");
 const englishPolicy = readRequired("PRIVACY.en.md");
 const workflow = readRequired(".github/workflows/pages.yml");
+// Temporary during the coordinated Pages action upgrades. Each alternate is an
+// exact, verified GitHub-owned commit SHA; this returns to one pin per action
+// immediately after all three dependency PRs land.
+const acceptedPagesActionPins = [
+  [
+    "actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b",
+    "actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d",
+  ],
+  [
+    "actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b",
+    "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9",
+  ],
+  [
+    "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e",
+    "actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128",
+  ],
+];
 const chinesePolicyDate = requiredMatch(
   chinesePolicy,
   /生效日期：(\d{4}-\d{2}-\d{2})/,
@@ -58,13 +75,6 @@ for (const [label, text, required] of [
   ["English policy", englishPolicy, "you can disable result reuse in the app"],
   ["Pages workflow", workflow, "workflow_dispatch:"],
   ["Pages workflow", workflow, "runs-on: ubuntu-24.04"],
-  ["Pages workflow", workflow, "actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b"],
-  [
-    "Pages workflow",
-    workflow,
-    "actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b",
-  ],
-  ["Pages workflow", workflow, "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"],
   ["Pages workflow", workflow, "github.event.repository.has_pages == true"],
   ["Pages workflow", workflow, "path: pages"],
   ["Pages workflow", workflow, "pages: write"],
@@ -72,6 +82,14 @@ for (const [label, text, required] of [
 ]) {
   if (!normalizeWhitespace(text).includes(normalizeWhitespace(required))) {
     failures.push(`${label} missing required content: ${required}`);
+  }
+}
+
+for (const acceptedPins of acceptedPagesActionPins) {
+  if (!acceptedPins.some((pin) => workflow.includes(pin))) {
+    failures.push(
+      `Pages workflow must use one of the approved action pins: ${acceptedPins.join(", ")}`,
+    );
   }
 }
 
