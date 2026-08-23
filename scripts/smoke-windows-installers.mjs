@@ -101,6 +101,7 @@ function smokeNsisInstaller(installer) {
   });
   const executable = findInstalledExecutable([installDir]);
   verifyInstalledExecutableArchitecture(executable, "NSIS");
+  verifyNsisRecordedInstallLocation(installDir);
   runInstalledSmoke(executable, "nsis");
   if (!options.keepInstalled) {
     const uninstaller = findUninstaller(installDir);
@@ -171,6 +172,36 @@ function verifyInstalledExecutableArchitecture(executable, label) {
     fail(`${label} installed ImgConvert.exe has architecture ${actual}, expected ${expected}`);
   }
   console.log(`verified ${label} installed ImgConvert.exe architecture: ${actual}`);
+}
+
+function verifyNsisRecordedInstallLocation(installDir) {
+  const registryKey = "Registry::HKEY_CURRENT_USER\\Software\\ImgConvert contributors\\ImgConvert";
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    `$value = (Get-Item -LiteralPath '${registryKey}').GetValue('')`,
+    "if ([string]::IsNullOrWhiteSpace($value)) { throw 'missing default registry value' }",
+    "[Console]::Write($value)",
+  ].join("; ");
+  const result = spawnSync(
+    "pwsh.exe",
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+    { cwd: repoRoot, encoding: "utf8", windowsHide: true },
+  );
+  if (result.error || result.status !== 0) {
+    fail("NSIS install did not record its current-user install location");
+  }
+  const recorded = String(result.stdout ?? "").trim();
+  if (normalizeWindowsPath(recorded) !== normalizeWindowsPath(installDir)) {
+    fail(`NSIS recorded install location differs from custom path: ${recorded}`);
+  }
+  console.log("verified NSIS current-user install location registry entry.");
+}
+
+function normalizeWindowsPath(value) {
+  return path.win32
+    .normalize(String(value))
+    .replace(/[\\/]+$/, "")
+    .toLowerCase();
 }
 
 function peProcessorArchitecture(file) {
