@@ -1053,6 +1053,9 @@ function checkMacosRuntimeGuardrails() {
     path.join(repoRoot, "scripts", "check-macos-bundle-artifacts.mjs"),
   );
   const notarizationScript = readText(path.join(repoRoot, "scripts", "notarize-macos-dmg.mjs"));
+  const universalVendorBuildScript = readText(
+    path.join(repoRoot, "scripts", "run-macos-universal-vendor-build.mjs"),
+  );
   if (!packageScripts["release:tag:check"]?.includes("verify-release-tag.mjs")) {
     failures.push("package.json must expose release:tag:check for immutable release verification");
   }
@@ -1098,6 +1101,7 @@ function checkMacosRuntimeGuardrails() {
     "scripts/check-macos-bundle-artifacts.mjs",
     "scripts/notarize-macos-dmg.mjs",
     "scripts/prepare-macos-mas-release.mjs",
+    "scripts/run-macos-universal-vendor-build.mjs",
     "scripts/package-macos-mas-pkg.mjs",
     "scripts/submit-macos-mas-pkg.mjs",
   ]) {
@@ -1123,6 +1127,30 @@ function checkMacosRuntimeGuardrails() {
   for (const expected of ["universal-apple-darwin", "--expected-architectures=arm64,x86_64"]) {
     if (!packageScripts["release:macos:mas"]?.includes(expected)) {
       failures.push(`release:macos:mas must build and verify a universal app: ${expected}`);
+    }
+  }
+  if (!packageScripts["release:macos:mas"]?.includes("run-macos-universal-vendor-build.mjs")) {
+    failures.push(
+      "release:macos:mas must route universal C codec builds through the locked vendor overlay",
+    );
+  }
+  for (const expected of [
+    '"cargo",',
+    '"vendor",',
+    '"--locked",',
+    "libdav1d-sys-",
+    "imgconvert_macos_cross_target",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "xcrun",
+    "needs_exe_wrapper = true",
+    ".cargo-checksum.json",
+    "CARGO_HOME",
+    "CARGO_NET_OFFLINE",
+    "mkdtempSync",
+  ]) {
+    if (!universalVendorBuildScript.includes(expected)) {
+      failures.push(`macOS universal vendor overlay missing marker: ${expected}`);
     }
   }
   for (const marker of [
@@ -1732,6 +1760,23 @@ function checkWindowsDirectConfig() {
   }
   if (windows.nsis?.displayLanguageSelector !== false) {
     failures.push("Windows direct NSIS config must follow the OS language without a selector");
+  }
+  if (windows.nsis?.installerHooks !== "nsis-hooks.nsh") {
+    failures.push("Windows direct NSIS config must use the bounded uninstall cleanup hook");
+    return;
+  }
+  const hooksPath = path.join(srcTauriRoot, windows.nsis.installerHooks);
+  const hooks = readText(hooksPath);
+  for (const expected of [
+    "NSIS_HOOK_POSTUNINSTALL",
+    'IfFileExists "$INSTDIR\\imgconvert.exe"',
+    'Delete "$INSTDIR\\imgconvert.exe"',
+    "Sleep 250",
+    "IntCmp $0 8",
+  ]) {
+    if (!hooks.includes(expected)) {
+      failures.push(`Windows NSIS uninstall cleanup hook missing marker: ${expected}`);
+    }
   }
 }
 

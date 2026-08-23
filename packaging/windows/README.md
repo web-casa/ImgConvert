@@ -7,6 +7,7 @@ This directory documents the first Windows release surface.
 - Direct distribution uses Tauri's automatic `src-tauri/tauri.windows.conf.json` merge on Windows.
 - The direct installer guardrails are intentionally explicit: no downgrade installs, SHA-256 signing digest, a silent embedded WebView2 bootstrapper, a minimum WebView2 runtime version, a pinned WiX `upgradeCode`, and a current-user NSIS default install.
 - WiX builds separate `en-US` and `zh-CN` MSI packages. NSIS builds one installer containing English and Simplified Chinese and follows the Windows display language because its language selector is disabled.
+- The NSIS configuration includes a bounded post-uninstall retry for only `ImgConvert.exe`, covering a short-lived Windows file handle without broad or recursive deletion.
 - The repository does not store signing certificates, certificate thumbprints, Partner Center credentials, or timestamping secrets. Configure those only in the Windows release runner or signing environment.
 
 Local preflight from any host:

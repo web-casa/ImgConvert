@@ -17,7 +17,8 @@
         "installMode": "currentUser",
         "languages": ["English", "SimpChinese"],
         "displayLanguageSelector": false,
-        "compression": "lzma"
+        "compression": "lzma",
+        "installerHooks": "nsis-hooks.nsh"
       }
     }
   }
