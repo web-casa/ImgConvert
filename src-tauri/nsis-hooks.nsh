@@ -1,10 +1,16 @@
 ; SPDX-License-Identifier: Apache-2.0
 
-; Tauri's template removes files through $INSTDIR. Set it from the actual
-; uninstaller location before Tauri's own cleanup, so a direct silent launch
-; remains correct after a user selected a custom install directory.
+; A directly launched NSIS uninstaller copies itself into a temporary
+; directory. In that process $EXEDIR is not the application's directory.
+; Tauri persists the current-user install location under this key, so restore
+; $INSTDIR before Tauri's own cleanup while preserving its value if absent.
 !macro NSIS_HOOK_PREUNINSTALL
-  StrCpy $INSTDIR "$EXEDIR"
+  Push $0
+  ReadRegStr $0 HKCU "Software\ImgConvert contributors\ImgConvert" ""
+  StrCmp $0 "" imgconvert_keep_uninstall_directory
+  StrCpy $INSTDIR $0
+imgconvert_keep_uninstall_directory:
+  Pop $0
 !macroend
 
 ; Tauri deletes the main executable before this post-uninstall hook. A short,
