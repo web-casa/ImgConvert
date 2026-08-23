@@ -1,5 +1,12 @@
 ; SPDX-License-Identifier: Apache-2.0
 
+; Tauri's template removes files through $INSTDIR. Set it from the actual
+; uninstaller location before Tauri's own cleanup, so a direct silent launch
+; remains correct after a user selected a custom install directory.
+!macro NSIS_HOOK_PREUNINSTALL
+  StrCpy $INSTDIR "$EXEDIR"
+!macroend
+
 ; Tauri deletes the main executable before this post-uninstall hook. A short,
 ; bounded retry covers a transient Windows file handle that can remain just
 ; after ImgConvert exits. It never deletes another path or a different file.

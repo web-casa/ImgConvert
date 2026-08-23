@@ -1768,6 +1768,8 @@ function checkWindowsDirectConfig() {
   const hooksPath = path.join(srcTauriRoot, windows.nsis.installerHooks);
   const hooks = readText(hooksPath);
   for (const expected of [
+    "NSIS_HOOK_PREUNINSTALL",
+    'StrCpy $INSTDIR "$EXEDIR"',
     "NSIS_HOOK_POSTUNINSTALL",
     'IfFileExists "$INSTDIR\\imgconvert.exe"',
     'Delete "$INSTDIR\\imgconvert.exe"',
