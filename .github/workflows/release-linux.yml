@@ -54,6 +54,7 @@ jobs:
             nasm \
             ninja-build \
             rpm \
+            rpm2cpio \
             cpio \
             binutils \
             file \

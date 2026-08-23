@@ -97,6 +97,8 @@ mod imageio {
 
     use crate::external_codecs::{is_heic_magic, MAX_HEIC_DECODED_PNG_BYTES};
 
+    use super::require_single_heic_frame;
+
     type Boolean = u8;
     type CFIndex = isize;
     type CFAllocatorRef = *const c_void;

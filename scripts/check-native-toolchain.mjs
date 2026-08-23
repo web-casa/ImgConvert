@@ -84,7 +84,7 @@ if (failures.length > 0) {
     console.error(`- ${failure}`);
   }
   console.error(
-    "Install the missing tools before building release artifacts. On Debian/Ubuntu this is usually: sudo apt install cmake meson ninja-build nasm rpm cpio binutils file desktop-file-utils appstream squashfs-tools patchelf",
+    "Install the missing tools before building release artifacts. On Debian/Ubuntu this is usually: sudo apt install cmake meson ninja-build nasm rpm rpm2cpio cpio binutils file desktop-file-utils appstream squashfs-tools patchelf",
   );
   process.exit(1);
 }

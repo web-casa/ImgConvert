@@ -1007,6 +1007,7 @@ function checkLinux() {
     "ubuntu-22.04-arm",
     "Verify native Rust target",
     "aarch64-unknown-linux-gnu",
+    "rpm2cpio",
     "cpio",
     "binutils",
   ]) {
@@ -1514,6 +1515,7 @@ function checkWindowsRuntimeGuardrails() {
   for (const expected of [
     "中文 路径",
     "转换 输出",
+    "windowsVerbatimArguments",
     "verifyInstalledExecutableArchitecture",
     "assertNoInstalledExecutable",
   ]) {
