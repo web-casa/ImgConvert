@@ -188,6 +188,7 @@ pnpm run release:platform:check
 
 - [ROADMAP](docs/ROADMAP.md)：路线图、版本状态、开发优先级与发布 readiness 报告
 - [ENGINE](docs/ENGINE.md)：图像核心、系统 HEIC、工具链与打包签名
+- [RELEASE_QA](docs/RELEASE_QA.md)：跨平台、安装包、更新与商店发布的必做验收记录
 - [LEGAL](docs/LEGAL.md)：Apache-2.0、依赖许可红线、HEVC 专利与分发边界
 - [REFERENCES](docs/REFERENCES.md)：参考项目调研与可复用设计
 - [PRIVACY](PRIVACY.md) / [English](PRIVACY.en.md)：中英文隐私政策

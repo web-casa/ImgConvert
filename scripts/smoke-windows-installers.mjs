@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -88,31 +88,39 @@ async function removeTemporaryRoot(directory) {
 }
 
 function smokeNsisInstaller(installer) {
-  const installDir = path.join(requiredTmpRoot(), "nsis-install");
+  // Keep this intentionally non-ASCII and space-containing. NSIS receives the
+  // install directory as a command-line argument, and the app then runs from
+  // it, so this catches a common Windows packaging/path regression.
+  const installDir = path.join(requiredTmpRoot(), "中文 路径", "ImgConvert");
   run(installer, ["/S", `/D=${installDir}`], `install NSIS ${path.basename(installer)}`);
-  const executable = findInstalledExecutable([installDir, ...standardInstallRoots()]);
+  const executable = findInstalledExecutable([installDir]);
+  verifyInstalledExecutableArchitecture(executable, "NSIS");
   runInstalledSmoke(executable, "nsis");
   if (!options.keepInstalled) {
     const uninstaller = findUninstaller(installDir);
-    if (uninstaller) {
-      run(uninstaller, ["/S"], "uninstall NSIS smoke package", { allowFailure: true });
+    if (!uninstaller) {
+      fail(`NSIS uninstaller was not found under ${installDir}`);
     }
+    run(uninstaller, ["/S"], "uninstall NSIS smoke package");
+    assertNoInstalledExecutable([installDir], "NSIS uninstall");
   }
 }
 
 function smokeMsiInstaller(installer) {
+  const roots = standardInstallRoots();
+  assertNoInstalledExecutable(roots, "MSI install preflight");
   const log = path.join(requiredTmpRoot(), "msi-install.log");
   run(
     "msiexec.exe",
     ["/i", installer, "/qn", "/norestart", "/L*v", log],
     `install MSI ${path.basename(installer)}`,
   );
-  const executable = findInstalledExecutable(standardInstallRoots());
+  const executable = findInstalledExecutable(roots);
+  verifyInstalledExecutableArchitecture(executable, "MSI");
   runInstalledSmoke(executable, "msi");
   if (!options.keepInstalled) {
-    run("msiexec.exe", ["/x", installer, "/qn", "/norestart"], "uninstall MSI smoke package", {
-      allowFailure: true,
-    });
+    run("msiexec.exe", ["/x", installer, "/qn", "/norestart"], "uninstall MSI smoke package");
+    assertNoInstalledExecutable(roots, "MSI uninstall");
   }
 }
 
@@ -121,21 +129,72 @@ function runInstalledSmoke(executable, label) {
     env: {
       IMGCONVERT_PACKAGE_CONVERT_SMOKE: "1",
       IMGCONVERT_PACKAGE_CONVERT_SMOKE_FORMATS: "jpeg,webp,png,avif",
-      IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR: path.join(requiredTmpRoot(), `${label}-convert`),
+      IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR: path.join(requiredTmpRoot(), `${label} 转换 输出`),
     },
   });
 }
 
 function findInstalledExecutable(roots) {
-  const candidates = roots
-    .filter(Boolean)
-    .flatMap((root) => collectFiles(root))
-    .filter((file) => path.basename(file).toLowerCase() === "imgconvert.exe")
-    .sort((a, b) => b.length - a.length);
+  const candidates = installedExecutables(roots).sort((a, b) => b.length - a.length);
   if (!candidates[0]) {
     fail(`installed ImgConvert.exe was not found under: ${roots.filter(Boolean).join(", ")}`);
   }
   return candidates[0];
+}
+
+function assertNoInstalledExecutable(roots, label) {
+  const candidates = installedExecutables(roots);
+  if (candidates.length > 0) {
+    fail(
+      `${label} found an existing ImgConvert.exe and refuses to overwrite or leave it behind: ${candidates.join(", ")}`,
+    );
+  }
+}
+
+function installedExecutables(roots) {
+  return roots
+    .filter(Boolean)
+    .flatMap((root) => collectFiles(root))
+    .filter((file) => path.basename(file).toLowerCase() === "imgconvert.exe");
+}
+
+function verifyInstalledExecutableArchitecture(executable, label) {
+  const expected = expectedWindowsArchitecture();
+  const actual = peProcessorArchitecture(executable);
+  if (actual !== expected) {
+    fail(`${label} installed ImgConvert.exe has architecture ${actual}, expected ${expected}`);
+  }
+  console.log(`verified ${label} installed ImgConvert.exe architecture: ${actual}`);
+}
+
+function peProcessorArchitecture(file) {
+  const binary = readFileSync(file);
+  if (binary.length < 0x40 || binary.readUInt16LE(0) !== 0x5a4d) {
+    fail(`${file} is not a valid PE executable (missing MZ header)`);
+  }
+  const peOffset = binary.readUInt32LE(0x3c);
+  if (peOffset > binary.length - 6 || binary.readUInt32LE(peOffset) !== 0x00004550) {
+    fail(`${file} is not a valid PE executable (missing PE header)`);
+  }
+  const machine = binary.readUInt16LE(peOffset + 4);
+  if (machine === 0x8664) return "x64";
+  if (machine === 0xaa64) return "arm64";
+  fail(`${file} uses unsupported PE machine type 0x${machine.toString(16).padStart(4, "0")}`);
+}
+
+function expectedWindowsArchitecture() {
+  const configured = String(process.env.WINDOWS_STORE_PROCESSOR_ARCHITECTURE ?? "")
+    .trim()
+    .toLowerCase();
+  if (configured) {
+    if (["x64", "arm64"].includes(configured)) {
+      return configured;
+    }
+    fail(`unsupported WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${configured}`);
+  }
+  if (process.arch === "arm64") return "arm64";
+  if (process.arch === "x64") return "x64";
+  fail(`unsupported Windows Node architecture: ${process.arch}`);
 }
 
 function findUninstaller(root) {

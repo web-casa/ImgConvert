@@ -5,9 +5,9 @@
 This directory documents the first macOS release surface.
 
 - Direct distribution uses Tauri's automatic `src-tauri/tauri.macos.conf.json` merge and `entitlements.macos.direct.plist`.
-- Mac App Store builds must use the generated config from `pnpm run release:macos:mas:prepare` and set `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` before compiling, so optional external codec/helper discovery is compiled off. MAS builds also set `IMGCONVERT_DISABLE_UPDATER=1`; updates are delivered by the App Store, never by Tauri updater.
+- Mac App Store builds must use the generated config from `pnpm run release:macos:mas:prepare` and set `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` before compiling, so optional external codec/helper discovery is compiled off. The MAS command builds one universal `arm64` + `x86_64` app with Tauri's `universal-apple-darwin` target. MAS builds also set `IMGCONVERT_DISABLE_UPDATER=1`; updates are delivered by the App Store, never by Tauri updater.
 - The MAS entitlement set is intentionally narrow: App Sandbox, user-selected read/write files, and app-scoped bookmarks. Do not add broad network or filesystem entitlements without a concrete feature need.
-- HEIC import uses the macOS system ImageIO framework as a read-only `system-imageio` provider. It does not link libheif, does not bundle x265, and does not enable HEIC output until encoding, patents, and sandbox behavior are separately audited.
+- HEIC import uses the macOS system ImageIO framework as a read-only `system-imageio` provider. It does not link libheif, does not bundle x265, and does not enable HEIC output until encoding, patents, and sandbox behavior are separately audited. Still HEIC/HEIF files are supported; multi-frame inputs are rejected rather than silently converting only frame zero.
 - Runtime file access is routed through Tauri dialog `fileAccessMode: "scoped"`, `tauri-plugin-fs`, `tauri-plugin-persisted-scope`, and the security-scoped resource shim in `src-tauri/src/macos_security.rs`. Dialog grants are added to the Tauri filesystem scope and persisted across launches; every backend path access still balances start/stop access with RAII.
 
 Local preflight from any host:
@@ -76,12 +76,12 @@ pnpm run release:macos:notarize -- --dmg=/path/to/ImgConvert.dmg --keychain-prof
 
 GitHub Actions:
 
-- Manual `macOS Smoke` runs on `macos-15` arm64, including the Apple Silicon AVIF benchmark and, by default, generated HEIC fixture import through ImageIO.
+- Manual `macOS Smoke` runs on `macos-15` arm64, including the Apple Silicon AVIF benchmark and, by default, generated HEIC fixture import through ImageIO. Manual `macOS Intel Smoke` runs the same ImageIO fixture path on `macos-15-intel`; run it before a tagged release.
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
-- Manual `build_mas_candidate=true` imports separate Apple Distribution and Mac Installer Distribution certificates, verifies the embedded provisioning profile and signed entitlements, builds a signed `.app`, and requires a signed `.pkg` artifact.
+- Manual `build_mas_candidate=true` imports separate Apple Distribution and Mac Installer Distribution certificates, verifies the embedded provisioning profile and signed entitlements, builds a signed universal `.app`, and requires a signed `.pkg` artifact. Artifact checks verify `file`, `lipo -archs`, `otool -L`, the ImageIO linkage, and the absence of linked `libheif`/`libx265`.
 - The manual `macOS DMG Release` workflow is the direct-distribution publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, then builds, signs, and submits separate arm64 and Intel x64 DMGs on the free standard `macos-15` and `macos-15-intel` runners. Run `macOS Notarization Finalize` once per architecture after Apple accepts each submission. `publish_release=true` only attaches a verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
-- The manual `macOS MAS Release` workflow checks out the same immutable tag, requires that commit to be on the default branch, builds a signed sandboxed `.app` and Installer-signed `.pkg`, and validates the package with App Store Connect. `upload_build=false` is the safe default; set it to true only after validation succeeds and the App Store Connect app record is ready.
+- The manual `macOS MAS Release` workflow checks out the same immutable tag, requires that commit to be on the default branch, builds a signed sandboxed universal `.app` and Installer-signed `.pkg`, and validates the package with App Store Connect. `upload_build=false` is the safe default; set it to true only after validation succeeds and the App Store Connect app record is ready.
 
 Required GitHub secrets:
 
@@ -91,11 +91,11 @@ Required GitHub secrets:
 
 macOS release acceptance still requires a real machine pass:
 
-- HEIC `.heic/.heif` import through ImageIO in direct build.
+- HEIC `.heic/.heif` import through ImageIO in both the arm64 and Intel direct builds, plus multi-frame rejection behavior.
 - MAS sandbox file-open/output-directory flow using scoped dialog grants and persisted scope. The hidden path smoke covers the conversion backend; the interactive GUI permission prompt still needs a real acceptance pass.
 - Apple Silicon AVIF benchmark has completed on `macos-15` arm64; rerun it before changing the rav1e default or codec choice.
 - `.dmg` Developer ID signing, `notarytool` submission, stapling, and Gatekeeper assessment.
-- App Store Connect package validation and optional build upload are automated. Build processing, metadata, TestFlight selection, pricing/availability, and App Review submission remain explicit account-owner steps.
+- App Store Connect package validation and optional build upload are automated. Build processing, metadata, TestFlight selection, pricing/availability, physical-machine sandbox testing, and App Review submission remain explicit account-owner steps. Use [`docs/RELEASE_QA.md`](../../docs/RELEASE_QA.md) as the cross-platform acceptance record.
 
 The v0.2.1 direct-DMG release deliberately has no macOS Tauri updater asset or
 endpoint. Until a separately reviewed `.app.tar.gz` updater artifact and

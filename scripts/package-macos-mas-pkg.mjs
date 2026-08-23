@@ -6,9 +6,31 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const options = { target: "" };
+
+for (const arg of process.argv.slice(2)) {
+  if (arg === "--") {
+    continue;
+  } else if (arg.startsWith("--target=")) {
+    options.target = arg.slice("--target=".length).trim();
+  } else if (arg === "--help" || arg === "-h") {
+    printHelp();
+    process.exit(0);
+  } else {
+    fail(`unknown argument: ${arg}`);
+  }
+}
 
 if (process.platform !== "darwin") {
   fail("MAS pkg packaging requires macOS");
+}
+if (
+  options.target &&
+  !["aarch64-apple-darwin", "x86_64-apple-darwin", "universal-apple-darwin"].includes(
+    options.target,
+  )
+) {
+  fail(`unsupported macOS target: ${options.target}`);
 }
 
 const identity = process.env.IMGCONVERT_MAS_INSTALLER_IDENTITY?.trim();
@@ -18,7 +40,7 @@ if (!identity) {
 
 const packageJson = JSON.parse(readFileSyncText(path.join(repoRoot, "package.json")));
 const app = findAppBundle();
-const pkgDir = path.join(cargoTargetRoot(), "release", "bundle", "pkg");
+const pkgDir = path.join(targetRoot(), "release", "bundle", "pkg");
 const pkgPath = path.join(pkgDir, `ImgConvert_${packageJson.version}_mas.pkg`);
 
 mkdirSync(pkgDir, { recursive: true });
@@ -28,12 +50,13 @@ verifyInstallerSignature(pkgPath);
 console.log(`ok ${path.relative(repoRoot, pkgPath)} (${statSync(pkgPath).size} bytes)`);
 
 function findAppBundle() {
-  const appDir = path.join(cargoTargetRoot(), "release", "bundle", "macos");
+  const appDir = path.join(targetRoot(), "release", "bundle", "macos");
   const apps = collectFiles(appDir).filter((file) => file.endsWith(".app"));
-  if (apps.length === 0) {
-    fail(`missing .app artifact under ${path.relative(repoRoot, appDir)}`);
+  if (apps.length !== 1) {
+    fail(
+      `expected exactly one .app artifact under ${path.relative(repoRoot, appDir)}, found ${apps.length}`,
+    );
   }
-  apps.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
   return apps[0];
 }
 
@@ -91,8 +114,21 @@ function cargoTargetRoot() {
     : path.join(repoRoot, "src-tauri", "target");
 }
 
+function targetRoot() {
+  return path.join(cargoTargetRoot(), ...(options.target ? [options.target] : []));
+}
+
 function readFileSyncText(file) {
   return readFileSync(file, "utf8");
+}
+
+function printHelp() {
+  console.log(`Usage: node scripts/package-macos-mas-pkg.mjs [options]
+
+Options:
+  --target=<target>  Optional Tauri target directory, for example universal-apple-darwin.
+  --help             Show this help.
+`);
 }
 
 function fail(message) {

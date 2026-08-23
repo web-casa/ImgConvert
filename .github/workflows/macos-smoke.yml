@@ -61,7 +61,26 @@ jobs:
           fi
 
       - name: Install native codec build tools
-        run: brew install cmake meson ninja
+        run: |
+          brew install cmake meson ninja
+          if [ "${{ inputs.build_mas_candidate }}" = "true" ]; then
+            # The universal MAS candidate compiles an Intel slice too; use the
+            # pinned NASM 2.x that libaom accepts for x86 builds.
+            nasm_version="2.16.03"
+            nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+            nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+            curl --fail --location --silent --show-error \
+              "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+              --output "$nasm_archive"
+            echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+              | shasum -a 256 -c -
+            mkdir "$nasm_root"
+            unzip -q "$nasm_archive" -d "$nasm_root"
+            nasm_bin="$nasm_root/nasm-$nasm_version"
+            echo "$nasm_bin" >> "$GITHUB_PATH"
+            export PATH="$nasm_bin:$PATH"
+            nasm -v
+          fi
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
@@ -77,6 +96,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
           components: rustfmt, clippy
+
+      - name: Verify native Rust target
+        run: rustup target list --installed | grep -Fx aarch64-apple-darwin
+
+      - name: Install Intel Rust target for universal MAS candidate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Verify universal macOS Rust targets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
+        run: |
+          rustup target list --installed | grep -Fx aarch64-apple-darwin
+          rustup target list --installed | grep -Fx x86_64-apple-darwin
 
       - run: pnpm install --frozen-lockfile
 
@@ -334,7 +366,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
         run: |
           shopt -s nullglob
-          apps=(src-tauri/target/release/bundle/macos/*.app)
+          apps=(src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app)
           if [ "${#apps[@]}" -ne 1 ]; then
             echo "expected exactly one MAS .app, found ${#apps[@]}"
             exit 1
@@ -342,23 +374,23 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           ditto -c -k --sequesterRsrc --keepParent \
             "${apps[0]}" \
-            "src-tauri/target/release/bundle/macos/ImgConvert_${version}_mas.app.zip"
+            "src-tauri/target/universal-apple-darwin/release/bundle/macos/ImgConvert_${version}_mas.app.zip"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
         with:
-          name: imgconvert-macos-arm64-mas-app
+          name: imgconvert-macos-universal-mas-app
           if-no-files-found: error
           retention-days: 3
-          path: src-tauri/target/release/bundle/macos/*.app.zip
+          path: src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.zip
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
         with:
-          name: imgconvert-macos-arm64-mas-pkg
+          name: imgconvert-macos-universal-mas-pkg
           if-no-files-found: error
           retention-days: 3
-          path: src-tauri/target/release/bundle/pkg/*.pkg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/pkg/*.pkg
 
   notarization-retry:
     name: Retry saved signed DMG submission

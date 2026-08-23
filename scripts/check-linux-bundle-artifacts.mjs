@@ -197,6 +197,9 @@ function inspectRpm(artifact) {
   if (!commandExists("rpm")) {
     return ["rpm is required to inspect .rpm artifacts"];
   }
+  if (!commandExists("rpm2cpio") || !commandExists("cpio")) {
+    return ["rpm2cpio and cpio are required to extract .rpm artifacts"];
+  }
 
   const query = commandOutput("rpm", ["-qpl", artifact]);
   if (!query.ok) {
@@ -210,7 +213,90 @@ function inspectRpm(artifact) {
   if (!files.some((file) => file.endsWith("/usr/share/applications/ImgConvert.desktop"))) {
     failures.push("rpm missing ImgConvert.desktop");
   }
+
+  const tmp = mkdtempSync(path.join(os.tmpdir(), "imgconvert-rpm-"));
+  try {
+    // Keep the CPIO stream on disk rather than in spawnSync's bounded output
+    // buffer: a release RPM can legitimately be much larger than 1 MiB.
+    const cpioPath = path.join(tmp, "payload.cpio");
+    const cpioOutput = openSync(cpioPath, "w");
+    let cpioArchive;
+    try {
+      cpioArchive = spawnSync("rpm2cpio", [artifact], {
+        encoding: "utf8",
+        stdio: ["ignore", cpioOutput, "pipe"],
+      });
+    } finally {
+      closeSync(cpioOutput);
+    }
+    if (cpioArchive.error) {
+      failures.push(`rpm2cpio could not start: ${cpioArchive.error.message}`);
+    } else if (cpioArchive.status !== 0) {
+      failures.push(`rpm2cpio extract failed: ${cpioArchive.stderr.trim()}`);
+    } else {
+      const cpioListInput = openSync(cpioPath, "r");
+      let listedMembers;
+      try {
+        listedMembers = spawnSync("cpio", ["-it", "--quiet", "--no-absolute-filenames"], {
+          cwd: tmp,
+          encoding: "utf8",
+          maxBuffer: 16 * 1024 * 1024,
+          stdio: [cpioListInput, "pipe", "pipe"],
+        });
+      } finally {
+        closeSync(cpioListInput);
+      }
+      if (listedMembers.error) {
+        failures.push(`cpio list could not start: ${listedMembers.error.message}`);
+      } else if (listedMembers.status !== 0) {
+        failures.push(`cpio list failed: ${listedMembers.stderr.trim()}`);
+      } else {
+        const unsafeMembers = listedMembers.stdout
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .filter((member) => !isSafeCpioMember(member));
+        if (unsafeMembers.length > 0) {
+          failures.push(
+            `rpm payload contains unsafe CPIO member path(s): ${unsafeMembers.slice(0, 3).join(", ")}`,
+          );
+          return failures;
+        }
+        // Keep an RPM payload confined to this temporary inspection directory.
+        const cpioInput = openSync(cpioPath, "r");
+        let extract;
+        try {
+          extract = spawnSync("cpio", ["-idm", "--quiet", "--no-absolute-filenames"], {
+            cwd: tmp,
+            encoding: "utf8",
+            stdio: [cpioInput, "pipe", "pipe"],
+          });
+        } finally {
+          closeSync(cpioInput);
+        }
+        if (extract.error) {
+          failures.push(`cpio could not start: ${extract.error.message}`);
+        } else if (extract.status !== 0) {
+          failures.push(`cpio extract failed: ${extract.stderr.trim()}`);
+        } else {
+          failures.push(...inspectExtractedLinuxBundle(tmp, "rpm"));
+        }
+      }
+    }
+  } finally {
+    rmSync(tmp, { force: true, recursive: true });
+  }
   return failures;
+}
+
+function isSafeCpioMember(member) {
+  const normalized = member.trim();
+  return (
+    normalized === member &&
+    normalized.length > 0 &&
+    !normalized.startsWith("/") &&
+    !normalized.includes("\0") &&
+    !normalized.split("/").includes("..")
+  );
 }
 
 function inspectAppImage(artifact) {
@@ -247,7 +333,6 @@ function inspectAppImageContents(artifact) {
 
 function inspectExtractedAppImage(root) {
   const failures = inspectExtractedLinuxBundle(root, "AppImage");
-  failures.push(...inspectGlibcTree(root, "AppImage"));
   for (const relative of ["AppRun", "AppRun.wrapped", path.join("usr", "bin", "imgconvert")]) {
     const launcher = path.join(root, relative);
     if (!existsSync(launcher)) {
@@ -308,8 +393,9 @@ function inspectExtractedLinuxBundle(root, source) {
   if (!existsSync(binary)) {
     failures.push(`${source} missing usr/bin/imgconvert`);
   } else {
-    failures.push(...inspectGlibcBaseline(binary, source));
+    failures.push(...inspectLinuxExecutable(binary, source));
   }
+  failures.push(...inspectGlibcTree(root, source));
 
   const desktopPath = path.join(root, "usr", "share", "applications", "ImgConvert.desktop");
   if (!existsSync(desktopPath)) {
@@ -339,17 +425,77 @@ function inspectExtractedLinuxBundle(root, source) {
   return failures;
 }
 
+function inspectLinuxExecutable(binary, source) {
+  if (!commandExists("file")) {
+    return ["file is required to inspect Linux executable architecture"];
+  }
+  const result = commandOutput("file", ["-b", binary]);
+  if (!result.ok) {
+    return [`file failed for ${source} binary: ${result.stderr}`];
+  }
+  const description = result.stdout.trim();
+  if (!description.includes("ELF 64-bit")) {
+    return [`${source} binary is not an ELF 64-bit executable: ${description}`];
+  }
+  const expected = expectedLinuxArchitecture();
+  if (!description.toLowerCase().includes(expected.fileMarker)) {
+    return [
+      `${source} binary architecture mismatch: expected ${expected.label}, file reported ${description}`,
+    ];
+  }
+
+  if (!commandExists("ldd")) {
+    return ["ldd is required to inspect Linux runtime dependencies"];
+  }
+  const dependencies = commandOutput("ldd", [binary]);
+  const output = `${dependencies.stdout}\n${dependencies.stderr}`.trim();
+  const staticBinary = /not a dynamic executable|statically linked/i.test(output);
+  if (!dependencies.ok && !staticBinary) {
+    return [`ldd failed for ${source} binary: ${output || "unknown error"}`];
+  }
+  if (staticBinary) {
+    return [];
+  }
+  const missing = output
+    .split(/\r?\n/)
+    .filter((line) => /=>\s+not found\b/i.test(line))
+    .map((line) => line.trim());
+  if (missing.length > 0) {
+    return [`${source} binary has unresolved runtime dependencies: ${missing.join("; ")}`];
+  }
+  return [];
+}
+
+function expectedLinuxArchitecture() {
+  const target = options.target.toLowerCase();
+  if (target.includes("aarch64") || target.includes("arm64")) {
+    return { fileMarker: "aarch64", label: "aarch64" };
+  }
+  if (target.includes("x86_64") || target.includes("amd64")) {
+    return { fileMarker: "x86-64", label: "x86_64" };
+  }
+  if (process.arch === "arm64") {
+    return { fileMarker: "aarch64", label: "aarch64" };
+  }
+  if (process.arch === "x64") {
+    return { fileMarker: "x86-64", label: "x86_64" };
+  }
+  fail(`unsupported host architecture for Linux bundle inspection: ${process.arch}`);
+}
+
 function inspectGlibcTree(root, source) {
   if (!commandExists("readelf")) {
     return ["readelf is required to inspect Linux binary GLIBC baseline"];
   }
 
+  const failures = [];
   let maximum = "0.0";
   let maximumFile = "";
   for (const file of collectFiles(root)) {
     if (!isElf(file)) {
       continue;
     }
+    failures.push(...inspectLinuxExecutable(file, `${source} bundled ELF`));
     const result = commandOutput("readelf", ["--version-info", file]);
     if (!result.ok) {
       continue;
@@ -363,14 +509,14 @@ function inspectGlibcTree(root, source) {
   }
 
   if (maximum === "0.0") {
-    return [`${source} GLIBC version requirements were not found in bundled ELF files`];
+    failures.push(`${source} GLIBC version requirements were not found in bundled ELF files`);
   }
   if (compareVersions(maximum, maxSupportedGlibc) > 0) {
-    return [
-      `${source} contains ${maximumFile} requiring GLIBC_${maximum}; AppImageHub baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 22.04)`,
-    ];
+    failures.push(
+      `${source} contains ${maximumFile} requiring GLIBC_${maximum}; release baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 22.04)`,
+    );
   }
-  return [];
+  return failures;
 }
 
 function isElf(file) {
@@ -389,30 +535,6 @@ function isElf(file) {
       closeSync(descriptor);
     }
   }
-}
-
-function inspectGlibcBaseline(binary, source) {
-  if (!commandExists("readelf")) {
-    return ["readelf is required to inspect Linux binary GLIBC baseline"];
-  }
-
-  const result = commandOutput("readelf", ["--version-info", binary]);
-  if (!result.ok) {
-    return [`readelf failed for ${source} binary: ${result.stderr}`];
-  }
-
-  const versions = [...result.stdout.matchAll(/GLIBC_(\d+\.\d+)/g)].map((match) => match[1]);
-  if (versions.length === 0) {
-    return [`${source} binary GLIBC version requirements were not found`];
-  }
-
-  const maxVersion = versions.sort(compareVersions).at(-1);
-  if (compareVersions(maxVersion, maxSupportedGlibc) > 0) {
-    return [
-      `${source} binary requires GLIBC_${maxVersion}; release baseline is GLIBC_${maxSupportedGlibc} (Ubuntu 22.04 LTS)`,
-    ];
-  }
-  return [];
 }
 
 function compareVersions(left, right) {

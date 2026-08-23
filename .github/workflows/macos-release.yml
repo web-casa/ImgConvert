@@ -121,6 +121,14 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Verify native Rust target
+        run: |
+          expected="aarch64-apple-darwin"
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            expected="x86_64-apple-darwin"
+          fi
+          rustup target list --installed | grep -Fx "$expected"
+
       - run: pnpm install --frozen-lockfile
 
       - name: Frontend typecheck

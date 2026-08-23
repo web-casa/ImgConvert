@@ -6,6 +6,18 @@ use imgconvert_core::{
     Format, ImageData, MAX_PIXELS,
 };
 
+// A 3×2 Adobe CMYK JPEG generated from a simple red-to-blue gradient. Keeping
+// it inline makes the decoder regression portable without a runtime image tool.
+const ADOBE_CMYK_JPEG_BASE64: &str = concat!(
+    "/9j/7gAOQWRvYmUAZAAAAAAC/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcG",
+    "CAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQF",
+    "BAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU",
+    "FBQUFBQUFBQUFBQU/8AAFAgAAgADBAERAAIRAQMRAQQRAP/EABUAAQEAAAAAAAAA",
+    "AAAAAAAAAAgJ/8QAGxAAAQQDAAAAAAAAAAAAAAAAAAIEBRZVlNH/xAAVAQEBAAAA",
+    "AAAAAAAAAAAAAAADCf/EABsRAAAHAQAAAAAAAAAAAAAAAAADBhZVk9IE/9oADgQB",
+    "AAIRAxEEAAA/AHtXorGM9dHCcb8Vst03m6DMtMRhFJeRVM//2Q==",
+);
+
 #[test]
 fn golden_lossless_formats_roundtrip_pixels_exactly() {
     let source = alpha_fixture(24, 18);
@@ -89,6 +101,50 @@ fn corrupted_inputs_fail_cleanly_without_successful_outputs() {
     assert!(
         err.to_string().contains("超过上限"),
         "huge header should trip pixel budget, got {err:?}"
+    );
+}
+
+#[test]
+fn cmyk_jpeg_decodes_and_converts_without_panicking() {
+    let source = decode_test_base64(ADOBE_CMYK_JPEG_BASE64);
+    let info = probe(&source).unwrap();
+    assert_eq!((info.format, info.width, info.height), (Format::Jpeg, 3, 2));
+
+    let decoded = codec_for(Format::Jpeg).decode(&source).unwrap();
+    assert_eq!((decoded.width, decoded.height), (3, 2));
+    assert_eq!(decoded.rgba8().unwrap().len(), 3 * 2 * 4);
+
+    let png = convert(&source, Format::Png, &EncodeOptions::default()).unwrap();
+    assert_eq!(Format::from_magic(&png), Some(Format::Png));
+    assert_eq!(probe(&png).unwrap().format, Format::Png);
+}
+
+#[test]
+fn animated_webp_is_rejected_before_decode_or_thumbnail() {
+    let animated = animated_webp_fixture();
+    for (label, operation) in [
+        ("probe", probe(&animated).map(|_| ())),
+        ("thumbnail", thumbnail(&animated, 128).map(|_| ())),
+        (
+            "convert",
+            convert(&animated, Format::Png, &EncodeOptions::default()).map(|_| ()),
+        ),
+    ] {
+        let error = operation.expect_err(&format!("{label} must reject animated WebP"));
+        assert!(
+            error.to_string().contains("动画 WebP 暂不支持"),
+            "{label} returned an unexpected error: {error}"
+        );
+    }
+}
+
+#[test]
+fn ten_thousand_square_png_is_rejected_before_any_pixel_allocation() {
+    let ten_thousand_square = png_header_with_dimensions(10_000, 10_000);
+    let error = probe(&ten_thousand_square).unwrap_err();
+    assert!(
+        error.to_string().contains("超过上限"),
+        "10000×10000 PNG must trip the decoded-pixel ceiling, got {error}"
     );
 }
 
@@ -332,4 +388,71 @@ fn png_header_with_dimensions(width: u32, height: u32) -> Vec<u8> {
     png.extend_from_slice(&[8, 6, 0, 0, 0]);
     png.extend_from_slice(&0u32.to_be_bytes());
     png
+}
+
+fn animated_webp_fixture() -> Vec<u8> {
+    let source = opaque_smooth_fixture(2, 2);
+    let still = codec_for(Format::WebP)
+        .encode(&source, &lossless_options(Format::WebP))
+        .unwrap();
+    assert!(still.starts_with(b"RIFF"));
+    assert_eq!(&still[8..12], b"WEBP");
+
+    let mut animated = b"RIFF\0\0\0\0WEBP".to_vec();
+    let mut vp8x = vec![0u8; 10];
+    vp8x[0] = 0x02; // animation flag in the VP8X feature bitfield
+    write_u24_le(&mut vp8x[4..7], source.width - 1);
+    write_u24_le(&mut vp8x[7..10], source.height - 1);
+    write_webp_chunk(&mut animated, b"VP8X", &vp8x);
+    write_webp_chunk(&mut animated, b"ANIM", &[0, 0, 0, 0, 0, 0]);
+
+    let mut frame = vec![0u8; 16];
+    write_u24_le(&mut frame[6..9], source.width - 1);
+    write_u24_le(&mut frame[9..12], source.height - 1);
+    write_u24_le(&mut frame[12..15], 100);
+    frame.extend_from_slice(&still[12..]);
+    write_webp_chunk(&mut animated, b"ANMF", &frame);
+    let riff_size = u32::try_from(animated.len() - 8).unwrap();
+    animated[4..8].copy_from_slice(&riff_size.to_le_bytes());
+    animated
+}
+
+fn write_webp_chunk(output: &mut Vec<u8>, fourcc: &[u8; 4], data: &[u8]) {
+    output.extend_from_slice(fourcc);
+    output.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    output.extend_from_slice(data);
+    if data.len() % 2 == 1 {
+        output.push(0);
+    }
+}
+
+fn write_u24_le(output: &mut [u8], value: u32) {
+    output[0] = (value & 0xff) as u8;
+    output[1] = ((value >> 8) & 0xff) as u8;
+    output[2] = ((value >> 16) & 0xff) as u8;
+}
+
+fn decode_test_base64(input: &str) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len() * 3 / 4);
+    let mut bits = 0u32;
+    let mut bit_count = 0u8;
+    for byte in input.bytes() {
+        let value = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => break,
+            b'\r' | b'\n' | b' ' | b'\t' => continue,
+            _ => panic!("invalid base64 byte in test fixture: {byte}"),
+        };
+        bits = (bits << 6) | u32::from(value);
+        bit_count += 6;
+        while bit_count >= 8 {
+            bit_count -= 8;
+            output.push((bits >> bit_count) as u8);
+        }
+    }
+    output
 }

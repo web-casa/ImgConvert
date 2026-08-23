@@ -127,6 +127,15 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Verify native Rust target
+        shell: pwsh
+        run: |
+          $expected = if ("${{ matrix.arch }}" -eq "arm64") { "aarch64-pc-windows-msvc" } else { "x86_64-pc-windows-msvc" }
+          $installed = rustup target list --installed
+          if ($installed -notcontains $expected) {
+            throw "Windows Smoke (${{ matrix.arch }}) requires Rust target $expected; installed: $($installed -join ', ')"
+          }
+
       - name: Configure MSVC build environment
         shell: pwsh
         run: |

@@ -1,0 +1,122 @@
+name: macOS Intel Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      heic_smoke:
+        description: Generate a small HEIC fixture with macOS sips and run ImageIO import smoke.
+        required: true
+        default: true
+        type: boolean
+      build_direct:
+        description: Build an unsigned Intel direct DMG and verify its Mach-O architecture.
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-intel-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  NODE_VERSION: "24"
+
+jobs:
+  macos-intel-smoke:
+    name: macOS Intel ImageIO Smoke
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify macOS runner architecture
+        run: |
+          echo "macOS version: $(sw_vers -productVersion)"
+          echo "Runner architecture: $(uname -m)"
+          test "$(uname -m)" = "x86_64" || {
+            echo "macOS Intel Smoke expects x86_64 runner"
+            exit 1
+          }
+
+      - name: Install native codec build tools
+        run: |
+          brew install cmake meson ninja
+          # libaom's x86 build path requires NASM 2.x.
+          nasm_version="2.16.03"
+          nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+          nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+          curl --fail --location --silent --show-error \
+            "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+            --output "$nasm_archive"
+          echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+            | shasum -a 256 -c -
+          mkdir "$nasm_root"
+          unzip -q "$nasm_archive" -d "$nasm_root"
+          nasm_bin="$nasm_root/nasm-$nasm_version"
+          echo "$nasm_bin" >> "$GITHUB_PATH"
+          export PATH="$nasm_bin:$PATH"
+          nasm -v
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.34.4
+          run_install: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify native Rust target
+        run: rustup target list --installed | grep -Fx x86_64-apple-darwin
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run release:macos:check
+      - run: cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
+
+      - name: Generate HEIC fixture
+        if: ${{ inputs.heic_smoke }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/imgconvert-macos-heic"
+          IMGCONVERT_PACKAGE_CONVERT_SMOKE=1 \
+          IMGCONVERT_PACKAGE_CONVERT_SMOKE_FORMATS=png \
+          IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR="$RUNNER_TEMP/imgconvert-macos-heic" \
+          cargo +1.96.0 run --manifest-path src-tauri/Cargo.toml --bin imgconvert
+          sips -s format heic \
+            "$RUNNER_TEMP/imgconvert-macos-heic/smoke.png" \
+            --out "$RUNNER_TEMP/imgconvert-macos-heic/smoke.heic"
+
+      - name: macOS Intel runtime smoke
+        if: ${{ !inputs.heic_smoke }}
+        run: pnpm run release:macos:smoke -- --skip-benchmark
+
+      - name: macOS Intel runtime smoke with HEIC fixture
+        if: ${{ inputs.heic_smoke }}
+        env:
+          IMGCONVERT_MACOS_HEIC_SMOKE_INPUT: ${{ runner.temp }}/imgconvert-macos-heic/smoke.heic
+        run: pnpm run release:macos:smoke -- --skip-benchmark
+
+      - name: Optional Intel direct DMG build
+        if: ${{ inputs.build_direct }}
+        run: pnpm run release:macos
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: ${{ inputs.build_direct }}
+        with:
+          name: imgconvert-macos-x64-dmg
+          if-no-files-found: error
+          retention-days: 3
+          path: src-tauri/target/release/bundle/dmg/*.dmg

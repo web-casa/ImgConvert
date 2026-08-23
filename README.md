@@ -194,6 +194,7 @@ pnpm run release:platform:check
 
 - [ROADMAP](docs/ROADMAP.md): roadmap, version status, priorities, and release readiness reports
 - [ENGINE](docs/ENGINE.md): image core, system HEIC integration, toolchain, packaging, and signing
+- [RELEASE_QA](docs/RELEASE_QA.md): required cross-platform, installer, updater, and store acceptance record
 - [LEGAL](docs/LEGAL.md): Apache-2.0, dependency licensing rules, HEVC patents, and distribution boundaries
 - [REFERENCES](docs/REFERENCES.md): reference-project research and reusable design decisions
 - [PRIVACY](PRIVACY.en.md) / [简体中文](PRIVACY.md): privacy policies in English and Chinese

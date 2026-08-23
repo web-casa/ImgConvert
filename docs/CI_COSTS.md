@@ -39,7 +39,10 @@ Default behavior:
   days; signing, asynchronous notarization submission, DMG, and MAS candidate
   steps remain opt-in because they require Apple secrets. A submitted DMG and
   its SHA-256-bound receipt are retained for seven days without holding the
-  runner open while Apple processes the request.
+  runner open while Apple processes the request. `macOS Intel Smoke` is a
+  separate manual-only `macos-15-intel` run for the same ImageIO HEIC path and
+  optional unsigned Intel DMG, so the release gate does not infer Intel support
+  from an Apple Silicon build.
 - `macOS DMG Release` is a manual-only arm64/x64 matrix using `macos-15` and
   `macos-15-intel`. It accepts only an exact application tag, requires Apple
   signing/notarization secrets, and saves each submitted DMG plus its receipt
@@ -84,6 +87,10 @@ Run the static guardrail after changing workflows:
 ```bash
 pnpm run ci:cost:check
 ```
+
+Use [`RELEASE_QA.md`](RELEASE_QA.md) with these workflows for the actual
+architecture, installation, image-corpus, updater, and store-device acceptance
+record. A green hosted-runner job alone is not release approval.
 
 Before deciding whether to run packaging or publishing jobs, run the read-only
 release readiness report:

@@ -76,6 +76,16 @@ pub fn decode_heic_to_png(input: &Path) -> Result<Vec<u8>, String> {
     platform::decode_heic_to_png(input)
 }
 
+fn require_single_heic_frame(input: &Path, frame_count: usize) -> Result<(), String> {
+    if frame_count == 1 {
+        return Ok(());
+    }
+    Err(format!(
+        "多帧 HEIC/HEIF 暂不支持（检测到 {frame_count} 帧，未转换以避免丢失帧）: {}",
+        input.display()
+    ))
+}
+
 fn heic_status() -> HeicStatus {
     platform::heic_status()
 }
@@ -132,7 +142,7 @@ mod platform {
 
     use crate::external_codecs::{is_heic_magic, MAX_HEIC_DECODED_PNG_BYTES};
 
-    use super::{DiagnosticMessage, HeicStatus};
+    use super::{require_single_heic_frame, DiagnosticMessage, HeicStatus};
 
     static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -271,6 +281,10 @@ mod platform {
                         input.display()
                     )
                 })?;
+            let frame_count = decoder
+                .GetFrameCount()
+                .map_err(|error| format!("Windows WIC 无法读取 HEIC 帧数: {error}"))?;
+            require_single_heic_frame(input, frame_count as usize)?;
             let frame = decoder
                 .GetFrame(0)
                 .map_err(|error| format!("Windows WIC 无法读取 HEIC 首帧: {error}"))?;
@@ -509,5 +523,14 @@ mod tests {
         } else {
             assert!(!heic_available());
         }
+    }
+
+    #[test]
+    fn multiframe_heic_is_rejected_before_frame_zero_is_decoded() {
+        let input = Path::new(r"C:\\fixtures\\animated.heic");
+        assert!(require_single_heic_frame(input, 1).is_ok());
+        let error = require_single_heic_frame(input, 3).unwrap_err();
+        assert!(error.contains("多帧 HEIC/HEIF 暂不支持"));
+        assert!(error.contains("3 帧"));
     }
 }

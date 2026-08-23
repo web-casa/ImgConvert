@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const options = {
-  platforms: ["macos", "windows"],
+  platforms: ["linux", "macos", "windows"],
   channels: ["direct", "store"],
   requireStoreEnv: false,
 };
@@ -18,7 +18,9 @@ for (const arg of process.argv.slice(2)) {
   } else if (arg.startsWith("--platform=")) {
     const value = arg.slice("--platform=".length).toLowerCase();
     options.platforms =
-      value === "all" ? ["macos", "windows"] : splitOption(value, ["macos", "windows"]);
+      value === "all"
+        ? ["linux", "macos", "windows"]
+        : splitOption(value, ["linux", "macos", "windows"]);
   } else if (arg.startsWith("--channel=")) {
     const value = arg.slice("--channel=".length).toLowerCase();
     options.channels =
@@ -56,6 +58,9 @@ if (options.platforms.includes("macos")) {
 }
 if (options.platforms.includes("windows")) {
   checkWindows();
+}
+if (options.platforms.includes("linux")) {
+  checkLinux();
 }
 if (options.channels.includes("store")) {
   checkStoreCodecGuardrail();
@@ -373,6 +378,9 @@ function checkImageQualityGuardrails() {
     "jpeg_chroma_grid_fixture",
     "jpeg_chroma_grid_score",
     "webp_block_score",
+    "cmyk_jpeg_decodes_and_converts_without_panicking",
+    "animated_webp_is_rejected_before_decode_or_thumbnail",
+    "ten_thousand_square_png_is_rejected_before_any_pixel_allocation",
   ]) {
     if (!imageQualityTest.includes(expected)) {
       failures.push(`image quality guardrail missing integration marker: ${expected}`);
@@ -945,6 +953,79 @@ function checkFlathubReleaseGuardrails() {
   }
 }
 
+function checkLinux() {
+  const packageScripts = packageJson.scripts ?? {};
+  const artifactCheck = readText(
+    path.join(repoRoot, "scripts", "check-linux-bundle-artifacts.mjs"),
+  );
+  const toolchainCheck = readText(path.join(repoRoot, "scripts", "check-native-toolchain.mjs"));
+  const matrixSmoke = readText(path.join(repoRoot, "scripts", "smoke-linux-package-matrix.mjs"));
+  const linuxWorkflow = readText(path.join(repoRoot, ".github", "workflows", "release-linux.yml"));
+  const ciWorkflow = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
+  const releaseQa = readText(path.join(repoRoot, "docs", "RELEASE_QA.md"));
+
+  for (const scriptName of [
+    "toolchain:check:linux:all",
+    "release:linux",
+    "release:linux:verify",
+    "release:linux:smoke:docker",
+  ]) {
+    if (!packageScripts[scriptName]) {
+      failures.push(`package.json must expose ${scriptName} for Linux release acceptance`);
+    }
+  }
+  if (!packageScripts["release:linux"]?.includes("check-linux-bundle-artifacts.mjs")) {
+    failures.push("release:linux must inspect produced Linux bundle artifacts");
+  }
+  for (const expected of [
+    "inspectRpm",
+    "rpm2cpio",
+    "--no-absolute-filenames",
+    "isSafeCpioMember",
+    '"cpio", ["-it", "--quiet", "--no-absolute-filenames"]',
+    "inspectLinuxExecutable",
+    "expectedLinuxArchitecture",
+    'commandOutput("ldd"',
+    'commandOutput("readelf"',
+  ]) {
+    if (!artifactCheck.includes(expected)) {
+      failures.push(`Linux bundle artifact check missing marker: ${expected}`);
+    }
+  }
+  for (const expected of ["rpm2cpio", "cpio", "file", "ldd", "readelf"]) {
+    if (!toolchainCheck.includes(expected)) {
+      failures.push(`Linux native toolchain check missing ${expected}`);
+    }
+  }
+  for (const expected of ["ubuntu:24.04", "debian:13", "fedora:42", "ubuntu:22.04"]) {
+    if (!matrixSmoke.includes(expected)) {
+      failures.push(`Linux Docker smoke matrix must retain ${expected}`);
+    }
+  }
+  for (const expected of [
+    "ubuntu-22.04",
+    "ubuntu-22.04-arm",
+    "Verify native Rust target",
+    "aarch64-unknown-linux-gnu",
+    "cpio",
+    "binutils",
+  ]) {
+    if (!linuxWorkflow.includes(expected)) {
+      failures.push(`Linux Release workflow must preserve ${expected}`);
+    }
+  }
+  for (const expected of ["ubuntu-22.04-arm", "Verify native Rust target"]) {
+    if (!ciWorkflow.includes(expected)) {
+      failures.push(`CI Linux package smoke must preserve ${expected}`);
+    }
+  }
+  for (const expected of ["Fedora 42", "every packaged ELF", "Ubuntu 22.04"]) {
+    if (!releaseQa.includes(expected)) {
+      failures.push(`docs/RELEASE_QA.md must document Linux acceptance: ${expected}`);
+    }
+  }
+}
+
 function checkMacos() {
   requireBundleIcon(".icns", "macOS");
   checkMacosRuntimeGuardrails();
@@ -1025,6 +1106,23 @@ function checkMacosRuntimeGuardrails() {
   if (!bundleArtifactScript.includes('arg.startsWith("--artifact=")')) {
     failures.push("macOS bundle artifact verification must accept an exact artifact path");
   }
+  for (const expected of [
+    "verifyAppMachOBinaries",
+    "verifyNestedCodeSignatures",
+    "isMachOBinary",
+    'spawnSync("lipo"',
+    'spawnSync("otool"',
+    "ImageIO.framework",
+  ]) {
+    if (!bundleArtifactScript.includes(expected)) {
+      failures.push(`macOS bundle verification must inspect every Mach-O binary: ${expected}`);
+    }
+  }
+  for (const expected of ["universal-apple-darwin", "--expected-architectures=arm64,x86_64"]) {
+    if (!packageScripts["release:macos:mas"]?.includes(expected)) {
+      failures.push(`release:macos:mas must build and verify a universal app: ${expected}`);
+    }
+  }
   for (const marker of [
     "mkdtempSync",
     "imgconvert-dmg-mount-",
@@ -1040,6 +1138,9 @@ function checkMacosRuntimeGuardrails() {
     failures.push("macOS notarization must verify the exact DMG submitted to Apple");
   }
   const macosWorkflow = readText(path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"));
+  const macosIntelWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "macos-intel-smoke.yml"),
+  );
   const macosReleaseWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "macos-release.yml"),
   );
@@ -1061,6 +1162,17 @@ function checkMacosRuntimeGuardrails() {
   ]) {
     if (!macosWorkflow.includes(expected)) {
       failures.push(`macOS Smoke workflow must retain ${expected} for AVIF benchmark review`);
+    }
+  }
+  for (const expected of [
+    "runs-on: macos-15-intel",
+    'test "$(uname -m)" = "x86_64"',
+    "sips -s format heic",
+    "IMGCONVERT_MACOS_HEIC_SMOKE_INPUT",
+    "Verify native Rust target",
+  ]) {
+    if (!macosIntelWorkflow.includes(expected)) {
+      failures.push(`macOS Intel Smoke workflow must preserve ${expected}`);
     }
   }
   for (const expected of [
@@ -1155,6 +1267,8 @@ function checkMacosRuntimeGuardrails() {
     "IMGCONVERT_DISABLE_UPDATER",
     "IMGCONVERT_MAS_PROVISION_PROFILE_BASE64",
     "upload_build",
+    "universal-apple-darwin",
+    "imgconvert-macos-universal-mas-${{ inputs.tag }}",
   ]) {
     if (!macosMasReleaseWorkflow.includes(expected)) {
       failures.push(`macOS MAS Release workflow must preserve ${expected}`);
@@ -1219,6 +1333,15 @@ function checkMacosRuntimeGuardrails() {
     failures.push(
       "macOS ImageIO HEIC bridge must use file URL decode instead of buffering full input",
     );
+  }
+  for (const expected of [
+    "CGImageSourceGetCount",
+    "require_single_heic_frame",
+    "多帧 HEIC/HEIF 暂不支持",
+  ]) {
+    if (!systemCodecs.includes(expected)) {
+      failures.push(`macOS ImageIO HEIC bridge must reject multi-frame input: ${expected}`);
+    }
   }
 
   const security = readText(path.join(repoRoot, "src-tauri", "src", "macos_security.rs"));
@@ -1387,6 +1510,19 @@ function checkWindowsRuntimeGuardrails() {
       );
     }
   }
+  const installerSmoke = readText(path.join(repoRoot, "scripts", "smoke-windows-installers.mjs"));
+  for (const expected of [
+    "中文 路径",
+    "转换 输出",
+    "verifyInstalledExecutableArchitecture",
+    "assertNoInstalledExecutable",
+  ]) {
+    if (!installerSmoke.includes(expected)) {
+      failures.push(
+        `Windows installer smoke must preserve path/architecture/uninstall coverage: ${expected}`,
+      );
+    }
+  }
   for (const expected of [
     "verifyPackageSignature(smokePackagePath)",
     "exportSignedSmokeBundle(",
@@ -1413,7 +1549,13 @@ function checkWindowsRuntimeGuardrails() {
   const windowsSystemCodecs = readText(
     path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),
   );
-  for (const expected of ["system-wic", "windowsHeifInstallHint"]) {
+  for (const expected of [
+    "system-wic",
+    "windowsHeifInstallHint",
+    "GetFrameCount",
+    "require_single_heic_frame",
+    "多帧 HEIC/HEIF 暂不支持",
+  ]) {
     if (!windowsSystemCodecs.includes(expected)) {
       failures.push(`Windows WIC HEIC diagnostics must mention ${expected}`);
     }
@@ -1496,12 +1638,12 @@ function checkMacosStoreConfig() {
   }
   if (macos.minimumSystemVersion !== macosMasMinimumSystemVersion) {
     failures.push(
-      `macOS MAS config must set minimumSystemVersion=${macosMasMinimumSystemVersion} for the arm64-only Store build`,
+      `macOS MAS config must set minimumSystemVersion=${macosMasMinimumSystemVersion} for the universal Store build`,
     );
   }
   if (!prepare.includes(`minimumSystemVersion: "${macosMasMinimumSystemVersion}"`)) {
     failures.push(
-      `prepare-macos-mas-release.mjs must generate minimumSystemVersion=${macosMasMinimumSystemVersion} for the arm64-only Store build`,
+      `prepare-macos-mas-release.mjs must generate minimumSystemVersion=${macosMasMinimumSystemVersion} for the universal Store build`,
     );
   }
   requireIcnsChunk("ic10", "macOS MAS 512pt@2x");

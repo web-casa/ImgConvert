@@ -39,7 +39,7 @@ if (!Number.isFinite(options.timeoutSeconds) || options.timeoutSeconds < 3) {
 const matrix = [
   { bundle: "deb", image: "ubuntu:24.04" },
   { bundle: "deb", image: "debian:13" },
-  { bundle: "rpm", image: "fedora:latest" },
+  { bundle: "rpm", image: "fedora:42" },
   { bundle: "appimage", image: "ubuntu:22.04" },
 ];
 

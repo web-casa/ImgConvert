@@ -26,7 +26,7 @@ function main() {
     throw new Error("Mac App Store validation and upload require macOS");
   }
 
-  const pkg = options.pkg ? path.resolve(options.pkg) : findMasPkg();
+  const pkg = options.pkg ? path.resolve(options.pkg) : findMasPkg(options.target);
   requirePkg(pkg);
   const credentials = appStoreCredentials(process.env);
 
@@ -40,12 +40,14 @@ function main() {
 }
 
 function parseOptions(args) {
-  const options = { help: false, pkg: null, upload: false };
+  const options = { help: false, pkg: null, target: "", upload: false };
   for (const arg of args) {
     if (arg === "--") {
       continue;
     } else if (arg.startsWith("--pkg=")) {
       options.pkg = requiredText(arg.slice("--pkg=".length), "package path");
+    } else if (arg.startsWith("--target=")) {
+      options.target = validateTarget(arg.slice("--target=".length));
     } else if (arg === "--upload") {
       options.upload = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -103,11 +105,17 @@ function runAltool(mode, pkg, credentials) {
   }
 }
 
-function findMasPkg() {
+function findMasPkg(target) {
   const packageVersion = JSON.parse(
     readFileSync(path.join(repoRoot, "package.json"), "utf8"),
   ).version;
-  const pkgDir = path.join(cargoTargetRoot(), "release", "bundle", "pkg");
+  const pkgDir = path.join(
+    cargoTargetRoot(),
+    ...(target ? [target] : []),
+    "release",
+    "bundle",
+    "pkg",
+  );
   const expectedName = `ImgConvert_${packageVersion}_mas.pkg`;
   const candidates = existsSync(pkgDir)
     ? readdirSync(pkgDir)
@@ -149,6 +157,14 @@ function optionalText(value, label) {
   return text || null;
 }
 
+function validateTarget(value) {
+  const target = requiredText(value, "target");
+  if (!["aarch64-apple-darwin", "x86_64-apple-darwin", "universal-apple-darwin"].includes(target)) {
+    throw new Error(`unsupported macOS target: ${target}`);
+  }
+  return target;
+}
+
 function cargoTargetRoot() {
   return process.env.CARGO_TARGET_DIR
     ? path.resolve(process.env.CARGO_TARGET_DIR)
@@ -163,6 +179,7 @@ Validation is the default and never uploads a build.
 
 Options:
   --pkg=<path>  Exact MAS .pkg. Defaults to the current release-version package.
+  --target=<target>  Tauri target directory used when locating the default package.
   --upload      Upload only after validation succeeds.
   --help        Show this help.
 

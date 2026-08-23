@@ -226,6 +226,8 @@ jobs:
             nasm \
             ninja-build \
             rpm \
+            cpio \
+            binutils \
             file \
             desktop-file-utils \
             appstream \
@@ -246,6 +248,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+      - name: Verify native Rust target
+        run: |
+          expected="x86_64-unknown-linux-gnu"
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            expected="aarch64-unknown-linux-gnu"
+          fi
+          rustup target list --installed | grep -Fx "$expected"
       - run: pnpm install --frozen-lockfile
       - run: pnpm run release:linux:debug
       - run: pnpm run release:linux:smoke:deb:debug

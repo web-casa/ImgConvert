@@ -8,6 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 const options = {
   profile: "release",
+  target: "",
   bundles: ["dmg"],
 };
 
@@ -16,6 +17,8 @@ for (const arg of process.argv.slice(2)) {
     continue;
   } else if (arg.startsWith("--profile=")) {
     options.profile = arg.slice("--profile=".length);
+  } else if (arg.startsWith("--target=")) {
+    options.target = arg.slice("--target=".length).trim();
   } else if (arg.startsWith("--bundles=")) {
     options.bundles = arg
       .slice("--bundles=".length)
@@ -30,6 +33,14 @@ for (const arg of process.argv.slice(2)) {
 if (!["debug", "release"].includes(options.profile)) {
   fail(`unsupported profile: ${options.profile}`);
 }
+if (
+  options.target &&
+  !["aarch64-apple-darwin", "x86_64-apple-darwin", "universal-apple-darwin"].includes(
+    options.target,
+  )
+) {
+  fail(`unsupported macOS target: ${options.target}`);
+}
 
 for (const bundle of options.bundles) {
   if (!["app", "dmg"].includes(bundle)) {
@@ -37,7 +48,12 @@ for (const bundle of options.bundles) {
   }
 }
 
-const bundleRoot = path.join(cargoTargetRoot(), options.profile, "bundle");
+const bundleRoot = path.join(
+  cargoTargetRoot(),
+  ...(options.target ? [options.target] : []),
+  options.profile,
+  "bundle",
+);
 
 for (const bundle of options.bundles) {
   const bundleDir = path.join(bundleRoot, bundle === "app" ? "macos" : bundle);

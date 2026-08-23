@@ -84,7 +84,7 @@ if (failures.length > 0) {
     console.error(`- ${failure}`);
   }
   console.error(
-    "Install the missing tools before building release artifacts. On Debian/Ubuntu this is usually: sudo apt install cmake meson ninja-build nasm rpm file desktop-file-utils appstream squashfs-tools patchelf",
+    "Install the missing tools before building release artifacts. On Debian/Ubuntu this is usually: sudo apt install cmake meson ninja-build nasm rpm cpio binutils file desktop-file-utils appstream squashfs-tools patchelf",
   );
   process.exit(1);
 }
@@ -121,19 +121,43 @@ function addLinuxBundleChecks(bundles) {
     });
   }
   if (unique.has("rpm")) {
-    checks.push({
-      name: "rpm",
-      commands: [["rpm", ["--version"]]],
-      reason: ".rpm artifact build and inspection",
-    });
-  }
-  if (unique.has("appimage")) {
     checks.push(
       {
-        name: "file",
-        commands: [["file", ["--version"]]],
-        reason: "linuxdeploy/AppImage binary inspection",
+        name: "rpm",
+        commands: [["rpm", ["--version"]]],
+        reason: ".rpm artifact build and inspection",
       },
+      {
+        name: "rpm2cpio",
+        commands: [["rpm2cpio", ["--help"]]],
+        reason: ".rpm payload extraction for ELF inspection",
+      },
+      {
+        name: "cpio",
+        commands: [["cpio", ["--version"]]],
+        reason: ".rpm payload extraction for ELF inspection",
+      },
+    );
+  }
+  checks.push(
+    {
+      name: "file",
+      commands: [["file", ["--version"]]],
+      reason: "Linux executable architecture inspection",
+    },
+    {
+      name: "ldd",
+      commands: [["ldd", ["--version"]]],
+      reason: "Linux runtime dependency inspection",
+    },
+    {
+      name: "readelf",
+      commands: [["readelf", ["--version"]]],
+      reason: "Linux GLIBC baseline inspection",
+    },
+  );
+  if (unique.has("appimage")) {
+    checks.push(
       {
         name: "desktop-file-validate",
         commands: [["desktop-file-validate", ["--help"]]],

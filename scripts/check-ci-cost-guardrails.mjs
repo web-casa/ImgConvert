@@ -14,6 +14,7 @@ const linuxRelease = readWorkflow("release-linux.yml");
 const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
+const macosIntelSmoke = readWorkflow("macos-intel-smoke.yml");
 const macosRelease = readWorkflow("macos-release.yml");
 const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
@@ -29,6 +30,7 @@ const allWorkflows = [
   ["release-updater.yml", updaterRelease],
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
+  ["macos-intel-smoke.yml", macosIntelSmoke],
   ["macos-release.yml", macosRelease],
   ["macos-mas-release.yml", macosMasRelease],
   ["macos-notarization-finalize.yml", macosNotarizationFinalize],
@@ -54,6 +56,7 @@ checkLinuxReleaseWorkflow();
 checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
+checkManualWorkflow("macos-intel-smoke.yml", macosIntelSmoke);
 checkManualWorkflow("macos-release.yml", macosRelease);
 checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
 checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
@@ -66,6 +69,7 @@ checkUpdaterUpgradeSmokeWorkflow();
 checkWindowsSmokeWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkMacosSmokeWorkflow();
+checkMacosIntelSmokeWorkflow();
 checkMacosDmgReleaseWorkflow();
 checkStandardPlatformWorkflow(
   "macos-release.yml",
@@ -377,6 +381,25 @@ function checkMacosSmokeWorkflow() {
   ]) {
     if (!macosSmoke.includes(marker)) {
       failures.push(`macos-smoke.yml missing bounded notarization retry marker: ${marker}`);
+    }
+  }
+}
+
+function checkMacosIntelSmokeWorkflow() {
+  requireBooleanInputDefault(macosIntelSmoke, "heic_smoke", true, "macos-intel-smoke.yml");
+  requireBooleanInputDefault(macosIntelSmoke, "build_direct", false, "macos-intel-smoke.yml");
+  for (const marker of [
+    "runs-on: macos-15-intel",
+    'test "$(uname -m)" = "x86_64"',
+    "nasm-2.16.03-macosx.zip",
+    "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75",
+    "sips -s format heic",
+    "IMGCONVERT_MACOS_HEIC_SMOKE_INPUT",
+    "--skip-benchmark",
+    "pnpm run release:macos",
+  ]) {
+    if (!macosIntelSmoke.includes(marker)) {
+      failures.push(`macos-intel-smoke.yml missing Intel ImageIO smoke marker: ${marker}`);
     }
   }
 }

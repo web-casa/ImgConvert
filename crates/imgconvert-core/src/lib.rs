@@ -22,8 +22,14 @@ use lcms2::{Flags, Intent, PixelFormat, Profile, Transform};
 use md5::{Digest as Md5Digest, Md5};
 use ssimulacra2::{compute_frame_ssimulacra2, ColorPrimaries, Rgb, TransferCharacteristic, Xyb};
 
-/// 像素数上限(防超大分配 / C 层 OOM;~100MP,可后续配置)。
-pub const MAX_PIXELS: usize = 100_000_000;
+/// 像素数上限（防超大分配 / C 层 OOM；64 MP）。
+/// Per-image decoded-pixel ceiling.
+///
+/// The desktop pipeline may hold the decoded RGBA input, an intermediate image,
+/// and an encoded candidate at once. 64 MP keeps the three-RGBA working-set
+/// estimate within the 768 MiB batch budget instead of accepting a 100 MP image
+/// that can exhaust memory before the batch scheduler has a chance to help.
+pub const MAX_PIXELS: usize = 64_000_000;
 
 /// 单个原始 metadata blob 上限。与 HEIC helper sidecar 上限保持一致,防容器 metadata 炸弹。
 pub const MAX_METADATA_BLOB_BYTES: usize = 16 * 1024 * 1024;

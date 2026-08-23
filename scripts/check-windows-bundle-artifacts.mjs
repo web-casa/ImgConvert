@@ -77,6 +77,8 @@ for (const bundle of options.bundles) {
   }
 }
 
+verifyMainExecutableArchitecture();
+
 for (const item of verified) {
   console.log(`ok ${path.relative(repoRoot, item.artifact)} (${item.size} bytes)`);
 }
@@ -90,6 +92,60 @@ if (failures.length > 0) {
 }
 
 console.log(`Windows bundle artifact check passed (${verified.length} artifact(s)).`);
+
+function verifyMainExecutableArchitecture() {
+  if (process.platform !== "win32") {
+    return;
+  }
+  const executable = path.join(cargoTargetRoot(), options.profile, "imgconvert.exe");
+  if (!existsSync(executable)) {
+    failures.push(
+      `missing built ImgConvert.exe for architecture verification: ${path.relative(repoRoot, executable)}`,
+    );
+    return;
+  }
+  const expected = expectedWindowsArchitecture();
+  const actual = peProcessorArchitecture(executable);
+  if (actual !== expected) {
+    failures.push(
+      `ImgConvert.exe architecture mismatch: expected ${expected} native build, got ${actual}`,
+    );
+    return;
+  }
+  console.log(`ok ${path.relative(repoRoot, executable)} (${actual})`);
+}
+
+function peProcessorArchitecture(file) {
+  const binary = readFileSync(file);
+  if (binary.length < 0x40 || binary.readUInt16LE(0) !== 0x5a4d) {
+    fail(`${path.relative(repoRoot, file)} is not a valid PE executable (missing MZ header)`);
+  }
+  const peOffset = binary.readUInt32LE(0x3c);
+  if (peOffset > binary.length - 6 || binary.readUInt32LE(peOffset) !== 0x00004550) {
+    fail(`${path.relative(repoRoot, file)} is not a valid PE executable (missing PE header)`);
+  }
+  const machine = binary.readUInt16LE(peOffset + 4);
+  if (machine === 0x8664) return "x64";
+  if (machine === 0xaa64) return "arm64";
+  fail(
+    `${path.relative(repoRoot, file)} uses unsupported PE machine type 0x${machine.toString(16).padStart(4, "0")}`,
+  );
+}
+
+function expectedWindowsArchitecture() {
+  const configured = String(process.env.WINDOWS_STORE_PROCESSOR_ARCHITECTURE ?? "")
+    .trim()
+    .toLowerCase();
+  if (configured) {
+    if (["x64", "arm64"].includes(configured)) {
+      return configured;
+    }
+    fail(`unsupported WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${configured}`);
+  }
+  if (process.arch === "arm64") return "arm64";
+  if (process.arch === "x64") return "x64";
+  fail(`unsupported Windows Node architecture: ${process.arch}`);
+}
 
 function collectFiles(dir) {
   if (!existsSync(dir)) {

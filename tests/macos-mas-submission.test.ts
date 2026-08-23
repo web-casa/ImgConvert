@@ -8,17 +8,22 @@ const { appStoreCredentials, buildAltoolArgs, parseOptions } = submissionModule;
 
 describe("Mac App Store submission CLI", () => {
   it("validates by default and requires an explicit upload flag", () => {
-    expect(parseOptions([])).toEqual({ help: false, pkg: null, upload: false });
+    expect(parseOptions([])).toEqual({ help: false, pkg: null, target: "", upload: false });
     expect(parseOptions(["--pkg=build/ImgConvert.pkg", "--upload"])).toEqual({
       help: false,
       pkg: "build/ImgConvert.pkg",
+      target: "",
       upload: true,
+    });
+    expect(parseOptions(["--target=universal-apple-darwin"])).toMatchObject({
+      target: "universal-apple-darwin",
     });
   });
 
   it("rejects unknown arguments and empty package paths", () => {
     expect(() => parseOptions(["--publish"])).toThrow(/unknown argument/);
     expect(() => parseOptions(["--pkg="])).toThrow(/package path is required/);
+    expect(() => parseOptions(["--target=linux-x86_64"])).toThrow(/unsupported macOS target/);
   });
 
   it("requires both Apple ID credentials and rejects multiline values", () => {

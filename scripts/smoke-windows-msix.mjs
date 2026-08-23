@@ -99,10 +99,11 @@ async function main() {
 
   try {
     const sourceArtifactSha256 = sha256File(sourcePackagePath);
-    const packageManifest = unpackPackageManifest(sourcePackagePath);
-    ensurePackagedManifestMatchesPrepared(preparedManifest, packageManifest);
-    identityName = xmlUnescape(manifestValue(packageManifest, "Name"));
-    const publisher = xmlUnescape(manifestValue(packageManifest, "Publisher"));
+    const unpackedPackage = unpackPackage(sourcePackagePath);
+    ensurePackagedManifestMatchesPrepared(preparedManifest, unpackedPackage.manifest);
+    verifyPackagedExecutableArchitecture(unpackedPackage.root, architecture);
+    identityName = xmlUnescape(manifestValue(unpackedPackage.manifest, "Name"));
+    const publisher = xmlUnescape(manifestValue(unpackedPackage.manifest, "Publisher"));
     const smokePackagePath = path.join(requiredTmpRoot(), path.basename(sourcePackagePath));
     copyFileSync(sourcePackagePath, smokePackagePath);
     ensurePackageAbsent(identityName);
@@ -155,7 +156,7 @@ function manifestValue(manifest, attribute) {
   return value;
 }
 
-function unpackPackageManifest(packagePath) {
+function unpackPackage(packagePath) {
   const makeappx = findWindowsSdkTool("makeappx.exe");
   if (!makeappx) {
     fail("makeappx.exe was not found; install the Windows 10/11 SDK before MSIX inspection");
@@ -170,7 +171,7 @@ function unpackPackageManifest(packagePath) {
   if (!existsSync(manifestPath)) {
     fail("unpacked MSIX does not contain AppxManifest.xml");
   }
-  return readFileSync(manifestPath, "utf8");
+  return { manifest: readFileSync(manifestPath, "utf8"), root: unpackDir };
 }
 
 function ensurePackagedManifestMatchesPrepared(preparedManifest, packageManifest) {
@@ -183,6 +184,34 @@ function ensurePackagedManifestMatchesPrepared(preparedManifest, packageManifest
       );
     }
   }
+}
+
+function verifyPackagedExecutableArchitecture(packageRoot, expectedArchitecture) {
+  const executable = path.join(packageRoot, "ImgConvert.exe");
+  if (!existsSync(executable)) {
+    fail("unpacked MSIX does not contain ImgConvert.exe");
+  }
+  const actualArchitecture = peProcessorArchitecture(executable);
+  if (actualArchitecture !== expectedArchitecture) {
+    fail(
+      `packed MSIX ImgConvert.exe architecture does not match the manifest: expected ${expectedArchitecture}, got ${actualArchitecture}`,
+    );
+  }
+}
+
+function peProcessorArchitecture(file) {
+  const binary = readFileSync(file);
+  if (binary.length < 0x40 || binary.readUInt16LE(0) !== 0x5a4d) {
+    fail(`${file} is not a valid PE executable (missing MZ header)`);
+  }
+  const peOffset = binary.readUInt32LE(0x3c);
+  if (peOffset > binary.length - 6 || binary.readUInt32LE(peOffset) !== 0x00004550) {
+    fail(`${file} is not a valid PE executable (missing PE header)`);
+  }
+  const machine = binary.readUInt16LE(peOffset + 4);
+  if (machine === 0x8664) return "x64";
+  if (machine === 0xaa64) return "arm64";
+  fail(`${file} uses unsupported PE machine type 0x${machine.toString(16).padStart(4, "0")}`);
 }
 
 function assertSourceArtifactUnchanged(sourcePackagePath, expectedSha256) {

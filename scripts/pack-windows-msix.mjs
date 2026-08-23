@@ -174,6 +174,17 @@ function packMsix() {
   if (!existsSync(output) || statSync(output).size === 0) {
     fail("makeappx.exe reported success but the .msix artifact is missing or empty");
   }
+  const validation = spawnSync(makeappx, ["validate", "/p", output], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: "inherit",
+  });
+  if (validation.error) {
+    fail(`makeappx.exe validate failed to start: ${validation.error.message}`);
+  }
+  if (validation.status !== 0) {
+    fail(`makeappx.exe validate failed with exit code ${validation.status ?? 1}`);
+  }
   console.log(`packed ${path.relative(repoRoot, output)}`);
 }
 

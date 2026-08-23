@@ -50,6 +50,18 @@ pub fn decode_heic_to_png(input: &Path) -> Result<Vec<u8>, String> {
     platform_decode_heic_to_png(input)
 }
 
+/// Image conversion has one output image. Reject a sequence instead of silently
+/// decoding frame zero and discarding the user's remaining HEIC frames.
+pub(crate) fn require_single_heic_frame(input: &Path, frame_count: usize) -> Result<(), String> {
+    if frame_count == 1 {
+        return Ok(());
+    }
+    Err(format!(
+        "多帧 HEIC/HEIF 暂不支持（检测到 {frame_count} 帧，未转换以避免丢失帧）: {}",
+        input.display()
+    ))
+}
+
 #[cfg(target_os = "macos")]
 fn platform_heic_available() -> bool {
     Path::new(IMAGEIO_FRAMEWORK_PATH).exists()
@@ -122,6 +134,7 @@ mod imageio {
     #[link(name = "ImageIO", kind = "framework")]
     extern "C" {
         fn CGImageSourceCreateWithURL(url: CFURLRef, options: CFDictionaryRef) -> CGImageSourceRef;
+        fn CGImageSourceGetCount(source: CGImageSourceRef) -> usize;
         fn CGImageSourceCreateImageAtIndex(
             source: CGImageSourceRef,
             index: usize,
@@ -176,6 +189,7 @@ mod imageio {
                 CGImageSourceCreateWithURL(input_url.as_cf(), std::ptr::null()),
                 "图像源",
             )?;
+            require_single_heic_frame(input, CGImageSourceGetCount(source.as_cf()))?;
             let image = CfGuard::new(
                 CGImageSourceCreateImageAtIndex(source.as_cf(), 0, std::ptr::null()),
                 "HEIC 帧",
@@ -276,6 +290,15 @@ mod tests {
         } else {
             assert!(!heic_available());
         }
+    }
+
+    #[test]
+    fn multiframe_heic_is_rejected_before_frame_zero_is_decoded() {
+        let input = Path::new("/tmp/animated.heic");
+        assert!(require_single_heic_frame(input, 1).is_ok());
+        let error = require_single_heic_frame(input, 2).unwrap_err();
+        assert!(error.contains("多帧 HEIC/HEIF 暂不支持"));
+        assert!(error.contains("2 帧"));
     }
 
     #[cfg(not(target_os = "macos"))]
