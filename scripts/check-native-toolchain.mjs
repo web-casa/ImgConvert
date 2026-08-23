@@ -70,7 +70,7 @@ if (options.linuxBundles.length > 0) {
 const failures = [];
 
 for (const check of checks) {
-  const result = runAny(check.commands);
+  const result = runAny(check.commands, check.allowNonZeroExit);
   if (result) {
     console.log(`${check.name}: ${firstLine(result.stdout || result.stderr)}`);
   } else {
@@ -91,13 +91,13 @@ if (failures.length > 0) {
 
 console.log(`native toolchain check passed on ${platform}/${arch}.`);
 
-function runAny(commands) {
+function runAny(commands, allowNonZeroExit = false) {
   for (const [command, args] of commands) {
     const result = spawnSync(command, args, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
-    if (result.status === 0) {
+    if (result.status === 0 || (allowNonZeroExit && Number.isInteger(result.status))) {
       return result;
     }
   }
@@ -129,7 +129,12 @@ function addLinuxBundleChecks(bundles) {
       },
       {
         name: "rpm2cpio",
+        // Ubuntu 22.04's rpm2cpio has no successful no-input invocation:
+        // `--help` prints usage but exits 1. A runnable binary is sufficient;
+        // the release artifact verifier subsequently runs it with an actual
+        // RPM and requires exit status 0.
         commands: [["rpm2cpio", ["--help"]]],
+        allowNonZeroExit: true,
         reason: ".rpm payload extraction for ELF inspection",
       },
       {

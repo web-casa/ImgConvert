@@ -992,7 +992,7 @@ function checkLinux() {
       failures.push(`Linux bundle artifact check missing marker: ${expected}`);
     }
   }
-  for (const expected of ["rpm2cpio", "cpio", "file", "ldd", "readelf"]) {
+  for (const expected of ["rpm2cpio", "allowNonZeroExit", "cpio", "file", "ldd", "readelf"]) {
     if (!toolchainCheck.includes(expected)) {
       failures.push(`Linux native toolchain check missing ${expected}`);
     }
