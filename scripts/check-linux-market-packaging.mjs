@@ -32,6 +32,7 @@ for (const marker of [
   "pkgname=imgconvert-bin",
   "arch=('x86_64')",
   "@VERSION@",
+  "@PACKAGE_URL@",
   "@APPIMAGE_SHA256@",
   "ImgConvert-${pkgver}-x86_64.AppImage",
   "--appimage-extract",

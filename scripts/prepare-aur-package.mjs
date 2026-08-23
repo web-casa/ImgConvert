@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = readJson(path.join(repoRoot, "package.json"));
 const aurSource = path.join(repoRoot, "packaging", "aur");
+const packageUrl = "https://imgconvert.web.casa/";
 const options = {
   artifact: "",
   output: path.join(repoRoot, "target", "aur", "imgconvert-bin"),
@@ -51,6 +52,7 @@ const hashes = {
 };
 const replacements = new Map([
   ["@VERSION@", packageJson.version],
+  ["@PACKAGE_URL@", packageUrl],
   ["@APPIMAGE_SHA256@", hashes.appImage],
   ["@WRAPPER_SHA256@", hashes.wrapper],
   ["@LICENSE_SHA256@", hashes.license],
@@ -89,7 +91,7 @@ function srcinfo(version, checksums) {
 \tpkgdesc = Local-first batch image converter (prebuilt AppImage)
 \tpkgver = ${version}
 \tpkgrel = 1
-\turl = https://github.com/web-casa/ImgConvert
+\turl = ${packageUrl}
 \tarch = x86_64
 \tlicense = Apache-2.0
 \tdepends = bash

@@ -24,11 +24,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.9/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.10/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.10" date="2026-08-24">
+      <description>
+        <p>Keeps AUR package metadata synchronized with the official project website.</p>
+      </description>
+    </release>
     <release version="0.2.9" date="2026-08-23">
       <description>
         <p>Improves conversion path handling and release reliability across supported platforms.</p>
