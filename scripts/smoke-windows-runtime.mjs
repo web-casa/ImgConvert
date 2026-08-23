@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -82,9 +82,6 @@ if (options.buildDirect) {
     buildArgs.splice(2, 0, "--debug");
   }
   run("pnpm", buildArgs, "Windows direct installer build");
-  if (selectedBundles().includes("nsis")) {
-    verifyGeneratedNsisUninstallHook(options.profile);
-  }
   run(
     "node",
     [
@@ -139,44 +136,6 @@ function runPackageConversionSmoke() {
     IMGCONVERT_PACKAGE_CONVERT_SMOKE_FORMATS: "jpeg,webp,png,avif",
     IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR: path.join(tmpRoot, "convert"),
   });
-}
-
-function selectedBundles() {
-  return options.bundles
-    .split(",")
-    .map((bundle) => bundle.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function verifyGeneratedNsisUninstallHook(profile) {
-  const scriptPath = path.join(
-    cargoTargetRoot(),
-    profile,
-    "nsis",
-    expectedWindowsArchitecture(),
-    "installer.nsi",
-  );
-  if (!existsSync(scriptPath)) {
-    fail(`generated NSIS script was not found: ${scriptPath}`);
-  }
-  const script = readFileSync(scriptPath, "utf8");
-  if (!/!include\s+"[^"\r\n]*nsis-hooks\.nsh"/i.test(script)) {
-    fail("generated NSIS script does not include the project uninstall hook");
-  }
-  console.log("generated NSIS uninstall hook source check passed.");
-}
-
-function expectedWindowsArchitecture() {
-  const configured = String(process.env.WINDOWS_STORE_PROCESSOR_ARCHITECTURE ?? "")
-    .trim()
-    .toLowerCase();
-  if (["x64", "arm64"].includes(configured)) {
-    return configured;
-  }
-  if (process.arch === "x64" || process.arch === "arm64") {
-    return process.arch;
-  }
-  fail(`unsupported Windows architecture for NSIS verification: ${process.arch}`);
 }
 
 function run(command, args, label, extraEnv = {}) {

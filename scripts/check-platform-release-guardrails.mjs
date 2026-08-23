@@ -1761,32 +1761,6 @@ function checkWindowsDirectConfig() {
   if (windows.nsis?.displayLanguageSelector !== false) {
     failures.push("Windows direct NSIS config must follow the OS language without a selector");
   }
-  if (windows.nsis?.installerHooks !== "nsis-hooks.nsh") {
-    failures.push("Windows direct NSIS config must use the bounded uninstall cleanup hook");
-    return;
-  }
-  const hooksPath = path.join(srcTauriRoot, windows.nsis.installerHooks);
-  const hooks = readText(hooksPath);
-  for (const expected of [
-    "NSIS_HOOK_PREUNINSTALL",
-    'ReadRegStr $0 HKCU "Software\\ImgConvert contributors\\ImgConvert" ""',
-    "imgconvert_keep_uninstall_directory",
-    "StrCpy $INSTDIR $0",
-    "NSIS_HOOK_POSTUNINSTALL",
-    'IfFileExists "$INSTDIR\\imgconvert.exe"',
-    'Delete "$INSTDIR\\imgconvert.exe"',
-    "Sleep 250",
-    "IntCmp $0 8",
-  ]) {
-    if (!hooks.includes(expected)) {
-      failures.push(`Windows NSIS uninstall cleanup hook missing marker: ${expected}`);
-    }
-  }
-  if (hooks.includes('StrCpy $INSTDIR "$EXEDIR"')) {
-    failures.push(
-      "Windows NSIS uninstall cleanup hook must not overwrite $INSTDIR with NSIS's temporary $EXEDIR",
-    );
-  }
 }
 
 function checkWindowsStoreDocs() {

@@ -69,7 +69,7 @@ tmpRoot = mkdtempSync(path.join(os.tmpdir(), "imgconvert-windows-install-smoke-"
 
 for (const artifact of artifacts) {
   if (artifact.toLowerCase().endsWith(".exe")) {
-    smokeNsisInstaller(artifact);
+    await smokeNsisInstaller(artifact);
   } else if (artifact.toLowerCase().endsWith(".msi")) {
     smokeMsiInstaller(artifact);
   }
@@ -87,7 +87,7 @@ async function removeTemporaryRoot(directory) {
   await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
-function smokeNsisInstaller(installer) {
+async function smokeNsisInstaller(installer) {
   // Keep this intentionally non-ASCII and space-containing. NSIS receives the
   // install directory as a command-line argument, and the app then runs from
   // it, so this catches a common Windows packaging/path regression.
@@ -109,7 +109,7 @@ function smokeNsisInstaller(installer) {
       fail(`NSIS uninstaller was not found under ${installDir}`);
     }
     run(uninstaller, ["/S"], "uninstall NSIS smoke package");
-    assertNoInstalledExecutable([installDir], "NSIS uninstall");
+    await waitForNoInstalledExecutable([installDir], "NSIS uninstall");
   }
 }
 
@@ -156,6 +156,24 @@ function assertNoInstalledExecutable(roots, label) {
       `${label} found an existing ImgConvert.exe and refuses to overwrite or leave it behind: ${candidates.join(", ")}`,
     );
   }
+}
+
+async function waitForNoInstalledExecutable(roots, label) {
+  // Without NSIS's `_?=` argument, the launched uninstaller starts a child
+  // process from a temporary directory and the original process returns
+  // immediately. Wait for that documented handoff to finish before asserting
+  // removal, rather than treating the parent process exit as completion.
+  const timeoutMs = 15_000;
+  const retryDelayMs = 100;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (installedExecutables(roots).length === 0) {
+      console.log(`${label} completed after NSIS child-process handoff.`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+  }
+  assertNoInstalledExecutable(roots, label);
 }
 
 function installedExecutables(roots) {
