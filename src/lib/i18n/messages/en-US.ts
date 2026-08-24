@@ -337,6 +337,7 @@ export const enUS = {
     skippedExisting: "Skipped (output already exists)",
     skippedMessage: "Skipped: {message}",
     outputExists: "Output file already exists:\n{path}",
+    outputBackupRetained: "Converted, but the previous output backup remains: {path}",
     webPreviewEngine: "Web preview · {formats}",
     plugin: "Plugin",
     systemHelper: "System helper",

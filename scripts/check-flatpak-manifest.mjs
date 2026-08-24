@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -219,15 +219,33 @@ function inspectHeicExtensionTemplate() {
 }
 
 function requireArchiveSource(text) {
-  const source = text.match(/^\s*(?<kind>path|url):\s+(?<location>\S+)\s*$/mu);
-  if (!source?.groups) {
+  const mainModule = imgconvertModule(text);
+  if (!mainModule) {
+    failures.push("manifest must define the imgconvert module");
+    return;
+  }
+
+  const archiveEntries = archiveSourceEntries(mainModule);
+  if (archiveEntries.length !== 1) {
+    failures.push(
+      `manifest must define exactly one archive source entry, found ${archiveEntries.length}`,
+    );
+    return;
+  }
+
+  const archiveEntry = archiveEntries[0];
+  const sources = [
+    ...(archiveEntry.fields.get("path") ?? []).map((location) => ({ kind: "path", location })),
+    ...(archiveEntry.fields.get("url") ?? []).map((location) => ({ kind: "url", location })),
+  ];
+  if (sources.length !== 1) {
     failures.push(
       "manifest archive source must point at release:flatpak:prepare output or an HTTPS release archive URL",
     );
     return;
   }
 
-  const { kind, location } = source.groups;
+  const { kind, location } = sources[0];
   const expectedArchiveName = `imgconvert-${packageJson.version}-source.tar.gz`;
   const archiveName = archiveNameFromLocation(kind, location);
   if (archiveName !== expectedArchiveName) {
@@ -249,10 +267,12 @@ function requireArchiveSource(text) {
     }
   }
 
-  const manifestSha = text.match(/^\s*sha256:\s+(?<sha>[a-f0-9]{64})\s*$/mu)?.groups?.sha;
-  if (!manifestSha) {
+  const checksums = archiveEntry.fields.get("sha256") ?? [];
+  if (checksums.length !== 1 || !/^[a-f0-9]{64}$/u.test(checksums[0])) {
+    failures.push("manifest archive source must pin exactly one sha256");
     return;
   }
+  const manifestSha = checksums[0];
 
   const expectedLocalArchive = path.join(
     repoRoot,
@@ -264,9 +284,15 @@ function requireArchiveSource(text) {
   const configuredLocalArchive =
     kind === "path" ? path.resolve(flatpakDir, location) : expectedLocalArchive;
 
-  if (kind === "path" && !isWithinDirectory(repoRoot, configuredLocalArchive)) {
-    failures.push("manifest archive path must stay within the repository");
-    return;
+  if (kind === "path") {
+    if (configuredLocalArchive !== expectedLocalArchive) {
+      failures.push("manifest archive path must be the release:flatpak:prepare output");
+      return;
+    }
+    if (!isWithinDirectory(repoRoot, configuredLocalArchive)) {
+      failures.push("manifest archive path must stay within the repository");
+      return;
+    }
   }
 
   const archiveToVerify =
@@ -286,6 +312,32 @@ function requireArchiveSource(text) {
     }
     return;
   }
+  let archiveStat;
+  try {
+    archiveStat = lstatSync(archiveToVerify);
+  } catch (error) {
+    failures.push(
+      `cannot inspect Flatpak source archive ${path.relative(repoRoot, archiveToVerify)}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
+  if (archiveStat.isSymbolicLink()) {
+    failures.push(
+      `Flatpak source archive must not be a symbolic link: ${path.relative(repoRoot, archiveToVerify)}`,
+    );
+    return;
+  }
+  try {
+    if (!isWithinDirectory(realpathSync(repoRoot), realpathSync(archiveToVerify))) {
+      failures.push("Flatpak source archive must resolve inside the repository");
+      return;
+    }
+  } catch (error) {
+    failures.push(
+      `cannot resolve Flatpak source archive ${path.relative(repoRoot, archiveToVerify)}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return;
+  }
   const actualSha = sha256File(archiveToVerify);
   if (actualSha !== manifestSha) {
     failures.push(
@@ -294,6 +346,140 @@ function requireArchiveSource(text) {
     return;
   }
   inspectArchiveVersions(archiveToVerify);
+}
+
+function imgconvertModule(text) {
+  const lines = text.split(/\r?\n/u);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const start = lines[index].match(/^(?<indent>[ \t]*)-\s*(?<inline>.*)$/u);
+    if (!start?.groups) {
+      continue;
+    }
+    const indent = start.groups.indent.length;
+    let end = index + 1;
+    while (end < lines.length && !endsYamlEntry(lines[end], indent)) {
+      end += 1;
+    }
+    const fields = yamlEntryFields(lines, index, end, indent, start.groups.inline);
+    if ((fields.get("name") ?? []).includes("imgconvert")) {
+      return lines.slice(index, end).join("\n");
+    }
+  }
+
+  return "";
+}
+
+function archiveSourceEntries(text) {
+  const lines = text.split(/\r?\n/u);
+  const entries = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const start = lines[index].match(/^(?<indent>[ \t]*)-\s*(?<inline>.*)$/u);
+    if (!start?.groups) {
+      continue;
+    }
+
+    const indent = start.groups.indent.length;
+    let end = index + 1;
+    while (end < lines.length && !endsYamlEntry(lines[end], indent)) {
+      end += 1;
+    }
+
+    const fields = yamlEntryFields(lines, index, end, indent, start.groups.inline);
+
+    if ((fields.get("type") ?? []).includes("archive")) {
+      entries.push({ fields });
+    }
+  }
+
+  return entries;
+}
+
+function yamlEntryFields(lines, index, end, entryIndent, inline) {
+  const fields = new Map();
+  addArchiveField(fields, inline);
+  const directIndent = smallestDirectFieldIndent(lines.slice(index + 1, end), entryIndent);
+  if (directIndent !== null) {
+    for (const line of lines.slice(index + 1, end)) {
+      if (leadingIndent(line) === directIndent) {
+        addArchiveField(fields, line.trim());
+      }
+    }
+  }
+  return fields;
+}
+
+function endsYamlEntry(line, entryIndent) {
+  const trimmed = line.trim();
+  return !!trimmed && !trimmed.startsWith("#") && leadingIndent(line) <= entryIndent;
+}
+
+function smallestDirectFieldIndent(lines, entryIndent) {
+  const indents = lines
+    .filter((line) => directArchiveField(line.trim()))
+    .map(leadingIndent)
+    .filter((indent) => indent > entryIndent);
+  return indents.length > 0 ? Math.min(...indents) : null;
+}
+
+function addArchiveField(fields, text) {
+  const field = directArchiveField(text);
+  if (!field) {
+    return;
+  }
+  const values = fields.get(field.key) ?? [];
+  values.push(normalizeYamlScalar(field.value));
+  fields.set(field.key, values);
+}
+
+function directArchiveField(text) {
+  const match = text.match(/^(?<key>[A-Za-z0-9_-]+):[ \t]*(?<value>.*)$/u);
+  if (!match?.groups) {
+    return null;
+  }
+  return { ...match.groups, value: stripYamlComment(match.groups.value) };
+}
+
+function stripYamlComment(value) {
+  let quote = "";
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote) {
+      if (character === quote) {
+        if (quote === "'" && value[index + 1] === "'") {
+          index += 1;
+        } else {
+          quote = "";
+        }
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "#" && (index === 0 || /[ \t]/u.test(value[index - 1]))) {
+      return value.slice(0, index);
+    }
+  }
+  return value;
+}
+
+function normalizeYamlScalar(value) {
+  const trimmed = value.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function leadingIndent(line) {
+  return line.match(/^[ \t]*/u)?.[0].length ?? 0;
 }
 
 function archiveNameFromLocation(kind, location) {
@@ -322,7 +508,7 @@ function sha256File(file) {
 }
 
 function inspectArchiveVersions(archivePath) {
-  const archivedPackageJson = readArchiveMember(archivePath, "./package.json");
+  const archivedPackageJson = readArchiveMember(archivePath, "package.json");
   if (!archivedPackageJson) {
     return;
   }
@@ -339,13 +525,11 @@ function inspectArchiveVersions(archivePath) {
     );
   }
 
-  const archivedCargoToml = readArchiveMember(archivePath, "./src-tauri/Cargo.toml");
+  const archivedCargoToml = readArchiveMember(archivePath, "src-tauri/Cargo.toml");
   if (!archivedCargoToml) {
     return;
   }
-  const archivedCargoVersion = archivedCargoToml.match(
-    /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"\s*$/mu,
-  )?.[1];
+  const archivedCargoVersion = cargoPackageVersion(archivedCargoToml);
   if (archivedCargoVersion !== packageJson.version) {
     failures.push(
       `Flatpak source archive Cargo.toml version ${archivedCargoVersion ?? "<missing>"} does not match ${packageJson.version}`,
@@ -354,18 +538,48 @@ function inspectArchiveVersions(archivePath) {
 }
 
 function readArchiveMember(archivePath, member) {
-  const result = spawnSync("tar", ["-xOzf", archivePath, member], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.status !== 0) {
-    failures.push(
-      `cannot read ${member} from Flatpak source archive: ${(result.stderr || result.stdout).trim()}`,
-    );
-    return "";
+  const normalized = member.replace(/^\.\//u, "");
+  let detail = "";
+  // Flatpak extracts this archive directly into the module build directory, so the files must
+  // live at its root. Support both common tar spellings without listing the vendored archive,
+  // whose file list is intentionally large enough to exceed spawnSync's default buffer.
+  for (const archiveMember of [`./${normalized}`, normalized]) {
+    const result = spawnSync("tar", ["-xOzf", archivePath, archiveMember], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    if (!result.error && result.status === 0) {
+      return String(result.stdout);
+    }
+    detail = commandFailureDetail(result);
   }
-  return result.stdout;
+  failures.push(`cannot read ${normalized} from Flatpak source archive: ${detail || "tar failed"}`);
+  return "";
+}
+
+function commandFailureDetail(result) {
+  return String(result.error?.message ?? result.stderr ?? result.stdout ?? "").trim();
+}
+
+function cargoPackageVersion(text) {
+  let inPackage = false;
+  for (const line of text.split(/\r?\n/u)) {
+    if (line.trim() === "[package]") {
+      inPackage = true;
+      continue;
+    }
+    if (inPackage && /^\[[^\]]+\]\s*$/u.test(line)) {
+      break;
+    }
+    if (inPackage) {
+      const version = line.match(/^version\s*=\s*"(?<version>[^"]+)"\s*$/u);
+      if (version?.groups?.version) {
+        return version.groups.version;
+      }
+    }
+  }
+  return null;
 }
 
 function inspectDesktop(text) {

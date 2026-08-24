@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -78,7 +78,7 @@ run(
   [
     "scripts/generate-linux-release-checksums.mjs",
     `--profile=${options.profile}`,
-    `--bundles=${availableChecksumBundles().join(",")}`,
+    "--bundles=appimage",
   ],
   updaterEnv,
 );
@@ -197,34 +197,6 @@ function defaultRepository() {
 
 function defaultKeyPath() {
   return path.join(os.homedir(), ".tauri", "imgconvert-updater.key");
-}
-
-function availableChecksumBundles() {
-  const bundleRoot = path.join(repoRoot, "src-tauri", "target", options.profile, "bundle");
-  const bundleExtensions = {
-    deb: ".deb",
-    rpm: ".rpm",
-    appimage: ".AppImage",
-  };
-  return Object.entries(bundleExtensions)
-    .filter(([bundle, extension]) => hasArtifact(path.join(bundleRoot, bundle), extension))
-    .map(([bundle]) => bundle);
-}
-
-function hasArtifact(dir, extension) {
-  if (!existsSync(dir)) {
-    return false;
-  }
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const entryPath = path.join(dir, entry.name);
-    if (entry.isDirectory() && hasArtifact(entryPath, extension)) {
-      return true;
-    }
-    if (entry.isFile() && entry.name.endsWith(extension) && statSync(entryPath).size > 0) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function expandHome(value) {

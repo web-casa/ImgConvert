@@ -87,6 +87,10 @@ jobs:
           TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
           TAURI_UPDATER_ENDPOINTS: '["https://github.com/${{ github.repository }}/releases/latest/download/latest.json"]'
         run: pnpm run release:linux:updater
+      - name: Cryptographically verify updater signatures
+        env:
+          TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+        run: pnpm run release:updater:signature:verify
       - name: Generate latest.json
         env:
           TAURI_UPDATER_ARTIFACT_BASE_URL: https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}
@@ -135,11 +139,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: imgconvert-updater-linux-${{ inputs.tag }}
           path: release-assets
-      - name: Verify release asset set
+      - name: Verify and stage release assets
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -153,6 +166,7 @@ jobs:
             'src-tauri/target/release/bundle/appimage/*.AppImage.sig'
             'src-tauri/target/release/bundle/SHA256SUMS'
           )
+          publishable=()
           for pattern in "${required[@]}"; do
             matches=()
             mapfile -t matches < <(compgen -G "release-assets/$pattern" || true)
@@ -160,7 +174,93 @@ jobs:
               echo "Expected exactly one non-empty release asset for $pattern" >&2
               exit 1
             fi
+            if [ "${pattern##*/}" != "SHA256SUMS" ]; then
+              publishable+=("${matches[0]}")
+            fi
           done
+          for checksum in \
+            release-assets/target/appimagehub/SHA256SUMS \
+            release-assets/src-tauri/target/release/bundle/SHA256SUMS; do
+            (
+              cd "$(dirname "$checksum")"
+              sha256sum --check --strict "$(basename "$checksum")"
+            )
+          done
+
+          release_dir='release-publish-assets'
+          mkdir "$release_dir"
+          for source in "${publishable[@]}"; do
+            asset_name="$(basename "$source")"
+            destination="$release_dir/$asset_name"
+            if [ -e "$destination" ]; then
+              echo "Release asset basename collision: $asset_name" >&2
+              exit 1
+            fi
+            cp "$source" "$destination"
+          done
+
+          python3 - "$RELEASE_TAG" "$RELEASE_REPOSITORY" "$release_dir/latest.json" "$release_dir" <<'PY'
+          import json
+          from pathlib import Path
+          from sys import argv
+          from urllib.parse import quote, unquote, urlparse
+
+          tag, repository, manifest_path, release_dir = argv[1:]
+          expected_version = tag.removeprefix("v")
+          manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+          if manifest.get("version") != expected_version:
+              raise SystemExit(
+                  f"latest.json version {manifest.get('version')!r} does not match {expected_version!r}"
+              )
+          platform = manifest.get("platforms", {}).get("linux-x86_64")
+          if not isinstance(platform, dict):
+              raise SystemExit("latest.json is missing the linux-x86_64 updater platform")
+          updater_url = urlparse(str(platform.get("url", "")))
+          artifact_name = unquote(updater_url.path.rsplit("/", 1)[-1])
+          if not artifact_name or Path(artifact_name).name != artifact_name:
+            raise SystemExit("latest.json updater URL does not name a safe release asset")
+          expected_path = f"/{repository}/releases/download/{tag}/{quote(artifact_name, safe='')}"
+          if (
+              updater_url.scheme != "https"
+              or updater_url.netloc != "github.com"
+              or updater_url.path != expected_path
+              or updater_url.params
+              or updater_url.query
+              or updater_url.fragment
+          ):
+              raise SystemExit("latest.json updater URL does not match this release")
+          artifact = Path(release_dir, artifact_name)
+          signature = Path(f"{artifact}.sig")
+          if not artifact.is_file() or not signature.is_file():
+              raise SystemExit(f"latest.json updater asset or signature is missing: {artifact_name}")
+          if signature.read_text(encoding="utf-8").strip() != str(platform.get("signature", "")).strip():
+              raise SystemExit(f"latest.json signature does not match {signature.name}")
+          Path(release_dir, "updater-artifact.txt").write_text(f"{artifact_name}\n", encoding="utf-8")
+          PY
+
+          (
+            cd "$release_dir"
+            sha256sum -- latest.json *.AppImage *.AppImage.sig > SHA256SUMS
+            sha256sum --check --strict SHA256SUMS
+          )
+      - name: Re-verify staged updater signature
+        env:
+          TAURI_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r artifact_name < release-publish-assets/updater-artifact.txt
+          case "$artifact_name" in
+            *.AppImage) ;;
+            *) echo "Invalid staged updater artifact name: $artifact_name" >&2; exit 1 ;;
+          esac
+          verifier_dir='release-updater-verification'
+          mkdir -p "$verifier_dir"
+          cp "release-publish-assets/$artifact_name" "$verifier_dir/$artifact_name"
+          cp "release-publish-assets/$artifact_name.sig" "$verifier_dir/$artifact_name.sig"
+          cargo +1.96.0 run --locked --quiet \
+            --manifest-path tools/updater-signature-verifier/Cargo.toml \
+            -- --bundle-root="$verifier_dir"
       - name: Publish GitHub Release assets
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
@@ -169,10 +269,7 @@ jobs:
           prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: true
           files: |
-            release-assets/target/updater/latest.json
-            release-assets/target/appimagehub/*.AppImage
-            release-assets/target/appimagehub/*.AppImage.sig
-            release-assets/target/appimagehub/SHA256SUMS
-            release-assets/src-tauri/target/release/bundle/appimage/*.AppImage
-            release-assets/src-tauri/target/release/bundle/appimage/*.AppImage.sig
-            release-assets/src-tauri/target/release/bundle/SHA256SUMS
+            release-publish-assets/latest.json
+            release-publish-assets/*.AppImage
+            release-publish-assets/*.AppImage.sig
+            release-publish-assets/SHA256SUMS

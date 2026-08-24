@@ -499,6 +499,12 @@ function checkFuzzCorpusGuardrails() {
 function checkTauriUpdaterGuardrails() {
   const packageScripts = packageJson.scripts ?? {};
   const packageDependencies = packageJson.dependencies ?? {};
+  const updaterVerifierManifest = path.join(
+    repoRoot,
+    "tools",
+    "updater-signature-verifier",
+    "Cargo.toml",
+  );
   const tauriCargo = readText(path.join(repoRoot, "src-tauri", "Cargo.toml"));
   const tauriLib = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));
   const tauriBuild = readText(path.join(repoRoot, "src-tauri", "build.rs"));
@@ -544,6 +550,25 @@ function checkTauriUpdaterGuardrails() {
   }
   if (!packageScripts["release:updater:verify"]?.includes("check-tauri-updater-manifest.mjs")) {
     failures.push("package.json must expose release:updater:verify");
+  }
+  if (
+    !packageScripts["release:updater:signature:verify"]?.includes(
+      "tools/updater-signature-verifier/Cargo.toml",
+    )
+  ) {
+    failures.push(
+      "package.json must verify updater signatures with the standalone release verifier",
+    );
+  }
+  if (!existsSync(updaterVerifierManifest)) {
+    failures.push("standalone updater signature verifier Cargo.toml is required");
+  } else {
+    const verifierCargo = readText(updaterVerifierManifest);
+    for (const dependency of ["base64", "minisign-verify"]) {
+      if (!verifierCargo.includes(dependency)) {
+        failures.push(`standalone updater signature verifier must depend on ${dependency}`);
+      }
+    }
   }
   if (!packageScripts["release:updater:smoke"]?.includes("smoke-tauri-updater-release.mjs")) {
     failures.push("package.json must expose release:updater:smoke");
@@ -718,10 +743,21 @@ function checkTauriUpdaterGuardrails() {
     "TAURI_SIGNING_PRIVATE_KEY",
     "releases/latest/download/latest.json",
     "release:updater:verify",
+    "release:updater:signature:verify",
+    "Cryptographically verify updater signatures",
     "IMGCONVERT_PACKAGE_CONVERT_SMOKE",
     "softprops/action-gh-release",
     "target/appimagehub/*.AppImage.sig",
     "target/appimagehub/SHA256SUMS",
+    "release-publish-assets/SHA256SUMS",
+    "Re-verify staged updater signature",
+    "updater-artifact.txt",
+    "tools/updater-signature-verifier/Cargo.toml",
+    '--bundle-root="$verifier_dir"',
+    "Release asset basename collision",
+    "sha256sum --check --strict",
+    "latest.json signature does not match",
+    "latest.json updater URL does not match this release",
     "persist-credentials: false",
   ]) {
     if (!updaterWorkflow.includes(expected)) {

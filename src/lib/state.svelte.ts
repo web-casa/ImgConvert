@@ -143,7 +143,12 @@ export interface ConvertResult {
   output: string;
   inSize: number;
   outSize: number;
+  warning?: ConvertWarning | null;
 }
+export type ConvertWarning = {
+  code: "previousOutputBackupRetained";
+  path: string;
+};
 export interface ImportScanError {
   path: string;
   error: CommandError;
@@ -1808,7 +1813,11 @@ function finalizeCancelledJobs(jobs: BatchJob[]) {
 
 function formatResultDetail(res: ConvertResult): string {
   const ratio = res.inSize > 0 ? Math.round((1 - res.outSize / res.inSize) * 100) : 0;
-  return `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
+  const detail = `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
+  if (res.warning?.code === "previousOutputBackupRetained") {
+    return `${detail} · ${translate("state.outputBackupRetained", { path: res.warning.path })}`;
+  }
+  return detail;
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {

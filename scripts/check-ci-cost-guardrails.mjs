@@ -320,6 +320,14 @@ function checkUpdaterReleaseWorkflow() {
     if (buildJob.includes("softprops/action-gh-release")) {
       failures.push("release-updater.yml must not publish from the signing build job");
     }
+    for (const marker of [
+      "Cryptographically verify updater signatures",
+      "pnpm run release:updater:signature:verify",
+    ]) {
+      if (!buildJob.includes(marker)) {
+        failures.push(`release-updater.yml build job missing signature verification: ${marker}`);
+      }
+    }
   }
   if (!publishJob) {
     failures.push("release-updater.yml must publish from a separate publish-release job");
@@ -330,8 +338,18 @@ function checkUpdaterReleaseWorkflow() {
       "contents: write",
       "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
       "softprops/action-gh-release",
-      "release-assets/target/updater/latest.json",
+      "release-publish-assets/latest.json",
+      "release-publish-assets/SHA256SUMS",
       "release-assets/target/appimagehub/SHA256SUMS",
+      "Re-verify staged updater signature",
+      "updater-artifact.txt",
+      "tools/updater-signature-verifier/Cargo.toml",
+      '--bundle-root="$verifier_dir"',
+      "Release asset basename collision",
+      "sha256sum --check --strict",
+      "latest.json signature does not match",
+      "latest.json updater URL does not match this release",
+      "RELEASE_REPOSITORY",
     ]) {
       if (!publishJob.includes(marker)) {
         failures.push(`release-updater.yml publish-release job missing marker: ${marker}`);
@@ -340,6 +358,11 @@ function checkUpdaterReleaseWorkflow() {
     if (publishJob.includes("TAURI_SIGNING_PRIVATE_KEY")) {
       failures.push(
         "release-updater.yml publish-release job must not receive the updater signing key",
+      );
+    }
+    if (!publishJob.includes("TAURI_UPDATER_PUBKEY")) {
+      failures.push(
+        "release-updater.yml publish-release job must re-verify staged updater artifacts with the public key",
       );
     }
   }
@@ -352,6 +375,11 @@ function checkUpdaterReleaseWorkflow() {
   }
   if (!updaterRelease.includes("pnpm run release:updater:verify")) {
     failures.push("release-updater.yml must verify latest.json before upload");
+  }
+  if (!updaterRelease.includes("pnpm run release:updater:signature:verify")) {
+    failures.push(
+      "release-updater.yml must cryptographically verify updater artifacts before upload",
+    );
   }
   if (!updaterRelease.includes("inputs.publish_release")) {
     failures.push("release-updater.yml publishing must be gated by publish_release");

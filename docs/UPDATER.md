@@ -84,15 +84,20 @@ pre-scrub artifact. The verify step checks that `latest.json` points at the
 final local artifact and that each manifest signature matches the adjacent
 `.sig` file.
 
-Upload these files to the GitHub Release:
+The build verifies each updater signature cryptographically with the configured
+Tauri public key. It then produces checksum manifests in two different
+directories. The publication job verifies both of them, ensures `latest.json`
+uses this repository and release tag, rejects duplicate GitHub asset names, then
+stages the following flat asset set for the GitHub Release:
 
-- `target/updater/latest.json`
-- `target/appimagehub/ImgConvert-<version>-x86_64.AppImage`
-- `target/appimagehub/ImgConvert-<version>-x86_64.AppImage.sig`
-- `target/appimagehub/SHA256SUMS`
-- `src-tauri/target/release/bundle/appimage/*.AppImage`
-- `src-tauri/target/release/bundle/appimage/*.AppImage.sig`
-- `src-tauri/target/release/bundle/SHA256SUMS`
+- `latest.json`
+- `ImgConvert-<version>-x86_64.AppImage` and its `.sig`
+- the Tauri updater AppImage and its `.sig`
+- one merged `SHA256SUMS`, covering `latest.json` and every published AppImage
+  and signature
+
+Do not attach both build-time files named `SHA256SUMS` directly: GitHub Release
+asset names are flat, so the later upload would overwrite the earlier one.
 
 Before uploading the first GitHub Releases batch, run the local read-only gate:
 
@@ -162,7 +167,11 @@ already passed the same hidden conversion smoke used by Linux package tests.
 The signing build job has read-only repository access and does not persist its
 checkout credential. A separate job downloads the already-built artifact and
 receives the narrowly scoped `contents: write` permission only while creating
-the GitHub Release.
+the GitHub Release. Before that job can publish, it verifies the build-time
+checksums, checks that `latest.json` names the exact signed Linux AppImage for
+this repository and tag, re-verifies that staged updater artifact with the
+configured public key, and generates the merged checksum manifest over the
+staged release assets.
 
 ## Store channels
 

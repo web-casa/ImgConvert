@@ -1,0 +1,16 @@
+[package]
+name = "imgconvert-updater-signature-verifier"
+version = "0.1.0"
+description = "Release-time verifier for ImgConvert Tauri updater signatures"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+# This release utility deliberately remains outside the application workspace.
+# It can therefore compile in the write-permission publishing job without the
+# Tauri GUI toolchain, native WebKit dependencies, or a frontend build.
+[workspace]
+
+[dependencies]
+base64 = "0.22"
+minisign-verify = "0.2.5"

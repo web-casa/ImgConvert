@@ -323,6 +323,7 @@ export const zhCN = {
     skippedExisting: "已跳过（输出已存在）",
     skippedMessage: "已跳过：{message}",
     outputExists: "输出文件已存在：\n{path}",
+    outputBackupRetained: "转换完成，但原输出备份仍保留在：{path}",
     webPreviewEngine: "网页预览 · {formats}",
     plugin: "插件",
     systemHelper: "系统 helper",

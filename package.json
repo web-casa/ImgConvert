@@ -70,6 +70,7 @@
     "release:updater:sign": "node scripts/sign-tauri-updater-artifacts.mjs",
     "release:updater:manifest": "node scripts/generate-tauri-updater-manifest.mjs",
     "release:updater:verify": "node scripts/check-tauri-updater-manifest.mjs",
+    "release:updater:signature:verify": "cargo +1.96.0 run --locked --quiet --manifest-path tools/updater-signature-verifier/Cargo.toml -- --profile=release",
     "release:updater:smoke": "node scripts/smoke-tauri-updater-release.mjs",
     "release:updater:upgrade-smoke": "node scripts/smoke-tauri-in-app-updater.mjs --require-gui",
     "release:updater:upgrade-smoke:eligibility": "node scripts/smoke-tauri-in-app-updater.mjs --eligibility-only",
@@ -122,7 +123,7 @@
     "release:windows:msix:smoke": "node scripts/smoke-windows-msix.mjs",
     "release:store-env:check": "node scripts/check-platform-release-guardrails.mjs --platform=all --channel=store --require-store-env",
     "quality:frontend": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm deadcode && pnpm test && pnpm build && pnpm check:ui-i18n && pnpm run docs:web:check",
-    "quality:rust": "pnpm run toolchain:check && cargo fmt --check && cargo clippy -p imgconvert-core -- -D warnings && cargo test -p imgconvert-core && cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check && cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml",
+    "quality:rust": "pnpm run toolchain:check && cargo fmt --check && cargo clippy -p imgconvert-core -- -D warnings && cargo test -p imgconvert-core && cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check && cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml && cargo +1.96.0 fmt --manifest-path tools/updater-signature-verifier/Cargo.toml --check && cargo +1.96.0 clippy --manifest-path tools/updater-signature-verifier/Cargo.toml -- -D warnings && cargo +1.96.0 test --manifest-path tools/updater-signature-verifier/Cargo.toml",
     "quality:security": "pnpm run docs:check && pnpm run architecture:check && pnpm run ci:cost:check && pnpm run release:linux:markets:check && pnpm run release:flatpak:verify && pnpm run license:check && cd src-tauri && cargo deny --manifest-path ../Cargo.toml check bans sources && cargo deny check bans sources",
     "tauri": "tauri",
     "check:ui-i18n": "node scripts/check-ui-hardcoded-strings.mjs"

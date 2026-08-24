@@ -150,6 +150,7 @@
     <div class="min-h-8">
       {#if item.detail}
         <div
+          title={item.detail}
           class="line-clamp-2 text-xs {item.status === 'error'
             ? 'text-destructive'
             : 'text-muted-foreground'}"
