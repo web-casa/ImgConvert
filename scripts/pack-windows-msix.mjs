@@ -5,6 +5,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -174,18 +175,71 @@ function packMsix() {
   if (!existsSync(output) || statSync(output).size === 0) {
     fail("makeappx.exe reported success but the .msix artifact is missing or empty");
   }
-  const validation = spawnSync(makeappx, ["validate", "/p", output], {
-    cwd: repoRoot,
-    env: process.env,
-    stdio: "inherit",
-  });
-  if (validation.error) {
-    fail(`makeappx.exe validate failed to start: ${validation.error.message}`);
-  }
-  if (validation.status !== 0) {
-    fail(`makeappx.exe validate failed with exit code ${validation.status ?? 1}`);
-  }
+  inspectPackedMsix(makeappx, output, manifest, architecture);
   console.log(`packed ${path.relative(repoRoot, output)}`);
+}
+
+function inspectPackedMsix(makeappx, output, expectedManifest, expectedArchitecture) {
+  // MakeAppx has no `validate` command. Round-tripping the package through its
+  // documented `unpack` command verifies that the generated archive can be
+  // read, then lets us verify the manifest and executable inside the package.
+  const inspectionRoot = mkdtempSync(path.join(os.tmpdir(), "imgconvert-msix-inspection-"));
+  const inspectionDir = path.join(inspectionRoot, "unpacked");
+
+  try {
+    const unpack = spawnSync(makeappx, ["unpack", "/p", output, "/d", inspectionDir], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: "inherit",
+    });
+    if (unpack.error) {
+      fail(`makeappx.exe unpack failed to start: ${unpack.error.message}`);
+    }
+    if (unpack.status !== 0) {
+      fail(`makeappx.exe unpack failed with exit code ${unpack.status ?? 1}`);
+    }
+
+    const packagedManifestPath = path.join(inspectionDir, "AppxManifest.xml");
+    if (!existsSync(packagedManifestPath)) {
+      fail("unpacked MSIX does not contain AppxManifest.xml");
+    }
+    const packagedManifest = readFileSync(packagedManifestPath, "utf8");
+    for (const attribute of ["Name", "Publisher", "Version", "ProcessorArchitecture"]) {
+      const expected = manifestIdentityValue(expectedManifest, attribute);
+      const actual = manifestIdentityValue(packagedManifest, attribute);
+      if (actual !== expected) {
+        fail(
+          `packed MSIX Identity ${attribute} does not match the prepared manifest: expected ${expected}, got ${actual}`,
+        );
+      }
+    }
+
+    const packagedExecutable = path.join(inspectionDir, "ImgConvert.exe");
+    if (!existsSync(packagedExecutable)) {
+      fail("unpacked MSIX does not contain ImgConvert.exe");
+    }
+    const executableArchitecture = peProcessorArchitecture(packagedExecutable);
+    if (executableArchitecture !== expectedArchitecture) {
+      fail(
+        `packed MSIX ImgConvert.exe architecture does not match the manifest: expected ${expectedArchitecture}, got ${executableArchitecture}`,
+      );
+    }
+
+    for (const asset of STORE_ASSETS) {
+      const packagedAsset = path.join(inspectionDir, "Assets", asset.file);
+      if (!existsSync(packagedAsset)) {
+        fail(`unpacked MSIX does not contain Store asset ${asset.file}`);
+      }
+      const size = pngSize(packagedAsset);
+      if (size.width !== asset.width || size.height !== asset.height) {
+        fail(
+          `packed Store asset ${asset.file} must be ${asset.width}x${asset.height}, got ${size.width}x${size.height}`,
+        );
+      }
+    }
+  } finally {
+    rmSync(inspectionRoot, { recursive: true, force: true });
+  }
 }
 
 function manifestIdentityValue(manifest, attribute) {

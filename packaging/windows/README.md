@@ -94,7 +94,9 @@ and reject any mismatch between the manifest and the PE machine type of
 `release:windows:msix` prepares the Store manifest and a Store Tauri
 config, runs `tauri build --ci --no-bundle`, validates the Store assets in `src-tauri/icons`, stages
 `src-tauri/target/windows-msix/layout`, and packs
-`ImgConvert_<version>_<x64|arm64>.msix` with `makeappx.exe`. Use
+`ImgConvert_<version>_<x64|arm64>.msix` with `makeappx.exe`. It then unpacks
+the generated package with the documented `makeappx unpack` command and checks
+the packaged identity, PE architecture, and Store assets. Use
 `release:windows:msix:pack` to repack an already-built binary.
 
 Sideload install smoke first copies the MSIX into a temporary directory, then
@@ -114,6 +116,15 @@ builds each native submission `.msix` with external codecs and Tauri updater dis
 runs the sideload smoke against a temporary copy, then uploads the untouched
 architecture-specific `imgconvert-windows-<arch>-msix-submission` artifacts. It never attaches MSIX to a
 GitHub Release or creates a Partner Center submission.
+
+The workflow itself must be dispatched from the default branch. If an older,
+already-public app tag contains the retired `makeappx validate` invocation, the
+workflow first verifies that tag, then replaces only the host-side
+`scripts/pack-windows-msix.mjs` from the immutable workflow commit. It logs the
+tag commit and tooling commit, rejects any broader working-tree change, and
+still compiles the application binary from the selected tag. This narrowly
+scoped compatibility path avoids mutating a public release tag while keeping
+the package inspection implementation current.
 
 For a real hosted-runner install smoke, manually dispatch `Windows Smoke` with
 `store_msix=true`. That path uses the isolated `ImgConvert.DevSmoke` identity,

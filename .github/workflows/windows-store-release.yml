@@ -60,6 +60,16 @@ jobs:
     env:
       WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${{ matrix.arch }}
     steps:
+      - name: Verify trusted workflow ref
+        shell: pwsh
+        env:
+          IMGCONVERT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $expectedRef = "refs/heads/$env:IMGCONVERT_DEFAULT_BRANCH"
+          if ($env:GITHUB_REF -ne $expectedRef) {
+            throw "Windows Store MSIX must be dispatched from $expectedRef, got $env:GITHUB_REF"
+          }
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.release_tag }}
@@ -70,6 +80,38 @@ jobs:
         env:
           IMGCONVERT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: node scripts/verify-release-tag.mjs --tag="$env:IMGCONVERT_RELEASE_TAG"
+
+      - name: Restore reviewed Store packaging tooling for a legacy release tag
+        shell: pwsh
+        env:
+          IMGCONVERT_WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          $legacyInvocation = '["validate", "/p", output]'
+          $sourceScript = Get-Content -Raw scripts/pack-windows-msix.mjs
+          $sourceCommit = git rev-parse HEAD
+          if (-not $sourceScript.Contains($legacyInvocation)) {
+            Write-Host "Store packaging tooling is part of the verified release tag at $sourceCommit."
+            exit 0
+          }
+
+          $toolingCommit = $env:IMGCONVERT_WORKFLOW_SHA
+          if ($toolingCommit -notmatch '^[0-9a-f]{40}$') {
+            throw "Workflow tooling commit is not a full immutable Git SHA: $toolingCommit"
+          }
+          $toolingSpec = "${toolingCommit}:scripts/pack-windows-msix.mjs"
+          git cat-file -e $toolingSpec
+          git restore --source=$toolingCommit -- scripts/pack-windows-msix.mjs
+
+          $reviewedScript = Get-Content -Raw scripts/pack-windows-msix.mjs
+          if ($reviewedScript.Contains($legacyInvocation) -or -not $reviewedScript.Contains("inspectPackedMsix")) {
+            throw "Reviewed workflow tooling does not provide supported MSIX package inspection"
+          }
+          $changedFiles = @(git diff --name-only)
+          if ($changedFiles.Count -ne 1 -or $changedFiles[0] -ne "scripts/pack-windows-msix.mjs") {
+            throw "Legacy tooling compatibility may only replace scripts/pack-windows-msix.mjs; got: $($changedFiles -join ', ')"
+          }
+          Write-Host "Verified app source tag commit: $sourceCommit"
+          Write-Host "Applied reviewed host-side packaging tooling from workflow commit: $toolingCommit"
 
       - name: Verify ARM64-aware Store packaging source
         if: ${{ matrix.arch == 'arm64' }}

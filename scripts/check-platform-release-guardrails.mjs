@@ -1879,9 +1879,33 @@ function checkWindowsStoreDocs() {
     }
   }
   const msixPack = readText(path.join(repoRoot, "scripts", "pack-windows-msix.mjs"));
-  for (const expected of ["peProcessorArchitecture", "MSIX architecture mismatch"]) {
+  for (const expected of [
+    "peProcessorArchitecture",
+    "MSIX architecture mismatch",
+    "inspectPackedMsix",
+    '["unpack", "/p", output, "/d", inspectionDir]',
+    "packed MSIX Identity",
+    "packed MSIX ImgConvert.exe architecture",
+  ]) {
     if (!msixPack.includes(expected)) {
       failures.push(`pack-windows-msix.mjs must verify executable architecture: ${expected}`);
+    }
+  }
+  if (msixPack.includes('["validate", "/p", output]')) {
+    failures.push("pack-windows-msix.mjs must not call unsupported makeappx validate");
+  }
+  const windowsStoreWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "windows-store-release.yml"),
+  );
+  for (const expected of [
+    "Verify trusted workflow ref",
+    "refs/heads/$env:IMGCONVERT_DEFAULT_BRANCH",
+    "Restore reviewed Store packaging tooling for a legacy release tag",
+    "git restore --source=$toolingCommit -- scripts/pack-windows-msix.mjs",
+    "Legacy tooling compatibility may only replace scripts/pack-windows-msix.mjs",
+  ]) {
+    if (!windowsStoreWorkflow.includes(expected)) {
+      failures.push(`Windows Store MSIX workflow must preserve legacy tooling safety: ${expected}`);
     }
   }
   const windowsWorkflow = readText(

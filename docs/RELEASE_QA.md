@@ -42,8 +42,9 @@ The release workflows additionally enforce these checks:
   Developer ID or MAS signing authority, notarization/Gatekeeper where
   applicable, and no linked `libheif`/`libx265`.
 - Windows: PE machine type before packaging, MSIX manifest/package executable
-  agreement, `makeappx validate`, Authenticode verification for signed
-  installers, and installed-binary architecture checks.
+  agreement, `makeappx pack` followed by `makeappx unpack` package inspection,
+  Authenticode verification for signed installers, and installed-binary
+  architecture checks.
 - Linux: ELF architecture and dynamic-library checks for every packaged ELF,
   GLIBC baseline, metadata checks, and Docker package smokes on Ubuntu 24.04,
   Debian 13, Fedora 42, and the Ubuntu 22.04 AppImageHub baseline.
