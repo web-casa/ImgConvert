@@ -4,12 +4,14 @@
 import { mount } from "svelte";
 import "./app.css";
 import App from "./App.svelte";
-import { initI18n } from "$lib/i18n";
 
-await initI18n();
+const target = document.getElementById("app");
+if (!target) {
+  throw new Error("ImgConvert root element is missing");
+}
 
 const app = mount(App, {
-  target: document.getElementById("app")!,
+  target,
 });
 
 export default app;

@@ -13,6 +13,7 @@ import {
 } from "$lib/command-error";
 import {
   locale as localeStore,
+  navigatorLocale,
   setAppLocale,
   systemLocale,
   translate,
@@ -1954,8 +1955,9 @@ export function applyTheme() {
 export const persistenceReady = $state({ ready: false });
 let store: Store | null = null;
 export async function initPersistence() {
-  const detectedLocale = await systemLocale();
+  let detectedLocale = navigatorLocale();
   try {
+    detectedLocale = await systemLocale();
     if (!isTauriRuntime()) {
       settings.locale = detectedLocale;
       setAppLocale(detectedLocale);

@@ -1777,6 +1777,7 @@ function checkMacosStoreConfig() {
     return;
   }
   requireEntitlement(entitlements, "com.apple.security.app-sandbox", true, "macOS MAS");
+  requireEntitlement(entitlements, "com.apple.security.network.client", true, "macOS MAS");
   requireEntitlement(
     entitlements,
     "com.apple.security.files.user-selected.read-write",
@@ -1789,6 +1790,11 @@ function checkMacosStoreConfig() {
     true,
     "macOS MAS",
   );
+  if (!prepare.includes("entitlements.macos.mas.plist")) {
+    failures.push(
+      "prepare-macos-mas-release.mjs must use entitlements.macos.mas.plist as its MAS entitlement template",
+    );
+  }
   checkForbiddenMacosEntitlements(entitlements, "macOS MAS entitlements");
 }
 

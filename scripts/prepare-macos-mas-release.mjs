@@ -52,8 +52,12 @@ mkdirSync(generatedRoot, { recursive: true });
 const generatedProfile = profile?.generatedPath ?? profile?.path;
 const entitlementsPath = path.join(generatedRoot, "entitlements.macos.mas.generated.plist");
 const configPath = path.join(generatedRoot, "tauri.macos.mas.generated.conf.json");
+const entitlementTemplatePath = path.join(srcTauriRoot, "entitlements.macos.mas.plist");
 
-writeFileSync(entitlementsPath, masEntitlements(teamId, identifier));
+writeFileSync(
+  entitlementsPath,
+  masEntitlements(readFileSync(entitlementTemplatePath, "utf8"), teamId, identifier),
+);
 writeFileSync(
   configPath,
   JSON.stringify(
@@ -106,25 +110,29 @@ function provisionProfilePath() {
   return { path: profilePath };
 }
 
-function masEntitlements(teamId, identifier) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>com.apple.security.app-sandbox</key>
-  <true/>
-  <key>com.apple.security.files.user-selected.read-write</key>
-  <true/>
-  <key>com.apple.security.files.bookmarks.app-scope</key>
-  <true/>
-  <key>com.apple.application-identifier</key>
+function masEntitlements(template, teamId, identifier) {
+  const closingDict = "</dict>";
+  const closingDictIndex = template.lastIndexOf(closingDict);
+  if (closingDictIndex < 0 || template.indexOf(closingDict) !== closingDictIndex) {
+    fail("entitlements.macos.mas.plist must contain exactly one closing dict");
+  }
+  for (const dynamicKey of [
+    "com.apple.application-identifier",
+    "com.apple.developer.team-identifier",
+  ]) {
+    if (template.includes(`<key>${dynamicKey}</key>`)) {
+      fail(`entitlements.macos.mas.plist must not define generated entitlement ${dynamicKey}`);
+    }
+  }
+
+  const generatedEntitlements = `  <key>com.apple.application-identifier</key>
   <string>${escapeXml(`${teamId}.${identifier}`)}</string>
   <key>com.apple.developer.team-identifier</key>
   <string>${escapeXml(teamId)}</string>
-</dict>
-</plist>
 `;
+  return `${template.slice(0, closingDictIndex)}${generatedEntitlements}${template.slice(
+    closingDictIndex,
+  )}`;
 }
 
 function escapeXml(value) {

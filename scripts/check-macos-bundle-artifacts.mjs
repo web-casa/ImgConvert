@@ -458,6 +458,7 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   const teamId = readPlistValue(profilePath, "TeamIdentifier:0");
   const expectedApplicationId = teamId ? `${teamId}.${identifier}` : null;
   requirePlistValue(entitlementsPath, "com.apple.security.app-sandbox", "true");
+  requirePlistValue(entitlementsPath, "com.apple.security.network.client", "true");
   requirePlistValue(entitlementsPath, "com.apple.security.files.user-selected.read-write", "true");
   requirePlistValue(entitlementsPath, "com.apple.security.files.bookmarks.app-scope", "true");
   requirePlistValue(entitlementsPath, "com.apple.developer.team-identifier", teamId);
