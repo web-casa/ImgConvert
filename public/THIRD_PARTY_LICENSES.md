@@ -7882,7 +7882,7 @@ limitations under the License.
 Used by:
 
 - imgconvert-core 0.1.0 — https://crates.io/crates/imgconvert-core
-- imgconvert 0.2.11 — https://crates.io/crates/imgconvert
+- imgconvert 0.2.12 — https://crates.io/crates/imgconvert
 - android_system_properties 0.1.5 — https://github.com/nical/android_system_properties
 - anyhow 1.0.103 — https://github.com/dtolnay/anyhow
 - async-trait 0.1.89 — https://github.com/dtolnay/async-trait
