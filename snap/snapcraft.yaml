@@ -2,7 +2,7 @@
 
 name: imgconvert
 title: ImgConvert
-version: "0.2.12"
+version: "0.2.13"
 summary: Local-first batch image converter
 description: |
   ImgConvert is a local-first desktop app for batch image conversion and compression. Add files or folders, choose JPEG, PNG, WebP, or AVIF output, then adjust quality, true lossless mode, and the destination for the queue. Individual images can override the shared format when needed.
