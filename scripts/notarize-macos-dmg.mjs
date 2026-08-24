@@ -50,7 +50,7 @@ async function main() {
     return;
   }
 
-  verifySignedDmg(dmg, options.profile);
+  verifySignedDmg(dmg, options.profile, options.expectedArchitectures);
   const submissionId = submitForNotarization(dmg, credentials);
   const receipt = createNotarizationReceipt({
     submissionId,
@@ -68,7 +68,13 @@ async function main() {
   }
 
   await waitForNotarization(submissionId, credentials, options);
-  finalizeAcceptedDmg(dmg, submissionId, credentials, options.profile);
+  finalizeAcceptedDmg(
+    dmg,
+    submissionId,
+    credentials,
+    options.profile,
+    options.expectedArchitectures,
+  );
 }
 
 async function finalizeSavedSubmission(dmg, options, credentials) {
@@ -94,10 +100,16 @@ async function finalizeSavedSubmission(dmg, options, credentials) {
     throw new Error(`unexpected Apple notarization status: ${status}`);
   }
 
-  finalizeAcceptedDmg(dmg, receipt.submissionId, credentials, options.profile);
+  finalizeAcceptedDmg(
+    dmg,
+    receipt.submissionId,
+    credentials,
+    options.profile,
+    options.expectedArchitectures,
+  );
 }
 
-function finalizeAcceptedDmg(dmg, submissionId, credentials, profile) {
+function finalizeAcceptedDmg(dmg, submissionId, credentials, profile, expectedArchitectures) {
   printNotarizationLog(submissionId, credentials);
   run("xcrun", ["stapler", "staple", dmg], "stapler staple");
   run(
@@ -114,13 +126,14 @@ function finalizeAcceptedDmg(dmg, submissionId, credentials, profile) {
       `--artifact=${dmg}`,
       "--require-signed",
       "--require-notarized",
+      ...expectedArchitectureArgument(expectedArchitectures),
     ],
     "signed/notarized DMG artifact verification",
   );
   console.log(`ok ${path.relative(repoRoot, dmg)} notarized and stapled`);
 }
 
-function verifySignedDmg(dmg, profile) {
+function verifySignedDmg(dmg, profile, expectedArchitectures) {
   run(
     "node",
     [
@@ -129,6 +142,7 @@ function verifySignedDmg(dmg, profile) {
       "--bundles=dmg",
       `--artifact=${dmg}`,
       "--require-signed",
+      ...expectedArchitectureArgument(expectedArchitectures),
     ],
     "signed DMG pre-submission verification",
   );
@@ -411,6 +425,7 @@ export function parseOptions(argv, env = process.env) {
     apiKey: env.APPLE_API_KEY ?? null,
     apiIssuer: env.APPLE_API_ISSUER ?? null,
     apiKeyPath: env.APPLE_API_KEY_PATH ?? null,
+    expectedArchitectures: [],
     timeoutMinutes: positiveInteger(env.IMGCONVERT_NOTARY_TIMEOUT_MINUTES, 60),
     pollSeconds: positiveInteger(env.IMGCONVERT_NOTARY_POLL_SECONDS, 20),
   };
@@ -462,7 +477,46 @@ function parseArgument(arg, options) {
     options.pollSeconds = positiveInteger(arg.slice("--poll-seconds=".length), options.pollSeconds);
     return;
   }
+  if (arg.startsWith("--expected-architectures=")) {
+    options.expectedArchitectures = parseExpectedArchitectures(
+      arg.slice("--expected-architectures=".length),
+    );
+    return;
+  }
   throw new Error(`unknown argument: ${arg}`);
+}
+
+function expectedArchitectureArgument(expectedArchitectures) {
+  if (!expectedArchitectures?.length) return [];
+  return [`--expected-architectures=${expectedArchitectures.join(",")}`];
+}
+
+function parseExpectedArchitectures(value) {
+  const requested = String(value ?? "")
+    .split(",")
+    .map((architecture) => architecture.trim())
+    .filter(Boolean);
+  if (requested.length === 0) {
+    throw new Error("--expected-architectures requires at least one architecture");
+  }
+
+  const aliases = {
+    arm64: "arm64",
+    aarch64: "arm64",
+    x64: "x86_64",
+    x86_64: "x86_64",
+  };
+  const normalized = requested.map((architecture) => {
+    const canonical = aliases[architecture.toLowerCase()];
+    if (!canonical) {
+      throw new Error(`unsupported macOS architecture: ${architecture}`);
+    }
+    return canonical;
+  });
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error("--expected-architectures must not contain duplicate architectures");
+  }
+  return normalized;
 }
 
 function selectMode(options, mode, argument) {
@@ -613,6 +667,7 @@ Options:
   --profile=<debug|release>       Cargo profile, defaults to release.
   --dmg=<path>                    DMG path. Defaults to the newest DMG artifact.
   --receipt=<path>                Receipt output for submit or input for finalize.
+  --expected-architectures=<list> Expected DMG app architecture(s), e.g. arm64 or x86_64.
   --keychain-profile=<name>       notarytool keychain profile.
   --apple-id=<id>                 Apple ID for notarytool.
   --password=<password>           App-specific password for notarytool.

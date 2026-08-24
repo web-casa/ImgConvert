@@ -88,6 +88,15 @@ describe("macOS notarization receipt", () => {
     ).toThrow(/mutually exclusive/);
   });
 
+  it("normalizes explicit architecture verification for cross-architecture finalization", () => {
+    expect(parseOptions(["--expected-architectures=x64,arm64"], {})).toMatchObject({
+      expectedArchitectures: ["x86_64", "arm64"],
+    });
+    expect(() => parseOptions(["--expected-architectures="], {})).toThrow(/at least one/);
+    expect(() => parseOptions(["--expected-architectures=arm64,aarch64"], {})).toThrow(/duplicate/);
+    expect(() => parseOptions(["--expected-architectures=ppc64"], {})).toThrow(/unsupported/);
+  });
+
   it("requires a valid release tag when publication is requested", () => {
     const dmg = fixtureDmg("signed-dmg");
 

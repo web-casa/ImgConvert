@@ -169,12 +169,20 @@ jobs:
           IMGCONVERT_NOTARY_EXPECTED_WORKFLOW: ${{ steps.source.outputs.workflow_name }}
           IMGCONVERT_NOTARY_EXPECTED_WORKFLOW_SHA: ${{ steps.source.outputs.head_sha }}
           IMGCONVERT_NOTARY_ALLOW_RELEASE: ${{ steps.source.outputs.allow_release }}
+          IMGCONVERT_DMG_ARCH: ${{ inputs.architecture }}
         run: |
+          case "$IMGCONVERT_DMG_ARCH" in
+            arm64) expected_architecture=arm64 ;;
+            x64) expected_architecture=x86_64 ;;
+            *) echo "unsupported DMG architecture: $IMGCONVERT_DMG_ARCH"; exit 1 ;;
+          esac
+
           node scripts/notarize-macos-dmg.mjs \
             --profile=release \
             --finalize \
             --dmg="$IMGCONVERT_MACOS_DMG" \
-            --receipt="$IMGCONVERT_NOTARY_RECEIPT"
+            --receipt="$IMGCONVERT_NOTARY_RECEIPT" \
+            --expected-architectures="$expected_architecture"
 
       - name: Report pending Apple status
         if: ${{ steps.notarization.outputs.notarization_status == 'In Progress' }}
