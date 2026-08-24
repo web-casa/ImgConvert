@@ -177,6 +177,8 @@ export const enUS = {
   errors: {
     fileNotFound: "File not found: {path}",
     permissionDenied: "Permission denied: {path}",
+    outputPermissionDenied:
+      "Cannot write to the output directory: {path}. Choose an output directory and try again.",
     unsupportedFormat: "Unsupported format: {format}",
     outputExists: "Output file already exists: {path}",
     outputNotSmaller: "Skipped because the output is not smaller than the source: {path}",

@@ -12,6 +12,7 @@ import {
   formatFromExt,
   formatImportSummary,
   formatLabel,
+  needsMacosOutputDirectoryGrant,
   qualityFloorFor,
   queue,
   setImportCommandError,
@@ -40,6 +41,13 @@ describe("state helpers", () => {
     expect(formatFromExt("JPG")).toBe("jpeg");
     expect(formatFromExt("unknown")).toBeNull();
     expect(formatLabel("webp")).toBe("WebP");
+  });
+
+  it("requires a fresh output-folder grant for each macOS app session", () => {
+    expect(needsMacosOutputDirectoryGrant("macos", false, false)).toBe(true);
+    expect(needsMacosOutputDirectoryGrant("macos", true, false)).toBe(true);
+    expect(needsMacosOutputDirectoryGrant("macos", true, true)).toBe(false);
+    expect(needsMacosOutputDirectoryGrant("windows", false, false)).toBe(false);
   });
 
   it("adds readable paths and reports duplicates/skips", () => {

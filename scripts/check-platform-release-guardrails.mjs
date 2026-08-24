@@ -1392,22 +1392,25 @@ function checkMacosRuntimeGuardrails() {
   const stateTs = readText(path.join(repoRoot, "src", "lib", "state.svelte.ts"));
   const capabilities = readText(path.join(repoRoot, "src-tauri", "capabilities", "default.json"));
   if (!cargoToml.includes("tauri-plugin-fs")) {
-    failures.push("macOS scoped dialog persistence needs tauri-plugin-fs in Cargo.toml");
+    failures.push("macOS dialog scope needs tauri-plugin-fs in Cargo.toml");
   }
   if (!cargoToml.includes("tauri-plugin-persisted-scope")) {
-    failures.push("macOS MAS path persistence needs tauri-plugin-persisted-scope in Cargo.toml");
+    failures.push("macOS Tauri scope persistence needs tauri-plugin-persisted-scope in Cargo.toml");
   }
   if (!libRs.includes("tauri_plugin_fs::init()")) {
-    failures.push("Tauri builder must register fs plugin before scoped dialog persistence");
+    failures.push("Tauri builder must register fs plugin before granting dialog paths");
   }
   if (!libRs.includes("tauri_plugin_persisted_scope::init()")) {
-    failures.push("Tauri builder must register persisted scope before macOS MAS release");
+    failures.push("Tauri builder must register persisted Tauri scope before macOS MAS release");
   }
-  if (!stateTs.includes('fileAccessMode: platform === "macos" ? "scoped" : undefined')) {
-    failures.push("macOS file dialog must request scoped file access");
+  if (!stateTs.includes("needsMacosOutputDirectoryGrant")) {
+    failures.push("macOS conversions must require a fresh output-directory grant per app session");
+  }
+  if (!stateTs.includes("recursive: true")) {
+    failures.push("macOS output-directory picker must grant recursive folder access");
   }
   if (!capabilities.includes('"fs:scope"')) {
-    failures.push("Tauri capability must include fs:scope so dialog grants can be persisted");
+    failures.push("Tauri capability must include fs:scope for dialog-selected paths");
   }
 
   const masPrepare = readText(path.join(repoRoot, "scripts", "prepare-macos-mas-release.mjs"));

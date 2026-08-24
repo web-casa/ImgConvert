@@ -35,6 +35,20 @@ describe("structured command errors", () => {
     expect(message).not.toContain("暂未纳入");
   });
 
+  it("explains how to restore output-directory access", async () => {
+    await initI18n("en-US");
+
+    expect(
+      formatCommandError({
+        code: "outputPermissionDenied",
+        params: { path: "/Users/example/Documents/ImgConvert Output" },
+        detail: "没有权限写入输出目录: Operation not permitted",
+      }),
+    ).toBe(
+      "Cannot write to the output directory: /Users/example/Documents/ImgConvert Output. Choose an output directory and try again.",
+    );
+  });
+
   it("accepts a JSON-encoded Error message from an IPC bridge", () => {
     const error = new Error(
       JSON.stringify({

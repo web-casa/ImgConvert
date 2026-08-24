@@ -1,7 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { FolderOpen, ArrowsClockwise, WarningCircle } from "phosphor-svelte";
-  import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import {
     commandErrorMessage,
@@ -20,8 +19,9 @@
     extOf,
     formatFromExt,
     capabilities,
+    chooseOutputDirectory,
+    clearOutputDirectory,
     isTauriRuntime,
-    pickSystemPaths,
     persistSettings,
     qualityFloorFor,
     queue,
@@ -132,26 +132,23 @@
     }
 
     try {
-      const paths = await pickSystemPaths({
-        directory: true,
-        multiple: false,
-        title: get(t)("settings.chooseOutputDir") as string,
-      });
-      if (busy || !paths[0]) return;
-      settings.outDir = paths[0];
+      const selected = await chooseOutputDirectory();
+      if (busy || !selected) return;
       outputMessage = null;
-      persistSettings();
     } catch (error) {
       outputMessage = commandErrorMessage(error);
     }
   }
 
-  function clearOut() {
+  async function clearOut() {
     if (busy) return;
 
-    settings.outDir = null;
-    outputMessage = null;
-    persistSettings();
+    try {
+      await clearOutputDirectory();
+      outputMessage = null;
+    } catch (error) {
+      outputMessage = commandErrorMessage(error);
+    }
   }
 
   function setFormat(value: string) {

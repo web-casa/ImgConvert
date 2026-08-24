@@ -166,6 +166,7 @@ export const zhCN = {
   errors: {
     fileNotFound: "找不到文件：{path}",
     permissionDenied: "没有权限访问：{path}",
+    outputPermissionDenied: "没有权限写入输出目录：{path}。请点击“输出目录”选择文件夹后重试。",
     unsupportedFormat: "不支持的格式：{format}",
     outputExists: "输出文件已存在：{path}",
     outputNotSmaller: "已跳过：输出文件未小于源文件：{path}",

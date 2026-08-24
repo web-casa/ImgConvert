@@ -3,6 +3,7 @@ import { translate } from "$lib/i18n";
 const ERROR_MESSAGE_KEYS = {
   fileNotFound: "errors.fileNotFound",
   permissionDenied: "errors.permissionDenied",
+  outputPermissionDenied: "errors.outputPermissionDenied",
   unsupportedFormat: "errors.unsupportedFormat",
   outputExists: "errors.outputExists",
   outputNotSmaller: "errors.outputNotSmaller",
@@ -21,6 +22,7 @@ export type CommandErrorCode = keyof typeof ERROR_MESSAGE_KEYS;
 const REQUIRED_MESSAGE_PARAMS: Partial<Record<CommandErrorCode, readonly string[]>> = {
   fileNotFound: ["path"],
   permissionDenied: ["path"],
+  outputPermissionDenied: ["path"],
   unsupportedFormat: ["format"],
   outputExists: ["path"],
   outputNotSmaller: ["path"],

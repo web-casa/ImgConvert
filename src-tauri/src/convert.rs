@@ -38,6 +38,7 @@ const MIN_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 5;
 const MAX_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 900;
 const INPUT_FILE_NOT_FOUND_PREFIX: &str = "输入文件不存在:";
 const INPUT_PERMISSION_DENIED_PREFIX: &str = "没有权限访问输入文件:";
+const OUTPUT_PERMISSION_DENIED_PREFIX: &str = "没有权限写入输出目录:";
 const UNSUPPORTED_TARGET_FORMAT_PREFIX: &str = "不支持的目标格式:";
 const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";
 const TIFF_OUTPUT_UNSUPPORTED_PREFIX: &str = "TIFF 暂未纳入";
@@ -114,7 +115,7 @@ pub struct RuntimeDiagnostics {
 pub struct ConvertOptions {
     /// 输入文件绝对路径。
     pub input: String,
-    /// 输出目录(若为空则与输入同目录)。
+    /// 输出目录(若为空则与输入同目录；macOS 沙盒前端会先要求用户选择目录)。
     pub out_dir: Option<String>,
     /// 从导入目录根到输入文件父目录的相对目录,用于保留目录结构。
     pub relative_dir: Option<String>,
@@ -637,12 +638,29 @@ pub fn command_error_for_conversion(
             .map(|path| path.to_string_lossy().to_string())
             .unwrap_or_else(|_| options.input.clone())
     };
+    let output_directory = || {
+        output_path(options)
+            .ok()
+            .and_then(|path| {
+                path.parent()
+                    .map(|parent| parent.to_string_lossy().to_string())
+            })
+            .unwrap_or_else(|| {
+                options
+                    .out_dir
+                    .clone()
+                    .unwrap_or_else(|| options.input.clone())
+            })
+    };
 
     if detail.starts_with(INPUT_FILE_NOT_FOUND_PREFIX) {
         return CommandError::file_not_found(options.input.clone(), detail);
     }
     if detail.starts_with(INPUT_PERMISSION_DENIED_PREFIX) {
         return CommandError::permission_denied(options.input.clone(), detail);
+    }
+    if detail.starts_with(OUTPUT_PERMISSION_DENIED_PREFIX) {
+        return CommandError::output_permission_denied(output_directory(), detail);
     }
     if detail.starts_with(UNSUPPORTED_TARGET_FORMAT_PREFIX)
         || detail.starts_with(HEIC_OUTPUT_DISABLED_PREFIX)
@@ -662,6 +680,18 @@ pub fn command_error_for_conversion(
     CommandError::conversion_failed(options.input.clone(), detail)
 }
 
+fn output_io_error(operation: &str, out: &Path, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::PermissionDenied {
+        let directory = out.parent().unwrap_or_else(|| Path::new("."));
+        return format!(
+            "{OUTPUT_PERMISSION_DENIED_PREFIX} {}: {error}",
+            directory.display()
+        );
+    }
+
+    format!("{operation} {}: {error}", out.display())
+}
+
 fn temp_file(out: &Path) -> Result<(PathBuf, File), String> {
     let parent = out.parent().unwrap_or_else(|| Path::new("."));
     let pid = std::process::id();
@@ -676,7 +706,7 @@ fn temp_file(out: &Path) -> Result<(PathBuf, File), String> {
         match OpenOptions::new().write(true).create_new(true).open(&tmp) {
             Ok(file) => return Ok((tmp, file)),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(format!("无法创建临时文件 {}: {e}", tmp.display())),
+            Err(e) => return Err(output_io_error("无法创建临时文件", out, &e)),
         }
     }
 
@@ -689,8 +719,7 @@ fn write_output(
     mode: WriteMode,
 ) -> Result<Option<ConvertWarning>, String> {
     if let Some(parent) = out.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("无法创建输出目录 {}: {e}", parent.display()))?;
+        fs::create_dir_all(parent).map_err(|e| output_io_error("无法创建输出目录", out, &e))?;
     }
 
     match mode {
@@ -704,7 +733,8 @@ fn write_temp_output(out: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
     if let Err(e) = tmp_file.write_all(bytes).and_then(|_| tmp_file.flush()) {
         drop(tmp_file);
         let cleanup = cleanup_partial_note(&tmp);
-        return Err(format!("无法写入临时文件 {}: {e}{cleanup}", tmp.display()));
+        let detail = output_io_error("无法写入临时文件", out, &e);
+        return Err(format!("{detail}{cleanup}"));
     }
     drop(tmp_file);
     Ok(tmp)
@@ -720,7 +750,8 @@ fn replace_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, St
         }
         Err(e) => {
             let cleanup = cleanup_partial_note(&tmp);
-            Err(format!("无法写入输出文件 {}: {e}{cleanup}", out.display()))
+            let detail = output_io_error("无法写入输出文件", out, &e);
+            Err(format!("{detail}{cleanup}"))
         }
     }
 }
@@ -758,33 +789,26 @@ where
                 Ok(()) => Ok(None),
                 Err(rename_error) => {
                     let cleanup = cleanup_partial_note(tmp);
-                    Err(format!(
-                        "无法写入输出文件 {}: {rename_error}{cleanup}",
-                        out.display()
-                    ))
+                    let detail = output_io_error("无法写入输出文件", out, &rename_error);
+                    Err(format!("{detail}{cleanup}"))
                 }
             };
         }
 
         let cleanup = cleanup_partial_note(tmp);
-        return Err(format!(
-            "无法暂存已存在的输出文件 {}: {error}{cleanup}",
-            out.display()
-        ));
+        let detail = output_io_error("无法暂存已存在的输出文件", out, &error);
+        return Err(format!("{detail}{cleanup}"));
     }
 
     match rename(tmp, out) {
         Ok(()) => Ok(cleanup_output_backup(&backup)),
         Err(rename_error) => {
             let cleanup = cleanup_partial_note(tmp);
+            let detail = output_io_error("无法写入输出文件", out, &rename_error);
             match rename(&backup, out) {
-                Ok(()) => Err(format!(
-                    "无法写入输出文件 {}: {rename_error}; 原文件已恢复{cleanup}",
-                    out.display()
-                )),
+                Ok(()) => Err(format!("{detail}; 原文件已恢复{cleanup}")),
                 Err(restore_error) => Err(format!(
-                    "无法写入输出文件 {}: {rename_error}; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
-                    out.display(),
+                    "{detail}; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
                     backup.display()
                 )),
             }
@@ -836,12 +860,7 @@ fn backup_path(out: &Path) -> Result<PathBuf, String> {
         match fs::symlink_metadata(&candidate) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(candidate),
             Ok(_) => continue,
-            Err(error) => {
-                return Err(format!(
-                    "无法检查输出备份路径 {}: {error}",
-                    candidate.display()
-                ));
-            }
+            Err(error) => return Err(output_io_error("无法检查输出备份路径", &candidate, &error)),
         }
     }
 
@@ -868,7 +887,7 @@ fn ensure_replaceable_output_entry(out: &Path) -> Result<(), String> {
         }
         Ok(_) => Err(format!("无法覆盖非普通输出路径 {}", out.display())),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(format!("无法读取已有输出路径 {}: {error}", out.display())),
+        Err(error) => Err(output_io_error("无法读取已有输出路径", out, &error)),
     }
 }
 
@@ -881,14 +900,15 @@ fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), String> {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
                 format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {}", out.display())
             } else {
-                format!("无法创建输出文件 {}: {e}", out.display())
+                output_io_error("无法创建输出文件", out, &e)
             }
         })?;
 
     if let Err(e) = file.write_all(bytes).and_then(|_| file.flush()) {
         drop(file);
         let cleanup = cleanup_partial_note(out);
-        return Err(format!("无法写入输出文件 {}: {e}{cleanup}", out.display()));
+        let detail = output_io_error("无法写入输出文件", out, &e);
+        return Err(format!("{detail}{cleanup}"));
     }
 
     Ok(())
@@ -2240,6 +2260,20 @@ mod tests {
             crate::command_error::ErrorCode::PermissionDenied
         );
 
+        options.format = "jpeg".to_string();
+        let output_denied = command_error_for_conversion(
+            &options,
+            format!("{OUTPUT_PERMISSION_DENIED_PREFIX} /images: Permission denied"),
+        );
+        assert_eq!(
+            output_denied.code,
+            crate::command_error::ErrorCode::OutputPermissionDenied
+        );
+        assert_eq!(
+            output_denied.params,
+            Some(serde_json::json!({ "path": "/images" }))
+        );
+
         let output_exists = command_error_for_conversion(
             &options,
             format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): /images/source.jpg"),
@@ -2297,6 +2331,19 @@ mod tests {
         assert!(err.contains(&blocked.to_string_lossy().to_string()));
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn output_io_error_keeps_output_permission_failures_machine_readable() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let detail = output_io_error(
+            "无法创建输出文件",
+            Path::new("/images/output/photo.webp"),
+            &error,
+        );
+
+        assert!(detail.starts_with(OUTPUT_PERMISSION_DENIED_PREFIX));
+        assert!(detail.contains("/images/output"));
     }
 
     #[test]

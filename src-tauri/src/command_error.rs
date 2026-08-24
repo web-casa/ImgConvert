@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 pub enum ErrorCode {
     FileNotFound,
     PermissionDenied,
+    OutputPermissionDenied,
     UnsupportedFormat,
     OutputExists,
     OutputNotSmaller,
@@ -54,6 +55,10 @@ impl CommandError {
 
     pub fn permission_denied(path: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::with_path(ErrorCode::PermissionDenied, path, detail)
+    }
+
+    pub fn output_permission_denied(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::OutputPermissionDenied, path, detail)
     }
 
     pub fn unsupported_format(format: impl Into<String>, detail: impl Into<String>) -> Self {
@@ -132,5 +137,22 @@ mod tests {
 
         assert_eq!(serialized["code"], "batchFailed");
         assert!(serialized["params"].is_null());
+    }
+
+    #[test]
+    fn serializes_output_directory_permission_errors() {
+        let error = CommandError::output_permission_denied(
+            "/images/output",
+            "cannot create output file: Permission denied",
+        );
+
+        assert_eq!(
+            serde_json::to_value(error).unwrap(),
+            json!({
+                "code": "outputPermissionDenied",
+                "params": { "path": "/images/output" },
+                "detail": "cannot create output file: Permission denied",
+            })
+        );
     }
 }

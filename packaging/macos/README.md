@@ -8,7 +8,7 @@ This directory documents the first macOS release surface.
 - Mac App Store builds must use the generated config from `pnpm run release:macos:mas:prepare` and set `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` before compiling, so optional external codec/helper discovery is compiled off. The MAS command builds one universal `arm64` + `x86_64` app with Tauri's `universal-apple-darwin` target. MAS builds also set `IMGCONVERT_DISABLE_UPDATER=1`; updates are delivered by the App Store, never by Tauri updater.
 - The MAS entitlement set is intentionally narrow: App Sandbox, user-selected read/write files, and app-scoped bookmarks. Do not add broad network or filesystem entitlements without a concrete feature need.
 - HEIC import uses the macOS system ImageIO framework as a read-only `system-imageio` provider. It does not link libheif, does not bundle x265, and does not enable HEIC output until encoding, patents, and sandbox behavior are separately audited. Still HEIC/HEIF files are supported; multi-frame inputs are rejected rather than silently converting only frame zero.
-- Runtime file access is routed through Tauri dialog `fileAccessMode: "scoped"`, `tauri-plugin-fs`, `tauri-plugin-persisted-scope`, and the security-scoped resource shim in `src-tauri/src/macos_security.rs`. Dialog grants are added to the Tauri filesystem scope and persisted across launches; every backend path access still balances start/stop access with RAII.
+- Runtime file access is routed through standard Tauri desktop dialogs, `tauri-plugin-fs`, `tauri-plugin-persisted-scope`, and the security-scoped resource shim in `src-tauri/src/macos_security.rs`. On macOS, the app requires a user-selected output folder once per app launch; that `NSOpenPanel` selection grants the current sandboxed process write access to the folder and its contents. A persisted Tauri filesystem scope does not recreate a macOS security-scoped bookmark, so it must not be used as cross-launch write authorization. Every backend path access still balances start/stop access with RAII when a platform grant is available.
 
 Local preflight from any host:
 
@@ -92,7 +92,7 @@ Required GitHub secrets:
 macOS release acceptance still requires a real machine pass:
 
 - HEIC `.heic/.heif` import through ImageIO in both the arm64 and Intel direct builds, plus multi-frame rejection behavior.
-- MAS sandbox file-open/output-directory flow using scoped dialog grants and persisted scope. The hidden path smoke covers the conversion backend; the interactive GUI permission prompt still needs a real acceptance pass.
+- MAS sandbox file-open/output-directory flow, including a fresh output-folder selection after relaunch. The hidden path smoke covers the conversion backend; the interactive GUI permission prompt still needs a real acceptance pass.
 - Apple Silicon AVIF benchmark has completed on `macos-15` arm64; rerun it before changing the rav1e default or codec choice.
 - `.dmg` Developer ID signing, `notarytool` submission, stapling, and Gatekeeper assessment.
 - App Store Connect package validation and optional build upload are automated. Build processing, metadata, TestFlight selection, pricing/availability, physical-machine sandbox testing, and App Review submission remain explicit account-owner steps. Use [`docs/RELEASE_QA.md`](../../docs/RELEASE_QA.md) as the cross-platform acceptance record.

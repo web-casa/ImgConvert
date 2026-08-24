@@ -112,7 +112,8 @@ uses a disposable DevSmoke identity and removes the test package afterwards.
 - Mac App Store: upload the universal signed `.pkg`, wait for processing, then
   test the exact processed build from TestFlight on physical Intel and Apple
   Silicon Macs. Exercise file selection, output-directory selection, conversion,
-  relaunch, and persisted access grants under the sandbox.
+  relaunch, then select the output directory again before converting under the
+  sandbox.
 - Microsoft Store: submit architecture-specific MSIX packages only after their
   sideload smoke succeeds; Store versions must use Store updates, not Tauri
   updater.

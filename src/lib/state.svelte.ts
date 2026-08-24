@@ -207,6 +207,8 @@ export interface PickPathOptions {
   multiple?: boolean;
   title?: string;
   extensions?: string[];
+  defaultPath?: string;
+  recursive?: boolean;
 }
 export interface ConversionPlanEntry {
   index: number;
@@ -356,6 +358,10 @@ const THUMBNAIL_CONCURRENCY = 2;
 const CLIPBOARD_MAX_BYTES = 128 * 1024 * 1024;
 const CLIPBOARD_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/avif"]);
 let hostPlatformPromise: Promise<string> | null = null;
+// `NSOpenPanel` grants the App Sandbox access for the current process. A path
+// restored from settings is not itself a macOS security-scoped bookmark, so it
+// must not be treated as a write grant after an app relaunch.
+let macosOutputDirectorySessionGrant = false;
 
 export const FORMAT_CATEGORIES = [
   { value: "modern", labelKey: "state.formatCategoryModern" },
@@ -724,6 +730,45 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
   });
 }
 
+export function needsMacosOutputDirectoryGrant(
+  platform: string,
+  hasOutputDirectory: boolean,
+  hasSessionGrant: boolean,
+): boolean {
+  return platform === "macos" && (!hasOutputDirectory || !hasSessionGrant);
+}
+
+/**
+ * Selects an output folder and records the current macOS process grant.
+ *
+ * The folder is kept as a convenience default for a later launch, but macOS
+ * requires the user to select it again before that later process writes to it.
+ */
+export async function chooseOutputDirectory(): Promise<boolean> {
+  if (!isTauriRuntime()) return false;
+
+  const platform = await hostPlatform();
+  const paths = await pickSystemPaths({
+    directory: true,
+    multiple: false,
+    recursive: true,
+    title: translate("settings.chooseOutputDir"),
+    defaultPath: settings.outDir ?? undefined,
+  });
+  if (!paths[0]) return false;
+
+  settings.outDir = paths[0];
+  macosOutputDirectorySessionGrant = platform === "macos";
+  await persistSettings();
+  return true;
+}
+
+export async function clearOutputDirectory(): Promise<void> {
+  settings.outDir = null;
+  macosOutputDirectorySessionGrant = false;
+  await persistSettings();
+}
+
 async function hostPlatform(): Promise<string> {
   hostPlatformPromise ??= invoke<string>("host_platform").catch((error) => {
     logCommandError("Failed to read host platform", error);
@@ -734,12 +779,12 @@ async function hostPlatform(): Promise<string> {
 
 async function pickWithTauriDialog(options: PickPathOptions): Promise<string[]> {
   const extensions = sanitizedDialogExtensions(options.extensions ?? []);
-  const platform = await hostPlatform();
   const selected = await openDialog({
     directory: options.directory ?? false,
     multiple: options.multiple ?? false,
     title: options.title || undefined,
-    fileAccessMode: platform === "macos" ? "scoped" : undefined,
+    defaultPath: options.defaultPath,
+    recursive: options.recursive ?? false,
     filters:
       !options.directory && extensions.length
         ? [
@@ -1538,11 +1583,33 @@ export async function convertAll() {
   ui.cancelRequested = false;
   ui.dragActive = false;
   try {
+    if (!(await ensureMacosOutputDirectoryAccess())) return;
     await convertAllWithBatch();
+  } catch (error) {
+    for (const item of queue) {
+      if (item.status !== "done") {
+        item.status = "error";
+        setItemCommandError(item, error);
+        item.progress = 100;
+        item.progressStage = null;
+      }
+    }
   } finally {
     ui.converting = false;
     ui.cancelRequested = false;
   }
+}
+
+async function ensureMacosOutputDirectoryAccess(): Promise<boolean> {
+  const platform = await hostPlatform();
+  const hasOutputDirectory = !!settings.outDir?.trim();
+  if (
+    !needsMacosOutputDirectoryGrant(platform, hasOutputDirectory, macosOutputDirectorySessionGrant)
+  ) {
+    return true;
+  }
+
+  return chooseOutputDirectory();
 }
 
 export async function cancelConversion() {
