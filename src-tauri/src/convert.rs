@@ -704,27 +704,88 @@ fn replace_output(out: &Path, bytes: &[u8]) -> Result<(), String> {
     match fs::rename(&tmp, out) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && out.exists() => {
-            if let Err(remove_error) = fs::remove_file(out) {
-                let cleanup = cleanup_partial_note(&tmp);
-                return Err(format!(
-                    "无法替换已存在的输出文件 {}: {remove_error}{cleanup}",
-                    out.display()
-                ));
-            }
-            if let Err(rename_error) = fs::rename(&tmp, out) {
-                let cleanup = cleanup_partial_note(&tmp);
-                return Err(format!(
-                    "无法写入输出文件 {}: {rename_error}{cleanup}",
-                    out.display()
-                ));
-            }
-            Ok(())
+            replace_existing_output(&tmp, out)
         }
         Err(e) => {
             let cleanup = cleanup_partial_note(&tmp);
             Err(format!("无法写入输出文件 {}: {e}{cleanup}", out.display()))
         }
     }
+}
+
+/// Windows cannot always replace an existing destination with `rename`. Stage the old output in
+/// the same directory first, so a failure while placing the new file can be rolled back without
+/// deleting the user's previous conversion result.
+fn replace_existing_output(tmp: &Path, out: &Path) -> Result<(), String> {
+    let mut rename = |from: &Path, to: &Path| fs::rename(from, to);
+    replace_existing_output_with_rename(tmp, out, &mut rename)
+}
+
+fn replace_existing_output_with_rename<F>(
+    tmp: &Path,
+    out: &Path,
+    rename: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(&Path, &Path) -> std::io::Result<()>,
+{
+    let backup = backup_path(out)?;
+    if let Err(error) = rename(out, &backup) {
+        let cleanup = cleanup_partial_note(tmp);
+        return Err(format!(
+            "无法暂存已存在的输出文件 {}: {error}{cleanup}",
+            out.display()
+        ));
+    }
+
+    match rename(tmp, out) {
+        Ok(()) => fs::remove_file(&backup).map_err(|error| {
+            format!(
+                "已写入输出文件 {}，但无法清理原文件备份 {}: {error}",
+                out.display(),
+                backup.display()
+            )
+        }),
+        Err(rename_error) => {
+            let cleanup = cleanup_partial_note(tmp);
+            match rename(&backup, out) {
+                Ok(()) => Err(format!(
+                    "无法写入输出文件 {}: {rename_error}; 原文件已恢复{cleanup}",
+                    out.display()
+                )),
+                Err(restore_error) => Err(format!(
+                    "无法写入输出文件 {}: {rename_error}; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
+                    out.display(),
+                    backup.display()
+                )),
+            }
+        }
+    }
+}
+
+fn backup_path(out: &Path) -> Result<PathBuf, String> {
+    let parent = out.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = out
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("output");
+    let pid = std::process::id();
+
+    for _ in 0..64 {
+        let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let candidate = parent.join(format!(
+            ".{file_name}.imgconvert-backup-{pid}-{nanos}-{counter}"
+        ));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("无法创建唯一输出备份路径".to_string())
 }
 
 fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), String> {
@@ -2782,6 +2843,33 @@ mod tests {
             })
             .count();
         assert_eq!(leftovers, 0);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replace_existing_output_restores_old_file_when_new_rename_fails() {
+        let dir = unique_test_dir("replace-restore");
+        fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("out.bin");
+        fs::write(&out, b"old").unwrap();
+        let tmp = write_temp_output(&out, b"new").unwrap();
+        let mut rename_calls = 0;
+
+        let error = replace_existing_output_with_rename(&tmp, &out, &mut |from, to| {
+            rename_calls += 1;
+            if rename_calls == 2 {
+                Err(std::io::Error::other("injected placement failure"))
+            } else {
+                fs::rename(from, to)
+            }
+        })
+        .unwrap_err();
+
+        assert!(error.contains("原文件已恢复"));
+        assert_eq!(fs::read(&out).unwrap(), b"old");
+        assert!(!tmp.exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
 
         fs::remove_dir_all(dir).unwrap();
     }

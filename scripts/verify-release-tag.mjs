@@ -73,6 +73,11 @@ function verifyHeadIsExactTag(tag) {
     fail(`required Git tag does not exist locally: ${tagRef}`);
   }
 
+  const tagType = gitOutput(["cat-file", "-t", tagRef], `inspect ${tag}`);
+  if (tagType !== "tag") {
+    fail(`release tag must be annotated, not lightweight: ${tag}`);
+  }
+
   const tagCommit = gitOutput(["rev-parse", "--verify", `${tag}^{commit}`], `resolve ${tag}`);
   const headCommit = gitOutput(["rev-parse", "--verify", "HEAD"], "resolve HEAD");
   if (tagCommit !== headCommit) {
@@ -141,7 +146,7 @@ function printHelp() {
 
 Verifies that the requested release tag exactly matches package.json,
 docs-site/package.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml.
-By default, it also requires HEAD to be the exact commit tagged by --tag.
+By default, it also requires an annotated tag whose commit exactly matches HEAD.
 
 Options:
   --tag=<tag>         Required release tag.

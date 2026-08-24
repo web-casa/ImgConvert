@@ -62,9 +62,9 @@
 </p>
 
 > [!NOTE]
-> 当前稳定版本为 **v0.2.8**。Snap Store 的 stable 渠道已提供 Linux amd64 与
-> arm64 版本。当前 GitHub Release 提供 Linux x86_64 AppImage 与 updater 元数据；
-> macOS 和 Windows 原生双架构候选包会先在 Actions 验证，再进入后续 Release。
+> 最新 GitHub Release 为 **v0.2.11**，提供 Linux x86_64 AppImage 与已签名的
+> updater 元数据。Snap Store 的 stable 渠道独立提供 Linux amd64 与 arm64 版本；
+> macOS 和 Windows 原生双架构候选包会先在 Actions 验证，再进入后续 GitHub Release。
 
 ## 下载
 
@@ -127,8 +127,8 @@
 
 ## 发布与项目状态
 
-- ✅ **Linux v0.2.8**：Snap Store stable 已提供 amd64 与 arm64；GitHub Release
-  提供 x86_64 AppImage 与 updater 元数据。
+- ✅ **GitHub Release v0.2.11**：提供 Linux x86_64 AppImage 与已签名 updater
+  元数据。Snap Store stable 独立提供 amd64 与 arm64。
 - 🚧 **桌面直发安装包**：macOS 和 Windows 的 arm64/x64 原生工作流已配置；
   成功通过 CI、签名与公证后再发布到 Release。
 - ✅ **macOS 直发**：Developer ID Application 签名、公证、staple 与 Gatekeeper

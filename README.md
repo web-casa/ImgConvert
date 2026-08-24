@@ -62,10 +62,10 @@
 </p>
 
 > [!NOTE]
-> The current stable version is **v0.2.8**. Snap Store provides stable Linux builds for
-> amd64 and arm64. The GitHub Release currently carries the Linux x86_64 AppImage and
-> updater metadata; native macOS and Windows dual-architecture candidates are validated
-> in Actions before they are attached to a later release.
+> The latest GitHub Release is **v0.2.11**, with the Linux x86_64 AppImage and signed
+> updater metadata. Snap Store provides Linux amd64 and arm64 builds on its independent
+> stable channel; native macOS and Windows dual-architecture candidates are validated in
+> Actions before they are attached to a later GitHub Release.
 
 ## Downloads
 
@@ -128,8 +128,8 @@
 
 ## Release and project status
 
-- ✅ **Linux v0.2.8**: Snap Store stable serves amd64 and arm64; GitHub Releases
-  provides the x86_64 AppImage and updater metadata.
+- ✅ **GitHub Release v0.2.11**: provides the Linux x86_64 AppImage and signed updater
+  metadata. Snap Store stable independently serves amd64 and arm64.
 - 🚧 **Direct desktop packages**: native macOS and Windows arm64/x64 workflows are
   configured; release publication follows successful CI, signing, and notarization.
 - ✅ **Direct macOS distribution**: Developer ID Application signing, notarization,

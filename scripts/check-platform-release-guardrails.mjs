@@ -720,6 +720,9 @@ function checkTauriUpdaterGuardrails() {
     "release:updater:verify",
     "IMGCONVERT_PACKAGE_CONVERT_SMOKE",
     "softprops/action-gh-release",
+    "target/appimagehub/*.AppImage.sig",
+    "target/appimagehub/SHA256SUMS",
+    "persist-credentials: false",
   ]) {
     if (!updaterWorkflow.includes(expected)) {
       failures.push(`release-updater.yml missing marker: ${expected}`);

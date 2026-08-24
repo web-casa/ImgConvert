@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const flatpakDir = path.join(repoRoot, "packaging", "flatpak");
 const manifestPath = path.join(flatpakDir, "io.github.yeagoo.imgconvert.yml");
 const desktopPath = path.join(flatpakDir, "io.github.yeagoo.imgconvert.desktop");
@@ -13,6 +16,20 @@ const prepareScriptPath = path.join(repoRoot, "scripts", "prepare-flatpak-releas
 const heicExtensionDir = path.join(flatpakDir, "extensions", "heic");
 
 const failures = [];
+const options = {
+  requireLocalSource: false,
+};
+
+for (const arg of process.argv.slice(2)) {
+  if (arg === "--") {
+    continue;
+  }
+  if (arg === "--require-local-source") {
+    options.requireLocalSource = true;
+    continue;
+  }
+  fail(`unknown argument: ${arg}`);
+}
 
 for (const file of [manifestPath, desktopPath, metainfoPath, prepareScriptPath]) {
   if (!existsSync(file)) {
@@ -202,18 +219,153 @@ function inspectHeicExtensionTemplate() {
 }
 
 function requireArchiveSource(text) {
-  const localSource =
-    /path:\s+\.\.\/\.\.\/target\/flatpak\/sources\/imgconvert-[^\s]+-source\.tar\.gz/.test(text);
-  const urlMatch = text.match(/url:\s+(https:\/\/\S+)/);
-  if (localSource || urlMatch) {
-    if (urlMatch && !/\/imgconvert-[^/]+-source\.tar\.gz$/.test(urlMatch[1])) {
-      failures.push("manifest archive url must point at an imgconvert release source archive");
+  const source = text.match(/^\s*(?<kind>path|url):\s+(?<location>\S+)\s*$/mu);
+  if (!source?.groups) {
+    failures.push(
+      "manifest archive source must point at release:flatpak:prepare output or an HTTPS release archive URL",
+    );
+    return;
+  }
+
+  const { kind, location } = source.groups;
+  const expectedArchiveName = `imgconvert-${packageJson.version}-source.tar.gz`;
+  const archiveName = archiveNameFromLocation(kind, location);
+  if (archiveName !== expectedArchiveName) {
+    failures.push(
+      `manifest archive source must use ${expectedArchiveName}, got ${archiveName || location}`,
+    );
+  }
+
+  if (kind === "url") {
+    let sourceUrl;
+    try {
+      sourceUrl = new URL(location);
+    } catch {
+      failures.push(`manifest archive url is invalid: ${location}`);
+      return;
+    }
+    if (sourceUrl.protocol !== "https:") {
+      failures.push("manifest archive url must use HTTPS");
+    }
+  }
+
+  const manifestSha = text.match(/^\s*sha256:\s+(?<sha>[a-f0-9]{64})\s*$/mu)?.groups?.sha;
+  if (!manifestSha) {
+    return;
+  }
+
+  const expectedLocalArchive = path.join(
+    repoRoot,
+    "target",
+    "flatpak",
+    "sources",
+    expectedArchiveName,
+  );
+  const configuredLocalArchive =
+    kind === "path" ? path.resolve(flatpakDir, location) : expectedLocalArchive;
+
+  if (kind === "path" && !isWithinDirectory(repoRoot, configuredLocalArchive)) {
+    failures.push("manifest archive path must stay within the repository");
+    return;
+  }
+
+  const archiveToVerify =
+    kind === "path"
+      ? configuredLocalArchive
+      : options.requireLocalSource
+        ? expectedLocalArchive
+        : "";
+  if (!archiveToVerify) {
+    return;
+  }
+  if (!existsSync(archiveToVerify)) {
+    if (options.requireLocalSource) {
+      failures.push(
+        `required Flatpak source archive is missing: ${path.relative(repoRoot, archiveToVerify)}`,
+      );
     }
     return;
   }
-  failures.push(
-    "manifest archive source must point at release:flatpak:prepare output or an HTTPS release archive URL",
+  const actualSha = sha256File(archiveToVerify);
+  if (actualSha !== manifestSha) {
+    failures.push(
+      `manifest archive sha256 does not match ${path.relative(repoRoot, archiveToVerify)}`,
+    );
+    return;
+  }
+  inspectArchiveVersions(archiveToVerify);
+}
+
+function archiveNameFromLocation(kind, location) {
+  if (kind === "url") {
+    try {
+      return path.posix.basename(new URL(location).pathname);
+    } catch {
+      return "";
+    }
+  }
+  return path.posix.basename(location.replaceAll("\\", "/"));
+}
+
+function isWithinDirectory(directory, candidate) {
+  const relative = path.relative(directory, candidate);
+  return (
+    relative !== "" &&
+    !relative.startsWith(`..${path.sep}`) &&
+    relative !== ".." &&
+    !path.isAbsolute(relative)
   );
+}
+
+function sha256File(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
+}
+
+function inspectArchiveVersions(archivePath) {
+  const archivedPackageJson = readArchiveMember(archivePath, "./package.json");
+  if (!archivedPackageJson) {
+    return;
+  }
+  try {
+    const archivedPackage = JSON.parse(archivedPackageJson);
+    if (archivedPackage.version !== packageJson.version) {
+      failures.push(
+        `Flatpak source archive package.json version ${archivedPackage.version ?? "<missing>"} does not match ${packageJson.version}`,
+      );
+    }
+  } catch (error) {
+    failures.push(
+      `cannot parse Flatpak source archive package.json: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const archivedCargoToml = readArchiveMember(archivePath, "./src-tauri/Cargo.toml");
+  if (!archivedCargoToml) {
+    return;
+  }
+  const archivedCargoVersion = archivedCargoToml.match(
+    /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"\s*$/mu,
+  )?.[1];
+  if (archivedCargoVersion !== packageJson.version) {
+    failures.push(
+      `Flatpak source archive Cargo.toml version ${archivedCargoVersion ?? "<missing>"} does not match ${packageJson.version}`,
+    );
+  }
+}
+
+function readArchiveMember(archivePath, member) {
+  const result = spawnSync("tar", ["-xOzf", archivePath, member], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    failures.push(
+      `cannot read ${member} from Flatpak source archive: ${(result.stderr || result.stdout).trim()}`,
+    );
+    return "";
+  }
+  return result.stdout;
 }
 
 function inspectDesktop(text) {
@@ -273,4 +425,9 @@ function parseDesktopEntry(text) {
     fields[line.slice(0, index)] = line.slice(index + 1);
   }
   return fields;
+}
+
+function fail(message) {
+  console.error(`check-flatpak-manifest: ${message}`);
+  process.exit(1);
 }

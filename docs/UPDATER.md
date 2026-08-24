@@ -87,6 +87,9 @@ final local artifact and that each manifest signature matches the adjacent
 Upload these files to the GitHub Release:
 
 - `target/updater/latest.json`
+- `target/appimagehub/ImgConvert-<version>-x86_64.AppImage`
+- `target/appimagehub/ImgConvert-<version>-x86_64.AppImage.sig`
+- `target/appimagehub/SHA256SUMS`
 - `src-tauri/target/release/bundle/appimage/*.AppImage`
 - `src-tauri/target/release/bundle/appimage/*.AppImage.sig`
 - `src-tauri/target/release/bundle/SHA256SUMS`
@@ -156,6 +159,10 @@ https://github.com/<owner>/<repo>/releases/latest/download/latest.json
 Before uploading assets, the workflow executes the signed AppImage with
 `IMGCONVERT_PACKAGE_CONVERT_SMOKE=1`, so the published updater artifact has
 already passed the same hidden conversion smoke used by Linux package tests.
+The signing build job has read-only repository access and does not persist its
+checkout credential. A separate job downloads the already-built artifact and
+receives the narrowly scoped `contents: write` permission only while creating
+the GitHub Release.
 
 ## Store channels
 

@@ -24,7 +24,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: updater-release-${{ inputs.tag }}
@@ -45,6 +45,7 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Verify release tag and source version
         env:
           IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
@@ -124,8 +125,43 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/release/bundle/SHA256SUMS
+
+  publish-release:
+    name: Publish GitHub Release assets
+    if: ${{ inputs.publish_release }}
+    needs: linux-updater
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: imgconvert-updater-linux-${{ inputs.tag }}
+          path: release-assets
+      - name: Verify release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          required=(
+            'target/updater/latest.json'
+            'target/appimagehub/*.AppImage'
+            'target/appimagehub/*.AppImage.sig'
+            'target/appimagehub/SHA256SUMS'
+            'src-tauri/target/release/bundle/appimage/*.AppImage'
+            'src-tauri/target/release/bundle/appimage/*.AppImage.sig'
+            'src-tauri/target/release/bundle/SHA256SUMS'
+          )
+          for pattern in "${required[@]}"; do
+            matches=()
+            mapfile -t matches < <(compgen -G "release-assets/$pattern" || true)
+            if [ "${#matches[@]}" -ne 1 ] || [ ! -s "${matches[0]}" ]; then
+              echo "Expected exactly one non-empty release asset for $pattern" >&2
+              exit 1
+            fi
+          done
       - name: Publish GitHub Release assets
-        if: ${{ inputs.publish_release }}
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ inputs.tag }}
@@ -133,7 +169,10 @@ jobs:
           prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: true
           files: |
-            target/updater/latest.json
-            target/appimagehub/*.AppImage
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            release-assets/target/updater/latest.json
+            release-assets/target/appimagehub/*.AppImage
+            release-assets/target/appimagehub/*.AppImage.sig
+            release-assets/target/appimagehub/SHA256SUMS
+            release-assets/src-tauri/target/release/bundle/appimage/*.AppImage
+            release-assets/src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            release-assets/src-tauri/target/release/bundle/SHA256SUMS

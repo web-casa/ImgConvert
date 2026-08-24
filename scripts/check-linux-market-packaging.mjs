@@ -51,8 +51,6 @@ for (const marker of [
   "workflow_dispatch:",
   "publish_snap",
   "default: false",
-  "snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79",
-  "snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40",
   "SNAP_STORE_LOGIN",
   "inputs.publish_snap",
   "retention-days: 7",
@@ -61,9 +59,13 @@ for (const marker of [
     failures.push(`Snap Store workflow missing marker: ${marker}`);
   }
 }
-for (const denied of ["push:", "pull_request:", "schedule:"]) {
-  if (hasYamlKeyLine(snapWorkflow, denied.slice(0, -1))) {
-    failures.push(`Snap Store workflow must remain manual-only: ${denied}`);
+requireWorkflowDispatchOnly(snapWorkflow, "Snap Store workflow");
+for (const [action, sha] of [
+  ["snapcore/action-build", "3bdaa03e1ba6bf59a65f84a751d943d549a54e79"],
+  ["snapcore/action-publish", "214b86e5ca036ead1668c79afb81e550e6c54d40"],
+]) {
+  if (!hasPinnedAction(snapWorkflow, action, sha)) {
+    failures.push(`Snap Store workflow must pin ${action} to ${sha}`);
   }
 }
 
@@ -129,6 +131,30 @@ function commandExists(command) {
 
 function hasYamlKeyLine(text, key) {
   return new RegExp(`^\\s*${escapeRegExp(key)}\\s*:`, "mu").test(text);
+}
+
+function requireWorkflowDispatchOnly(text, label) {
+  const triggerHeader = text.match(/^on:[ \t]*(?<inline>[^\r\n]*)$/mu);
+  if (!triggerHeader) {
+    failures.push(`${label} must declare an on: trigger block`);
+    return;
+  }
+  if (triggerHeader.groups?.inline?.trim()) {
+    failures.push(`${label} must use only a block workflow_dispatch trigger`);
+  }
+  if (!hasYamlKeyLine(text, "workflow_dispatch")) {
+    failures.push(`${label} must declare workflow_dispatch`);
+  }
+  for (const trigger of ["push", "pull_request", "pull_request_target", "schedule"]) {
+    if (hasYamlKeyLine(text, trigger)) {
+      failures.push(`${label} must remain manual-only: ${trigger}:`);
+    }
+  }
+}
+
+function hasPinnedAction(text, action, sha) {
+  const expression = `^\\s*(?:-\\s+)?uses:\\s*${escapeRegExp(action)}@${sha}(?:\\s+#.*)?\\s*$`;
+  return new RegExp(expression, "mu").test(text);
 }
 
 function escapeRegExp(value) {

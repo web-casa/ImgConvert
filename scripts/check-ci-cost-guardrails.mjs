@@ -305,6 +305,45 @@ function checkUpdaterReleaseWorkflow() {
   requireBooleanInputDefault(updaterRelease, "draft_release", true, "release-updater.yml");
   requireBooleanInputDefault(updaterRelease, "prerelease", false, "release-updater.yml");
 
+  if (!/^permissions:\s*\n\s+contents:\s*read\s*$/mu.test(updaterRelease)) {
+    failures.push("release-updater.yml must default to read-only contents permissions");
+  }
+
+  const buildJob = workflowJobBody(updaterRelease, "linux-updater");
+  const publishJob = workflowJobBody(updaterRelease, "publish-release");
+  if (!buildJob) {
+    failures.push("release-updater.yml must define the linux-updater build job");
+  } else {
+    if (!buildJob.includes("persist-credentials: false")) {
+      failures.push("release-updater.yml build checkout must not persist GitHub credentials");
+    }
+    if (buildJob.includes("softprops/action-gh-release")) {
+      failures.push("release-updater.yml must not publish from the signing build job");
+    }
+  }
+  if (!publishJob) {
+    failures.push("release-updater.yml must publish from a separate publish-release job");
+  } else {
+    for (const marker of [
+      "if: ${{ inputs.publish_release }}",
+      "needs: linux-updater",
+      "contents: write",
+      "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "softprops/action-gh-release",
+      "release-assets/target/updater/latest.json",
+      "release-assets/target/appimagehub/SHA256SUMS",
+    ]) {
+      if (!publishJob.includes(marker)) {
+        failures.push(`release-updater.yml publish-release job missing marker: ${marker}`);
+      }
+    }
+    if (publishJob.includes("TAURI_SIGNING_PRIVATE_KEY")) {
+      failures.push(
+        "release-updater.yml publish-release job must not receive the updater signing key",
+      );
+    }
+  }
+
   if (!updaterRelease.includes("pnpm run release:linux:updater")) {
     failures.push("release-updater.yml must build signed Linux updater artifacts");
   }
@@ -651,6 +690,19 @@ function requireStringInput(text, inputName, workflowName) {
 function hasYamlKeyLine(text, key) {
   const pattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*:`);
   return text.split(/\r?\n/).some((line) => pattern.test(line));
+}
+
+function workflowJobBody(text, jobId) {
+  const start = `\n  ${jobId}:\n`;
+  const startIndex = text.indexOf(start);
+  if (startIndex < 0) {
+    return "";
+  }
+  const bodyStart = startIndex + start.length;
+  const nextJobOffset = text.slice(bodyStart).search(/\n {2}[A-Za-z0-9_-]+:\n/u);
+  return nextJobOffset < 0
+    ? text.slice(bodyStart)
+    : text.slice(bodyStart, bodyStart + nextJobOffset);
 }
 
 function readWorkflow(name) {

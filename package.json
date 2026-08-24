@@ -1,7 +1,7 @@
 {
   "name": "imgconvert",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.2.11",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.34.4",
@@ -75,7 +75,7 @@
     "release:updater:upgrade-smoke:eligibility": "node scripts/smoke-tauri-in-app-updater.mjs --eligibility-only",
     "release:linux:updater": "node scripts/release-linux-updater.mjs",
     "release:updater:local": "pnpm run release:linux:updater && pnpm run release:updater:manifest && pnpm run release:updater:verify",
-    "release:flatpak:prepare": "node scripts/prepare-flatpak-release.mjs",
+    "release:flatpak:prepare": "node scripts/prepare-flatpak-release.mjs && node scripts/check-flatpak-manifest.mjs --require-local-source",
     "release:snap:verify": "node scripts/check-snap-package.mjs",
     "release:appimagehub:prepare": "node scripts/prepare-appimagehub-release.mjs",
     "release:aur:prepare": "node scripts/prepare-aur-package.mjs && node scripts/verify-aur-package.mjs",

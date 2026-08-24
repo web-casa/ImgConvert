@@ -36,10 +36,11 @@ if (existsSync(packageDir)) {
 if (failures.length === 0) {
   const pkgbuild = readFileSync(path.join(packageDir, "PKGBUILD"), "utf8");
   const srcinfo = readFileSync(path.join(packageDir, ".SRCINFO"), "utf8");
-  for (const denied of ["@VERSION@", "@APPIMAGE_SHA256@", "SKIP"]) {
-    if (pkgbuild.includes(denied)) {
-      failures.push(`generated PKGBUILD contains denied marker: ${denied}`);
-    }
+  if (/@[A-Z0-9_]+@/u.test(pkgbuild) || /\bSKIP\b/u.test(pkgbuild)) {
+    failures.push("generated PKGBUILD contains an unresolved placeholder or SKIP checksum");
+  }
+  if (/@[A-Z0-9_]+@/u.test(srcinfo) || /\bSKIP\b/u.test(srcinfo)) {
+    failures.push("generated .SRCINFO contains an unresolved placeholder or SKIP checksum");
   }
   if (!srcinfo.includes("pkgbase = imgconvert-bin")) {
     failures.push("generated .SRCINFO has the wrong pkgbase");
