@@ -759,6 +759,9 @@ function checkTauriUpdaterGuardrails() {
     "latest.json signature does not match",
     "latest.json updater URL does not match this release",
     "persist-credentials: false",
+    "refresh-github-release-checksums.mjs",
+    "Refresh merged GitHub Release checksums",
+    "--verify",
   ]) {
     if (!updaterWorkflow.includes(expected)) {
       failures.push(`release-updater.yml missing marker: ${expected}`);
@@ -1000,6 +1003,9 @@ function checkLinux() {
   const toolchainCheck = readText(path.join(repoRoot, "scripts", "check-native-toolchain.mjs"));
   const matrixSmoke = readText(path.join(repoRoot, "scripts", "smoke-linux-package-matrix.mjs"));
   const linuxWorkflow = readText(path.join(repoRoot, ".github", "workflows", "release-linux.yml"));
+  const linuxFinalizeWorkflow = readText(
+    path.join(repoRoot, ".github", "workflows", "linux-release-assets-finalize.yml"),
+  );
   const ciWorkflow = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
   const releaseQa = readText(path.join(repoRoot, "docs", "RELEASE_QA.md"));
 
@@ -1008,6 +1014,7 @@ function checkLinux() {
     "release:linux",
     "release:linux:verify",
     "release:linux:smoke:docker",
+    "release:github:checksums:refresh",
   ]) {
     if (!packageScripts[scriptName]) {
       failures.push(`package.json must expose ${scriptName} for Linux release acceptance`);
@@ -1060,10 +1067,40 @@ function checkLinux() {
       failures.push(`CI Linux package smoke must preserve ${expected}`);
     }
   }
-  for (const expected of ["Fedora 42", "every packaged ELF", "Ubuntu 22.04"]) {
+  for (const expected of [
+    "Fedora 42",
+    "every packaged ELF",
+    "Ubuntu 22.04",
+    "tag-triggered `Linux Release` matrix succeeds",
+  ]) {
     if (!releaseQa.includes(expected)) {
       failures.push(`docs/RELEASE_QA.md must document Linux acceptance: ${expected}`);
     }
+  }
+  for (const expected of [
+    "source_run_id",
+    "release_tag",
+    "actions: read",
+    "contents: write",
+    "source run must be triggered by a tag push",
+    "release-linux.yml",
+    "finalizer must run from the default branch",
+    "imgconvert-linux-amd64-release",
+    "imgconvert-linux-arm64-release",
+    "gh run download",
+    "sha256sum --check --strict",
+    "gh release upload",
+    "refresh-github-release-checksums.mjs",
+    "Refresh merged GitHub Release checksums",
+    "--verify",
+    "release already has",
+  ]) {
+    if (!linuxFinalizeWorkflow.includes(expected)) {
+      failures.push(`Linux Release Assets Finalize workflow must preserve ${expected}`);
+    }
+  }
+  if (!linuxFinalizeWorkflow.includes('"$checksum_assets/SHA256SUMS" --clobber')) {
+    failures.push("Linux Release Assets Finalize may clobber only the merged SHA256SUMS asset");
   }
 }
 
@@ -1286,6 +1323,9 @@ function checkMacosRuntimeGuardrails() {
     "notarization_status == 'Accepted'",
     "gh release view",
     "gh release upload",
+    "refresh-github-release-checksums.mjs",
+    "Refresh merged GitHub Release checksums",
+    "--verify",
   ]) {
     if (!macosNotarizationFinalizeWorkflow.includes(expected)) {
       failures.push(`macOS notarization finalizer must preserve ${expected}`);

@@ -62,20 +62,19 @@
 </p>
 
 > [!NOTE]
-> 最新 GitHub Release 为 **v0.2.11**，提供 Linux x86_64 AppImage 与已签名的
-> updater 元数据。Snap Store 的 stable 渠道独立提供 Linux amd64 与 arm64 版本；
-> macOS 和 Windows 原生双架构候选包会先在 Actions 验证，再进入后续 GitHub Release。
+> 最新 GitHub Release 为 **v0.2.11**，提供已签名/公证的 macOS DMG、Linux
+> amd64/arm64 直装包，以及已签名的 Linux x86_64 updater 元数据。Snap Store 的
+> stable 渠道也独立提供 Linux amd64 与 arm64 版本。
 
 ## 下载
 
-| 平台                | 安装包                                        | 状态                                  |
-| ------------------- | --------------------------------------------- | ------------------------------------- |
-| macOS arm64 / x64   | DMG                                           | 双架构 CI 验证中                      |
-| Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                       | 双架构 CI 验证中                      |
-| Linux amd64 / arm64 | [Snap Store](https://snapcraft.io/imgconvert) | stable 渠道已发布                     |
-| Linux x86_64        | [AppImage][latest-release]                    | 已发布，含 updater 元数据             |
-| Microsoft Store     | MSIX                                          | x64 已进 Partner Center，arm64 待提交 |
-| Mac App Store       | MAS 包                                        | 等待验证与审核                        |
+| 平台                | 安装包                                                                          | 状态                                        |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
+| macOS arm64 / x64   | [DMG][latest-release]                                                           | 已签名、公证并发布                          |
+| Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                                                         | 双架构 CI 验证中                            |
+| Linux amd64 / arm64 | [GitHub 安装包][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`、RPM 和 AppImage 已发布；Snap stable |
+| Microsoft Store     | MSIX                                                                            | x64 已进 Partner Center，arm64 待提交       |
+| Mac App Store       | MAS 包                                                                          | 等待验证与审核                              |
 
 > [!WARNING]
 > Actions 生成的 Windows EXE/MSI 候选包当前没有 Authenticode 签名，可能触发
@@ -127,12 +126,11 @@
 
 ## 发布与项目状态
 
-- ✅ **GitHub Release v0.2.11**：提供 Linux x86_64 AppImage 与已签名 updater
-  元数据。Snap Store stable 独立提供 amd64 与 arm64。
-- 🚧 **桌面直发安装包**：macOS 和 Windows 的 arm64/x64 原生工作流已配置；
-  成功通过 CI、签名与公证后再发布到 Release。
-- ✅ **macOS 直发**：Developer ID Application 签名、公证、staple 与 Gatekeeper
-  验证已通过。
+- ✅ **GitHub Release v0.2.11**：提供 Linux amd64/arm64 直装包、已签名的 Linux
+  x86_64 updater 元数据，以及已公证的 macOS arm64/x64 DMG。Snap Store stable 独立
+  提供 amd64 与 arm64。
+- 🚧 **Windows 直装包**：arm64/x64 原生工作流已配置；公开 EXE/MSI 仍等待
+  Authenticode 签名。
 - ✅ **核心能力**：P0–P3 的 UI、Rust 引擎、批处理、压缩、metadata、色彩、
   fuzz 与跨平台打包入口已落地。
 - 🚧 **真实发布验收**：MAS 已完成构建、沙盒与签名检查，仍需 App Store Connect

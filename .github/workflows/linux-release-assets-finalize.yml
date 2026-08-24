@@ -1,0 +1,267 @@
+name: Linux Release Assets Finalize
+run-name: Publish Linux assets from run ${{ inputs.source_run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful tag-triggered Linux Release workflow run ID.
+        required: true
+        type: string
+      release_tag:
+        description: Immutable release tag whose Linux assets will be attached.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: linux-release-assets-finalize-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish Linux direct assets
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Validate source Linux Release run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$SOURCE_RUN_ID" in
+            ''|*[!0-9]*) echo "source_run_id must contain only digits"; exit 1 ;;
+          esac
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "release_tag must be a semantic v-prefixed tag"
+            exit 1
+          }
+
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          test "$(jq -r '.status' <<< "$run_json")" = "completed" || { echo "source run is not completed"; exit 1; }
+          test "$(jq -r '.conclusion' <<< "$run_json")" = "success" || { echo "source run did not succeed"; exit 1; }
+          test "$(jq -r '.event' <<< "$run_json")" = "push" || { echo "source run must be triggered by a tag push"; exit 1; }
+          test "$(jq -r '.head_repository.full_name' <<< "$run_json")" = "$GITHUB_REPOSITORY" || { echo "source repository mismatch"; exit 1; }
+          test "$(jq -r '.head_branch' <<< "$run_json")" = "$RELEASE_TAG" || { echo "source run tag does not match release_tag"; exit 1; }
+          test "$(jq -r '.name' <<< "$run_json")" = "Linux Release" || { echo "source workflow name mismatch"; exit 1; }
+
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.default_branch')"
+          test "$GITHUB_REF" = "refs/heads/$default_branch" || { echo "finalizer must run from the default branch"; exit 1; }
+
+          source_sha="$(jq -r '.head_sha' <<< "$run_json")"
+          workflow_id="$(jq -r '.workflow_id' <<< "$run_json")"
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid source head SHA"; exit 1; }
+          [[ "$workflow_id" =~ ^[0-9]+$ ]] || { echo "invalid source workflow ID"; exit 1; }
+          workflow_path="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id" --jq '.path')"
+          test "$workflow_path" = ".github/workflows/release-linux.yml" || { echo "source workflow path mismatch"; exit 1; }
+
+          artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          for architecture in amd64 arm64; do
+            artifact_name="imgconvert-linux-${architecture}-release"
+            count="$(jq --arg name "$artifact_name" '[.artifacts[] | select(.name == $name and .expired == false)] | length' <<< "$artifacts_json")"
+            test "$count" = "1" || { echo "source run must contain exactly one live $artifact_name artifact"; exit 1; }
+          done
+
+          {
+            echo "source_sha=$source_sha"
+            echo "default_branch=$default_branch"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Validate immutable tag and existing GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          DEFAULT_BRANCH: ${{ steps.source.outputs.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          tag_sha="$(git rev-parse "$RELEASE_TAG^{commit}")"
+          test "$tag_sha" = "$SOURCE_SHA" || { echo "release tag does not match the source build commit"; exit 1; }
+          git merge-base --is-ancestor "$tag_sha" "origin/$DEFAULT_BRANCH" || {
+            echo "release tag must point to a commit on the default branch"
+            exit 1
+          }
+          package_version="$(git show "$RELEASE_TAG:package.json" | jq -r '.version')"
+          test "$package_version" = "${RELEASE_TAG#v}" || { echo "release tag does not match package.json version"; exit 1; }
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
+
+      - name: Download verified build artifacts and current release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_assets="$GITHUB_WORKSPACE/linux-source-assets"
+          existing_assets="$GITHUB_WORKSPACE/linux-existing-release-assets"
+          mkdir -p "$source_assets/amd64" "$source_assets/arm64" "$existing_assets"
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name imgconvert-linux-amd64-release --dir "$source_assets/amd64"
+          gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name imgconvert-linux-arm64-release --dir "$source_assets/arm64"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing_assets"
+
+      - name: Verify checksums and stage non-conflicting direct packages
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          release_version="${RELEASE_TAG#v}"
+          source_assets="$GITHUB_WORKSPACE/linux-source-assets"
+          existing_assets="$GITHUB_WORKSPACE/linux-existing-release-assets"
+          staged_assets="$GITHUB_WORKSPACE/linux-release-publish-assets"
+          mkdir -p "$staged_assets"
+
+          stage_source_asset() {
+            local architecture="$1"
+            local relative_path="$2"
+            local source_dir="$source_assets/$architecture"
+            local checksum="$source_dir/SHA256SUMS"
+            local source_path="$source_dir/$relative_path"
+            local asset_name="${relative_path##*/}"
+
+            if ! test -f "$checksum" || test -L "$checksum"; then
+              echo "missing safe checksum manifest for $architecture"
+              exit 1
+            fi
+            if ! test -f "$source_path" || test -L "$source_path" || ! test -s "$source_path"; then
+              echo "missing safe source asset: $relative_path"
+              exit 1
+            fi
+            awk -v expected="$relative_path" '
+              $1 ~ /^[[:xdigit:]]{64}$/ && $2 == expected && NF == 2 { found = 1 }
+              END { exit(found ? 0 : 1) }
+            ' "$checksum" || { echo "checksum manifest does not cover $relative_path"; exit 1; }
+            case "$asset_name" in
+              *$'\n'*|*$'\r'*|*/*|.*|'') echo "unsafe release asset name: $asset_name"; exit 1 ;;
+              *[!A-Za-z0-9._-]*) echo "unsafe release asset name: $asset_name"; exit 1 ;;
+            esac
+            test ! -e "$existing_assets/$asset_name" || { echo "release already has $asset_name"; exit 1; }
+            test ! -e "$staged_assets/$asset_name" || { echo "staged asset collision: $asset_name"; exit 1; }
+            cp -- "$source_path" "$staged_assets/$asset_name"
+          }
+
+          for architecture in amd64 arm64; do
+            source_dir="$source_assets/$architecture"
+            checksum="$source_dir/SHA256SUMS"
+            if ! test -f "$checksum" || test -L "$checksum"; then
+              echo "missing safe checksum manifest for $architecture"
+              exit 1
+            fi
+            (
+              cd "$source_dir"
+              sha256sum --check --strict SHA256SUMS
+            )
+          done
+
+          # The signed x86_64 updater AppImage is already attached under the same
+          # basename. Publish only the non-conflicting native packages plus arm64 AppImage.
+          stage_source_asset amd64 "deb/ImgConvert_${release_version}_amd64.deb"
+          stage_source_asset amd64 "rpm/ImgConvert-${release_version}-1.x86_64.rpm"
+          stage_source_asset arm64 "appimage/ImgConvert_${release_version}_aarch64.AppImage"
+          stage_source_asset arm64 "deb/ImgConvert_${release_version}_arm64.deb"
+          stage_source_asset arm64 "rpm/ImgConvert-${release_version}-1.aarch64.rpm"
+
+          existing_checksum="$existing_assets/SHA256SUMS"
+          if ! test -f "$existing_checksum" || test -L "$existing_checksum"; then
+            echo "existing release has no safe SHA256SUMS"
+            exit 1
+          fi
+          (
+            cd "$existing_assets"
+            sha256sum --check --strict SHA256SUMS
+          )
+
+          existing_files=()
+          while IFS= read -r -d '' file; do existing_files+=("$file"); done < <(
+            find "$existing_assets" -maxdepth 1 -type f -print0
+          )
+          test "${#existing_files[@]}" -gt 1 || { echo "existing release has too few assets"; exit 1; }
+          for source_path in "${existing_files[@]}"; do
+            asset_name="$(basename "$source_path")"
+            if [ "$asset_name" = "SHA256SUMS" ]; then
+              continue
+            fi
+            case "$asset_name" in
+              *$'\n'*|*$'\r'*|*/*|.*|'') echo "unsafe existing release asset name: $asset_name"; exit 1 ;;
+              *[!A-Za-z0-9._-]*) echo "unsafe existing release asset name: $asset_name"; exit 1 ;;
+            esac
+            test -s "$source_path" || { echo "existing release asset is empty: $asset_name"; exit 1; }
+            test ! -e "$staged_assets/$asset_name" || { echo "release asset collision: $asset_name"; exit 1; }
+            cp -- "$source_path" "$staged_assets/$asset_name"
+          done
+
+      - name: Attach verified Linux packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$GITHUB_WORKSPACE/linux-release-publish-assets"
+          gh release upload "$RELEASE_TAG" \
+            "$release_dir"/*.deb \
+            "$release_dir"/*.rpm \
+            "$release_dir"/*_aarch64.AppImage \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Refresh merged GitHub Release checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checksum_assets="$GITHUB_WORKSPACE/linux-release-checksum-assets"
+          mkdir -p "$checksum_assets"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets" --verify
+          gh release upload "$RELEASE_TAG" "$checksum_assets/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify public release assets and merged checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          public_assets="$GITHUB_WORKSPACE/linux-public-release-assets"
+          release_version="${RELEASE_TAG#v}"
+          mkdir -p "$public_assets"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$public_assets"
+          for asset_name in \
+            "ImgConvert_${release_version}_amd64.deb" \
+            "ImgConvert-${release_version}-1.x86_64.rpm" \
+            "ImgConvert_${release_version}_aarch64.AppImage" \
+            "ImgConvert_${release_version}_arm64.deb" \
+            "ImgConvert-${release_version}-1.aarch64.rpm"; do
+            test -s "$public_assets/$asset_name" || {
+              echo "missing published release asset: $asset_name"
+              exit 1
+            }
+          done
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$public_assets" --verify

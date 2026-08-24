@@ -62,21 +62,19 @@
 </p>
 
 > [!NOTE]
-> The latest GitHub Release is **v0.2.11**, with the Linux x86_64 AppImage and signed
-> updater metadata. Snap Store provides Linux amd64 and arm64 builds on its independent
-> stable channel; native macOS and Windows dual-architecture candidates are validated in
-> Actions before they are attached to a later GitHub Release.
+> The latest GitHub Release is **v0.2.11**, with signed/notarized macOS DMGs,
+> Linux amd64/arm64 direct packages, and signed Linux x86_64 updater metadata.
+> Snap Store independently provides Linux amd64 and arm64 builds on its stable channel.
 
 ## Downloads
 
-| Platform            | Package                                       | Status                               |
-| ------------------- | --------------------------------------------- | ------------------------------------ |
-| macOS arm64 / x64   | DMG                                           | Dual-architecture CI validation      |
-| Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                 | Dual-architecture CI validation      |
-| Linux amd64 / arm64 | [Snap Store](https://snapcraft.io/imgconvert) | Stable channel                       |
-| Linux x86_64        | [AppImage][latest-release]                    | Published with updater metadata      |
-| Microsoft Store     | MSIX                                          | x64 in Partner Center; arm64 pending |
-| Mac App Store       | MAS package                                   | Pending validation and review        |
+| Platform            | Package                                                                           | Status                                           |
+| ------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------ |
+| macOS arm64 / x64   | [DMG][latest-release]                                                             | Signed, notarized, and published                 |
+| Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                                                     | Dual-architecture CI validation                  |
+| Linux amd64 / arm64 | [GitHub packages][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`, RPM, and AppImage published; Snap stable |
+| Microsoft Store     | MSIX                                                                              | x64 in Partner Center; arm64 pending             |
+| Mac App Store       | MAS package                                                                       | Pending validation and review                    |
 
 > [!WARNING]
 > Windows EXE/MSI candidates produced by Actions are not currently Authenticode-signed
@@ -128,12 +126,11 @@
 
 ## Release and project status
 
-- ✅ **GitHub Release v0.2.11**: provides the Linux x86_64 AppImage and signed updater
-  metadata. Snap Store stable independently serves amd64 and arm64.
-- 🚧 **Direct desktop packages**: native macOS and Windows arm64/x64 workflows are
-  configured; release publication follows successful CI, signing, and notarization.
-- ✅ **Direct macOS distribution**: Developer ID Application signing, notarization,
-  stapling, and Gatekeeper verification have passed.
+- ✅ **GitHub Release v0.2.11**: provides Linux amd64/arm64 direct packages, signed
+  Linux x86_64 updater metadata, and notarized macOS arm64/x64 DMGs. Snap Store stable
+  independently serves amd64 and arm64.
+- 🚧 **Windows direct packages**: native arm64/x64 workflows are configured; public
+  EXE/MSI publication waits for Authenticode signing.
 - ✅ **Core product**: the P0–P3 UI, Rust engine, batch processing, compression,
   metadata, color, fuzzing, and cross-platform packaging entrypoints are implemented.
 - 🚧 **Real release validation**: the MAS build, sandbox, and signing checks pass;

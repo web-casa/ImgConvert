@@ -58,6 +58,14 @@ pnpm run release:updater:upgrade-smoke -- \
   --from-tag=v<previous> --to-tag=v<current> --platform=linux-x86_64
 ```
 
+After a tag-triggered `Linux Release` matrix succeeds, use the manual `Linux
+Release Assets Finalize` workflow from `main` to attach its verified amd64 and
+arm64 direct packages to the existing same-tag GitHub Release. The finalizer
+checks the source run provenance, immutable tag commit, both per-architecture
+checksum manifests, and the current release checksum manifest before it
+publishes assets. It then replaces only the release-level `SHA256SUMS` with a
+merged manifest and verifies the public download set again.
+
 ## Image corpus and resource acceptance
 
 Record the machine, OS version, package type, and result for each supported

@@ -93,11 +93,20 @@ stages the following flat asset set for the GitHub Release:
 - `latest.json`
 - `ImgConvert-<version>-x86_64.AppImage` and its `.sig`
 - the Tauri updater AppImage and its `.sig`
-- one merged `SHA256SUMS`, covering `latest.json` and every published AppImage
-  and signature
+- one merged `SHA256SUMS`, initially covering `latest.json`, every published
+  updater AppImage, and signature
 
 Do not attach both build-time files named `SHA256SUMS` directly: GitHub Release
 asset names are flat, so the later upload would overwrite the earlier one.
+
+After the tag-triggered Linux package matrix succeeds, run `Linux Release
+Assets Finalize` from `main` with its run ID and the same tag. It accepts only
+the successful `Linux Release` tag-push run from this repository, verifies both
+artifact checksum manifests, and attaches the non-conflicting `.deb`, `.rpm`,
+and arm64 AppImage files. Every GitHub Release asset attachment then refreshes
+only the release-level `SHA256SUMS` into a manifest covering the complete public
+release set. The Linux finalizer does not rebuild packages or receive the
+updater signing key.
 
 Before uploading the first GitHub Releases batch, run the local read-only gate:
 

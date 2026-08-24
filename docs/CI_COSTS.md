@@ -34,6 +34,10 @@ Default behavior:
   install/runtime smoke matrix.
   Manual dispatch also defaults to both architectures; Docker smoke remains an
   explicit opt-in.
+- `Linux Release Assets Finalize` is a manual-only `ubuntu-22.04` job. It does
+  not rebuild packages: it downloads the two successful tag-build artifacts,
+  verifies their checksums and source/tag provenance, then attaches the direct
+  Linux packages to an existing Release and refreshes the merged checksum file.
 - `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
   runner. It retains the Apple Silicon AVIF benchmark JSON artifact for 14
   days; signing, asynchronous notarization submission, DMG, and MAS candidate

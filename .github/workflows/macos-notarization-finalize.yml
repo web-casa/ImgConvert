@@ -221,3 +221,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
         run: gh release upload "$IMGCONVERT_RELEASE_TAG" "$IMGCONVERT_MACOS_DMG" --repo "$GITHUB_REPOSITORY"
+
+      - name: Refresh merged GitHub Release checksums
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          checksum_assets="$RUNNER_TEMP/imgconvert-release-checksum-assets"
+          mkdir -p "$checksum_assets"
+          gh release download "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets" --verify
+          gh release upload "$IMGCONVERT_RELEASE_TAG" "$checksum_assets/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"

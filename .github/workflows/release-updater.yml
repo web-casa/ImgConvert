@@ -144,6 +144,9 @@ jobs:
           ref: ${{ inputs.tag }}
           fetch-depth: 1
           persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -273,3 +276,16 @@ jobs:
             release-publish-assets/*.AppImage
             release-publish-assets/*.AppImage.sig
             release-publish-assets/SHA256SUMS
+      - name: Refresh merged GitHub Release checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checksum_assets='release-checksum-assets'
+          mkdir -p "$checksum_assets"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets" --verify
+          gh release upload "$RELEASE_TAG" "$checksum_assets/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"

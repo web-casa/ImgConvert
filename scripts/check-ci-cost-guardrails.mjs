@@ -11,6 +11,7 @@ const failures = [];
 const packageJson = readJson(path.join(repoRoot, "package.json"));
 const ci = readWorkflow("ci.yml");
 const linuxRelease = readWorkflow("release-linux.yml");
+const linuxReleaseAssetsFinalize = readWorkflow("linux-release-assets-finalize.yml");
 const updaterRelease = readWorkflow("release-updater.yml");
 const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
@@ -27,6 +28,7 @@ const pages = readWorkflow("pages.yml");
 const allWorkflows = [
   ["ci.yml", ci],
   ["release-linux.yml", linuxRelease],
+  ["linux-release-assets-finalize.yml", linuxReleaseAssetsFinalize],
   ["release-updater.yml", updaterRelease],
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
@@ -53,6 +55,8 @@ for (const name of readdirSync(workflowsDir)
 checkAutomaticLinuxCiWorkflow();
 checkUbuntuAptBootstrap();
 checkLinuxReleaseWorkflow();
+checkLinuxReleaseAssetsFinalizeWorkflow();
+checkManualWorkflow("linux-release-assets-finalize.yml", linuxReleaseAssetsFinalize);
 checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
@@ -292,6 +296,55 @@ function checkLinuxReleaseWorkflow() {
   }
 }
 
+function checkLinuxReleaseAssetsFinalizeWorkflow() {
+  requireStringInput(
+    linuxReleaseAssetsFinalize,
+    "source_run_id",
+    "linux-release-assets-finalize.yml",
+  );
+  requireStringInput(
+    linuxReleaseAssetsFinalize,
+    "release_tag",
+    "linux-release-assets-finalize.yml",
+  );
+  for (const marker of [
+    "actions: read",
+    "contents: write",
+    "runs-on: ubuntu-22.04",
+    "timeout-minutes: 20",
+    "source run must be triggered by a tag push",
+    "source run tag does not match release_tag",
+    "finalizer must run from the default branch",
+    "release-linux.yml",
+    "imgconvert-linux-amd64-release",
+    "imgconvert-linux-arm64-release",
+    "gh run download",
+    "gh release download",
+    "sha256sum --check --strict",
+    "gh release upload",
+    '"$checksum_assets/SHA256SUMS" --clobber',
+    "refresh-github-release-checksums.mjs",
+    "Refresh merged GitHub Release checksums",
+    "--verify",
+    "Verify public release assets and merged checksums",
+  ]) {
+    if (!linuxReleaseAssetsFinalize.includes(marker)) {
+      failures.push(`linux-release-assets-finalize.yml missing marker: ${marker}`);
+    }
+  }
+  if (!linuxReleaseAssetsFinalize.includes("persist-credentials: false")) {
+    failures.push("linux-release-assets-finalize.yml checkout must not persist GitHub credentials");
+  }
+  if (linuxReleaseAssetsFinalize.includes("ref: ${{ steps.source.outputs.source_sha }}")) {
+    failures.push(
+      "linux-release-assets-finalize.yml must not execute code from the source build run",
+    );
+  }
+  if (linuxReleaseAssetsFinalize.includes("git checkout --detach")) {
+    failures.push("linux-release-assets-finalize.yml must not execute code from a release tag");
+  }
+}
+
 function checkManualWorkflow(name, text) {
   for (const trigger of ["push", "pull_request", "pull_request_target"]) {
     if (hasYamlKeyLine(text, trigger)) {
@@ -350,6 +403,9 @@ function checkUpdaterReleaseWorkflow() {
       "latest.json signature does not match",
       "latest.json updater URL does not match this release",
       "RELEASE_REPOSITORY",
+      "refresh-github-release-checksums.mjs",
+      "Refresh merged GitHub Release checksums",
+      "--verify",
     ]) {
       if (!publishJob.includes(marker)) {
         failures.push(`release-updater.yml publish-release job missing marker: ${marker}`);
@@ -551,6 +607,9 @@ function checkMacosNotarizationFinalizeWorkflow() {
     "imgconvert-macos-${{ inputs.architecture }}-dmg-notarized",
     "gh release view",
     "gh release upload",
+    "refresh-github-release-checksums.mjs",
+    "Refresh merged GitHub Release checksums",
+    "--verify",
   ]) {
     if (!macosNotarizationFinalize.includes(marker)) {
       failures.push(`macos-notarization-finalize.yml missing marker: ${marker}`);

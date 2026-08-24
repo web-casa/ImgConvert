@@ -66,6 +66,7 @@
     "release:linux:smoke:appimagehub": "node scripts/smoke-linux-package-install.mjs --bundle=appimage --image=ubuntu:22.04 --convert-smoke",
     "release:linux:smoke:docker": "node scripts/smoke-linux-package-matrix.mjs",
     "release:linux:checksums": "node scripts/generate-linux-release-checksums.mjs --bundles=deb,rpm,appimage",
+    "release:github:checksums:refresh": "node scripts/refresh-github-release-checksums.mjs",
     "release:updater:prepare": "node scripts/prepare-tauri-updater-release.mjs",
     "release:updater:sign": "node scripts/sign-tauri-updater-artifacts.mjs",
     "release:updater:manifest": "node scripts/generate-tauri-updater-manifest.mjs",
