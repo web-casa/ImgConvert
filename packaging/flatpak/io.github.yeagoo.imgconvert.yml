@@ -66,4 +66,4 @@ modules:
     sources:
       - type: archive
         path: ../../target/flatpak/sources/imgconvert-0.2.11-source.tar.gz
-        sha256: dace8e9cf048b2c14d768a4162e25bd783c536031b08c65c97fe0cc58a389cc1
+        sha256: 57514c8142dd1efbb67c920088b4069f0378255c05db3a99f3d325702fcfb8ff
