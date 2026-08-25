@@ -2120,14 +2120,24 @@ mod tests {
 
         let diagnostic =
             set_selected_heic_helper(Some(helper.to_string_lossy().to_string())).unwrap();
-        let found = find_heic_helper().unwrap();
+        if let Some(reason) = external_codec_discovery_disabled_reason() {
+            let expected_message = reason.diagnostic(false);
+            assert!(!diagnostic.available);
+            assert_eq!(
+                diagnostic.message.as_ref().map(|message| &message.code),
+                Some(&expected_message.code)
+            );
+            assert!(find_heic_helper().is_none());
+        } else {
+            let found = find_heic_helper().unwrap();
 
-        assert!(diagnostic.available);
-        assert_eq!(
-            diagnostic.provider.as_ref().unwrap().kind,
-            "selected-helper"
-        );
-        assert_eq!(found.provider_info().kind, "selected-helper");
+            assert!(diagnostic.available);
+            assert_eq!(
+                diagnostic.provider.as_ref().unwrap().kind,
+                "selected-helper"
+            );
+            assert_eq!(found.provider_info().kind, "selected-helper");
+        }
 
         let diagnostic = set_selected_heic_helper(None).unwrap();
         assert!(!diagnostic.configured);
@@ -2171,11 +2181,17 @@ mod tests {
             Some(helper.to_string_lossy().as_ref())
         );
         let message = diagnostic.message.as_ref().unwrap();
-        assert_eq!(message.code, "selectedHelperUnavailable");
-        assert!(message
-            .detail
-            .as_deref()
-            .is_some_and(|detail| detail.contains("HEIC_SELECTED_HELPER_UNTRUSTED")));
+        if let Some(reason) = external_codec_discovery_disabled_reason() {
+            let expected_message = reason.diagnostic(false);
+            assert_eq!(message.code, expected_message.code);
+            assert!(message.detail.is_none());
+        } else {
+            assert_eq!(message.code, "selectedHelperUnavailable");
+            assert!(message
+                .detail
+                .as_deref()
+                .is_some_and(|detail| detail.contains("HEIC_SELECTED_HELPER_UNTRUSTED")));
+        }
 
         fs::remove_dir_all(dir).unwrap();
     }

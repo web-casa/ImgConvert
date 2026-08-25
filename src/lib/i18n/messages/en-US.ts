@@ -37,6 +37,7 @@ export const enUS = {
     theme: "Theme",
     pluginDiagnostics: "Plugin diagnostics",
     appUpdate: "App update",
+    privacySupport: "Privacy and support",
     licenses: "Licenses",
     language: "Language",
   },
@@ -179,6 +180,23 @@ export const enUS = {
     description: "Apache-2.0 project notice and third-party dependency license attribution.",
     close: "Close",
     loading: "Loading…",
+  },
+  privacySupport: {
+    title: "Privacy and support",
+    description:
+      "Read the policy included with this app and open the project support channel when you need help.",
+    localPolicy: "Included privacy policy",
+    localCopyBadge: "LOCAL COPY",
+    localPolicyDescription:
+      "This policy is bundled with the app so it remains available without a network connection.",
+    support: "Support",
+    supportDescription:
+      "Support is handled through the ImgConvert issue tracker in your default browser.",
+    supportUrl: "github.com/web-casa/ImgConvert/issues",
+    openSupport: "Open support",
+    openingSupport: "Opening support…",
+    openSupportError: "Unable to open the support page. Copy the address below into your browser.",
+    close: "Close",
   },
   update: {
     webPreview: "The web preview is not connected to the desktop update channel",

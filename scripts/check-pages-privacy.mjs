@@ -13,6 +13,9 @@ const notFoundPage = readRequired("pages/404.html");
 const styles = readRequired("pages/assets/privacy.css");
 const chinesePolicy = readRequired("PRIVACY.md");
 const englishPolicy = readRequired("PRIVACY.en.md");
+const websiteLegal = readRequired("website/src/lib/legal.ts");
+const privacySupportDialog = readRequired("src/lib/components/PrivacySupportDialog.svelte");
+const topbar = readRequired("src/lib/components/Topbar.svelte");
 const workflow = readRequired(".github/workflows/pages.yml");
 const chinesePolicyDate = requiredMatch(
   chinesePolicy,
@@ -35,17 +38,22 @@ for (const [label, text, required] of [
   ["privacy page", privacyPage, 'id="zh-CN"'],
   ["privacy page", privacyPage, 'lang="en"'],
   ["privacy page", privacyPage, 'lang="zh-CN"'],
-  ["privacy page", privacyPage, "custom output directory"],
+  ["privacy page", privacyPage, "custom output-directory path"],
   ["privacy page", privacyPage, "result-cache records"],
   ["privacy page", privacyPage, "you can disable result reuse in the app"],
+  ["privacy page", privacyPage, "Mac App Store edition does not access Apple Music"],
+  ["privacy page", privacyPage, "built-in macOS ImageIO"],
   ["privacy page", privacyPage, "自定义输出目录"],
   ["privacy page", privacyPage, "结果缓存记录"],
   ["privacy page", privacyPage, "你可以在应用中关闭结果复用"],
-  ["privacy page", privacyPage, "ImgConvert 不输出 HEIC 文件"],
+  ["privacy page", privacyPage, "Mac App Store 版本不会访问 Apple Music"],
+  ["privacy page", privacyPage, "macOS 内置 ImageIO"],
   ["privacy page", privacyPage, "https://github.com/web-casa/ImgConvert/issues"],
   ["landing page", landingPage, "url=privacy/"],
-  ["Chinese policy", chinesePolicy, "不会上传、收集或向第三方传输以下信息"],
-  ["Chinese policy", chinesePolicy, "自定义输出目录或 HEIC helper"],
+  ["Chinese policy", chinesePolicy, "不会为图片转换或分析目的上传、收集或向第三方传输以下信息"],
+  ["Chinese policy", chinesePolicy, "Mac App Store 版本不会访问 Apple Music"],
+  ["Chinese policy", chinesePolicy, "Mac App Store 和 Microsoft Store 版本均不启用应用内更新"],
+  ["Chinese policy", chinesePolicy, "在允许用户选择 HEIC helper 的版本中"],
   ["Chinese policy", chinesePolicy, "结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小"],
   ["Chinese policy", chinesePolicy, "你可以在应用中关闭结果复用"],
   [
@@ -53,9 +61,24 @@ for (const [label, text, required] of [
     englishPolicy,
     "does not upload, collect, or transmit the following information",
   ],
-  ["English policy", englishPolicy, "custom output directory or a HEIC helper"],
+  ["English policy", englishPolicy, "The Mac App Store edition does not access Apple Music"],
+  [
+    "English policy",
+    englishPolicy,
+    "The Mac App Store and Microsoft Store editions do not enable an in-app updater",
+  ],
+  ["English policy", englishPolicy, "On editions that allow a user-selected HEIC helper"],
   ["English policy", englishPolicy, "Result-cache records contain only hashes and file sizes"],
   ["English policy", englishPolicy, "you can disable result reuse in the app"],
+  ["website privacy copy", websiteLegal, "Apple platform access and HEIC decoding"],
+  ["website privacy copy", websiteLegal, "Apple 平台访问与 HEIC 解码"],
+  ["website privacy copy", websiteLegal, "Mac App Store and Microsoft Store editions"],
+  ["website privacy copy", websiteLegal, "Mac App Store 和 Microsoft Store 版本"],
+  ["in-app privacy", privacySupportDialog, "../../../PRIVACY.en.md?raw"],
+  ["in-app privacy", privacySupportDialog, "../../../PRIVACY.md?raw"],
+  ["in-app privacy", privacySupportDialog, "https://github.com/web-casa/ImgConvert/issues"],
+  ["in-app privacy", privacySupportDialog, "openUrl(SUPPORT_URL)"],
+  ["top bar", topbar, "onOpenPrivacySupport"],
   ["Pages workflow", workflow, "workflow_dispatch:"],
   ["Pages workflow", workflow, "runs-on: ubuntu-24.04"],
   ["Pages workflow", workflow, "actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d"],
@@ -72,6 +95,21 @@ for (const [label, text, required] of [
 ]) {
   if (!normalizeWhitespace(text).includes(normalizeWhitespace(required))) {
     failures.push(`${label} missing required content: ${required}`);
+  }
+}
+
+for (const [label, text] of [
+  ["privacy page", privacyPage],
+  ["Chinese policy", chinesePolicy],
+  ["English policy", englishPolicy],
+  ["website privacy copy", websiteLegal],
+]) {
+  if (
+    /covers the current ImgConvert Microsoft Store edition|适用于当前 ImgConvert Microsoft Store 版本/.test(
+      text,
+    )
+  ) {
+    failures.push(label + " must not limit the privacy policy to the Microsoft Store edition");
   }
 }
 

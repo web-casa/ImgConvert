@@ -1,7 +1,7 @@
 {
   "name": "imgconvert",
   "private": true,
-  "version": "0.2.15",
+  "version": "0.2.16",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.34.4",
@@ -98,7 +98,7 @@
     "release:platform:check": "pnpm run architecture:check && pnpm run release:readiness:check && node scripts/check-platform-release-guardrails.mjs --platform=all --channel=all",
     "release:macos:check": "node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=direct,store",
     "release:macos:direct:check": "node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=direct",
-    "release:macos:store:check": "node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=store --require-store-env",
+    "release:macos:store:check": "node scripts/check-pages-privacy.mjs && node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=store --require-store-env",
     "bench:platform": "node scripts/benchmark-platform.mjs",
     "bench:avif:macos": "node scripts/benchmark-macos-avif.mjs",
     "release:macos:smoke": "node scripts/smoke-macos-runtime.mjs",

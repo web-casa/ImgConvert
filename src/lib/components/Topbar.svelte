@@ -8,6 +8,7 @@
     PuzzlePiece,
     Sparkle,
     DownloadSimple,
+    ShieldCheck,
     Translate,
   } from "phosphor-svelte";
   import { t } from "svelte-i18n";
@@ -18,10 +19,12 @@
 
   let {
     onOpenLegal,
+    onOpenPrivacySupport,
     onOpenPluginDiagnostics,
     onOpenUpdates,
   }: {
     onOpenLegal: () => void;
+    onOpenPrivacySupport: () => void;
     onOpenPluginDiagnostics: () => void;
     onOpenUpdates: () => void;
   } = $props();
@@ -119,6 +122,14 @@
         <DownloadSimple weight="duotone" />
       </Button>
     {/if}
+    <Button
+      variant="ghost"
+      size="icon"
+      title={$t("topbar.privacySupport")}
+      onclick={onOpenPrivacySupport}
+    >
+      <ShieldCheck weight="duotone" />
+    </Button>
     <Button variant="ghost" size="icon" title={$t("topbar.licenses")} onclick={onOpenLegal}>
       <Info weight="duotone" />
     </Button>

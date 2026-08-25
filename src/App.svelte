@@ -16,6 +16,7 @@
   import { Button } from "$lib/components/ui/button";
   import Dropzone from "$lib/components/Dropzone.svelte";
   import LegalDialog from "$lib/components/LegalDialog.svelte";
+  import PrivacySupportDialog from "$lib/components/PrivacySupportDialog.svelte";
   import PluginDiagnosticsDialog from "$lib/components/PluginDiagnosticsDialog.svelte";
   import QueueItem from "$lib/components/QueueItem.svelte";
   import OutputDestinationControl from "$lib/components/OutputDestinationControl.svelte";
@@ -48,6 +49,7 @@
     queue.length ? Math.round((settledCount / queue.length) * 100) : 0,
   );
   let legalOpen = $state(false);
+  let privacySupportOpen = $state(false);
   let pluginDiagnosticsOpen = $state(false);
   let updateOpen = $state(false);
   onMount(() => {
@@ -103,6 +105,7 @@
       <div class="shrink-0 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <Topbar
           onOpenLegal={() => (legalOpen = true)}
+          onOpenPrivacySupport={() => (privacySupportOpen = true)}
           onOpenPluginDiagnostics={() => (pluginDiagnosticsOpen = true)}
           onOpenUpdates={() => (updateOpen = true)}
         />
@@ -259,6 +262,7 @@
 
     <PluginDiagnosticsDialog bind:open={pluginDiagnosticsOpen} />
     <UpdateDialog bind:open={updateOpen} />
+    <PrivacySupportDialog bind:open={privacySupportOpen} />
     <LegalDialog bind:open={legalOpen} />
   {:else}
     <div class="grid h-dvh place-items-center bg-background text-sm text-muted-foreground">

@@ -67,16 +67,23 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       title: "用清楚的话，\n说明隐私。",
       intro:
         "ImgConvert 是一款在本机运行的图片批量转换工具。我们默认按“本地优先、最小收集”的原则处理数据。",
-      effectiveDate: "生效日期：2026-08-19",
+      effectiveDate: "生效日期：2026-08-25",
       sourceNote: "以下内容与项目公开隐私政策保持一致。",
       sections: [
+        {
+          title: "适用范围",
+          paragraphs: [
+            "本政策适用于当前 ImgConvert 的官方桌面版。若不同分发渠道的数据处理方式不同，本政策会明确标注对应渠道。",
+            "本政策不替代 Apple、Microsoft、GitHub 或操作系统提供方各自的隐私政策。",
+          ],
+        },
         {
           title: "核心承诺",
           items: [
             "图片转换、压缩、缩略图生成和处理均在本机完成。",
             "不上传，也不会向我们或第三方收集你的图片、文件路径、剪贴板内容或转换结果。",
             "不包含广告 SDK、行为统计 SDK、第三方埋点或账号系统。",
-            "Microsoft Store 版本不启用应用内更新，软件更新由 Microsoft Store 提供。",
+            "Mac App Store 和 Microsoft Store 版本均不启用应用内更新，软件更新由各自的应用商店提供。",
           ],
         },
         {
@@ -104,9 +111,16 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "本机设置、缓存与临时文件",
           paragraphs: [
-            "应用会在本机保存转换偏好设置。若你主动选择自定义输出目录或 HEIC helper，其路径会保存在本机设置中，以便下次继续使用。",
+            "应用会在本机保存转换偏好设置。若你主动选择自定义输出目录，其路径会保存在本机设置中，以便下次继续使用。在允许用户选择 HEIC helper 的版本中，所选 helper 的路径也可能保存在本机。",
             "转换过程中，应用还可能在本机临时目录或应用数据目录中创建临时文件、缩略图缓存和结果缓存记录。结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小，不包含图片字节或文件路径；它可能在当前任务结束后继续保留，直至被清除。",
             "临时文件仅用于完成当前转换任务，用户可以随时删除。设置、缓存和临时文件都不会同步到任何服务器；你可以在应用中关闭结果复用。如需删除已保存的设置和缓存记录，请删除相应的本机应用数据或缓存目录。",
+          ],
+        },
+        {
+          title: "Apple 平台访问与 HEIC 解码",
+          paragraphs: [
+            "Mac App Store 版本不会访问 Apple Music、你的 Apple Music 资料库或照片图库，也不会请求通讯录、相机、麦克风或位置数据访问权限。",
+            "当你在 Mac App Store 版本中主动选择 HEIC 文件时，ImgConvert 可能通过 macOS 内置的 ImageIO 框架在本机解码该文件。该版本不输出 HEIC，不捆绑外部 HEIC/HEVC 编解码器，也不发现第三方 codec helper。",
           ],
         },
         {
@@ -127,9 +141,10 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           paragraphs: ["ImgConvert 不面向儿童提供定向内容，也不主动收集任何用户的个人信息。"],
         },
         {
-          title: "第三方服务",
+          title: "更新与第三方服务",
           paragraphs: [
-            "Microsoft Store 版本不调用第三方网络服务。应用不包含分析、广告或远程配置服务。",
+            "Mac App Store 和 Microsoft Store 版本不使用应用内更新通道。单独配置的直发版本仅会在你主动检查或安装更新时连接 GitHub Releases；该连接受 GitHub 隐私政策约束，且不会上传你的图片或转换数据。",
+            "除上述可选、由用户主动触发的直发更新连接外，ImgConvert 不会为了应用运行调用第三方网络服务，也不包含分析、广告、崩溃报告或远程配置服务。",
           ],
         },
         {
@@ -138,7 +153,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         },
       ],
       contactTitle: "联系我们",
-      contact: "如对隐私政策有任何问题，请在项目仓库提交 issue。",
+      contact: "如需支持或对隐私政策有任何问题，请使用项目 issue tracker。",
       contactLink: "前往 ImgConvert Issues",
     },
     legal: {
@@ -187,16 +202,23 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       title: "Privacy,\nin plain language.",
       intro:
         "ImgConvert is a local image batch-conversion tool. We process data according to the principles of local-first operation and minimal collection.",
-      effectiveDate: "Effective date: August 19, 2026",
+      effectiveDate: "Effective date: August 25, 2026",
       sourceNote: "This page stays aligned with the public project privacy policy.",
       sections: [
+        {
+          title: "Scope",
+          paragraphs: [
+            "This policy covers the current official ImgConvert desktop releases. Where a data practice differs by distribution channel, this policy identifies that channel specifically.",
+            "It does not replace the privacy policies of Apple, Microsoft, GitHub, or your operating-system provider.",
+          ],
+        },
         {
           title: "Core commitments",
           items: [
             "Image conversion, compression, thumbnail generation, and processing run on your device.",
             "We do not upload or collect your images, file paths, clipboard content, or conversion results for us or a third party.",
             "ImgConvert contains no advertising SDK, behavioral analytics SDK, third-party tracking, or account system.",
-            "The Microsoft Store edition does not enable an in-app updater; software updates are delivered by Microsoft Store.",
+            "The Mac App Store and Microsoft Store editions do not enable an in-app updater. Their software updates are delivered by the respective store.",
           ],
         },
         {
@@ -227,9 +249,16 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "Local settings, caches, and temporary files",
           paragraphs: [
-            "ImgConvert stores conversion preferences locally. If you actively choose a custom output directory or a HEIC helper, its path is stored in local settings for your next use.",
+            "ImgConvert stores conversion preferences locally. If you actively choose a custom output directory, its path is stored in local settings for your next use. On editions that allow a user-selected HEIC helper, that selected helper path may also be stored locally.",
             "During conversion, ImgConvert may also create temporary files, thumbnail caches, and result-cache records in the local temporary directory or app-data directory. Result-cache records contain only hashes and file sizes used to verify or reuse conversion results; they do not contain image bytes or file paths and may remain after a task completes until you clear them.",
             "Temporary files are used only to complete the current conversion task, and you may delete them at any time. Settings, caches, and temporary files are never synchronized to a server; you can disable result reuse in the app. To remove saved settings and cache records, delete the relevant local app-data or cache directory.",
+          ],
+        },
+        {
+          title: "Apple platform access and HEIC decoding",
+          paragraphs: [
+            "The Mac App Store edition does not access Apple Music, your Apple Music library, or your Photos library. It does not request access to contacts, camera, microphone, or location data.",
+            "When you actively select a HEIC file in the Mac App Store edition, ImgConvert may use the built-in macOS ImageIO framework to decode that selected file on your device. It does not create HEIC output, bundle an external HEIC/HEVC codec, or discover third-party codec helpers in that edition.",
           ],
         },
         {
@@ -252,9 +281,10 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           ],
         },
         {
-          title: "Third-party services",
+          title: "Updates and third-party services",
           paragraphs: [
-            "The Microsoft Store edition does not call third-party network services. It does not include analytics, advertising, crash reporting, or remote-configuration services.",
+            "The Mac App Store and Microsoft Store editions do not use an in-app update channel. A separately configured direct-distribution build can contact GitHub Releases only after you choose to check for or install an update; that connection is governed by GitHub's privacy practices and does not upload your images or conversion data.",
+            "Apart from that optional, user-initiated direct-update connection, ImgConvert does not call third-party network services for app operation. It does not include analytics, advertising, crash reporting, or remote-configuration services.",
           ],
         },
         {
@@ -265,7 +295,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         },
       ],
       contactTitle: "Contact",
-      contact: "For questions about this policy, open an issue in the project repository.",
+      contact: "For support or questions about this policy, use the project issue tracker.",
       contactLink: "Open ImgConvert Issues",
     },
     legal: {
