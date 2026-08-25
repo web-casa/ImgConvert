@@ -215,6 +215,8 @@ export interface ConversionPlanEntry {
   input: string;
   output: string | null;
   exists: boolean;
+  sameAsSource: boolean;
+  conflictsWithQueuedInput: boolean;
   error: CommandError | null;
 }
 export interface AppUpdateState {
@@ -261,6 +263,8 @@ type ConvertRequest = {
   sourceWidth: number | null;
   sourceHeight: number | null;
   fileNameTemplate: string;
+  outputSuffix: string | null;
+  allowSourceOverwrite: boolean;
   preserveMetadata: boolean;
   colorManagementPolicy: ColorManagementPolicy;
 };
@@ -322,6 +326,8 @@ export interface Settings {
   outDir: string | null;
   heicHelperPath: string | null;
   fileNameTemplate: string;
+  outputSuffixEnabled: boolean;
+  outputSuffix: string;
   preserveMetadata: boolean;
   colorManagementPolicy: ColorManagementPolicy;
   concurrency: number;
@@ -357,11 +363,28 @@ const THUMBNAIL_MAX_EDGE = 180;
 const THUMBNAIL_CONCURRENCY = 2;
 const CLIPBOARD_MAX_BYTES = 128 * 1024 * 1024;
 const CLIPBOARD_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/avif"]);
-let hostPlatformPromise: Promise<string> | null = null;
+export const OUTPUT_SUFFIX_MAX_CHARS = 48;
+const OUTPUT_SUFFIX_MAX_BYTES = 128;
+export const DEFAULT_OUTPUT_SUFFIX = "_done";
+export interface RuntimeFileAccess {
+  useHostLinuxPicker: boolean;
+  requiresOutputDirectory: boolean;
+  requiresOutputDirectorySessionGrant: boolean;
+}
+
+const SAFE_FILE_ACCESS_FALLBACK: RuntimeFileAccess = {
+  useHostLinuxPicker: false,
+  // If the bridge cannot report its policy, favor an explicit output folder
+  // over a potentially unauthorized sibling write.
+  requiresOutputDirectory: true,
+  requiresOutputDirectorySessionGrant: true,
+};
+
+let runtimeFileAccessPromise: Promise<RuntimeFileAccess> | null = null;
 // `NSOpenPanel` grants the App Sandbox access for the current process. A path
 // restored from settings is not itself a macOS security-scoped bookmark, so it
 // must not be treated as a write grant after an app relaunch.
-let macosOutputDirectorySessionGrant = false;
+export const outputDirectoryGrant = $state({ sessionGranted: false });
 
 export const FORMAT_CATEGORIES = [
   { value: "modern", labelKey: "state.formatCategoryModern" },
@@ -442,6 +465,8 @@ export const settings = $state<Settings>({
   outDir: null,
   heicHelperPath: null,
   fileNameTemplate: "%name%",
+  outputSuffixEnabled: true,
+  outputSuffix: DEFAULT_OUTPUT_SUFFIX,
   preserveMetadata: false,
   colorManagementPolicy: "preserve",
   concurrency: 0,
@@ -713,9 +738,9 @@ export function readableExtensions(): string[] {
 export async function pickSystemPaths(options: PickPathOptions): Promise<string[]> {
   if (!isTauriRuntime()) return [];
 
-  const platform = await hostPlatform();
-  if (platform !== "linux") {
-    return pickWithTauriDialog(options);
+  const access = await runtimeFileAccess();
+  if (!access.useHostLinuxPicker) {
+    return pickWithTauriDialog(options, access);
   }
 
   return invoke<string[]>("pick_paths", {
@@ -730,12 +755,113 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
   });
 }
 
-export function needsMacosOutputDirectoryGrant(
-  platform: string,
+export function needsOutputDirectoryGrant(
+  requiresOutputDirectory: boolean,
+  requiresOutputDirectorySessionGrant: boolean,
   hasOutputDirectory: boolean,
   hasSessionGrant: boolean,
 ): boolean {
-  return platform === "macos" && (!hasOutputDirectory || !hasSessionGrant);
+  return (
+    requiresOutputDirectory &&
+    (!hasOutputDirectory || (requiresOutputDirectorySessionGrant && !hasSessionGrant))
+  );
+}
+
+export function hasTemporaryQueuedInput(
+  items: readonly Pick<QueueItem, "temporary" | "status">[] = queue,
+): boolean {
+  // Completed clipboard imports no longer need a writable folder. Keep this
+  // in lockstep with `prepareBatchJobs`, which also omits completed items.
+  return items.some((item) => item.temporary === true && item.status !== "done");
+}
+
+export function needsOutputDirectoryForBatch(
+  requiresOutputDirectory: boolean,
+  requiresOutputDirectorySessionGrant: boolean,
+  hasOutputDirectory: boolean,
+  hasSessionGrant: boolean,
+  hasTemporaryInput: boolean,
+): boolean {
+  return (
+    needsOutputDirectoryGrant(
+      requiresOutputDirectory,
+      requiresOutputDirectorySessionGrant,
+      hasOutputDirectory,
+      hasSessionGrant,
+    ) ||
+    (hasTemporaryInput && !hasOutputDirectory)
+  );
+}
+
+/**
+ * Custom suffixes remain literal text, not file-name template syntax. The UI
+ * normalizes only cross-platform-invalid characters; the Rust command repeats
+ * the validation so direct IPC calls cannot bypass it.
+ */
+export function normalizeOutputSuffixInput(value: string): {
+  value: string;
+  adjusted: boolean;
+} {
+  const input = value.normalize("NFC");
+  const trimmed = input.trim();
+  const encoder = new TextEncoder();
+  let normalized = "";
+  let byteLength = 0;
+  let adjusted = input !== value || trimmed !== input;
+
+  for (const character of trimmed) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const isControl = codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
+    const safeCharacter = /[\\/:*?"<>|]/.test(character) || isControl ? "_" : character;
+    if (safeCharacter !== character) adjusted = true;
+    const nextBytes = encoder.encode(safeCharacter).length;
+    if (
+      Array.from(normalized).length >= OUTPUT_SUFFIX_MAX_CHARS ||
+      byteLength + nextBytes > OUTPUT_SUFFIX_MAX_BYTES
+    ) {
+      adjusted = true;
+      break;
+    }
+    normalized += safeCharacter;
+    byteLength += nextBytes;
+  }
+
+  return { value: normalized, adjusted };
+}
+
+export function normalizePersistedOutputSuffixSettings(
+  persisted: Pick<Partial<Settings>, "outputSuffixEnabled"> | undefined,
+  outputSuffixEnabled: unknown,
+  outputSuffix: unknown,
+): Pick<Settings, "outputSuffixEnabled" | "outputSuffix"> {
+  const normalizedOutputSuffix =
+    typeof outputSuffix === "string" ? normalizeOutputSuffixInput(outputSuffix).value : "";
+  return {
+    // Older persisted settings only have the template. Preserve that behavior
+    // until the user actively enables the new suffix switch.
+    outputSuffixEnabled:
+      persisted && !Object.hasOwn(persisted, "outputSuffixEnabled")
+        ? false
+        : typeof outputSuffixEnabled === "boolean"
+          ? outputSuffixEnabled
+          : true,
+    outputSuffix: normalizedOutputSuffix || DEFAULT_OUTPUT_SUFFIX,
+  };
+}
+
+export function outputSuffixForRequest(enabled: boolean, suffix: string): string | null {
+  return enabled ? suffix : null;
+}
+
+/**
+ * macOS document pickers must return security-scoped URLs rather than copied
+ * sandbox files. The runtime policy intentionally uses the session-grant flag
+ * as the platform-neutral signal for this requirement.
+ */
+export function scopedDialogFileAccessMode(
+  requiresOutputDirectorySessionGrant: boolean,
+): "scoped" | undefined {
+  return requiresOutputDirectorySessionGrant ? "scoped" : undefined;
 }
 
 /**
@@ -747,7 +873,7 @@ export function needsMacosOutputDirectoryGrant(
 export async function chooseOutputDirectory(): Promise<boolean> {
   if (!isTauriRuntime()) return false;
 
-  const platform = await hostPlatform();
+  const access = await runtimeFileAccess();
   const paths = await pickSystemPaths({
     directory: true,
     multiple: false,
@@ -758,26 +884,33 @@ export async function chooseOutputDirectory(): Promise<boolean> {
   if (!paths[0]) return false;
 
   settings.outDir = paths[0];
-  macosOutputDirectorySessionGrant = platform === "macos";
+  outputDirectoryGrant.sessionGranted = access.requiresOutputDirectorySessionGrant;
   await persistSettings();
   return true;
 }
 
 export async function clearOutputDirectory(): Promise<void> {
   settings.outDir = null;
-  macosOutputDirectorySessionGrant = false;
+  outputDirectoryGrant.sessionGranted = false;
   await persistSettings();
 }
 
-async function hostPlatform(): Promise<string> {
-  hostPlatformPromise ??= invoke<string>("host_platform").catch((error) => {
-    logCommandError("Failed to read host platform", error);
-    return "unknown";
+export async function getRuntimeFileAccess(): Promise<RuntimeFileAccess> {
+  runtimeFileAccessPromise ??= invoke<RuntimeFileAccess>("file_access_runtime").catch((error) => {
+    logCommandError("Failed to read runtime file access policy", error);
+    return SAFE_FILE_ACCESS_FALLBACK;
   });
-  return hostPlatformPromise;
+  return runtimeFileAccessPromise;
 }
 
-async function pickWithTauriDialog(options: PickPathOptions): Promise<string[]> {
+async function runtimeFileAccess(): Promise<RuntimeFileAccess> {
+  return getRuntimeFileAccess();
+}
+
+async function pickWithTauriDialog(
+  options: PickPathOptions,
+  access: RuntimeFileAccess,
+): Promise<string[]> {
   const extensions = sanitizedDialogExtensions(options.extensions ?? []);
   const selected = await openDialog({
     directory: options.directory ?? false,
@@ -785,6 +918,7 @@ async function pickWithTauriDialog(options: PickPathOptions): Promise<string[]> 
     title: options.title || undefined,
     defaultPath: options.defaultPath,
     recursive: options.recursive ?? false,
+    fileAccessMode: scopedDialogFileAccessMode(access.requiresOutputDirectorySessionGrant),
     filters:
       !options.directory && extensions.length
         ? [
@@ -1583,7 +1717,7 @@ export async function convertAll() {
   ui.cancelRequested = false;
   ui.dragActive = false;
   try {
-    if (!(await ensureMacosOutputDirectoryAccess())) return;
+    if (!(await ensureOutputDirectoryAccess())) return;
     await convertAllWithBatch();
   } catch (error) {
     for (const item of queue) {
@@ -1600,11 +1734,17 @@ export async function convertAll() {
   }
 }
 
-async function ensureMacosOutputDirectoryAccess(): Promise<boolean> {
-  const platform = await hostPlatform();
+async function ensureOutputDirectoryAccess(): Promise<boolean> {
+  const access = await runtimeFileAccess();
   const hasOutputDirectory = !!settings.outDir?.trim();
   if (
-    !needsMacosOutputDirectoryGrant(platform, hasOutputDirectory, macosOutputDirectorySessionGrant)
+    !needsOutputDirectoryForBatch(
+      access.requiresOutputDirectory,
+      access.requiresOutputDirectorySessionGrant,
+      hasOutputDirectory,
+      outputDirectoryGrant.sessionGranted,
+      hasTemporaryQueuedInput(),
+    )
   ) {
     return true;
   }
@@ -1636,12 +1776,9 @@ async function convertAllWithBatch() {
   }
 
   try {
-    if (settings.overwrite === "ask") {
-      await applyAskOverwriteDecisions(jobs);
-      if (ui.cancelRequested) {
-        finalizeCancelledJobs(jobs);
-        return;
-      }
+    if (!(await applyOutputSafetyDecisions(jobs))) {
+      if (ui.cancelRequested) finalizeCancelledJobs(jobs);
+      return;
     }
 
     const progress = new Channel<BatchProgressEvent>((event) => {
@@ -1676,17 +1813,86 @@ function batchConcurrency(): number | null {
   return concurrency > 0 ? Math.min(8, concurrency) : null;
 }
 
-async function applyAskOverwriteDecisions(jobs: BatchJob[]) {
+async function applyOutputSafetyDecisions(jobs: BatchJob[]): Promise<boolean> {
   const plan = await invoke<ConversionPlanEntry[]>("plan_conversions", {
     options: jobs.map((job) => job.options),
   });
 
+  const queuedInputConflicts = plan.filter(
+    (entry) => !entry.error && entry.conflictsWithQueuedInput,
+  );
+  if (queuedInputConflicts.length) {
+    const acknowledged = await confirmDialog(
+      translate("state.queuedInputConflictMessage", { count: queuedInputConflicts.length }),
+      {
+        title: translate("state.queuedInputConflictTitle"),
+        kind: "warning",
+        okLabel: translate("state.continueRemaining"),
+        cancelLabel: translate("state.cancel"),
+      },
+    );
+    if (!acknowledged) return false;
+  }
+
+  if (settings.overwrite === "ask") {
+    await applyAskOverwriteDecisions(jobs, plan);
+    return !ui.cancelRequested;
+  }
+
+  return applySourceOverwriteDecisions(jobs, plan);
+}
+
+async function applySourceOverwriteDecisions(
+  jobs: BatchJob[],
+  plan: ConversionPlanEntry[],
+): Promise<boolean> {
+  const sourceCollisions = plan.filter(
+    (entry) => !entry.error && entry.sameAsSource && !entry.conflictsWithQueuedInput,
+  );
+  if (!sourceCollisions.length) return true;
+
+  if (settings.overwrite === "skip") {
+    return confirmDialog(
+      translate("state.sourceOverwriteWillSkipMessage", { count: sourceCollisions.length }),
+      {
+        title: translate("state.sourceOverwriteTitle"),
+        kind: "warning",
+        okLabel: translate("state.continueConversion"),
+        cancelLabel: translate("state.cancel"),
+      },
+    );
+  }
+
+  const confirmed = await confirmDialog(
+    translate("state.sourceOverwriteMessage", { count: sourceCollisions.length }),
+    {
+      title: translate("state.sourceOverwriteTitle"),
+      kind: "warning",
+      okLabel: translate("state.sourceOverwrite"),
+      cancelLabel: translate("state.cancel"),
+    },
+  );
+  if (!confirmed) return false;
+
+  for (const entry of sourceCollisions) {
+    const job = jobs[entry.index];
+    if (!job) continue;
+    job.options.overwrite = true;
+    job.options.overwriteMode = "overwrite";
+    // This value exists only in the in-memory request for this batch. The
+    // Rust command independently rejects source replacement without it.
+    job.options.allowSourceOverwrite = true;
+  }
+  return true;
+}
+
+async function applyAskOverwriteDecisions(jobs: BatchJob[], plan: ConversionPlanEntry[]) {
   for (const entry of plan) {
     if (ui.cancelRequested) break;
     const job = jobs[entry.index];
     if (!job) continue;
 
-    if (entry.error) {
+    if (entry.error || entry.conflictsWithQueuedInput) {
       continue;
     }
     if (!entry.exists) {
@@ -1695,15 +1901,19 @@ async function applyAskOverwriteDecisions(jobs: BatchJob[]) {
       continue;
     }
 
+    const sourceCollision = entry.sameAsSource;
     const confirmed = await confirmDialog(formatAskOverwriteMessage(entry), {
-      title: translate("state.confirmOverwriteTitle"),
+      title: translate(
+        sourceCollision ? "state.sourceOverwriteTitle" : "state.confirmOverwriteTitle",
+      ),
       kind: "warning",
-      okLabel: translate("state.overwrite"),
+      okLabel: translate(sourceCollision ? "state.sourceOverwrite" : "state.overwrite"),
       cancelLabel: translate("state.skip"),
     });
     if (confirmed) {
       job.options.overwrite = true;
       job.options.overwriteMode = "overwrite";
+      job.options.allowSourceOverwrite = sourceCollision;
     } else {
       job.options.overwrite = false;
       job.options.overwriteMode = "skip";
@@ -1763,6 +1973,8 @@ function buildConvertRequest(item: QueueItem, format: string): ConvertRequest {
     sourceWidth: item.metadata?.width ?? null,
     sourceHeight: item.metadata?.height ?? null,
     fileNameTemplate: settings.fileNameTemplate,
+    outputSuffix: outputSuffixForRequest(settings.outputSuffixEnabled, settings.outputSuffix),
+    allowSourceOverwrite: false,
     preserveMetadata: settings.preserveMetadata,
     colorManagementPolicy: settings.colorManagementPolicy,
   };
@@ -1889,6 +2101,9 @@ function formatResultDetail(res: ConvertResult): string {
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {
+  if (entry.sameAsSource) {
+    return translate("state.sourceOverwriteSingleMessage", { path: entry.output ?? entry.input });
+  }
   return translate("state.outputExists", { path: entry.output ?? entry.input });
 }
 
@@ -2036,7 +2251,7 @@ export async function initPersistence() {
     const saved = await store.get<Partial<Settings>>("settings");
     if (saved) {
       Object.assign(settings, saved);
-      normalizeSettings(detectedLocale);
+      normalizeSettings(detectedLocale, saved);
     } else {
       settings.locale = detectedLocale;
     }
@@ -2055,7 +2270,7 @@ export async function persistSettings() {
   await store.set("settings", { ...settings });
 }
 
-function normalizeSettings(fallbackLocale: AppLocale) {
+function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settings>) {
   const overwrite = settings.overwrite as unknown;
   if (overwrite !== "ask" && overwrite !== "skip" && overwrite !== "overwrite") {
     settings.overwrite = overwrite === true ? "overwrite" : "skip";
@@ -2079,6 +2294,13 @@ function normalizeSettings(fallbackLocale: AppLocale) {
   if (typeof settings.fileNameTemplate !== "string" || !settings.fileNameTemplate.trim()) {
     settings.fileNameTemplate = "%name%";
   }
+  const suffixSettings = normalizePersistedOutputSuffixSettings(
+    persisted,
+    settings.outputSuffixEnabled,
+    settings.outputSuffix,
+  );
+  settings.outputSuffixEnabled = suffixSettings.outputSuffixEnabled;
+  settings.outputSuffix = suffixSettings.outputSuffix;
   if (typeof settings.preserveMetadata !== "boolean") {
     settings.preserveMetadata = false;
   }

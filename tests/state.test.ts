@@ -12,9 +12,15 @@ import {
   formatFromExt,
   formatImportSummary,
   formatLabel,
-  needsMacosOutputDirectoryGrant,
+  hasTemporaryQueuedInput,
+  needsOutputDirectoryForBatch,
+  needsOutputDirectoryGrant,
+  normalizeOutputSuffixInput,
+  normalizePersistedOutputSuffixSettings,
+  outputSuffixForRequest,
   qualityFloorFor,
   queue,
+  scopedDialogFileAccessMode,
   setImportCommandError,
   setImportMessage,
   settings,
@@ -35,6 +41,9 @@ describe("state helpers", () => {
     settings.jpegQualityFloor = 30;
     settings.webpQualityFloor = 30;
     settings.avifQualityFloor = 30;
+    settings.outputSuffixEnabled = true;
+    settings.outputSuffix = "_done";
+    settings.fileNameTemplate = "%name%";
   });
 
   it("maps extensions and labels through the capability model", () => {
@@ -44,10 +53,69 @@ describe("state helpers", () => {
   });
 
   it("requires a fresh output-folder grant for each macOS app session", () => {
-    expect(needsMacosOutputDirectoryGrant("macos", false, false)).toBe(true);
-    expect(needsMacosOutputDirectoryGrant("macos", true, false)).toBe(true);
-    expect(needsMacosOutputDirectoryGrant("macos", true, true)).toBe(false);
-    expect(needsMacosOutputDirectoryGrant("windows", false, false)).toBe(false);
+    expect(needsOutputDirectoryGrant(true, true, false, false)).toBe(true);
+    expect(needsOutputDirectoryGrant(true, true, true, false)).toBe(true);
+    expect(needsOutputDirectoryGrant(true, true, true, true)).toBe(false);
+  });
+
+  it("requires a selected output folder for Flatpak portal writes", () => {
+    expect(needsOutputDirectoryGrant(true, false, false, false)).toBe(true);
+    expect(needsOutputDirectoryGrant(true, false, true, false)).toBe(false);
+    expect(needsOutputDirectoryGrant(false, false, false, false)).toBe(false);
+  });
+
+  it("requires an explicit output folder for temporary clipboard imports on every platform", () => {
+    expect(needsOutputDirectoryForBatch(false, false, false, false, true)).toBe(true);
+    expect(needsOutputDirectoryForBatch(false, false, true, false, true)).toBe(false);
+    expect(needsOutputDirectoryForBatch(true, false, true, false, true)).toBe(false);
+    expect(needsOutputDirectoryForBatch(true, true, true, false, false)).toBe(true);
+    expect(hasTemporaryQueuedInput([{ temporary: true, status: "pending" }])).toBe(true);
+    expect(hasTemporaryQueuedInput([{ temporary: true, status: "done" }])).toBe(false);
+    expect(hasTemporaryQueuedInput([{ temporary: false, status: "pending" }])).toBe(false);
+  });
+
+  it("normalizes custom suffixes before they reach the conversion command", () => {
+    expect(normalizeOutputSuffixInput(" _done%100 ")).toEqual({
+      value: "_done%100",
+      adjusted: true,
+    });
+    expect(normalizeOutputSuffixInput("_done/path")).toEqual({
+      value: "_done_path",
+      adjusted: true,
+    });
+    expect(normalizeOutputSuffixInput("...")).toEqual({ value: "...", adjusted: false });
+
+    const emojiSuffix = normalizeOutputSuffixInput("😀".repeat(48));
+    expect(Array.from(emojiSuffix.value).length).toBeLessThanOrEqual(48);
+    expect(new TextEncoder().encode(emojiSuffix.value).length).toBeLessThanOrEqual(128);
+    expect(emojiSuffix.adjusted).toBe(true);
+  });
+
+  it("keeps existing template-only settings unchanged until suffixes are explicitly enabled", () => {
+    expect(normalizePersistedOutputSuffixSettings({}, true, "_done")).toEqual({
+      outputSuffixEnabled: false,
+      outputSuffix: "_done",
+    });
+    expect(
+      normalizePersistedOutputSuffixSettings({ outputSuffixEnabled: false }, false, "_custom"),
+    ).toEqual({
+      outputSuffixEnabled: false,
+      outputSuffix: "_custom",
+    });
+    expect(normalizePersistedOutputSuffixSettings(undefined, "invalid", "")).toEqual({
+      outputSuffixEnabled: true,
+      outputSuffix: "_done",
+    });
+  });
+
+  it("sends a suffix only while the suffix switch is enabled", () => {
+    expect(outputSuffixForRequest(true, "-min")).toBe("-min");
+    expect(outputSuffixForRequest(false, "-min")).toBeNull();
+  });
+
+  it("keeps macOS file picker access security-scoped", () => {
+    expect(scopedDialogFileAccessMode(true)).toBe("scoped");
+    expect(scopedDialogFileAccessMode(false)).toBeUndefined();
   });
 
   it("adds readable paths and reports duplicates/skips", () => {

@@ -6,7 +6,7 @@
 //! 图片编解码由 `imgconvert-core` 进程内完成；这里只负责路径解析、文件读写、
 //! 覆盖策略和前端能力矩阵。
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{self, File, FileTimes, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -43,8 +43,18 @@ const UNSUPPORTED_TARGET_FORMAT_PREFIX: &str = "不支持的目标格式:";
 const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";
 const TIFF_OUTPUT_UNSUPPORTED_PREFIX: &str = "TIFF 暂未纳入";
 const OUTPUT_EXISTS_PREFIX: &str = "输出已存在";
+const INVALID_OUTPUT_SUFFIX_PREFIX: &str = "输出后缀无效:";
+const SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX: &str = "覆盖源文件需要明确确认:";
+const OUTPUT_CONFLICTS_WITH_INPUT_PREFIX: &str = "输出路径与批次输入冲突:";
+const OUTPUT_SAFETY_CHECK_PREFIX: &str = "无法安全验证输出路径:";
 const OUTPUT_NOT_SMALLER_PREFIX: &str = "候选输出不小于源文件";
 const GENERATION_LOSS_GUARD_PREFIX: &str = "代际损失防护:";
+const MAX_OUTPUT_SUFFIX_CHARS: usize = 48;
+const MAX_OUTPUT_SUFFIX_BYTES: usize = 128;
+// Most commonly used filesystems allow a 255-byte filename component. Leave a
+// safety margin for platform and encoding differences while preserving both
+// the original stem and a user-entered suffix when a name is unusually long.
+const MAX_OUTPUT_FILE_NAME_BYTES: usize = 240;
 
 enum WriteMode {
     Replace,
@@ -59,6 +69,64 @@ struct IndexedConvertOptions {
 struct SourceForCore {
     bytes: Vec<u8>,
     metadata_override: Option<RawMetadata>,
+}
+
+/// A copyable file identity used only while planning a batch. Unlike
+/// `same_file::Handle`, this does not retain an open file descriptor for each
+/// queued input. The OS metadata is intentionally obtained under the same
+/// scoped-access boundary as conversion work.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct FileIdentity {
+    device: u64,
+    inode: u64,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy)]
+struct FileIdentity {
+    legacy_volume_serial_number: u32,
+    legacy_file_index: u64,
+    file_id: Option<(u64, [u8; 16])>,
+}
+
+#[cfg(windows)]
+impl PartialEq for FileIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.file_id, other.file_id) {
+            (Some(left), Some(right)) => left == right,
+            // If `FILE_ID_INFO` is unavailable for either path (older or
+            // remote filesystem), compare the legacy pair. This can only
+            // produce a conservative false positive on uncommon ReFS cases;
+            // it must never turn a potential source collision into a miss.
+            _ => {
+                self.legacy_volume_serial_number == other.legacy_volume_serial_number
+                    && self.legacy_file_index == other.legacy_file_index
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Eq for FileIdentity {}
+
+#[cfg(windows)]
+impl std::hash::Hash for FileIdentity {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash the compatibility pair because equality may deliberately use
+        // it when either side lacks a 128-bit file id. Collisions remain safe:
+        // `PartialEq` resolves them with the stronger id whenever both exist.
+        state.write_u32(self.legacy_volume_serial_number);
+        state.write_u64(self.legacy_file_index);
+    }
+}
+
+// There are no currently supported desktop targets outside Unix and Windows,
+// but retaining a normalized-path fallback keeps this safety code portable.
+#[cfg(not(any(unix, windows)))]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct FileIdentity {
+    canonical_path: PathBuf,
 }
 
 /// 前端启动时读取的进程内 core 能力矩阵。
@@ -115,7 +183,7 @@ pub struct RuntimeDiagnostics {
 pub struct ConvertOptions {
     /// 输入文件绝对路径。
     pub input: String,
-    /// 输出目录(若为空则与输入同目录；macOS 沙盒前端会先要求用户选择目录)。
+    /// 输出目录(若为空则与输入同目录；macOS/portal 沙盒前端会先要求用户选择目录)。
     pub out_dir: Option<String>,
     /// 从导入目录根到输入文件父目录的相对目录,用于保留目录结构。
     pub relative_dir: Option<String>,
@@ -188,6 +256,12 @@ pub struct ConvertOptions {
     pub overwrite_mode: Option<String>,
     /// 文件名模板,支持 %name% / %extension% / %date%。
     pub file_name_template: Option<String>,
+    /// 输出文件名追加的字面后缀。存在时优先于旧的文件名模板，且不会解析模板占位符。
+    #[serde(default)]
+    pub output_suffix: Option<String>,
+    /// 仅由本次明确确认生成的短生命周期授权；后端仍会拒绝未授权的原图覆盖。
+    #[serde(default)]
+    pub allow_source_overwrite: bool,
     /// 元数据保留开关预留;core P2 才实现实际透传。
     pub preserve_metadata: Option<bool>,
     /// 色彩管理策略:preserve | convertToSrgb。
@@ -275,6 +349,8 @@ pub struct ConversionPlanEntry {
     pub input: String,
     pub output: Option<String>,
     pub exists: bool,
+    pub same_as_source: bool,
+    pub conflicts_with_queued_input: bool,
     pub error: Option<CommandError>,
 }
 
@@ -514,8 +590,95 @@ fn sanitize_file_stem(stem: &str) -> String {
     let trimmed = cleaned.trim_matches([' ', '.']);
     if trimmed.is_empty() {
         "converted".to_string()
+    } else if is_windows_reserved_file_stem(trimmed) {
+        format!("_{trimmed}")
     } else {
         trimmed.to_string()
+    }
+}
+
+fn is_windows_reserved_file_stem(stem: &str) -> bool {
+    let base = stem
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim_matches([' ', '.'])
+        .to_ascii_uppercase();
+    matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || base
+            .strip_prefix("COM")
+            .or_else(|| base.strip_prefix("LPT"))
+            .is_some_and(|number| {
+                matches!(number, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+            })
+}
+
+fn validated_output_suffix(raw: &str) -> Result<String, String> {
+    let suffix = raw.trim();
+    if suffix.is_empty() {
+        return Err(format!("{INVALID_OUTPUT_SUFFIX_PREFIX}不能为空"));
+    }
+    if suffix.chars().count() > MAX_OUTPUT_SUFFIX_CHARS || suffix.len() > MAX_OUTPUT_SUFFIX_BYTES {
+        return Err(format!(
+            "{INVALID_OUTPUT_SUFFIX_PREFIX}最多 {MAX_OUTPUT_SUFFIX_CHARS} 个字符"
+        ));
+    }
+    if suffix.chars().any(|ch| {
+        ch.is_control() || matches!(ch, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
+    }) {
+        return Err(format!(
+            "{INVALID_OUTPUT_SUFFIX_PREFIX}不能包含路径分隔符或系统保留字符"
+        ));
+    }
+    Ok(suffix.to_string())
+}
+
+fn truncate_utf8_prefix(input: &str, max_bytes: usize) -> &str {
+    if input.len() <= max_bytes {
+        return input;
+    }
+
+    let mut end = 0;
+    for (index, ch) in input.char_indices() {
+        let next = index + ch.len_utf8();
+        if next > max_bytes {
+            break;
+        }
+        end = next;
+    }
+    &input[..end]
+}
+
+fn truncate_utf8_suffix(input: &str, max_bytes: usize) -> &str {
+    if input.len() <= max_bytes {
+        return input;
+    }
+
+    let start = input
+        .char_indices()
+        .find_map(|(index, _)| (input.len() - index <= max_bytes).then_some(index))
+        .unwrap_or(input.len());
+    &input[start..]
+}
+
+fn truncate_output_stem(output_stem: String, ext: &str) -> String {
+    let extension_bytes = ext.len() + 1;
+    let max_stem_bytes = MAX_OUTPUT_FILE_NAME_BYTES.saturating_sub(extension_bytes);
+    if output_stem.len() <= max_stem_bytes {
+        return output_stem;
+    }
+
+    // Keep a meaningful tail (usually the user suffix) as well as the source
+    // name prefix. `~` also makes the automatic shortening visible.
+    let tail_budget = 48.min(max_stem_bytes / 3);
+    let head_budget = max_stem_bytes.saturating_sub(tail_budget + 1);
+    let head = truncate_utf8_prefix(&output_stem, head_budget);
+    let tail = truncate_utf8_suffix(&output_stem, tail_budget);
+    let shortened = format!("{head}~{tail}");
+    if shortened.is_empty() {
+        "converted".to_string()
+    } else {
+        shortened
     }
 }
 
@@ -531,13 +694,55 @@ fn apply_file_name_template(template: Option<&str>, source_stem: &str, ext: &str
     sanitize_file_stem(&rendered)
 }
 
+fn output_stem(opts: &ConvertOptions, source_stem: &str, ext: &str) -> String {
+    let output_stem =
+        apply_file_name_template(opts.file_name_template.as_deref(), source_stem, ext);
+    truncate_output_stem(sanitize_file_stem(&output_stem), ext)
+}
+
 fn output_file_name(output_stem: String, ext: &str) -> String {
     let extension = format!(".{ext}");
-    if output_stem.to_ascii_lowercase().ends_with(&extension) {
-        output_stem
+    let stem = output_stem
+        .strip_suffix(&extension)
+        .or_else(|| {
+            output_stem
+                .to_ascii_lowercase()
+                .ends_with(&extension)
+                .then(|| &output_stem[..output_stem.len() - extension.len()])
+        })
+        .unwrap_or(&output_stem);
+    format!("{}{extension}", truncate_output_stem(stem.to_string(), ext))
+}
+
+/// Builds a suffix-mode filename without interpreting or normalizing the
+/// suffix as a template/stem. This matters for values such as `.png`: the
+/// user explicitly asked for `source.png.png`, not an extension-deduplicated
+/// `source.png`. Reserve enough space for the entire validated suffix first,
+/// then shorten only the source portion on a UTF-8 boundary.
+fn output_file_name_with_suffix(
+    source_stem: &str,
+    raw_suffix: &str,
+    ext: &str,
+) -> Result<String, String> {
+    let suffix = validated_output_suffix(raw_suffix)?;
+    let source_stem = sanitize_file_stem(source_stem);
+    let extension = format!(".{ext}");
+    let reserved_bytes = suffix.len() + extension.len();
+    let max_source_bytes = MAX_OUTPUT_FILE_NAME_BYTES
+        .checked_sub(reserved_bytes)
+        .ok_or_else(|| format!("{INVALID_OUTPUT_SUFFIX_PREFIX}与目标扩展名组合后过长"))?;
+    let source_prefix = truncate_utf8_prefix(&source_stem, max_source_bytes);
+    // `source_stem` is always non-empty after sanitizing and the suffix limit
+    // leaves ample room for at least one source character. Keep a defensive
+    // fallback so this invariant remains true if either limit changes later.
+    let source_prefix = if source_prefix.is_empty() {
+        truncate_utf8_prefix("converted", max_source_bytes)
     } else {
-        format!("{output_stem}{extension}")
-    }
+        source_prefix
+    };
+    let output_name = format!("{source_prefix}{suffix}{extension}");
+    debug_assert!(output_name.len() <= MAX_OUTPUT_FILE_NAME_BYTES);
+    Ok(output_name)
 }
 
 /// 根据输入路径与目标格式计算输出路径。
@@ -548,8 +753,10 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("无法解析文件名: {}", opts.input))?;
     let ext = ext_for_format(&opts.format)?;
     let stem = stem.to_string_lossy();
-    let output_stem = apply_file_name_template(opts.file_name_template.as_deref(), &stem, ext);
-    let output_name = output_file_name(output_stem, ext);
+    let output_name = match opts.output_suffix.as_deref() {
+        Some(suffix) => output_file_name_with_suffix(&stem, suffix, ext)?,
+        None => output_file_name(output_stem(opts, &stem, ext), ext),
+    };
 
     let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref()) {
         Some(grant) => {
@@ -603,24 +810,82 @@ fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, Stri
 }
 
 pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
+    let input_identities = match input_identity_index(options) {
+        Ok(identities) => identities,
+        Err(error) => {
+            // Do not claim that a batch is safe when a queued source could
+            // not be identified. The batch command makes the same
+            // conservative decision before it starts any writer.
+            return options
+                .iter()
+                .enumerate()
+                .map(|(index, options)| ConversionPlanEntry {
+                    index,
+                    input: options.input.clone(),
+                    output: None,
+                    exists: false,
+                    same_as_source: false,
+                    conflicts_with_queued_input: false,
+                    error: Some(CommandError::output_safety_check_failed(
+                        options.input.clone(),
+                        error.clone(),
+                    )),
+                })
+                .collect();
+        }
+    };
     options
         .iter()
         .enumerate()
-        .map(|(index, options)| match output_path(options) {
-            Ok(output) => ConversionPlanEntry {
+        .map(|(index, options)| {
+            let _input_scope = access::scoped_path_access(Path::new(&options.input));
+            let _output_dir_scope = access::output_directory(options.out_dir.as_deref())
+                .map(|grant| grant.scoped_access());
+            let output = match output_path(options) {
+                Ok(output) => output,
+                Err(error) => {
+                    return ConversionPlanEntry {
+                        index,
+                        input: options.input.clone(),
+                        output: None,
+                        exists: false,
+                        same_as_source: false,
+                        conflicts_with_queued_input: false,
+                        error: Some(command_error_for_conversion(options, error)),
+                    };
+                }
+            };
+            let _output_scope = output.parent().map(access::scoped_path_access);
+            let output_identity = match existing_file_identity(&output) {
+                Ok(identity) => identity,
+                Err(error) => {
+                    return ConversionPlanEntry {
+                        index,
+                        input: options.input.clone(),
+                        output: Some(output.to_string_lossy().to_string()),
+                        exists: output_entry_exists(&output),
+                        same_as_source: false,
+                        conflicts_with_queued_input: false,
+                        error: Some(CommandError::output_safety_check_failed(
+                            output.to_string_lossy().to_string(),
+                            error,
+                        )),
+                    };
+                }
+            };
+            let input_indexes = output_identity
+                .as_ref()
+                .and_then(|identity| input_identities.get(identity));
+            ConversionPlanEntry {
                 index,
                 input: options.input.clone(),
-                exists: output.exists(),
+                exists: output_entry_exists(&output),
+                same_as_source: input_indexes.is_some_and(|indexes| indexes.contains(&index)),
+                conflicts_with_queued_input: input_indexes
+                    .is_some_and(|indexes| indexes.iter().any(|input_index| *input_index != index)),
                 output: Some(output.to_string_lossy().to_string()),
                 error: None,
-            },
-            Err(error) => ConversionPlanEntry {
-                index,
-                input: options.input.clone(),
-                output: None,
-                exists: false,
-                error: Some(command_error_for_conversion(options, error)),
-            },
+            }
         })
         .collect()
 }
@@ -670,6 +935,18 @@ pub fn command_error_for_conversion(
     }
     if detail.starts_with(OUTPUT_EXISTS_PREFIX) {
         return CommandError::output_exists(output(), detail);
+    }
+    if detail.starts_with(INVALID_OUTPUT_SUFFIX_PREFIX) {
+        return CommandError::invalid_output_suffix(detail);
+    }
+    if detail.starts_with(SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX) {
+        return CommandError::source_overwrite_confirmation_required(output(), detail);
+    }
+    if detail.starts_with(OUTPUT_CONFLICTS_WITH_INPUT_PREFIX) {
+        return CommandError::output_conflicts_with_input(output(), detail);
+    }
+    if detail.starts_with(OUTPUT_SAFETY_CHECK_PREFIX) {
+        return CommandError::output_safety_check_failed(output(), detail);
     }
     if detail.starts_with(OUTPUT_NOT_SMALLER_PREFIX)
         || detail.starts_with(GENERATION_LOSS_GUARD_PREFIX)
@@ -952,7 +1229,27 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
         None if opts.overwrite => "overwrite",
         None => "skip",
     };
-    if out.exists() && overwrite_mode != "overwrite" {
+    if overwrite_mode == "overwrite" {
+        // `existing_file_identity` treats a verified-missing destination as
+        // non-conflicting, but returns an error for an existing path whose
+        // identity cannot be read. Never fail open here: this check guards the
+        // explicit authorization boundary for source replacement.
+        if let Some(output_identity) = existing_file_identity(&out)? {
+            let input_identity = existing_file_identity(input)?.ok_or_else(|| {
+                format!(
+                    "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取输入文件身份: {}",
+                    input.display()
+                )
+            })?;
+            if output_identity == input_identity && !opts.allow_source_overwrite {
+                return Err(format!(
+                    "{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} {}",
+                    out.display()
+                ));
+            }
+        }
+    }
+    if output_entry_exists(&out) && overwrite_mode != "overwrite" {
         if overwrite_mode == "ask" {
             return Err(format!(
                 "{OUTPUT_EXISTS_PREFIX}(需要确认覆盖): {}",
@@ -1364,6 +1661,8 @@ pub fn path_conversion_smoke_options(
         overwrite: true,
         overwrite_mode: Some("overwrite".to_string()),
         file_name_template: Some("%name%-imgconvert-smoke".to_string()),
+        output_suffix: None,
+        allow_source_overwrite: false,
         preserve_metadata: Some(false),
         color_management_policy: None,
     }
@@ -1485,10 +1784,63 @@ fn prepare_batch_work(
     let mut jobs = VecDeque::new();
     let mut preflight_events = Vec::new();
     let mut output_paths = HashSet::new();
+    let input_identities = match input_identity_index(&options) {
+        Ok(identities) => identities,
+        Err(error) => {
+            // A source whose identity cannot be checked may still exist. Do
+            // not start any writer that could replace it through an alias.
+            let failures = options
+                .into_iter()
+                .enumerate()
+                .map(|(index, options)| BatchProgressEvent::FileError {
+                    index,
+                    input: options.input.clone(),
+                    error: CommandError::output_safety_check_failed(options.input, error.clone()),
+                })
+                .collect();
+            return (jobs, failures);
+        }
+    };
 
     for (index, options) in options.into_iter().enumerate() {
+        let _output_dir_scope =
+            access::output_directory(options.out_dir.as_deref()).map(|grant| grant.scoped_access());
         match output_path(&options) {
             Ok(output) => {
+                let _output_scope = output.parent().map(access::scoped_path_access);
+                let output_identity = match existing_file_identity(&output) {
+                    Ok(identity) => identity,
+                    Err(error) => {
+                        preflight_events.push(BatchProgressEvent::FileError {
+                            index,
+                            input: options.input,
+                            error: CommandError::output_safety_check_failed(
+                                output.to_string_lossy().to_string(),
+                                error,
+                            ),
+                        });
+                        continue;
+                    }
+                };
+                if output_identity.is_some_and(|identity| {
+                    input_identities
+                        .get(&identity)
+                        .is_some_and(|input_indexes| {
+                            input_indexes
+                                .iter()
+                                .any(|input_index| *input_index != index)
+                        })
+                }) {
+                    preflight_events.push(BatchProgressEvent::FileError {
+                        index,
+                        input: options.input,
+                        error: CommandError::output_conflicts_with_input(
+                            output.to_string_lossy().to_string(),
+                            format!("{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} {}", output.display()),
+                        ),
+                    });
+                    continue;
+                }
                 let key = output_conflict_key(&output);
                 if !output_paths.insert(key) {
                     preflight_events.push(BatchProgressEvent::FileError {
@@ -1524,6 +1876,124 @@ fn output_conflict_key(output: &Path) -> PathBuf {
         Ok(parent) => parent.join(file_name),
         Err(_) => output.to_path_buf(),
     }
+}
+
+fn input_identity_index(
+    options: &[ConvertOptions],
+) -> Result<HashMap<FileIdentity, Vec<usize>>, String> {
+    let mut identities = HashMap::new();
+    for (index, options) in options.iter().enumerate() {
+        let input = Path::new(&options.input);
+        let _input_scope = access::scoped_path_access(input);
+        if let Some(identity) = existing_file_identity(input)? {
+            identities
+                .entry(identity)
+                .or_insert_with(Vec::new)
+                .push(index);
+        }
+    }
+    Ok(identities)
+}
+
+/// Returns `None` when no underlying regular file needs a collision check:
+/// a positively absent path, dangling final symlink, or non-file destination.
+/// Permission and metadata failures stay errors so collision protection never
+/// quietly degrades to a path-string comparison.
+fn existing_file_identity(path: &Path) -> Result<Option<FileIdentity>, String> {
+    match fs::metadata(path) {
+        // Input sources are required to be regular files. A destination that
+        // resolves to a directory, device, or other non-file entry therefore
+        // cannot alias a source; leave its normal write-path validation to
+        // the converter instead of turning it into an identity error.
+        Ok(metadata) if !metadata.is_file() => Ok(None),
+        Ok(_) => file_identity(path).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            match fs::symlink_metadata(path) {
+                Err(link_error) if link_error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                // A dangling link is an existing output entry, but cannot be
+                // the same underlying file as an accessible source. Keeping
+                // it as `None` preserves the safe replacement behavior for
+                // the link itself; `output_entry_exists` still handles it as
+                // an existing destination later.
+                Ok(metadata) if metadata.file_type().is_symlink() => Ok(None),
+                Ok(_) => Err(file_identity_error(path, error)),
+                Err(link_error) => Err(file_identity_error(path, link_error)),
+            }
+        }
+        Err(error) => Err(file_identity_error(path, error)),
+    }
+}
+
+fn file_identity_error(path: &Path, error: impl std::fmt::Display) -> String {
+    format!(
+        "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取 {} 的文件身份: {error}",
+        path.display()
+    )
+}
+
+#[cfg(unix)]
+fn file_identity(path: &Path) -> Result<FileIdentity, String> {
+    use std::os::unix::fs::MetadataExt;
+
+    let metadata = fs::metadata(path).map_err(|error| file_identity_error(path, error))?;
+    Ok(FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    })
+}
+
+#[cfg(windows)]
+fn file_identity(path: &Path) -> Result<FileIdentity, String> {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::Storage::FileSystem::{
+        FileIdInfo, GetFileInformationByHandle, GetFileInformationByHandleEx,
+        BY_HANDLE_FILE_INFORMATION, FILE_ID_INFO,
+    };
+
+    let file = File::open(path).map_err(|error| file_identity_error(path, error))?;
+    let handle = HANDLE(file.as_raw_handle());
+    let mut legacy_info = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: `file` remains alive for this call and `as_raw_handle` returns
+    // the valid Windows file handle owned by it.
+    unsafe {
+        GetFileInformationByHandle(handle, &mut legacy_info)
+            .map_err(|error| file_identity_error(path, error))?;
+    }
+    let mut file_id_info = FILE_ID_INFO::default();
+    // SAFETY: same live `file` and handle as the legacy query above.
+    let file_id = unsafe {
+        GetFileInformationByHandleEx(
+            handle,
+            FileIdInfo,
+            (&mut file_id_info as *mut FILE_ID_INFO).cast(),
+            std::mem::size_of::<FILE_ID_INFO>() as u32,
+        )
+    }
+    .ok()
+    .map(|()| {
+        (
+            file_id_info.VolumeSerialNumber,
+            file_id_info.FileId.Identifier,
+        )
+    });
+
+    // `FILE_ID_INFO` is the primary identity (including ReFS's 128-bit file
+    // id). Older or remote Windows filesystems can reject that query, so retain
+    // the documented volume/index pair as a safe compatibility fallback.
+    Ok(FileIdentity {
+        legacy_volume_serial_number: legacy_info.dwVolumeSerialNumber,
+        legacy_file_index: (u64::from(legacy_info.nFileIndexHigh) << 32)
+            | u64::from(legacy_info.nFileIndexLow),
+        file_id,
+    })
+}
+
+#[cfg(not(any(unix, windows)))]
+fn file_identity(path: &Path) -> Result<FileIdentity, String> {
+    let canonical_path =
+        fs::canonicalize(path).map_err(|error| file_identity_error(path, error))?;
+    Ok(FileIdentity { canonical_path })
 }
 
 fn batch_worker_loop(
@@ -2214,6 +2684,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         }
@@ -2281,6 +2753,42 @@ mod tests {
         assert_eq!(
             output_exists.code,
             crate::command_error::ErrorCode::OutputExists
+        );
+
+        let invalid_suffix = command_error_for_conversion(
+            &options,
+            format!("{INVALID_OUTPUT_SUFFIX_PREFIX}不能包含路径分隔符或系统保留字符"),
+        );
+        assert_eq!(
+            invalid_suffix.code,
+            crate::command_error::ErrorCode::InvalidOutputSuffix
+        );
+
+        let source_confirmation = command_error_for_conversion(
+            &options,
+            format!("{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} /images/source.jpg"),
+        );
+        assert_eq!(
+            source_confirmation.code,
+            crate::command_error::ErrorCode::SourceOverwriteConfirmationRequired
+        );
+
+        let queued_input_conflict = command_error_for_conversion(
+            &options,
+            format!("{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} /images/source.jpg"),
+        );
+        assert_eq!(
+            queued_input_conflict.code,
+            crate::command_error::ErrorCode::OutputConflictsWithInput
+        );
+
+        let safety_check = command_error_for_conversion(
+            &options,
+            format!("{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取 /images/source.jpg 的文件身份"),
+        );
+        assert_eq!(
+            safety_check.code,
+            crate::command_error::ErrorCode::OutputSafetyCheckFailed
         );
 
         let not_smaller = command_error_for_conversion(
@@ -3251,6 +3759,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3357,6 +3867,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("ask".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3371,6 +3883,170 @@ mod tests {
             Some(output.to_string_lossy().as_ref())
         );
         assert!(plan[0].error.is_none());
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn conversion_plan_marks_output_that_is_the_same_source_file() {
+        let dir = unique_test_dir("plan-source-collision");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("real.png");
+        let output_alias = dir.join("alias.png");
+        fs::write(&input, one_by_one_png()).unwrap();
+        fs::hard_link(&input, &output_alias).unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.format = "png".to_string();
+        options.file_name_template = Some("alias".to_string());
+
+        let plan = conversion_plan(&[options]);
+
+        assert!(plan[0].exists);
+        assert!(plan[0].same_as_source);
+        assert!(!plan[0].conflicts_with_queued_input);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn convert_requires_explicit_authorization_before_replacing_the_source() {
+        let dir = unique_test_dir("source-overwrite-confirmation");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.png");
+        let original = one_by_one_png();
+        fs::write(&input, &original).unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.format = "png".to_string();
+        options.overwrite = true;
+        options.overwrite_mode = Some("overwrite".to_string());
+
+        let error = convert(&options).unwrap_err();
+        assert!(error.starts_with(SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX));
+        assert_eq!(fs::read(&input).unwrap(), original);
+
+        options.allow_source_overwrite = true;
+        let result = convert(&options).unwrap();
+        assert_eq!(PathBuf::from(result.output), input);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn output_suffix_is_literal_validated_and_keeps_a_safe_filename_length() {
+        let mut options = test_convert_options("holiday.2026.01.png".to_string());
+        options.out_dir = Some("out".to_string());
+        options.output_suffix = Some("_done%100".to_string());
+
+        assert_eq!(
+            output_path(&options).unwrap(),
+            PathBuf::from("out").join("holiday.2026.01_done%100.jpg")
+        );
+
+        options.output_suffix = Some("_bad/path".to_string());
+        assert!(output_path(&options)
+            .unwrap_err()
+            .starts_with(INVALID_OUTPUT_SUFFIX_PREFIX));
+
+        options.output_suffix = Some(".jpg".to_string());
+        assert_eq!(
+            output_path(&options).unwrap(),
+            PathBuf::from("out").join("holiday.2026.01.jpg.jpg")
+        );
+
+        options.output_suffix = Some("x".repeat(MAX_OUTPUT_SUFFIX_CHARS + 1));
+        assert!(output_path(&options)
+            .unwrap_err()
+            .starts_with(INVALID_OUTPUT_SUFFIX_PREFIX));
+
+        options.input = format!("{}.png", "a".repeat(300));
+        options.output_suffix = Some("_done".to_string());
+        let output_name = output_path(&options)
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        assert!(output_name.len() <= MAX_OUTPUT_FILE_NAME_BYTES);
+        assert!(output_name.ends_with("_done.jpg"));
+
+        let emoji_suffix = "😀".repeat(MAX_OUTPUT_SUFFIX_BYTES / "😀".len());
+        options.output_suffix = Some(emoji_suffix.clone());
+        let output_name = output_path(&options)
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        assert!(output_name.len() <= MAX_OUTPUT_FILE_NAME_BYTES);
+        assert!(output_name.ends_with(&format!("{emoji_suffix}.jpg")));
+    }
+
+    #[test]
+    fn batch_preflight_rejects_output_that_would_replace_another_queued_input() {
+        let dir = unique_test_dir("batch-input-collision");
+        fs::create_dir_all(&dir).unwrap();
+        let png = dir.join("sample.png");
+        let jpeg = dir.join("sample.jpg");
+        fs::write(&png, one_by_one_png()).unwrap();
+        fs::write(&jpeg, one_by_one_png()).unwrap();
+
+        let mut png_to_jpeg = test_convert_options(png.to_string_lossy().to_string());
+        png_to_jpeg.format = "jpeg".to_string();
+        let mut jpeg_to_png = test_convert_options(jpeg.to_string_lossy().to_string());
+        jpeg_to_png.format = "png".to_string();
+
+        let (jobs, preflight_events) = prepare_batch_work(vec![png_to_jpeg, jpeg_to_png]);
+
+        assert!(jobs.is_empty());
+        assert_eq!(preflight_events.len(), 2);
+        assert!(preflight_events.iter().all(|event| matches!(
+            event,
+            BatchProgressEvent::FileError {
+                error: CommandError {
+                    code: crate::command_error::ErrorCode::OutputConflictsWithInput,
+                    ..
+                },
+                ..
+            }
+        )));
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn batch_identity_preflight_does_not_keep_one_file_descriptor_per_input() {
+        fn open_descriptor_count() -> Option<usize> {
+            fs::read_dir("/proc/self/fd")
+                .ok()
+                .map(|entries| entries.count())
+        }
+
+        let Some(before) = open_descriptor_count() else {
+            return;
+        };
+        let dir = unique_test_dir("batch-identity-fds");
+        fs::create_dir_all(&dir).unwrap();
+        let options = (0..192)
+            .map(|index| {
+                let input = dir.join(format!("input-{index}.png"));
+                fs::write(&input, b"identity").unwrap();
+                test_convert_options(input.to_string_lossy().to_string())
+            })
+            .collect::<Vec<_>>();
+
+        let identities = input_identity_index(&options).unwrap();
+        let after = open_descriptor_count().unwrap();
+
+        assert_eq!(identities.len(), options.len());
+        // Allow a small amount of parallel-test noise. The old
+        // `same_file::Handle` index retained 192 descriptors here.
+        assert!(
+            after <= before + 16,
+            "identity preflight unexpectedly retained descriptors: before={before}, after={after}"
+        );
 
         fs::remove_dir_all(dir).unwrap();
     }
@@ -3412,6 +4088,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3499,6 +4177,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3549,6 +4229,8 @@ mod tests {
                 overwrite: false,
                 overwrite_mode: Some("skip".to_string()),
                 file_name_template: Some("%name%".to_string()),
+                output_suffix: None,
+                allow_source_overwrite: false,
                 preserve_metadata: Some(false),
                 color_management_policy: None,
             })
@@ -3610,6 +4292,8 @@ mod tests {
                 overwrite: true,
                 overwrite_mode: Some("overwrite".to_string()),
                 file_name_template: Some("%name%".to_string()),
+                output_suffix: None,
+                allow_source_overwrite: false,
                 preserve_metadata: Some(false),
                 color_management_policy: None,
             })
@@ -3666,6 +4350,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3808,6 +4494,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };
@@ -3865,6 +4553,8 @@ mod tests {
             overwrite: false,
             overwrite_mode: Some("skip".to_string()),
             file_name_template: Some("%name%".to_string()),
+            output_suffix: None,
+            allow_source_overwrite: false,
             preserve_metadata: Some(false),
             color_management_policy: None,
         };

@@ -6,6 +6,8 @@ use std::process::{Command, ExitStatus};
 
 use serde::Deserialize;
 
+use crate::access;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativePickOptions {
@@ -46,6 +48,11 @@ const HOST_DIALOG_ENV_REMOVE: &[&str] = &[
 ];
 
 pub fn pick_paths(options: &NativePickOptions) -> Result<Vec<String>, String> {
+    if !access::runtime_file_access().use_host_linux_picker {
+        return Err(
+            "宿主系统文件选择器只适用于 AppImage 运行时；沙盒环境必须使用门户文件选择器。".into(),
+        );
+    }
     pick_paths_linux(options)
 }
 

@@ -18,6 +18,7 @@
   import LegalDialog from "$lib/components/LegalDialog.svelte";
   import PluginDiagnosticsDialog from "$lib/components/PluginDiagnosticsDialog.svelte";
   import QueueItem from "$lib/components/QueueItem.svelte";
+  import OutputDestinationControl from "$lib/components/OutputDestinationControl.svelte";
   import SettingsBar from "$lib/components/SettingsBar.svelte";
   import Topbar from "$lib/components/Topbar.svelte";
   import UpdateDialog from "$lib/components/UpdateDialog.svelte";
@@ -178,7 +179,7 @@
         class="shrink-0 border-t bg-background/95 px-4 py-3 shadow-[0_-12px_32px_rgba(15,23,42,0.08)] backdrop-blur"
       >
         <div
-          class="mx-auto flex w-full max-w-[1440px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          class="mx-auto flex w-full max-w-[1440px] flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
         >
           <div class="min-w-0">
             <div class="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -212,33 +213,36 @@
             </div>
           </div>
 
-          <div class="flex shrink-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onclick={clearQueue}
-              disabled={ui.converting || ui.importing || !queue.length}
-            >
-              <Trash />
-              {$t("app.clear")}
-            </Button>
-            <Button
-              variant={ui.converting ? "destructive" : "default"}
-              size="default"
-              class="min-w-40 justify-center font-semibold shadow-sm"
-              onclick={ui.converting ? cancelConversion : convertAll}
-              disabled={ui.converting
-                ? ui.cancelRequested
-                : ui.importing || !queue.length || !engine.ok}
-            >
-              {#if ui.converting}
-                <StopCircle />
-                {ui.cancelRequested ? $t("app.canceling") : $t("app.cancelConversion")}
-              {:else}
-                <PlayCircle />
-                {$t("app.startConversion")}
-              {/if}
-            </Button>
+          <div class="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+            <OutputDestinationControl />
+            <div class="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onclick={clearQueue}
+                disabled={ui.converting || ui.importing || !queue.length}
+              >
+                <Trash />
+                {$t("app.clear")}
+              </Button>
+              <Button
+                variant={ui.converting ? "destructive" : "default"}
+                size="default"
+                class="min-w-40 justify-center font-semibold shadow-sm"
+                onclick={ui.converting ? cancelConversion : convertAll}
+                disabled={ui.converting
+                  ? ui.cancelRequested
+                  : ui.importing || !queue.length || !engine.ok}
+              >
+                {#if ui.converting}
+                  <StopCircle />
+                  {ui.cancelRequested ? $t("app.canceling") : $t("app.cancelConversion")}
+                {:else}
+                  <PlayCircle />
+                  {$t("app.startConversion")}
+                {/if}
+              </Button>
+            </div>
           </div>
         </div>
 

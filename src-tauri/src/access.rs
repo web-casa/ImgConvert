@@ -9,6 +9,8 @@
 
 use std::path::{Path, PathBuf};
 
+use serde::Serialize;
+
 use crate::macos_security::ScopedResource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +41,76 @@ pub struct ScopedPathAccess {
     #[allow(dead_code)]
     path: PathBuf,
     _resource: ScopedResource,
+}
+
+/// Platform-specific user-selected file access policy exposed to the frontend.
+///
+/// This deliberately describes capabilities rather than packaging names in
+/// JavaScript. Flatpak and strict Snap runtimes must use the GTK portal file
+/// chooser, while the AppImage needs its host-dialog workaround for the
+/// WebKit/GTK crash.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeFileAccess {
+    pub use_host_linux_picker: bool,
+    pub requires_output_directory: bool,
+    pub requires_output_directory_session_grant: bool,
+}
+
+pub fn runtime_file_access() -> RuntimeFileAccess {
+    let platform = std::env::consts::OS;
+    let flatpak = if platform == "linux" {
+        is_flatpak_runtime()
+    } else {
+        false
+    };
+    let snap = if platform == "linux" {
+        is_snap_runtime()
+    } else {
+        false
+    };
+    let appimage = if platform == "linux" {
+        is_appimage_runtime()
+    } else {
+        false
+    };
+
+    runtime_file_access_for(platform, flatpak, snap, appimage)
+}
+
+fn runtime_file_access_for(
+    platform: &str,
+    flatpak: bool,
+    snap: bool,
+    appimage: bool,
+) -> RuntimeFileAccess {
+    let requires_output_directory_session_grant = platform == "macos";
+    RuntimeFileAccess {
+        // Never try to execute host zenity/kdialog in a portal sandbox. GTK's
+        // GtkFileChooserNative uses the file chooser portal there instead.
+        use_host_linux_picker: platform == "linux" && appimage && !flatpak && !snap,
+        // An individual portal-selected source file does not grant permission
+        // to create a sibling output. Selecting an output folder provides the
+        // required writable document-portal scope.
+        requires_output_directory: requires_output_directory_session_grant || flatpak || snap,
+        requires_output_directory_session_grant,
+    }
+}
+
+fn is_flatpak_runtime() -> bool {
+    Path::new("/.flatpak-info").is_file() || has_environment_value("FLATPAK_ID")
+}
+
+fn is_snap_runtime() -> bool {
+    has_environment_value("SNAP") || has_environment_value("SNAP_NAME")
+}
+
+fn is_appimage_runtime() -> bool {
+    has_environment_value("APPIMAGE") || has_environment_value("APPDIR")
+}
+
+fn has_environment_value(name: &str) -> bool {
+    std::env::var_os(name).is_some_and(|value| !value.is_empty())
 }
 
 impl ScopedPathAccess {
@@ -149,5 +221,57 @@ mod tests {
     #[test]
     fn scoped_access_is_noop_off_macos() {
         assert!(!scoped_path_access(Path::new("/tmp")).started());
+    }
+
+    #[test]
+    fn runtime_file_access_keeps_appimage_workaround_out_of_flatpak() {
+        assert_eq!(
+            runtime_file_access_for("linux", false, false, true),
+            RuntimeFileAccess {
+                use_host_linux_picker: true,
+                requires_output_directory: false,
+                requires_output_directory_session_grant: false,
+            }
+        );
+        assert_eq!(
+            runtime_file_access_for("linux", true, false, true),
+            RuntimeFileAccess {
+                use_host_linux_picker: false,
+                requires_output_directory: true,
+                requires_output_directory_session_grant: false,
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_file_access_requires_output_directory_for_snap_portal_paths() {
+        assert_eq!(
+            runtime_file_access_for("linux", false, true, false),
+            RuntimeFileAccess {
+                use_host_linux_picker: false,
+                requires_output_directory: true,
+                requires_output_directory_session_grant: false,
+            }
+        );
+    }
+
+    #[test]
+    fn runtime_file_access_requires_a_fresh_macos_directory_grant() {
+        assert_eq!(
+            runtime_file_access_for("macos", false, false, false),
+            RuntimeFileAccess {
+                use_host_linux_picker: false,
+                requires_output_directory: true,
+                requires_output_directory_session_grant: true,
+            }
+        );
+        assert_eq!(
+            runtime_file_access_for("windows", false, false, false),
+            RuntimeFileAccess {
+                use_host_linux_picker: false,
+                requires_output_directory: false,
+                requires_output_directory_session_grant: false,
+            }
+        );
     }
 }

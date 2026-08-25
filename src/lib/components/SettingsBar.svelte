@@ -1,13 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
-  import { FolderOpen, ArrowsClockwise, WarningCircle } from "phosphor-svelte";
+  import { ArrowsClockwise, WarningCircle } from "phosphor-svelte";
   import { t } from "svelte-i18n";
-  import {
-    commandErrorMessage,
-    formatLocalizedMessage,
-    translationMessage,
-    type LocalizedMessage,
-  } from "$lib/localized-message";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
@@ -19,9 +13,8 @@
     extOf,
     formatFromExt,
     capabilities,
-    chooseOutputDirectory,
-    clearOutputDirectory,
-    isTauriRuntime,
+    DEFAULT_OUTPUT_SUFFIX,
+    normalizeOutputSuffixInput,
     persistSettings,
     qualityFloorFor,
     queue,
@@ -33,7 +26,7 @@
   import { cn } from "$lib/utils.js";
 
   let { variant = "bar" }: { variant?: "bar" | "panel" } = $props();
-  let outputMessage = $state<LocalizedMessage | null>(null);
+  let suffixFeedback = $state<"adjusted" | "required" | null>(null);
   let activeSwitchHelp = $state<SwitchHelpKey | null>(null);
   const busy = $derived(ui.converting || ui.importing);
   const isPanel = $derived(variant === "panel");
@@ -123,44 +116,11 @@
     }
   });
 
-  async function pickOut() {
-    if (busy) return;
-
-    if (!isTauriRuntime()) {
-      outputMessage = translationMessage("settings.webOutputDirUnsupported");
-      return;
-    }
-
-    try {
-      const selected = await chooseOutputDirectory();
-      if (busy || !selected) return;
-      outputMessage = null;
-    } catch (error) {
-      outputMessage = commandErrorMessage(error);
-    }
-  }
-
-  async function clearOut() {
-    if (busy) return;
-
-    try {
-      await clearOutputDirectory();
-      outputMessage = null;
-    } catch (error) {
-      outputMessage = commandErrorMessage(error);
-    }
-  }
-
   function setFormat(value: string) {
     if (busy) return;
 
     settings.format = value;
     persistSettings();
-  }
-
-  function localizedText(message: LocalizedMessage, currentTranslation: unknown): string {
-    void currentTranslation;
-    return formatLocalizedMessage(message);
   }
 
   function setOverwrite(value: string) {
@@ -176,6 +136,32 @@
     if (busy) return;
 
     settings.fileNameTemplate = value;
+    persistSettings();
+  }
+
+  function setOutputSuffixEnabled(checked: boolean) {
+    if (busy) return;
+
+    settings.outputSuffixEnabled = checked;
+    if (checked && !settings.outputSuffix.trim()) {
+      settings.outputSuffix = DEFAULT_OUTPUT_SUFFIX;
+    }
+    suffixFeedback = null;
+    persistSettings();
+  }
+
+  function setOutputSuffix(value: string) {
+    if (busy) return;
+
+    const normalized = normalizeOutputSuffixInput(value);
+    if (!normalized.value) {
+      settings.outputSuffix = DEFAULT_OUTPUT_SUFFIX;
+      suffixFeedback = "required";
+      persistSettings();
+      return;
+    }
+    settings.outputSuffix = normalized.value;
+    suffixFeedback = normalized.adjusted ? "adjusted" : null;
     persistSettings();
   }
 
@@ -417,14 +403,64 @@
     </div>
 
     <div class="flex min-w-0 flex-col gap-1.5">
-      <Label class="text-xs text-muted-foreground">{$t("settings.fileNameTemplate")}</Label>
-      <input
-        value={settings.fileNameTemplate}
-        class="h-8 rounded-md border bg-background px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        placeholder="%name%"
-        disabled={busy}
-        oninput={(event) => setTemplate(event.currentTarget.value)}
-      />
+      <div class="flex items-center justify-between gap-3">
+        <Label class="text-xs text-muted-foreground">{$t("settings.outputSuffix")}</Label>
+        <div class="flex items-center gap-2">
+          <Label class="text-xs text-muted-foreground">{$t("settings.addOutputSuffix")}</Label>
+          <Switch
+            size="sm"
+            checked={settings.outputSuffixEnabled}
+            disabled={busy}
+            onCheckedChange={setOutputSuffixEnabled}
+            aria-label={$t("settings.addOutputSuffix")}
+          />
+        </div>
+      </div>
+      {#if settings.outputSuffixEnabled}
+        <input
+          value={settings.outputSuffix}
+          class="h-8 rounded-md border bg-background px-2 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          placeholder={DEFAULT_OUTPUT_SUFFIX}
+          aria-label={$t("settings.outputSuffix")}
+          aria-describedby="output-suffix-hint"
+          disabled={busy}
+          oninput={(event) => setOutputSuffix(event.currentTarget.value)}
+        />
+        <p id="output-suffix-hint" class="text-[11px] leading-4 text-muted-foreground">
+          {$t("settings.outputSuffixHint")}
+        </p>
+        {#if suffixFeedback}
+          <p class="text-[11px] leading-4 text-amber-700 dark:text-amber-300" aria-live="polite">
+            {$t(
+              suffixFeedback === "adjusted"
+                ? "settings.outputSuffixAdjusted"
+                : "settings.outputSuffixRequired",
+            )}
+          </p>
+        {/if}
+      {:else}
+        <p class="text-[11px] leading-4 text-amber-700 dark:text-amber-300">
+          {$t("settings.suffixDisabledCollisionHint")}
+        </p>
+        <details class="rounded-md border border-dashed bg-muted/25 px-2.5 py-2">
+          <summary
+            class="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            {$t("settings.advancedFileNameTemplate")}
+          </summary>
+          <p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+            {$t("settings.advancedFileNameTemplateHint")}
+          </p>
+          <input
+            value={settings.fileNameTemplate}
+            class="mt-2 h-8 w-full rounded-md border bg-background px-2 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            placeholder="%name%"
+            aria-label={$t("settings.fileNameTemplate")}
+            disabled={busy}
+            oninput={(event) => setTemplate(event.currentTarget.value)}
+          />
+        </details>
+      {/if}
     </div>
 
     <div class={cn("min-w-0", isPanel ? "border-t pt-3" : "lg:col-span-3")}>
@@ -539,22 +575,8 @@
       </div>
     {/if}
 
-    <div class="flex min-w-0 items-center gap-2">
-      <Button variant="ghost" size="sm" onclick={pickOut} disabled={busy}>
-        <FolderOpen weight="duotone" />
-        {$t("settings.outputDirectory")}
-      </Button>
-      <button
-        class="max-w-[220px] truncate text-left text-xs text-muted-foreground hover:text-foreground"
-        title={settings.outDir ?? $t("settings.sameAsSourceClear")}
-        onclick={clearOut}
-        disabled={busy}
-      >
-        {settings.outDir ?? $t("settings.sameAsSource")}
-      </button>
-      {#if outputMessage}
-        <span class="text-xs text-muted-foreground">{localizedText(outputMessage, $t)}</span>
-      {/if}
+    <div class="flex min-w-0 items-center">
+      <p class="text-xs text-muted-foreground">{$t("settings.outputAtBottom")}</p>
     </div>
 
     <div class={cn("flex min-w-0 flex-col gap-2 border-t pt-3", isPanel ? "" : "lg:col-span-5")}>

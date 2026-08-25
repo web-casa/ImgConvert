@@ -17,6 +17,10 @@ pub enum ErrorCode {
     OutputPermissionDenied,
     UnsupportedFormat,
     OutputExists,
+    InvalidOutputSuffix,
+    SourceOverwriteConfirmationRequired,
+    OutputConflictsWithInput,
+    OutputSafetyCheckFailed,
     OutputNotSmaller,
     ConversionFailed,
     BatchFailed,
@@ -71,6 +75,25 @@ impl CommandError {
 
     pub fn output_exists(path: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::with_path(ErrorCode::OutputExists, path, detail)
+    }
+
+    pub fn invalid_output_suffix(detail: impl Into<String>) -> Self {
+        Self::new(ErrorCode::InvalidOutputSuffix, None, detail)
+    }
+
+    pub fn source_overwrite_confirmation_required(
+        path: impl Into<String>,
+        detail: impl Into<String>,
+    ) -> Self {
+        Self::with_path(ErrorCode::SourceOverwriteConfirmationRequired, path, detail)
+    }
+
+    pub fn output_conflicts_with_input(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::OutputConflictsWithInput, path, detail)
+    }
+
+    pub fn output_safety_check_failed(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::OutputSafetyCheckFailed, path, detail)
     }
 
     pub fn output_not_smaller(path: impl Into<String>, detail: impl Into<String>) -> Self {

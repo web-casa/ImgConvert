@@ -1008,6 +1008,9 @@ function checkLinux() {
   );
   const ciWorkflow = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
   const releaseQa = readText(path.join(repoRoot, "docs", "RELEASE_QA.md"));
+  const tauriLib = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));
+  const access = readText(path.join(repoRoot, "src-tauri", "src", "access.rs"));
+  const state = readText(path.join(repoRoot, "src", "lib", "state.svelte.ts"));
 
   for (const scriptName of [
     "toolchain:check:linux:all",
@@ -1101,6 +1104,30 @@ function checkLinux() {
   }
   if (!linuxFinalizeWorkflow.includes('"$checksum_assets/SHA256SUMS" --clobber')) {
     failures.push("Linux Release Assets Finalize may clobber only the merged SHA256SUMS asset");
+  }
+  if (!tauriLib.includes("file_access_runtime")) {
+    failures.push("Linux file access policy must expose the file_access_runtime command");
+  }
+  for (const expected of [
+    "RuntimeFileAccess",
+    "use_host_linux_picker",
+    "requires_output_directory",
+    "is_flatpak_runtime",
+    "is_snap_runtime",
+  ]) {
+    if (!access.includes(expected)) {
+      failures.push(`Linux file access policy must preserve ${expected}`);
+    }
+  }
+  for (const expected of [
+    "runtimeFileAccess",
+    "useHostLinuxPicker",
+    "needsOutputDirectoryGrant",
+    "requiresOutputDirectory",
+  ]) {
+    if (!state.includes(expected)) {
+      failures.push(`Linux portal file picker wiring must preserve ${expected}`);
+    }
   }
 }
 
@@ -1403,8 +1430,11 @@ function checkMacosRuntimeGuardrails() {
   if (!libRs.includes("tauri_plugin_persisted_scope::init()")) {
     failures.push("Tauri builder must register persisted Tauri scope before macOS MAS release");
   }
-  if (!stateTs.includes("needsMacosOutputDirectoryGrant")) {
+  if (!stateTs.includes("needsOutputDirectoryGrant")) {
     failures.push("macOS conversions must require a fresh output-directory grant per app session");
+  }
+  if (!stateTs.includes("fileAccessMode: scopedDialogFileAccessMode(")) {
+    failures.push("macOS file selection must keep the dialog security-scoped");
   }
   if (!stateTs.includes("recursive: true")) {
     failures.push("macOS output-directory picker must grant recursive folder access");

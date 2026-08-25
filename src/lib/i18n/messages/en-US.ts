@@ -15,6 +15,17 @@ export const enUS = {
     canceling: "Canceling",
     cancelConversion: "Cancel conversion",
     startConversion: "Start conversion / compression",
+    outputLocation: "Output location",
+    chooseOutputLocation: "Choose output folder",
+    changeOutputLocation: "Change output folder",
+    clearOutputLocation: "Clear custom output folder",
+    outputSourceFolders: "Source file folders",
+    outputFolderRequired: "Choose and authorize an output folder before starting",
+    outputFolderReauthorizationRequired:
+      "Reauthorize this output folder for the current app session",
+    outputFolderRequiredForClipboard: "Clipboard images need an output folder",
+    outputAccessChecking: "Checking output-folder authorization…",
+    outputWebPreview: "The web preview has no local output location",
   },
   topbar: {
     themeDark: "Dark",
@@ -128,10 +139,24 @@ export const enUS = {
     concurrency: "Concurrency",
     existingFiles: "Existing files",
     fileNameTemplate: "File name template",
+    outputSuffix: "File-name suffix",
+    addOutputSuffix: "Add suffix",
+    outputSuffixHint:
+      "Added before the extension. Unicode text is supported; maximum 48 characters and 128 bytes.",
+    outputSuffixAdjusted:
+      "Unsupported path characters were replaced and the safe length limit was applied.",
+    outputSuffixRequired:
+      "Enter at least one character, or turn this switch off to omit the suffix.",
+    advancedFileNameTemplate: "Advanced file-name template",
+    advancedFileNameTemplateHint:
+      "Used when “Add suffix” is off. Supports %name%, %extension%, and %date%.",
+    suffixDisabledCollisionHint:
+      "With no suffix and the same target format, an output can match its source. You will be warned; replacement needs explicit confirmation.",
     followGlobalFormat: "Follow global format",
     outputDirectory: "Output directory",
     sameAsSource: "Same directory as source",
     sameAsSourceClear: "Same directory as source (click to clear custom directory)",
+    outputAtBottom: "Set the output location in the bottom action bar",
     formatParameters: "Format parameters",
     descriptionSeparator: ": ",
     jpegProgressiveMode: "Progressive",
@@ -181,6 +206,13 @@ export const enUS = {
       "Cannot write to the output directory: {path}. Choose an output directory and try again.",
     unsupportedFormat: "Unsupported format: {format}",
     outputExists: "Output file already exists: {path}",
+    invalidOutputSuffix: "The file-name suffix contains unsupported characters or is too long.",
+    sourceOverwriteConfirmationRequired:
+      "Explicit confirmation is required before replacing a source file: {path}",
+    outputConflictsWithInput:
+      "To protect a queued source, this output was not written because it matches another input: {path}",
+    outputSafetyCheckFailed:
+      "Could not verify that this batch can safely preserve source files. Check access to the affected file and try again: {path}",
     outputNotSmaller: "Skipped because the output is not smaller than the source: {path}",
     conversionFailed: "Could not convert image: {path}",
     batchFailed: "The batch conversion could not be completed.",
@@ -333,6 +365,20 @@ export const enUS = {
     confirmOverwriteTitle: "Confirm overwrite",
     overwrite: "Overwrite",
     skip: "Skip",
+    cancel: "Cancel",
+    continueConversion: "Continue conversion",
+    continueRemaining: "Continue remaining items",
+    sourceOverwriteTitle: "Source file may be replaced",
+    sourceOverwrite: "Replace source file",
+    sourceOverwriteMessage:
+      "{count} output file(s) are the same file as their source. Continuing will replace the original and cannot be undone.",
+    sourceOverwriteSingleMessage:
+      "This output is the same file as its source:\n{path}\n\nConfirming will replace the original and cannot be undone.",
+    sourceOverwriteWillSkipMessage:
+      "{count} output file(s) match their source. With “Skip” selected, those originals will not be changed.",
+    queuedInputConflictTitle: "Queued source overwrite prevented",
+    queuedInputConflictMessage:
+      "{count} output path(s) match another queued input. To protect sources, those items will not be written; the remaining items can continue.",
     unsupportedTarget: "Unsupported target format: {format}",
     readingAndConverting: "Reading and converting",
     cancelled: "Canceled",

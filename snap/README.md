@@ -3,10 +3,13 @@
 # Snap Store packaging
 
 ImgConvert is packaged as a strict `core24` desktop snap. The GNOME extension
-provides the GTK/WebKit runtime. `home` grants access to non-hidden files under
-the user's home directory; `removable-media` is optional and may require a
-manual connection. The snap does not request classic confinement, network,
-background-service, or system-control interfaces.
+provides the GTK/WebKit runtime and enables GTK's portal-aware native file
+chooser. `home` grants access to non-hidden files under the user's home
+directory; `removable-media` is optional and may require a manual connection.
+Select an output folder before converting: a portal-selected input file (in
+particular one from a hidden directory or removable media) does not by itself
+grant permission to create a sibling output. The snap does not request classic
+confinement, network, background-service, or system-control interfaces.
 
 The Store build uses Snapcraft's custom lifecycle with Rustup pinned to Rust
 1.96.0. The custom lifecycle clears the GNOME SDK library path before invoking

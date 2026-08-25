@@ -6,7 +6,8 @@ This directory contains the ImgConvert Flatpak packaging surface:
 
 - `io.github.yeagoo.imgconvert.yml` builds from a generated release archive instead of the repository root.
 - `pnpm run release:flatpak:prepare` creates that release archive with vendored Corepack/pnpm (`.flatpak-vendor/corepack.tgz`) plus vendored Cargo/npm inputs under `target/flatpak/sources/`, then updates the manifest `sha256`.
-- `finish-args` intentionally avoid broad host filesystem access so file access continues to go through user-selected portal paths.
+- `finish-args` intentionally avoid broad host filesystem access so file access continues to go through user-selected portal paths. Flatpak uses Tauri's GTK `GtkFileChooserNative` dialog (the portal-aware path), never the AppImage-only host `zenity`/`kdialog` workaround.
+- Select an output folder before the first conversion. A portal-selected individual input file does not authorize creating a sibling output; the selected output folder grants writable document-portal access and is retained by the portal across app launches.
 - The manifest tracks the supported GNOME `50` runtime; do not leave Flathub packaging pinned to EOL GNOME branches.
 - AppStream metadata uses `metadata_license=CC0-1.0`; the application/project license remains `Apache-2.0`.
 - `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` is set for the Flatpak main package so host PATH/XDG helpers stay disabled inside the sandbox.

@@ -13,6 +13,9 @@ test("loads the web preview shell", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /开始转换 \/ 压缩|Start conversion \/ compression/ }),
   ).toBeVisible();
+  await expect(
+    page.getByText(/网页预览不支持本机输出位置|The web preview has no local output location/),
+  ).toBeVisible();
 });
 
 test("keeps the primary conversion action visible in a short viewport", async ({ page }) => {

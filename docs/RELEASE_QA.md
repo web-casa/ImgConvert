@@ -114,6 +114,14 @@ uses a disposable DevSmoke identity and removes the test package afterwards.
   Silicon Macs. Exercise file selection, output-directory selection, conversion,
   relaunch, then select the output directory again before converting under the
   sandbox.
+- Flatpak: use the portal file picker to select an input, then select an output
+  folder before converting. Confirm no broad host filesystem permission is
+  required, the output is created through the portal path, and the saved output
+  folder remains usable after relaunch.
+- Snap: test both a normal home-directory input and a portal-provided hidden or
+  removable-media input. Select an output folder before conversion and confirm
+  the conversion succeeds under strict confinement without requesting classic
+  confinement.
 - Microsoft Store: submit architecture-specific MSIX packages only after their
   sideload smoke succeeds; Store versions must use Store updates, not Tauri
   updater.

@@ -41,10 +41,10 @@ pub fn run_path_conversion_smoke(
     convert::convert(&options)
 }
 
-/// 返回当前宿主平台,供前端选择平台专属系统集成路径。
+/// 返回当前运行时的文件访问策略,供前端选择正确的系统文件选择器和输出目录流程。
 #[tauri::command]
-fn host_platform() -> &'static str {
-    std::env::consts::OS
+fn file_access_runtime() -> access::RuntimeFileAccess {
+    access::runtime_file_access()
 }
 
 /// 返回进程内 core 的格式能力矩阵。
@@ -180,7 +180,8 @@ fn cleanup_imported_temp_file(
     import::cleanup_imported_temp_file(path, &state).map_err(CommandError::clipboard_import_failed)
 }
 
-/// Linux AppImage 下优先使用宿主系统文件选择器,避免 WebKit/GTK dialog 进程内崩溃。
+/// AppImage 下使用宿主系统文件选择器,避免 WebKit/GTK dialog 进程内崩溃。
+/// Flatpak 由前端改用 GTK portal picker,本命令也会拒绝在该沙盒中执行。
 #[tauri::command]
 async fn pick_paths(options: NativePickOptions) -> Result<Vec<String>, CommandError> {
     tauri::async_runtime::spawn_blocking(move || native_dialog::pick_paths(&options))
@@ -221,7 +222,7 @@ pub fn run() {
 
     builder
         .invoke_handler(tauri::generate_handler![
-            host_platform,
+            file_access_runtime,
             capabilities,
             runtime_diagnostics,
             codec_diagnostics,
