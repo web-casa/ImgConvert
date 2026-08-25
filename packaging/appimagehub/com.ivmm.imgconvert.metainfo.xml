@@ -25,11 +25,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.14/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.15/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.15" date="2026-08-25">
+      <description>
+        <p>Removes unused update-related macOS automation from the Mac App Store build.</p>
+      </description>
+    </release>
     <release version="0.2.14" date="2026-08-25">
       <description>
         <p>Adds safer output naming, configurable suffixes, output-folder authorization, and explicit source-overwrite protection.</p>

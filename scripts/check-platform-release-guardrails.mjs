@@ -1186,10 +1186,11 @@ function checkMacosRuntimeGuardrails() {
     !packageScripts["release:macos:mas"]?.includes("release:macos:mas:prepare") ||
     !packageScripts["release:macos:mas"]?.includes("check-macos-bundle-artifacts.mjs") ||
     !packageScripts["release:macos:mas"]?.includes("--require-mas") ||
-    !packageScripts["release:macos:mas"]?.includes("IMGCONVERT_DISABLE_EXTERNAL_CODECS=1")
+    !packageScripts["release:macos:mas"]?.includes("IMGCONVERT_DISABLE_EXTERNAL_CODECS=1") ||
+    !packageScripts["release:macos:mas"]?.includes("--no-default-features")
   ) {
     failures.push(
-      "package.json must expose release:macos:mas with store codec guardrail and app artifact verification",
+      "package.json must expose release:macos:mas with Store-only dependency and codec guardrails plus app artifact verification",
     );
   }
   if (!packageScripts["release:macos:mas:pkg"]?.includes("package-macos-mas-pkg.mjs")) {
@@ -1222,6 +1223,8 @@ function checkMacosRuntimeGuardrails() {
     'spawnSync("lipo"',
     'spawnSync("otool"',
     "ImageIO.framework",
+    "osakit.framework",
+    "NSAppleMusicUsageDescription",
   ]) {
     if (!bundleArtifactScript.includes(expected)) {
       failures.push(`macOS bundle verification must inspect every Mach-O binary: ${expected}`);
@@ -1765,10 +1768,41 @@ function checkMacosDirectConfig() {
 
 function checkMacosStoreConfig() {
   const prepare = readText(path.join(repoRoot, "scripts", "prepare-macos-mas-release.mjs"));
+  const cargoManifest = readText(path.join(srcTauriRoot, "Cargo.toml"));
+  const appSource = readText(path.join(srcTauriRoot, "src", "lib.rs"));
+  const buildScript = readText(path.join(srcTauriRoot, "build.rs"));
   for (const expected of ["IMGCONVERT_DISABLE_UPDATER", 'capabilities: ["default"]']) {
     if (!prepare.includes(expected)) {
       failures.push(
         `prepare-macos-mas-release.mjs must enforce Store updater disable: ${expected}`,
+      );
+    }
+  }
+  if (
+    !cargoManifest.includes('default = ["updater"]') ||
+    !cargoManifest.includes('updater = ["dep:tauri-plugin-updater"]') ||
+    !/tauri-plugin-updater\s*=\s*\{[^}]*optional\s*=\s*true[^}]*\}/.test(cargoManifest)
+  ) {
+    failures.push(
+      "src-tauri/Cargo.toml must make tauri-plugin-updater optional behind the updater feature",
+    );
+  }
+  if (
+    !appSource.includes('#[cfg(feature = "updater")]') ||
+    !appSource.includes("tauri_plugin_updater::Builder::new().build()")
+  ) {
+    failures.push(
+      "src-tauri/src/lib.rs must register the updater only when its feature is enabled",
+    );
+  }
+  for (const expected of [
+    "CARGO_FEATURE_UPDATER",
+    "capabilities/default.json",
+    "capabilities_path_pattern",
+  ]) {
+    if (!buildScript.includes(expected)) {
+      failures.push(
+        `src-tauri/build.rs must exclude updater capabilities when building without its feature: ${expected}`,
       );
     }
   }
@@ -1803,6 +1837,11 @@ function checkMacosStoreConfig() {
   if (!infoPlist.includes("ITSAppUsesNonExemptEncryption") || !infoPlist.includes("<false/>")) {
     failures.push(
       "Info.macos.mas.plist must declare no non-exempt encryption for App Store review",
+    );
+  }
+  if (infoPlist.includes("NSAppleMusicUsageDescription")) {
+    failures.push(
+      "Info.macos.mas.plist must not declare an Apple Music purpose string because ImgConvert does not access that library",
     );
   }
   const entitlements = readEntitlements(macos.entitlements);

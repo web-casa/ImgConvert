@@ -1,6 +1,6 @@
 [package]
 name = "imgconvert"
-version = "0.2.14"
+version = "0.2.15"
 description = "Local-first cross-platform batch image converter"
 authors = ["ImgConvert"]
 license = "Apache-2.0"
@@ -15,6 +15,12 @@ edition = "2021"
 name = "tauri_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Direct builds retain the in-app updater. Mac App Store builds explicitly turn
+# this feature off, since Store updates are delivered by the App Store itself.
+default = ["updater"]
+updater = ["dep:tauri-plugin-updater"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -26,7 +32,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-persisted-scope = "2"
-tauri-plugin-updater = "2"
+tauri-plugin-updater = { version = "2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio-util = "0.7"

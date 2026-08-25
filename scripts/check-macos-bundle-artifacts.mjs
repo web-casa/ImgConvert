@@ -391,6 +391,20 @@ function verifyMacBinary(binary, { requireImageIo = false } = {}) {
       );
     }
   }
+  if (options.requireMas) {
+    for (const framework of [
+      "osakit.framework",
+      "medialibrary.framework",
+      "mediaplayer.framework",
+      "musickit.framework",
+    ]) {
+      if (normalizedLinkage.includes(framework)) {
+        failures.push(
+          `${path.relative(repoRoot, binary)} must not link ${framework}; the MAS build does not access the Apple Music library`,
+        );
+      }
+    }
+  }
   if (requireImageIo && !normalizedLinkage.includes("imageio.framework")) {
     failures.push(
       `${path.relative(repoRoot, binary)} must link ImageIO.framework for macOS HEIC import`,
@@ -452,6 +466,7 @@ function verifyMasSigningAuthority(appPath) {
 function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   const entitlementsPath = path.join(temporaryRoot, "entitlements.plist");
   const profilePath = path.join(temporaryRoot, "profile.plist");
+  const infoPlist = path.join(appPath, "Contents", "Info.plist");
   if (!writeCodesignEntitlements(appPath, entitlementsPath)) return;
   if (!decodeProvisioningProfile(profile, profilePath)) return;
 
@@ -470,6 +485,11 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   );
   if (readPlistValue(entitlementsPath, "com.apple.security.get-task-allow") === "true") {
     failures.push("MAS app must not enable com.apple.security.get-task-allow");
+  }
+  if (readPlistValue(infoPlist, "NSAppleMusicUsageDescription") !== null) {
+    failures.push(
+      "MAS Info.plist must not declare NSAppleMusicUsageDescription because ImgConvert does not access the Apple Music library",
+    );
   }
 }
 
