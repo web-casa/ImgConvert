@@ -4,7 +4,8 @@
     "macOS": {
       "minimumSystemVersion": "10.13",
       "hardenedRuntime": true,
-      "entitlements": "entitlements.macos.direct.plist"
+      "entitlements": "entitlements.macos.direct.plist",
+      "infoPlist": "Info.macos.privacy.plist"
     }
   }
 }

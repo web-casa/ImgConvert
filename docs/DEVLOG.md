@@ -767,7 +767,7 @@ Codex 在 macOS 第一批能力之后补齐发布链路的 repo 侧闭环:
 - **显式公证闭环**:新增 `pnpm run release:macos:notarize` 与 `scripts/notarize-macos-dmg.mjs`,支持 notarytool keychain profile、App Store Connect API key 或 Apple ID/app-specific password 三种凭据,并串起 `notarytool submit --wait`、`stapler staple`、`spctl` 和 signed/notarized artifact verifier。
 - **MAS candidate 入口**:新增 `scripts/prepare-macos-mas-release.mjs`,从 `APPLE_TEAM_ID` 与 provisioning profile 生成 team/application identifier entitlement、MAS config 和 `embedded.provisionprofile` 映射;新增 `pnpm run release:macos:mas` 构建 signed `.app` candidate,`pnpm run release:macos:mas:pkg` 用 `productbuild` 生成可上传 `.pkg`。
 - **GitHub-hosted macOS smoke 升级**:`.github/workflows/macos-smoke.yml` 默认在 `macos-15` arm64 上生成 HEIC fixture 并跑 ImageIO 路径转换 smoke;手动触发可构建 unsigned `.dmg`,或导入 Apple `.p12` secrets 后构建 signed/notarized `.dmg`;也可生成 MAS signed `.app` candidate 和可选 `.pkg` artifact。
-- **guardrail 加固**:`release:macos:check` 现在要求 macOS release/MAS/notarize/pkg 脚本存在,检查 fs/persisted-scope 依赖与注册、`fs:scope` capability、MAS `Info.macos.mas.plist` 加密声明、generated entitlement 关键字段和 macOS README 发布步骤。
+- **guardrail 加固**:`release:macos:check` 现在要求 macOS release/MAS/notarize/pkg 脚本存在,检查 fs/persisted-scope 依赖与注册、`fs:scope` capability、MAS 隐私 Info.plist 加密声明、generated entitlement 关键字段和 macOS README 发布步骤。
 
 限制:
 

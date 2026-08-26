@@ -1,6 +1,6 @@
 # ImgConvert 隐私政策
 
-生效日期：2026-08-25
+生效日期：2026-08-26
 
 English version: <https://web-casa.github.io/ImgConvert/privacy/#en>
 
@@ -42,7 +42,9 @@ ImgConvert 只在必要时访问你主动选择的文件或文件夹：
 
 ## Apple 平台访问与 HEIC 解码
 
-Mac App Store 版本不会访问 Apple Music、你的 Apple Music 资料库或照片图库，也不会请求通讯录、相机、麦克风或位置数据访问权限。
+当你明确选择位于受保护媒体资料库内的文件夹导入图片时，Mac App Store 版本可能请求 macOS 的“媒体资料库”访问权限。该权限只用于扫描所选文件夹的内容，找出要加入本地转换队列的图片；例如，可在本机转换所选文件夹中的专辑封面图片。应用不会查询 Apple Music 目录，也不会读取播放或收听活动。
+
+你可以在 macOS 隐私设置中拒绝或撤销该权限。ImgConvert 的其他功能仍可使用；只有从该受保护位置导入图片无法在未获授权时继续。Mac App Store 版本不会访问照片图库，也不会请求通讯录、相机、麦克风或位置数据访问权限。
 
 当你在 Mac App Store 版本中主动选择 HEIC 文件时，ImgConvert 可能通过 macOS 内置的 ImageIO 框架在本机解码该文件。该版本不输出 HEIC，不捆绑外部 HEIC/HEVC 编解码器，也不发现第三方 codec helper。
 

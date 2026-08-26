@@ -1,6 +1,6 @@
 # ImgConvert Privacy Policy
 
-Effective date: August 25, 2026
+Effective date: August 26, 2026
 
 Chinese version: <https://web-casa.github.io/ImgConvert/privacy/#zh-CN>
 
@@ -51,9 +51,18 @@ background.
 
 ## Apple platform access and HEIC decoding
 
-The Mac App Store edition does not access Apple Music, your Apple Music library,
-or your Photos library. It does not request access to contacts, camera,
-microphone, or location data.
+The Mac App Store edition may request macOS Media Library access only when you
+explicitly select a folder in that protected location for image import. It uses
+that access only to scan the selected folder for images to add to the local
+conversion queue. For example, it can locally convert album-art images in the
+selected folder. It does not query the Apple Music catalog or read playback or
+listening activity.
+
+You can deny or revoke this permission in macOS privacy settings. The rest of
+ImgConvert remains available; only image import from that selected protected
+location cannot proceed without access. The Mac App Store edition does not
+access your Photos library or request access to contacts, camera, microphone,
+or location data.
 
 When you actively select a HEIC file in the Mac App Store edition, ImgConvert
 may use the built-in macOS ImageIO framework to decode that selected file on

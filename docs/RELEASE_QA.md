@@ -113,7 +113,10 @@ uses a disposable DevSmoke identity and removes the test package afterwards.
   test the exact processed build from TestFlight on physical Intel and Apple
   Silicon Macs. Exercise file selection, output-directory selection, conversion,
   relaunch, then select the output directory again before converting under the
-  sandbox.
+  sandbox. On a clean macOS test user, also exercise a selected folder in the
+  Media Library privacy domain and verify that any resulting prompt shows the
+  current `NSAppleMusicUsageDescription`; capture both Allow and Don't Allow
+  behavior without requiring the rest of the app to stop working.
 - Flatpak: use the portal file picker to select an input, then select an output
   folder before converting. Confirm no broad host filesystem permission is
   required, the output is created through the portal path, and the saved output

@@ -74,7 +74,7 @@ writeFileSync(
           minimumSystemVersion: "12.0",
           hardenedRuntime: true,
           entitlements: "target/macos-mas/entitlements.macos.mas.generated.plist",
-          infoPlist: "Info.macos.mas.plist",
+          infoPlist: "Info.macos.privacy.plist",
           files: generatedProfile
             ? {
                 "embedded.provisionprofile": generatedProfile,

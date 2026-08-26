@@ -15,6 +15,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const macosMediaLibraryUsageDescription =
+  "ImgConvert scans the contents of folders you explicitly select, including a selected folder in your media library, to find image files for the local conversion queue. For example, it can convert album-art images in that folder locally; it does not read Apple Music playback or listening activity.";
 
 const options = {
   profile: "release",
@@ -486,11 +488,7 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   if (readPlistValue(entitlementsPath, "com.apple.security.get-task-allow") === "true") {
     failures.push("MAS app must not enable com.apple.security.get-task-allow");
   }
-  if (readPlistValue(infoPlist, "NSAppleMusicUsageDescription") !== null) {
-    failures.push(
-      "MAS Info.plist must not declare NSAppleMusicUsageDescription because ImgConvert does not access the Apple Music library",
-    );
-  }
+  requirePlistValue(infoPlist, "NSAppleMusicUsageDescription", macosMediaLibraryUsageDescription);
 }
 
 function writeCodesignEntitlements(appPath, destination) {

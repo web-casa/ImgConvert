@@ -37,6 +37,9 @@ const tauriConfigPath = path.join(repoRoot, "src-tauri", "tauri.conf.json");
 const tauriConfig = readJson(tauriConfigPath);
 const srcTauriRoot = path.join(repoRoot, "src-tauri");
 const macosMasMinimumSystemVersion = "12.0";
+const macosPrivacyInfoPlist = "Info.macos.privacy.plist";
+const macosMediaLibraryUsageDescription =
+  "ImgConvert scans the contents of folders you explicitly select, including a selected folder in your media library, to find image files for the local conversion queue. For example, it can convert album-art images in that folder locally; it does not read Apple Music playback or listening activity.";
 const failures = [];
 
 checkCommonBundleMetadata();
@@ -1756,6 +1759,10 @@ function checkMacosDirectConfig() {
   if (macos.entitlements !== "entitlements.macos.direct.plist") {
     failures.push("macOS direct config must use entitlements.macos.direct.plist");
   }
+  if (macos.infoPlist !== macosPrivacyInfoPlist) {
+    failures.push(`macOS direct config must merge ${macosPrivacyInfoPlist}`);
+  }
+  requireMacosMediaLibraryUsageDescription("macOS direct");
   const entitlements = readEntitlements(macos.entitlements);
   if (!entitlements) {
     return;
@@ -1830,20 +1837,16 @@ function checkMacosStoreConfig() {
   if (macos.entitlements !== "entitlements.macos.mas.plist") {
     failures.push("macOS MAS config must use entitlements.macos.mas.plist");
   }
-  if (macos.infoPlist !== "Info.macos.mas.plist") {
-    failures.push("macOS MAS config must merge Info.macos.mas.plist");
+  if (macos.infoPlist !== macosPrivacyInfoPlist) {
+    failures.push(`macOS MAS config must merge ${macosPrivacyInfoPlist}`);
   }
-  const infoPlist = readText(path.join(srcTauriRoot, "Info.macos.mas.plist"));
+  const infoPlist = readText(path.join(srcTauriRoot, macosPrivacyInfoPlist));
   if (!infoPlist.includes("ITSAppUsesNonExemptEncryption") || !infoPlist.includes("<false/>")) {
     failures.push(
-      "Info.macos.mas.plist must declare no non-exempt encryption for App Store review",
+      `${macosPrivacyInfoPlist} must declare no non-exempt encryption for App Store review`,
     );
   }
-  if (infoPlist.includes("NSAppleMusicUsageDescription")) {
-    failures.push(
-      "Info.macos.mas.plist must not declare an Apple Music purpose string because ImgConvert does not access that library",
-    );
-  }
+  requireMacosMediaLibraryUsageDescription("macOS MAS");
   const entitlements = readEntitlements(macos.entitlements);
   if (!entitlements) {
     return;
@@ -1868,6 +1871,18 @@ function checkMacosStoreConfig() {
     );
   }
   checkForbiddenMacosEntitlements(entitlements, "macOS MAS entitlements");
+}
+
+function requireMacosMediaLibraryUsageDescription(channel) {
+  const infoPlist = readText(path.join(srcTauriRoot, macosPrivacyInfoPlist));
+  if (!infoPlist.includes("NSAppleMusicUsageDescription")) {
+    failures.push(`${channel} privacy Info.plist must declare NSAppleMusicUsageDescription`);
+  }
+  if (!infoPlist.includes(macosMediaLibraryUsageDescription)) {
+    failures.push(
+      `${channel} privacy Info.plist must explain user-selected folder scanning, local conversion, and the album-art example`,
+    );
+  }
 }
 
 function checkWindowsDirectConfig() {

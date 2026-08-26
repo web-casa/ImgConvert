@@ -67,7 +67,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       title: "用清楚的话，\n说明隐私。",
       intro:
         "ImgConvert 是一款在本机运行的图片批量转换工具。我们默认按“本地优先、最小收集”的原则处理数据。",
-      effectiveDate: "生效日期：2026-08-25",
+      effectiveDate: "生效日期：2026-08-26",
       sourceNote: "以下内容与项目公开隐私政策保持一致。",
       sections: [
         {
@@ -119,7 +119,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "Apple 平台访问与 HEIC 解码",
           paragraphs: [
-            "Mac App Store 版本不会访问 Apple Music、你的 Apple Music 资料库或照片图库，也不会请求通讯录、相机、麦克风或位置数据访问权限。",
+            "当你明确选择位于受保护媒体资料库内的文件夹导入图片时，Mac App Store 版本可能请求 macOS 的“媒体资料库”访问权限。该权限只用于扫描所选文件夹的内容，找出要加入本地转换队列的图片；例如，可在本机转换所选文件夹中的专辑封面图片。应用不会查询 Apple Music 目录，也不会读取播放或收听活动。你可以在 macOS 隐私设置中拒绝或撤销该权限；ImgConvert 的其他功能仍可使用。该版本不会访问照片图库，也不会请求通讯录、相机、麦克风或位置数据访问权限。",
             "当你在 Mac App Store 版本中主动选择 HEIC 文件时，ImgConvert 可能通过 macOS 内置的 ImageIO 框架在本机解码该文件。该版本不输出 HEIC，不捆绑外部 HEIC/HEVC 编解码器，也不发现第三方 codec helper。",
           ],
         },
@@ -202,7 +202,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       title: "Privacy,\nin plain language.",
       intro:
         "ImgConvert is a local image batch-conversion tool. We process data according to the principles of local-first operation and minimal collection.",
-      effectiveDate: "Effective date: August 25, 2026",
+      effectiveDate: "Effective date: August 26, 2026",
       sourceNote: "This page stays aligned with the public project privacy policy.",
       sections: [
         {
@@ -257,7 +257,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "Apple platform access and HEIC decoding",
           paragraphs: [
-            "The Mac App Store edition does not access Apple Music, your Apple Music library, or your Photos library. It does not request access to contacts, camera, microphone, or location data.",
+            "The Mac App Store edition may request macOS Media Library access only when you explicitly select a folder in that protected location for image import. It uses that access only to scan the selected folder for images to add to the local conversion queue. For example, it can locally convert album-art images in the selected folder. It does not query the Apple Music catalog or read playback or listening activity. You can deny or revoke this permission in macOS privacy settings; the rest of ImgConvert remains available. The edition does not access your Photos library or request access to contacts, camera, microphone, or location data.",
             "When you actively select a HEIC file in the Mac App Store edition, ImgConvert may use the built-in macOS ImageIO framework to decode that selected file on your device. It does not create HEIC output, bundle an external HEIC/HEVC codec, or discover third-party codec helpers in that edition.",
           ],
         },
