@@ -321,6 +321,8 @@ export interface Settings {
   generationLossProtection: boolean;
   resultCache: boolean;
   skipIfLarger: boolean;
+  /** Internal migration marker for opt-in policies that can skip a conversion. */
+  conversionPolicyVersion: number;
   multiCandidate: boolean;
   overwrite: OverwriteMode;
   outDir: string | null;
@@ -378,6 +380,7 @@ const CLIPBOARD_IMAGE_MIME_TYPES = new Set([
 export const OUTPUT_SUFFIX_MAX_CHARS = 48;
 const OUTPUT_SUFFIX_MAX_BYTES = 128;
 export const DEFAULT_OUTPUT_SUFFIX = "_done";
+export const CONVERSION_POLICY_VERSION = 2;
 export interface RuntimeFileAccess {
   useHostLinuxPicker: boolean;
   requiresOutputDirectory: boolean;
@@ -469,9 +472,12 @@ export const settings = $state<Settings>({
   jpegTrellis: true,
   autoQuality: false,
   autoQualityScore: 80,
-  generationLossProtection: true,
+  generationLossProtection: false,
   resultCache: true,
-  skipIfLarger: true,
+  // A requested format conversion must produce that format. Keeping only smaller
+  // results is useful for compression-only work, but requires an explicit opt-in.
+  skipIfLarger: false,
+  conversionPolicyVersion: CONVERSION_POLICY_VERSION,
   multiCandidate: true,
   overwrite: "skip",
   outDir: null,
@@ -858,6 +864,34 @@ export function normalizePersistedOutputSuffixSettings(
           ? outputSuffixEnabled
           : true,
     outputSuffix: normalizedOutputSuffix || DEFAULT_OUTPUT_SUFFIX,
+  };
+}
+
+export function normalizePersistedConversionPolicySettings(
+  persisted:
+    | Pick<
+        Partial<Settings>,
+        "generationLossProtection" | "skipIfLarger" | "conversionPolicyVersion"
+      >
+    | undefined,
+  generationLossProtection: unknown,
+  skipIfLarger: unknown,
+): Pick<Settings, "generationLossProtection" | "skipIfLarger" | "conversionPolicyVersion"> & {
+  migrated: boolean;
+} {
+  const usesCurrentPolicy = persisted?.conversionPolicyVersion === CONVERSION_POLICY_VERSION;
+
+  return {
+    // Releases before this policy version enabled skip policies by default, so
+    // a persisted `true` is not reliable evidence of an informed opt-in.
+    // Migrate every legacy profile to the conversion-first default once.
+    generationLossProtection:
+      usesCurrentPolicy && typeof generationLossProtection === "boolean"
+        ? generationLossProtection
+        : false,
+    skipIfLarger: usesCurrentPolicy && typeof skipIfLarger === "boolean" ? skipIfLarger : false,
+    conversionPolicyVersion: CONVERSION_POLICY_VERSION,
+    migrated: Boolean(persisted) && !usesCurrentPolicy,
   };
 }
 
@@ -2256,7 +2290,10 @@ export async function initPersistence() {
     const saved = await store.get<Partial<Settings>>("settings");
     if (saved) {
       Object.assign(settings, saved);
-      normalizeSettings(detectedLocale, saved);
+      const migratedConversionPolicy = normalizeSettings(detectedLocale, saved);
+      if (migratedConversionPolicy) {
+        await persistSettings();
+      }
     } else {
       settings.locale = detectedLocale;
     }
@@ -2275,7 +2312,7 @@ export async function persistSettings() {
   await store.set("settings", { ...settings });
 }
 
-function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settings>) {
+function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settings>): boolean {
   const overwrite = settings.overwrite as unknown;
   if (overwrite !== "ask" && overwrite !== "skip" && overwrite !== "overwrite") {
     settings.overwrite = overwrite === true ? "overwrite" : "skip";
@@ -2374,15 +2411,17 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   } else {
     settings.autoQualityScore = Math.min(95, Math.max(50, Math.round(settings.autoQualityScore)));
   }
-  if (typeof settings.generationLossProtection !== "boolean") {
-    settings.generationLossProtection = true;
-  }
   if (typeof settings.resultCache !== "boolean") {
     settings.resultCache = true;
   }
-  if (typeof settings.skipIfLarger !== "boolean") {
-    settings.skipIfLarger = true;
-  }
+  const conversionPolicySettings = normalizePersistedConversionPolicySettings(
+    persisted,
+    settings.generationLossProtection,
+    settings.skipIfLarger,
+  );
+  settings.generationLossProtection = conversionPolicySettings.generationLossProtection;
+  settings.skipIfLarger = conversionPolicySettings.skipIfLarger;
+  settings.conversionPolicyVersion = conversionPolicySettings.conversionPolicyVersion;
   if (typeof settings.multiCandidate !== "boolean") {
     settings.multiCandidate = true;
   }
@@ -2393,6 +2432,7 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   settings.jpegQualityFloor = normalizeQualityFloor(settings.jpegQualityFloor, 30);
   settings.webpQualityFloor = normalizeQualityFloor(settings.webpQualityFloor, 30);
   settings.avifQualityFloor = normalizeQualityFloor(settings.avifQualityFloor, 30);
+  return conversionPolicySettings.migrated;
 }
 
 function clampQuality(value: unknown): number {

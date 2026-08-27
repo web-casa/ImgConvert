@@ -117,7 +117,7 @@
 | 格式转换   | 支持 SVG、静态 GIF、BMP、AVIF、WebP、JPEG、PNG 导入；JPEG/PNG/WebP/AVIF 输出，支持 AVIF 真无损 |
 | 批量工作流 | 文件、目录、递归与剪贴板导入；去重、异步缩略图、进度和取消                                     |
 | 性能控制   | Rust 端批量转换、并发控制、内存预算降并发与 Channel 进度上报                                   |
-| 压缩策略   | `skip-if-larger`、多候选取最小、自动质量与代际损失防护                                         |
+| 压缩策略   | 可选 `skip-if-larger` 与代际跳过策略、多候选取最小和自动质量                                   |
 | 图像保真   | EXIF orientation 真旋正，保留或剥离 ICC / EXIF / XMP / IPTC                                    |
 | 色彩管理   | Display P3 ICC 测试、显式转 sRGB 与色彩管线 v2                                                 |
 | HEIC 导入  | macOS ImageIO、Windows WIC、Linux helper / Flatpak extension；只读导入                         |

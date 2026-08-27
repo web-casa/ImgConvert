@@ -132,7 +132,7 @@ export const homeData: Record<DocsLocale, HomeData> = {
       {
         glyph: "LOSSY · COMPAT",
         name: "JPEG",
-        desc: "兼容性最佳，支持自动质量与 skip-if-larger",
+        desc: "兼容性最佳，支持自动质量与可选的更小输出策略",
         tag: "mozjpeg encoder",
       },
       {
@@ -254,7 +254,7 @@ export const homeData: Record<DocsLocale, HomeData> = {
       {
         glyph: "LOSSY · COMPAT",
         name: "JPEG",
-        desc: "Best compatibility, with auto quality and skip-if-larger",
+        desc: "Best compatibility, with auto quality and an optional keep-smaller policy",
         tag: "mozjpeg encoder",
       },
       {
@@ -321,7 +321,7 @@ export const homeData: Record<DocsLocale, HomeData> = {
       processed: "0 / 12 processed · 1.2 MB saved",
       quality: "Quality · 85",
       queued: "ImgConvert — 12 files queued",
-      skip: "skip-if-larger ✓",
+      skip: "conversion-first ✓",
     },
     sections: {
       ctaDescription:

@@ -154,11 +154,11 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] **per-format 参数第一批**(在 core 已接 mozjpeg/oxipng/webp/libavif-sys 之上):quality、progressive、oxipng level、AVIF speed、WebP method;默认值为 oxipng=4 / AVIF speed=8 / WebP method=4,其中 AVIF/WebP 已用 Linux arm64 release benchmark 第一批复核，AVIF speed=8 已由 macOS Apple Silicon 真实 runner 复核；Windows 数据继续按发布验收补齐。已贯通 core、Tauri IPC、设置持久化和 shadcn 格式参数 UI。
 - [x] 全局有损/无损开关 + 每格式质量下限阈值(TIFF 为 **P2 可选**,非 v1 承诺,与顶部「TIFF 推后」一致)。当前全局无损对 PNG/WebP/AVIF 生效;JPEG/WebP/AVIF 有损模式可设 30-100 的质量下限,低于 30 视为禁用。
 - [x] **有损 PNG 量化用宽松库**:`color_quant`(MIT)实验性限色,默认关闭;仍输出普通 PNG 并继续走 oxipng。⚠️ **不用 imagequant/GPL**。
-- [x] **skip-if-larger / 永不变差第一批**:候选输出不小于源文件时跳过写入,批量计为 skipped;默认开启,可在设置里关闭以强制格式迁移。
+- [x] **skip-if-larger / 永不变差第一批**:候选输出不小于源文件时可跳过写入,批量计为 skipped；现为默认关闭的显式压缩策略，以保证格式迁移（例如旧系统所需 PNG）会产生输出。
 - [x] **多候选取最小第一批**(借鉴 ImageOptim + Hando keep_bar):同一目标格式下比较等价多参数候选,只写最小有效输出。当前覆盖 JPEG baseline/progressive、PNG oxipng level、WebP method;不改变 quality/lossless/目标格式,AVIF 暂不做多候选以避免编码时间爆炸。
 - [x] **自动质量(仅 JPEG/WebP)**:`ssimulacra2`(BSD-2-Clause,default-features=false)感知打分 + step≈4 二分搜索压到目标分;WebP lossless 作为候选参与比较。
 - [x] **ICC/EXIF/XMP 透传容器手术**:默认剥离,开启 `preserveMetadata` 后 JPEG APP1 EXIF/XMP + Extended XMP + APP2 ICC(含分块)、PNG `iCCP`/`eXIf`/`iTXt` XMP(读压缩/未压缩,写未压缩)、WebP RIFF/`VP8X`/`ICCP`/`EXIF`/`XMP `、AVIF libavif ICC/EXIF/XMP metadata API 均可保留。JPEG/PNG 解码旋正后把 EXIF orientation 改写为 1。
-- [x] **代际损失防护**:对 JPEG/AVIF/lossy WebP 源再次输出有损格式时按 source bpp 分级要求最低收益(2%/3%/5%/8%),收益不足计 skipped;VP8L lossless WebP 与 AVIF lossless 目标不触发。
+- [x] **代际损失防护**:对 JPEG/AVIF/lossy WebP 源再次输出有损格式时可按 source bpp 分级要求最低收益(2%/3%/5%/8%),收益不足计 skipped；现为默认关闭的显式压缩策略，VP8L lossless WebP 与 AVIF lossless 目标不触发。
 - [x] 结果缓存(设置哈希 + 文件 blake3 哈希)跳过已优化:默认开启,命中时复用已有输出;缓存只记录 hash/size,不缓存图片内容。
 - [x] 高级参数面板(AVIF speed/subsample、WebP near_lossless/sharp_yuv、MozJPEG trellis 等):已接 core/Tauri/前端设置持久化。
 - [x] ⚠️ **不做**:JPEG XL(评审一致,过早);PNG 有损限色仅标「实验性」,PNG 默认仍是 oxipng 无损。

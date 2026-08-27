@@ -88,9 +88,9 @@ export const enUS = {
         "Prefer lossless pixels when the target format supports it; output size may not be minimal.",
     },
     skipLarger: {
-      label: "Skip larger outputs",
+      label: "Keep smaller outputs only",
       description:
-        "Do not write a larger raster conversion. This setting doesn't skip SVG rasterization because vector and raster file sizes aren't comparable.",
+        "Off by default. When enabled, write a bitmap result only when it is smaller than its source. Leave it off when a required format, such as PNG for a legacy system, matters more than size. SVG rasterization is unaffected.",
     },
     multiCandidate: {
       label: "Try smallest candidate",
@@ -103,9 +103,9 @@ export const enUS = {
         "JPEG/WebP search for the lowest quality that reaches the target score to minimize size.",
     },
     generationProtection: {
-      label: "Generation protection",
+      label: "Keep beneficial lossy re-encodes only",
       description:
-        "Require enough size savings when re-encoding lossy sources to reduce generational loss.",
+        "Off by default. When enabled, a lossy image is written to another lossy format only when it saves enough space. Leave it off when the requested format is required.",
     },
     resultCache: {
       label: "Result cache",

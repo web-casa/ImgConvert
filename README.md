@@ -117,7 +117,7 @@
 | Conversion          | SVG, static GIF, BMP, AVIF, WebP, JPEG, and PNG input; JPEG/PNG/WebP/AVIF output with true lossless AVIF support    |
 | Batch workflow      | Files, folders, recursive and clipboard imports; deduplication, asynchronous thumbnails, progress, and cancellation |
 | Performance         | Rust batch conversion, controlled concurrency, memory-aware throttling, and channel-based progress reporting        |
-| Compression         | `skip-if-larger`, smallest-candidate selection, automatic quality, and generation-loss protection                   |
+| Compression         | Optional `skip-if-larger` and generation-loss policies, smallest-candidate selection, and automatic quality         |
 | Fidelity            | Physical EXIF orientation correction; preserve or strip ICC / EXIF / XMP / IPTC metadata                            |
 | Color               | Display P3 ICC tests, explicit sRGB conversion, and color pipeline v2                                               |
 | HEIC import         | macOS ImageIO, Windows WIC, Linux helper / Flatpak extension; import only                                           |

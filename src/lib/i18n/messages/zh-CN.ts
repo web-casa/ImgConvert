@@ -84,9 +84,9 @@ export const zhCN = {
       description: "优先保持像素不损失；仅在目标格式支持时可用，文件体积不一定最小。",
     },
     skipLarger: {
-      label: "跳过变大输出",
+      label: "仅保留更小的输出",
       description:
-        "位图候选输出不小于位图源文件时不写入；SVG 栅格化不受此设置影响，因为矢量与位图文件大小不可直接比较。",
+        "默认关闭。启用后仅在位图输出小于源文件时写入；若需要指定格式兼容旧系统（例如 PNG），请保持关闭。SVG 栅格化不受此设置影响。",
     },
     multiCandidate: {
       label: "多候选取最小",
@@ -97,8 +97,9 @@ export const zhCN = {
       description: "JPEG/WebP 会搜索达到目标评分的最低质量，尽量减少体积。",
     },
     generationProtection: {
-      label: "代际防护",
-      description: "有损源再次输出有损格式时要求足够体积收益，减少反复压缩造成的劣化。",
+      label: "仅保留有损重编码收益",
+      description:
+        "默认关闭。启用后，有损图片再次输出有损格式时必须达到足够体积收益才写入；若需要指定格式，请保持关闭。",
     },
     resultCache: {
       label: "结果缓存",

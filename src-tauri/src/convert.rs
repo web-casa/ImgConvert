@@ -242,13 +242,13 @@ pub struct ConvertOptions {
     /// 自动质量目标分。
     #[serde(default = "default_auto_quality_score")]
     pub auto_quality_score: f64,
-    /// 对有损源再次输出有损格式时,要求有足够体积收益才写入。
+    /// 仅压缩工作流可选：对有损源再次输出有损格式时要求足够体积收益才写入。
     #[serde(default = "default_generation_loss_protection")]
     pub generation_loss_protection: bool,
     /// 根据源文件 blake3 + 编码设置 hash 复用已存在输出。
     #[serde(default = "default_result_cache")]
     pub result_cache: bool,
-    /// 候选输出不小于源文件时跳过写入,防止越转越大。
+    /// 仅压缩工作流可选：候选输出不小于源文件时跳过写入。
     #[serde(default = "default_skip_if_larger")]
     pub skip_if_larger: bool,
     /// 同一目标格式下尝试多个等价编码候选并取最小输出。
@@ -310,7 +310,7 @@ fn default_auto_quality_score() -> f64 {
 }
 
 fn default_generation_loss_protection() -> bool {
-    true
+    false
 }
 
 fn default_result_cache() -> bool {
@@ -318,7 +318,7 @@ fn default_result_cache() -> bool {
 }
 
 fn default_skip_if_larger() -> bool {
-    true
+    false
 }
 
 fn default_multi_candidate() -> bool {
@@ -2656,6 +2656,26 @@ mod tests {
     }
 
     #[test]
+    fn conversion_skip_policies_are_opt_in_by_default() {
+        let options: ConvertOptions = serde_json::from_value(serde_json::json!({
+            "input": "/tmp/source.png",
+            "outDir": null,
+            "relativeDir": null,
+            "format": "png",
+            "quality": 80,
+            "lossless": false,
+            "overwrite": false,
+            "overwriteMode": "skip",
+            "fileNameTemplate": "%name%",
+            "preserveMetadata": false,
+        }))
+        .unwrap();
+
+        assert!(!options.skip_if_larger);
+        assert!(!options.generation_loss_protection);
+    }
+
+    #[test]
     fn core_source_reader_rejects_oversized_file_before_reading_it() {
         let dir = unique_test_dir("oversized-source");
         fs::create_dir_all(&dir).unwrap();
@@ -3940,6 +3960,27 @@ mod tests {
         assert!(err.contains("不小于源文件"));
         assert!(!out_dir.join("sample.jpg").exists());
 
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn convert_writes_larger_candidate_when_size_policy_is_disabled() {
+        let dir = unique_test_dir("allow-larger-single");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.png");
+        let source = one_by_one_png();
+        fs::write(&input, &source).unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(out_dir.to_string_lossy().to_string());
+        options.skip_if_larger = false;
+        options.multi_candidate = false;
+
+        let result = convert(&options).unwrap();
+
+        assert!(Path::new(&result.output).exists());
+        assert!(result.out_size >= source.len() as u64);
         fs::remove_dir_all(dir).unwrap();
     }
 

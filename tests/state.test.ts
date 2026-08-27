@@ -16,10 +16,12 @@ import {
   needsOutputDirectoryForBatch,
   needsOutputDirectoryGrant,
   normalizeOutputSuffixInput,
+  normalizePersistedConversionPolicySettings,
   normalizePersistedOutputSuffixSettings,
   outputSuffixForRequest,
   qualityFloorFor,
   queue,
+  CONVERSION_POLICY_VERSION,
   setImportCommandError,
   setImportMessage,
   settings,
@@ -108,6 +110,27 @@ describe("state helpers", () => {
       outputSuffixEnabled: true,
       outputSuffix: "_done",
     });
+  });
+
+  it("migrates the former default skip policies to conversion-first behavior", () => {
+    expect(
+      normalizePersistedConversionPolicySettings({ skipIfLarger: true }, true, true),
+    ).toMatchObject({
+      generationLossProtection: false,
+      skipIfLarger: false,
+      migrated: true,
+    });
+    expect(
+      normalizePersistedConversionPolicySettings(
+        {
+          generationLossProtection: true,
+          skipIfLarger: true,
+          conversionPolicyVersion: CONVERSION_POLICY_VERSION,
+        },
+        true,
+        true,
+      ),
+    ).toMatchObject({ generationLossProtection: true, skipIfLarger: true, migrated: false });
   });
 
   it("sends a suffix only while the suffix switch is enabled", () => {

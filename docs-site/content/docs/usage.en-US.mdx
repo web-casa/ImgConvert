@@ -31,7 +31,8 @@ HEIC is an optional input only; ImgConvert does not produce HEIC output. When th
 
 Common strategies:
 
-- `skip-if-larger`: skip writing a converted result when it is larger than the source.
+- `skip-if-larger`: an opt-in compression policy that writes a converted result only when it is smaller than the source. It is off by default; keep it off when the requested format is required for compatibility.
+- Generation-loss protection: an opt-in policy that skips lossy-to-lossy re-encodes without enough savings. It is off by default for the same conversion-first reason.
 - Auto quality: primarily for JPEG/WebP, searches for a smaller output at acceptable quality.
 - Smallest of multiple candidates: compares several candidate results within the available budget.
 - True-lossless AVIF: exposed only when the capability matrix explicitly supports it.
