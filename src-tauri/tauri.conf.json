@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ImgConvert",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "identifier": "com.ivmm.imgconvert",
   "build": {
     "beforeDevCommand": "pnpm run dev",
@@ -35,7 +35,8 @@
     "licenseFile": "../LICENSE",
     "category": "Photography",
     "shortDescription": "Local-first batch image converter",
-    "longDescription": "ImgConvert converts JPEG, PNG, WebP, and AVIF images locally with an in-process Rust image pipeline.",
+    "longDescription": "ImgConvert converts JPEG, PNG, WebP, and AVIF images locally, and imports SVG, static GIF, and BMP files for conversion, with an in-process Rust image pipeline.",
+    "resources": ["PrivacyInfo.xcprivacy"],
     "linux": {
       "deb": {
         "section": "graphics",

@@ -7,7 +7,10 @@ description = "ImgConvert 的进程内图像编解码核心(纯库,无 UI/IO 框
 
 [dependencies]
 # 解码/容器:default-features=false 避免带回 AVIF/ravif/rayon/nasm(Codex 修正)
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp"] }
+# SVG is parsed and rasterized in-process. Keep compressed SVG, raster <image>
+# references, and external resource loading out of the product surface.
+resvg = { version = "0.48.1", default-features = false, features = ["text", "system-fonts"] }
 # JPEG 编码(底层 mozjpeg-sys:Unix ARM64 用 gas,x86 用 NASM；Windows ARM64 使用 clang-cl 标量路径)
 mozjpeg = "0.10"
 # PNG 无损优化(纯 Rust)

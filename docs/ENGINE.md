@@ -30,6 +30,7 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 - 色彩管理语义分两层:默认 `convert()` 保持嵌入 ICC/metadata 保真,不会自动改像素;显式 `convert_with_color_policy(..., ConvertToSrgb)` 会通过 LittleCMS 做像素级 ICC→sRGB 转换并清空源 ICC,避免写回 stale profile。Tauri/前端通过 `colorManagementPolicy` 暴露「转为 sRGB」。`resize_linear()` 和缩略图路径使用 sRGB↔linear、预乘 alpha 的 bilinear resize;`resize_linear()` 对非空 ICC 输入会拒绝,要求先转 sRGB。
 - **崩溃防护(Codex 修正)**:`std::panic::catch_unwind` **只能截 Rust panic,挡不住 C 侧 segfault/abort/UB**。真正的健壮性靠:libjpeg error handler + **输入尺寸/像素上限** + 对可疑文件走隔离 worker + fuzz/corpus 测试。不要承诺「防住 C 崩溃」。
 - **格式检测**:magic bytes + 扩展名。
+- **输入/输出边界**:SVG、静态 GIF、BMP 为只读输入格式；可写格式仍只有 JPEG、PNG、WebP、AVIF。SVG 不加载任何外部或 data-URI raster `<image>`，携带这类 `<image>` `href` 的文件会明确拒绝，不会因一个被选中的 SVG 读取其他路径或静默丢失内容。
 - 解码**保留 ICC/EXIF/XMP**(支持范围见 §5),不要直接 `to_rgb8` 丢元数据。
 
 ---
@@ -43,7 +44,9 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 | **WebP** | `image` | **`webp`**(libwebp) | `webp`(Apache/MIT;底层 libwebp BSD) | quality(有损);**无损=独立 lossless 模式**(`WebPConfig.lossless`,**不是 q100**);method 0–6(**甜点 4**);near_lossless 0–100(100=关闭,仅无损模式生效);sharp_yuv 可选;alpha |
 | **AVIF** | `libavif-sys`(dav1d 默认) | **`libavif-sys`(rav1e 有损 + aom 无损)** | `libavif-sys`(**BSD-2,以 cargo-about 实测为准**)、libavif(BSD-2)、rav1e(BSD-2)、libaom(BSD,以 cargo-about 实测为准) | quality、speed 0–10(甜点 8),subsample 4:4:4/4:2:0;`lossless=true` 强制 AOM 后端 + identity matrix + full range + quantizer 0 + YUV444,并以像素级 round-trip 测试守住。采 DropWebP 路线。⚠️ **弃用裸 `ravif`/`image::AvifEncoder` 的真因(Codex 修正)不是「丢 alpha」**(它们都能处理 RGBA8 alpha),而是 **ICC/EXIF/nclx 等容器元数据控制弱 + 后端不可插拔 + 解码一致性**;libavif 容器层能正确写 ICC/nclx/alpha/EXIF。后端可插拔:rav1e(默认有损,构建稳)/aom(真无损)/svt |
 | **TIFF**(推后) | `image` | `image`(tiff feature) | `image` | v1 不做;无损 deflate/lzw |
-| **GIF/BMP**(读) | `image` | — | `image` | 解码用 |
+| **SVG**(读) | `resvg` | — | `resvg`(Apache-2.0/MIT) | 仅本地栅格化；默认 96 DPI、16 MiB 源码上限、64 MP 画布上限；携带 `href` 的本地路径或 data URI `<image>` 会明确拒绝，避免 SVG 扩大文件访问边界或静默丢失内容 |
+| **GIF**(读) | `image` | — | `image` | 仅静态 GIF；在 LZW 像素解码前检查 image descriptor 数量，动画 GIF 明确拒绝 |
+| **BMP**(读) | `image` | — | `image` | 解码用，走与 PNG/JPEG 相同的尺寸和分配上限 |
 | ~~**JPEG XL**~~ | — | — | — | **删除**(评审一致:libjxl 重型 C++,过早) |
 | 缩放 | — | — | `fast_image_resize`(MIT/Apache) | — |
 | 质量判定 | — | — | **`ssimulacra2`**(宽松,**勿用 dssim/AGPL**) | 感知打分,用于「自动质量」(§6) |
@@ -122,7 +125,7 @@ HEIC = HEIF 容器 + 常见 HEVC 编码,有专利;**主程序不捆绑 x265、�
   - `readable` 只能声明 `heic/heif/hif`,且必须包含 `heic`;`writable` 必须为空。
   - `license` 允许 `LGPL-2.1-only` / `LGPL-2.1-or-later` / `LGPL-3.0-only` / `LGPL-3.0-or-later` 以及 MIT/Apache/BSD/MPL 等宽松许可;拒绝 GPL/AGPL。
   - `command` 可以是 manifest 目录内的相对路径,也可以是受信任目录里的绝对路径;相对路径禁止 `..`,符号链接解析后不能逃出 manifest 目录。manifest/helper 文件会解析到 canonical 路径后校验父目录信任与文件写权限,manifest 文件读取上限为 64 KiB。
-  - 用户显式选择的 helper 必须解析为普通可执行文件,且 helper 文件本身不能 group/world-writable;不要求它位于 PATH 或 manifest 目录中,但仍不执行 shell。
+  - 用户显式选择的 helper 同样必须解析为 canonical 的受信任普通可执行文件；Linux 校验父目录及所有祖先目录、helper 文件均不可 group/world-writable；Windows 只接受 Program Files、`%PROGRAMDATA%\\ImgConvert\\codecs` 或 `%LOCALAPPDATA%\\ImgConvert\\codecs` 下的 `.exe`。因此“手动选择”只授予配置意图，不能绕过路径信任检查，也不执行 shell。
   - `args` 是 argv 模板,占位符 `{input}` / `{output}` 必须各自作为独立 argv entry 出现;可选 `{metadata}` 也必须是独立 argv entry,用于让 helper 写 metadata sidecar;主程序不执行 shell。
 - v1 错误码前缀包括:`HEIC_PLUGIN_PROTOCOL_UNSUPPORTED`、`HEIC_PLUGIN_LICENSE_UNSUPPORTED`、`HEIC_PLUGIN_READABLE_UNSUPPORTED`、`HEIC_PLUGIN_WRITABLE_UNSUPPORTED`、`HEIC_PLUGIN_MANIFEST_UNTRUSTED`、`HEIC_PLUGIN_MANIFEST_TOO_LARGE`、`HEIC_PLUGIN_HELPER_UNTRUSTED`、`HEIC_PLUGIN_HELPER_NOT_EXECUTABLE`、`HEIC_PLUGIN_ARGS_INVALID`、`HEIC_PLUGIN_DECODE_KIND_UNSUPPORTED`、`HEIC_PLUGIN_OUTPUT_UNSUPPORTED`。
 - 调用方式优先用**独立进程 + JSON/stdin/stdout/临时文件**,不要 `dlopen` 到主进程。这样主程序 Apache-2.0 依赖树保持干净,LGPL helper 可单独履行源码/替换/NOTICE 义务。
@@ -131,8 +134,8 @@ HEIC = HEIF 容器 + 常见 HEVC 编码,有专利;**主程序不捆绑 x265、�
   { "version": 1, "icc": "icc.bin", "exif": "exif.bin", "xmp": "xmp.bin", "iptc": "iptc.bin" }
   ```
   sidecar 引用的 blob 必须是同一受控临时目录内的普通文件名,JSON 上限 64 KiB,单个 metadata blob 上限 16 MiB;主程序读取后会规范化 EXIF/XMP orientation 并传给 core。`iptc` 字段可选,老 helper 不需要提供。未声明 `{metadata}` 的老 helper 仍只输出 PNG。
-- 安全约束:helper 路径必须来自受信任安装目录或用户显式选择;manifest 不允许任意 shell;传参使用 argv/JSON,禁止拼 shell 命令;临时文件放应用受控目录并清理。helper stdout 不落盘,stderr 只保留前 64 KiB;helper 输出 PNG 读取上限为 512 MiB;metadata sidecar 禁止绝对路径、`..` 和子目录逃逸。
-- 平台信任边界:Linux 使用 PATH/manifest 目录及祖先、manifest/helper 文件不可 group/world-writable 的信任模型,临时目录 0700。Windows 外部 helper 已启用:手动 helper 必须是用户显式选择的普通 `.exe`;manifest/PATH 自动发现只接受 canonical 后位于 Program Files、`%PROGRAMDATA%\ImgConvert\codecs` 或 `%LOCALAPPDATA%\ImgConvert\codecs` 下的目录,helper 解码临时目录位于 `%LOCALAPPDATA%\ImgConvert\Temp\heic`,同样不走 shell。macOS 外部 helper 自动发现暂不启用;Windows WIC 和 macOS ImageIO 系统解码仍是 P3 平台项,不是 P1.5 外部 helper 的一部分。
+- 安全约束:HEIC 源文件先受 256 MiB 上限约束；helper 路径必须来自受信任安装目录；用户显式选择也必须通过该信任检查。manifest 不允许任意 shell;传参使用 argv/JSON,禁止拼 shell 命令;临时文件放应用受控目录并清理。helper/ImageIO/WIC 输出的桥接 PNG 读取上限为 256 MiB，且批处理把 HEIC 系统解码串行化；helper stdout 不落盘,stderr 只保留前 64 KiB;metadata sidecar 禁止绝对路径、`..` 和子目录逃逸。
+- 平台信任边界:Linux 使用 PATH/manifest/手动 helper 目录及其祖先、manifest/helper 文件均不可 group/world-writable 的信任模型,临时目录 0700。Windows 外部 helper 已启用:手动 helper、manifest/PATH 自动发现均只接受 canonical 后位于 Program Files、`%PROGRAMDATA%\ImgConvert\codecs` 或 `%LOCALAPPDATA%\ImgConvert\codecs` 下的 `.exe`;helper 解码临时目录位于 `%LOCALAPPDATA%\ImgConvert\Temp\heic`,同样不走 shell。macOS 外部 helper 自动发现暂不启用;Windows WIC 和 macOS ImageIO 系统解码仍是 P3 平台项,不是 P1.5 外部 helper 的一部分。
 - 分发约束:外部 helper 主要面向直发包/用户自行安装场景;App Store/MS Store/Flathub 构建默认禁用外部 helper,除非对应渠道明确允许并完成单独合规设计。当前实现支持用 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` 在运行时或构建时禁用外部 codec/helper 自动发现,诊断 UI 会显示禁用原因。
 
 ---
@@ -194,7 +197,7 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 - **平台 benchmark**:`pnpm run bench:platform` 默认用 release profile 跑隐藏入口,输出 AVIF/WebP JSON lines,并生成 `target/benchmarks/*.json` 汇总报告(样本、median、吞吐、字节数、默认参数建议),用于 Linux/macOS/Windows/arm64 复核 AVIF speed、WebP method、耗时和输出体积。`--profile=debug` 仅用于脚本烟测。旧 `bench:avif:macos` 复用同一报告层,作为 Apple Silicon AVIF 专项入口；手动 `macOS Smoke` 会上传 `imgconvert-macos-arm64-avif-benchmark` JSON artifact 并保留 14 天。
 - **wall-clock 软超时**:Tauri 转换路径默认每文件 180s 预算,可用 `IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 覆盖,`0/off/disabled/none` 关闭。core 的 timed API 在解码后、候选编码/评分边界检查 deadline;单个进程内 C/Rust codec 调用不做强杀,避免不安全地终止线程,但超时结果不会写盘,多候选/自动质量不会继续追加后续候选。
 - **图像质量测试体系**:`pnpm run test:image-quality` 运行 core integration suite,覆盖 deterministic golden fixtures、CMYK JPEG 导入、PNG/WebP/AVIF lossless 像素逐字节一致性、JPEG/WebP/AVIF 高质量有损 PSNR/MAE 下限、动画 WebP 与损坏输入的干净拒绝、10,000 × 10,000 PNG 在分配前的像素上限拒绝、输出字节确定性和 JPEG 8×8 亮度/色度网格、WebP-like 4×4 block artifact hint。该入口只用自生成 fixture,适合 CI;真实相机 corpus/fuzz 仍是独立后续项。跨平台物理安装与商店验收见 [RELEASE_QA.md](RELEASE_QA.md)。
-- **Fuzz/corpus**:`fuzz/` 为独立 cargo-fuzz crate,不进普通 workspace。`decode_pipeline` 覆盖 magic/probe/thumbnail/有界 decode,`convert_pipeline` 覆盖有界真实转换,`metadata_semantics` 覆盖 EXIF/XMP/IPTC 语义检查和规范化。`pnpm run fuzz:prepare` 生成 deterministic seeds,并从本地 `corpus/real` 或 `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF 到 ignored corpus;真实图片和 fuzz artifacts 不入仓库。`pnpm run fuzz:replay` 不依赖 `cargo-fuzz`,会把 prepared corpus 与 `fuzz/artifacts/<target>/` crash inputs 走普通 core 路径并写 `target/fuzz-corpus/replay-report.json`;`fuzz:smoke` 串起 prepare + compile + replay。`pnpm run fuzz:minimize` 默认 dry-run 生成 `target/fuzz-corpus/minimize-report.json`;显式 `fuzz:minimize:run` 才调用 `cargo fuzz tmin` 并复跑 artifacts。
+- **Fuzz/corpus**:`fuzz/` 为独立 cargo-fuzz crate,不进普通 workspace。`decode_pipeline` 覆盖 magic/probe/thumbnail/有界 decode,`convert_pipeline` 覆盖有界真实转换,`metadata_semantics` 覆盖 EXIF/XMP/IPTC 语义检查和规范化。`pnpm run fuzz:prepare` 生成 deterministic seeds,并从本地 `corpus/real` 或 `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF/SVG/GIF/BMP 到 ignored corpus;真实图片和 fuzz artifacts 不入仓库。`pnpm run fuzz:replay` 不依赖 `cargo-fuzz`,会把 prepared corpus 与 `fuzz/artifacts/<target>/` crash inputs 走普通 core 路径并写 `target/fuzz-corpus/replay-report.json`;`fuzz:smoke` 串起 prepare + compile + replay。`pnpm run fuzz:minimize` 默认 dry-run 生成 `target/fuzz-corpus/minimize-report.json`;显式 `fuzz:minimize:run` 才调用 `cargo fuzz tmin` 并复跑 artifacts。
 - 未做:Windows 真实 runner benchmark 报告、真实 corpus 驱动的更多压缩噪声指纹、长期 fuzz 运行和真实 crash 样本积累。
 
 ---
@@ -211,7 +214,7 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
   可参考 Hando 的 **EventSink trait**(生产/测试两实现)做可测试抽象,但用 Channel 落地。
 - **取消**:`tokio_util::sync::CancellationToken` 存入 `.manage()`,长任务 `select!` 监听;参考项目**无一实现**,这是我们的增量。
 - **并发**:全局信号量限并发(默认 `(num_cpus-1).clamp(1,8)`)。⚠️ **关键(评审 #4 + Codex)**:AVIF 编码器内部多线程;文件级并发 × 内部多线程 = **oversubscribe + OOM**。走 libavif 路线时应设 **libavif encoder `maxThreads=1`**(sys 层对应 C 字段;高层 `libavif` wrapper 是 `set_max_threads`),靠文件级并行,不要两层都开。
-- **P0.5 诊断**:`AVIF_ENCODER_MAX_THREADS=1` 已提升为 `imgconvert-core` 常量并写入 `avifEncoder.maxThreads`;Tauri `runtime_diagnostics()` 暴露默认并发、内存预算、RGBA 工作集倍率和 AVIF 内部线程上限。单测覆盖该诊断,平台性能/线程数实测放到 P3/macOS 阶段。
+- **P0.5 诊断**:`AVIF_ENCODER_MAX_THREADS=1` 已提升为 `imgconvert-core` 常量并写入 `avifEncoder.maxThreads`;Tauri `runtime_diagnostics()` 暴露默认并发、内存预算、RGBA 工作集倍率和 AVIF 内部线程上限。批处理估算同时纳入导入尺寸的像素工作集和实际源文件字节数，文件大小无法可靠读取时按 256 MiB 上限保守预留。单测覆盖该诊断,平台性能/线程数实测放到 P3/macOS 阶段。
 - **传参传文件路径**,⚠️ 别学 tavif/compressor 把整图 base64 穿 IPC。
 
 ---
@@ -228,19 +231,19 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 |---|---|---|---|---|
 | **GitHub Releases 第一期** | Linux `.deb`/`.rpm`/AppImage + updater assets | 无 | updater artifact 用 Tauri key 签名 | 自由;⚠️ webkit2gtk 动态系统依赖,各发行版版本不同 |
 | **Flathub(后续)** | Flatpak | portal | — | **文件 portal**(拿到的可能是 portal 路径非真实路径,P0.5 验证) |
-| **Mac App Store(后续)** | `.pkg` | **App Sandbox 必须** | Apple Distribution + provisioning | security-scoped bookmarks;输出目录走 NSOpenPanel |
+| **Mac App Store(后续)** | `.pkg` | **App Sandbox 必须** | Apple Distribution + provisioning | 用户选择文件读写；每次启动重新选择输出目录 |
 | **Microsoft Store(后续)** | **MSIX**(Tauri 非一等)| `runFullTrust` | Partner Center | 较自由 |
 | 直接分发(macOS/Win,后续)| `.dmg`/`.msi` | 无 | Developer ID + 公证 / 代码签名 | 自由 |
 
 - ⚠️ **为商店留门(贯穿全程)**:即使第一期只发 GitHub Releases Linux 包,也要保持**主程序核心无子进程**、**文件访问抽象成「用户显式授权目录」**(Flatpak portal ↔ 未来 MAS security-scoped bookmark 同一抽象),否则后续上 Flathub/MAS 会大返工(评审 #6)。P1.5 HEIC helper 是主包外直发增强,商店构建默认禁用。
-- **P0.5 文件授权边界**:`src-tauri/src/access.rs` 已作为唯一授权路径 grant 入口,当前直发路径、剪贴板临时文件和输出目录都先经该层。该层刻意不要求 canonical 路径,避免破坏 Flatpak portal 映射路径;macOS 第一批已在同一层接入 `CFURLStartAccessingSecurityScopedResource`/`CFURLStopAccessingSecurityScopedResource` RAII 钩子。完整 MAS 持久化仍需要文件选择层提供真实 security-scoped bookmark data。
+- **P0.5 文件授权边界**:`src-tauri/src/access.rs` 已作为唯一授权路径 grant 入口,当前直发路径、剪贴板临时文件和输出目录都先经该层。该层刻意不要求 canonical 路径,避免破坏 Flatpak portal 映射路径;macOS 第一批在同一层保留 `CFURLStartAccessingSecurityScopedResource`/`CFURLStopAccessingSecurityScopedResource` RAII 钩子，但当前 MAS 设计不跨启动保留访问，而是每次启动重新选择输出目录。未来若实现持久化，必须由原生文件选择层提供真实 security-scoped bookmark data。
 - **平台发布护栏第一批**:`pnpm run release:platform:check` 静态校验 macOS/Windows 发布元数据、平台图标、Apache-2.0 许可证和商店禁外部 helper 的 build-time 机制。实际 MAS/MS Store build 前用 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 pnpm run release:store-env:check` 强制确认构建环境已关闭外部 codec/helper 自动发现;这与 Flatpak manifest 的运行时禁用互补。
 - **架构前提护栏**:`pnpm run architecture:check` 静态校验主程序 Apache-2.0、pnpm 锁文件策略、core 格式矩阵不含 HEIC、`image/libavif-sys/ssimulacra2/lcms2` 的关键 feature 边界、禁止 libvips/libheif/x265/imagequant/dssim、store/Flatpak 禁宿主外部 helper、HEIC provider read-only 和 `access.rs` 显式授权路径抽象。`release:platform:check` 与 `quality:security` 会先跑该入口。
-- **macOS 打包/沙盒护栏第一批**:`src-tauri/tauri.macos.conf.json` 是 Tauri 在 macOS 上自动合并的直发配置,启用 hardened runtime 并使用 `entitlements.macos.direct.plist`(不启用 App Sandbox)。MAS candidate 先由 `pnpm run release:macos:mas:prepare` 生成配置，再用 `universal-apple-darwin` 构建 `arm64` + `x86_64` app，对应 `entitlements.macos.mas.plist`:App Sandbox + user-selected read/write + app-scoped bookmarks。`pnpm run release:macos:check` 会拒绝 broad filesystem/network server/temporary exception entitlements;`IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 pnpm run release:macos:store:check` 是 MAS build 前置门槛。
-- **macOS runtime 第一批**:`macos_system_codecs.rs` 暴露系统 ImageIO HEIC readable-only provider，并拒绝多帧输入以免悄悄丢帧；`macos_security.rs` 暴露 security-scoped start/stop RAII;`pnpm run bench:avif:macos` 在 Apple Silicon 上测 rav1e AVIF speed。`pnpm run release:macos:smoke` 聚合 direct/store guardrail、AVIF benchmark、可选 HEIC 样张路径转换 smoke 和可选 `.dmg` notarytool/stapler/Gatekeeper 检查；另有 `macOS Intel Smoke` 在真实 Intel runner 复核 ImageIO。每个 app 内的 Mach-O 均会检查架构、链接和签名。MAS sandbox HEIC GUI smoke 和 bookmark 持久化仍需真实安装后的交互验收。
+- **macOS 打包/沙盒护栏第一批**:`src-tauri/tauri.macos.conf.json` 是 Tauri 在 macOS 上自动合并的直发配置,启用 hardened runtime 并使用 `entitlements.macos.direct.plist`(不启用 App Sandbox)。MAS candidate 先由 `pnpm run release:macos:mas:prepare` 生成配置，再用 `universal-apple-darwin` 构建 `arm64` + `x86_64` app，对应 `entitlements.macos.mas.plist`:App Sandbox + network client（仅本地 WKWebView IPC）+ user-selected read/write；不声明没有实现的 app-scoped bookmarks。`PrivacyInfo.xcprivacy` 作为 bundle resource 并由最终包校验。`pnpm run release:macos:check` 会拒绝 broad filesystem/network server/temporary exception entitlement 与未使用 bookmark entitlement;`IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 pnpm run release:macos:store:check` 是 MAS build 前置门槛。
+- **macOS runtime 第一批**:`macos_system_codecs.rs` 暴露系统 ImageIO HEIC readable-only provider，并拒绝多帧输入以免悄悄丢帧；`macos_security.rs` 提供 security-scoped start/stop RAII 边界；`pnpm run bench:avif:macos` 在 Apple Silicon 上测 rav1e AVIF speed。`pnpm run release:macos:smoke` 聚合 direct/store guardrail、AVIF benchmark、可选 HEIC 样张路径转换 smoke 和可选 `.dmg` notarytool/stapler/Gatekeeper 检查；另有 `macOS Intel Smoke` 在真实 Intel runner 复核 ImageIO。每个 app 内的 Mach-O 均会检查架构、链接和签名。MAS sandbox HEIC GUI、Media Library TCC、以及重启后重新选择输出目录仍需真实安装后的交互验收；当前不支持 bookmark 持久化。
 - **Windows 打包/Store 护栏第一批**:`src-tauri/tauri.windows.conf.json` 是 Tauri 在 Windows 上自动合并的直发配置,面向 `.msi`/NSIS。它显式禁止降级安装、使用 SHA-256 signing digest、silent embedded WebView2 bootstrapper、稳定 WiX `upgradeCode` 和 NSIS current-user 默认安装。`pnpm run release:windows:direct:check` 会校验这些边界;`IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 pnpm run release:windows:store:check` 只做 Store candidate preflight。
 - **Windows runtime 第一批**:`pnpm run release:windows:smoke` 聚合 direct/store guardrail 与隐藏包内转换 smoke,在 Windows runner 上验证真实 JPEG/WebP/PNG/AVIF 转换链路。`.github/workflows/windows-smoke.yml` 手动 `build_direct` 可构建 unsigned `.msi`/NSIS `.exe`,检查 PE 架构；开启 `install_smoke` 后会实际安装、从中文且带空格的路径启动、转换到中文输出目录并卸载。MSIX 会校验 manifest/payload PE 架构、`makeappx validate` 和 sideload 生命周期。真实代码签名、timestamp 和 Partner Center 提交仍需 Windows 发布阶段继续推进。
-- **MAS 现状(2026-06 实查)**:Tauri 2 + Svelte **可上 MAS**——官方文档完整(App Sandbox + Entitlements.plist + provisioning + Mac Installer Distribution 证书 + `.pkg` + altool),有真实上架案例(如 Simple Invoice & Bill Maker),Svelte 不影响(WKWebView 静态资源)。⚠️ **唯一硬点**:批量目录访问要的 **security-scoped bookmark 在 Tauri 不是一等公民**(核心 issue #3716 自 2022 未解)。`tauri-plugin-dialog` 能返回 bookmark 数据,但 `startAccessingSecurityScopedResource`/`stop` 生命周期**需自写 `objc2` shim**(忘 stop 泄漏内核资源 + 丢越沙盒能力)。→ 这是「用户显式授权目录」抽象的 macOS 落地点,P0.5 文件访问尖刺要把它设计进去。
+- **MAS 现状(2026-08 实查)**:Tauri 2 + Svelte **可上 MAS**——App Sandbox、Entitlements.plist、provisioning、Mac Installer Distribution 证书与 `.pkg` 路线均可用，Svelte 静态资源运行在 WKWebView。Tauri desktop dialog 返回的是路径，`fileAccessMode` 只在 iOS 生效，不能当作 macOS bookmark API。当前产品选择不做跨启动 bookmark 持久化：每次启动重新选择输出目录，以 user-selected read/write entitlement 获得本进程范围；若未来需要持久化访问，必须新增真实 bookmark 创建、存储、解析、stale bookmark 处理及原生 macOS 实机测试。
 - **HEVC/HEIC 专利(评审 #9)**:调用系统编解码器是**实务安全垫**(平台已付费),**非法律免责**;按平台能力如实表述,营销勿平铺「支持 HEIC」;商用前请 IP 律师出意见。
 
 ---

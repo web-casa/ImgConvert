@@ -15,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const macosPrivacyManifest = "PrivacyInfo.xcprivacy";
 const macosMediaLibraryUsageDescription =
   "ImgConvert scans the contents of folders you explicitly select, including a selected folder in your media library, to find image files for the local conversion queue. For example, it can convert album-art images in that folder locally; it does not read Apple Music playback or listening activity.";
 
@@ -477,7 +478,7 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   requirePlistValue(entitlementsPath, "com.apple.security.app-sandbox", "true");
   requirePlistValue(entitlementsPath, "com.apple.security.network.client", "true");
   requirePlistValue(entitlementsPath, "com.apple.security.files.user-selected.read-write", "true");
-  requirePlistValue(entitlementsPath, "com.apple.security.files.bookmarks.app-scope", "true");
+  requirePlistKeyAbsent(entitlementsPath, "com.apple.security.files.bookmarks.app-scope");
   requirePlistValue(entitlementsPath, "com.apple.developer.team-identifier", teamId);
   requirePlistValue(entitlementsPath, "com.apple.application-identifier", expectedApplicationId);
   requirePlistValue(
@@ -489,6 +490,27 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
     failures.push("MAS app must not enable com.apple.security.get-task-allow");
   }
   requirePlistValue(infoPlist, "NSAppleMusicUsageDescription", macosMediaLibraryUsageDescription);
+  verifyPrivacyManifest(appPath);
+}
+
+function verifyPrivacyManifest(appPath) {
+  const manifestPath = path.join(appPath, "Contents", "Resources", macosPrivacyManifest);
+  if (!existsSync(manifestPath)) {
+    failures.push(`missing privacy manifest: ${path.relative(repoRoot, manifestPath)}`);
+    return;
+  }
+  requirePlistValue(manifestPath, "NSPrivacyTracking", "false");
+  requireEmptyPlistArray(manifestPath, "NSPrivacyCollectedDataTypes");
+  requirePlistValue(
+    manifestPath,
+    "NSPrivacyAccessedAPITypes:0:NSPrivacyAccessedAPIType",
+    "NSPrivacyAccessedAPICategoryFileTimestamp",
+  );
+  requirePlistValue(
+    manifestPath,
+    "NSPrivacyAccessedAPITypes:0:NSPrivacyAccessedAPITypeReasons:0",
+    "3B52.1",
+  );
 }
 
 function writeCodesignEntitlements(appPath, destination) {
@@ -520,6 +542,23 @@ function requirePlistValue(plistPath, key, expected) {
   const value = readPlistValue(plistPath, key);
   if (!expected || value !== expected) {
     failures.push(`unexpected ${key}: ${value ?? "<missing>"}, expected ${expected ?? "<value>"}`);
+  }
+}
+
+function requirePlistKeyAbsent(plistPath, key) {
+  if (readPlistValue(plistPath, key) !== null) {
+    failures.push(`unexpected ${key}: this MAS entitlement must be absent`);
+  }
+}
+
+function requireEmptyPlistArray(plistPath, key) {
+  const value = readPlistValue(plistPath, key);
+  if (value === null || !value.startsWith("Array")) {
+    failures.push(`unexpected ${key}: expected an empty array`);
+    return;
+  }
+  if (readPlistValue(plistPath, `${key}:0`) !== null) {
+    failures.push(`unexpected ${key}: ImgConvert must not declare collected data`);
   }
 }
 

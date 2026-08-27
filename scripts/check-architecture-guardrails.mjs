@@ -90,6 +90,7 @@ function checkLicensingAndDependencies() {
   }
 
   requireDependencyWith(coreCargo, "image", "default-features = false");
+  requireDependencyWith(coreCargo, "resvg", "default-features = false");
   requireDependencyWith(coreCargo, "libavif-sys", "default-features = false");
   requireDependencyWith(coreCargo, "libavif-sys", '"codec-rav1e"');
   requireDependencyWith(coreCargo, "libavif-sys", '"codec-aom"');
@@ -133,8 +134,16 @@ function checkCoreFormatBoundary() {
   }
   requireText(
     coreLib,
-    "READABLE_FORMATS: &[Format] = &[Format::Jpeg, Format::Png, Format::WebP, Format::Avif]",
-    "core readable formats must stay JPEG/PNG/WebP/AVIF only",
+    `READABLE_FORMATS: &[Format] = &[
+    Format::Jpeg,
+    Format::Png,
+    Format::WebP,
+    Format::Avif,
+    Format::Svg,
+    Format::Gif,
+    Format::Bmp,
+]`,
+    "core readable formats must include JPEG/PNG/WebP/AVIF plus SVG/static GIF/BMP",
   );
   requireText(
     coreLib,

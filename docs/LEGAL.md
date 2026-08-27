@@ -65,7 +65,7 @@
 - 功能范围:只声明 `readable: ["heic","heif","hif"]`;`writable` 为空。HEIC 编码输出暂缓,避免 x265/GPL 与 HEVC 编码专利风险。
 - LGPL 义务:插件必须提供许可证全文、NOTICE/版权、对应源码或源码获取方式,并允许用户替换 LGPL 组件。若修改 libheif/libde265,需提供修改源码。
 - Flatpak HEIC extension 当前 repo 侧 manifest 固定 `libde265`/`libheif` 源码 tarball 与 sha256,关闭 HEIC encoding、`x265` 和 GPL-only codec 路径;真正提交 Flathub addon 前仍需复核上游许可证文本、源码可得性、专利/地区分发风险和 AppStream 文案。
-- 安全义务:主程序不得执行来自图片目录的同名 helper;只允许受信任安装目录或用户显式选择的 helper。调用必须避免 shell 拼接,防止路径/文件名注入。
+- 安全义务:主程序不得执行来自图片目录的同名 helper。用户显式选择仅表示配置意图，helper 仍必须位于受信任安装目录（Linux 目录及祖先、文件均不可 group/world-writable；Windows 为批准的安装根）才会执行。调用必须避免 shell 拼接,防止路径/文件名注入。
 
 ## AV1 / AVIF 专利
 

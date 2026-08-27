@@ -122,7 +122,7 @@ sideload 成功当作 Store 审核已同意；账户负责人必须在 Partner C
 
 可作为事实准确的英文初稿（仍由账户负责人在提交当日核对后录入）：
 
-> ImgConvert is a packaged Win32/Tauri desktop application. `runFullTrust` is required to launch its full-trust desktop process. The app converts image files only after the user explicitly selects files or folders and chooses an output directory. It does not declare `broadFileSystemAccess`, elevation, device, network, or background-task capabilities. To test, launch the app, import a JPEG/PNG/WebP/AVIF sample with the file picker, select one of those output formats, choose an output directory, and start the conversion. No account, network service, external codec helper, or in-app updater is required for the Microsoft Store build.
+> ImgConvert is a packaged Win32/Tauri desktop application. `runFullTrust` is required to launch its full-trust desktop process. The app converts image files only after the user explicitly selects files or folders and chooses an output directory. It does not declare `broadFileSystemAccess`, elevation, device, network, or background-task capabilities. To test, launch the app, import a JPEG/PNG/WebP/AVIF/SVG/static-GIF/BMP sample with the file picker, select JPEG, PNG, WebP, or AVIF output, choose an output directory, and start the conversion. No account, network service, external codec helper, or in-app updater is required for the Microsoft Store build.
 
 不得声称 Store 已批准此 capability；最终审批和任何补充问题均由 Microsoft/Partner Center
 决定。
@@ -170,7 +170,7 @@ listing，再发布该版本。Microsoft 要求隐私政策说明产品访问、
 | 编号 | 画面 | `en-US` / `zh-CN` 要求 | 备注 |
 | --- | --- | --- | --- |
 | 1 | 空队列与导入入口 | 对应语言 UI | 展示本地批量导入，不显示真实路径。 |
-| 2 | 格式与压缩设置 | 对应语言 UI | 只展示已实现的 JPEG/PNG/WebP/AVIF。 |
+| 2 | 格式与压缩设置 | 对应语言 UI | 输出项只展示已实现的 JPEG/PNG/WebP/AVIF；输入能力可在其他截图中展示 SVG、静态 GIF、BMP。 |
 | 3 | 转换队列与完成结果 | 对应语言 UI | 使用可公开的样张和通用文件名。 |
 | 4 | 可选能力/隐私或更新边界 | 对应语言 UI | 若展示 HEIC，明确系统扩展和 decode-only 限制；不必强行展示。 |
 

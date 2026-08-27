@@ -9,7 +9,9 @@
 
 use std::path::Path;
 
-use crate::external_codecs::{CodecProviderDiagnostic, CodecProviderInfo};
+use crate::external_codecs::{
+    validate_system_heic_dimensions, CodecProviderDiagnostic, CodecProviderInfo,
+};
 
 const HEIC_EXTENSIONS: &[&str] = &["heic", "heif", "hif"];
 const IMAGEIO_PROVIDER_ID: &str = "macos-imageio-heic";
@@ -110,8 +112,10 @@ mod imageio {
     type CGImageSourceRef = *const c_void;
     type CGImageDestinationRef = *const c_void;
     type CGImageRef = *const c_void;
+    type CFNumberType = i32;
 
     const K_CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
+    const K_CF_NUMBER_SINT64_TYPE: CFNumberType = 4;
     const PNG_UTI: &[u8] = b"public.png\0";
 
     #[link(name = "CoreFoundation", kind = "framework")]
@@ -119,6 +123,12 @@ mod imageio {
         fn CFDataCreateMutable(allocator: CFAllocatorRef, capacity: CFIndex) -> CFMutableDataRef;
         fn CFDataGetBytePtr(data: *const c_void) -> *const u8;
         fn CFDataGetLength(data: *const c_void) -> CFIndex;
+        fn CFDictionaryGetValue(dictionary: CFDictionaryRef, key: *const c_void) -> *const c_void;
+        fn CFNumberGetValue(
+            number: *const c_void,
+            number_type: CFNumberType,
+            value_ptr: *mut c_void,
+        ) -> Boolean;
         fn CFRelease(cf: CFTypeRef);
         fn CFURLCreateFromFileSystemRepresentation(
             allocator: CFAllocatorRef,
@@ -137,6 +147,11 @@ mod imageio {
     extern "C" {
         fn CGImageSourceCreateWithURL(url: CFURLRef, options: CFDictionaryRef) -> CGImageSourceRef;
         fn CGImageSourceGetCount(source: CGImageSourceRef) -> usize;
+        fn CGImageSourceCopyPropertiesAtIndex(
+            source: CGImageSourceRef,
+            index: usize,
+            options: CFDictionaryRef,
+        ) -> CFDictionaryRef;
         fn CGImageSourceCreateImageAtIndex(
             source: CGImageSourceRef,
             index: usize,
@@ -154,6 +169,8 @@ mod imageio {
             properties: CFDictionaryRef,
         );
         fn CGImageDestinationFinalize(destination: CGImageDestinationRef) -> Boolean;
+        static kCGImagePropertyPixelWidth: CFStringRef;
+        static kCGImagePropertyPixelHeight: CFStringRef;
     }
 
     struct CfGuard(NonNull<c_void>);
@@ -192,6 +209,7 @@ mod imageio {
                 "图像源",
             )?;
             require_single_heic_frame(input, CGImageSourceGetCount(source.as_cf()))?;
+            validate_source_dimensions(source.as_cf())?;
             let image = CfGuard::new(
                 CGImageSourceCreateImageAtIndex(source.as_cf(), 0, std::ptr::null()),
                 "HEIC 帧",
@@ -241,6 +259,51 @@ mod imageio {
             }
             Ok(slice::from_raw_parts(ptr, len).to_vec())
         }
+    }
+
+    /// `CGImageSourceCopyPropertiesAtIndex` exposes HEIC dimensions without
+    /// constructing a decoded `CGImage`. Apple documents the values as
+    /// CFNumbers keyed by `kCGImagePropertyPixelWidth/Height`.
+    unsafe fn validate_source_dimensions(source: CFTypeRef) -> Result<(), String> {
+        let properties = CfGuard::new(
+            CGImageSourceCopyPropertiesAtIndex(source, 0, std::ptr::null()),
+            "HEIC 图像属性",
+        )?;
+        let width = image_property_u32(
+            properties.as_cf(),
+            kCGImagePropertyPixelWidth,
+            "宽度",
+        )?;
+        let height = image_property_u32(
+            properties.as_cf(),
+            kCGImagePropertyPixelHeight,
+            "高度",
+        )?;
+        super::validate_system_heic_dimensions(width, height)
+    }
+
+    unsafe fn image_property_u32(
+        properties: CFDictionaryRef,
+        key: CFStringRef,
+        label: &str,
+    ) -> Result<u32, String> {
+        let value = CFDictionaryGetValue(properties, key);
+        if value.is_null() {
+            return Err(format!("macOS ImageIO 未提供 HEIC {label}"));
+        }
+
+        let mut value_i64 = 0i64;
+        if CFNumberGetValue(
+            value,
+            K_CF_NUMBER_SINT64_TYPE,
+            (&mut value_i64 as *mut i64).cast::<c_void>(),
+        ) == 0
+            || value_i64 <= 0
+            || value_i64 > i64::from(u32::MAX)
+        {
+            return Err(format!("macOS ImageIO 返回了无效 HEIC {label}"));
+        }
+        Ok(value_i64 as u32)
     }
 
     fn validate_heic_header(input: &Path) -> Result<(), String> {

@@ -77,13 +77,17 @@ platform before publishing.
 | CMYK JPEG | Imports and converts without a crash or inverted/empty output. |
 | PNG with transparency | Alpha survives PNG/WebP/AVIF lossless conversions; JPEG is flattened deliberately. |
 | Animated WebP | Clear rejection; no frame-zero-only output is written. |
+| SVG with paths/text | Imports, produces the declared canvas size, and converts to every supported output format. SVG containing an external or data-URI raster `<image>` reference is clearly rejected rather than silently omitting it. |
+| Static GIF | Imports and converts normally. |
+| Animated GIF | Clear rejection; no frame-zero-only output is written. |
+| BMP | Imports and converts without an inverted or empty output. |
 | Still HEIC/HEIF | Imports only where the platform provider is available; verify both macOS architectures through ImageIO. |
 | Multi-frame HEIC/HEIF through macOS ImageIO or Windows WIC | Clear rejection; no frame-zero-only output is written. External Linux helpers remain a separately audited, decode-only integration. |
 | Large 8,000 × 8,000 image | Converts on a representative machine without runaway batch parallelism. |
 | 10,000 × 10,000 image | Is rejected before pixel allocation. The 64 MP ceiling is intentional and prevents a single image from exhausting the 768 MiB batch working-set budget. |
 | Corrupt/truncated image | Fails cleanly with no successful output file. |
 
-CMYK JPEG, PNG transparency, animated WebP, and corrupt-input cases have
+CMYK JPEG, PNG transparency, SVG/static-GIF/BMP import, animated WebP/GIF, and corrupt-input cases have
 deterministic core regression coverage. The ImageIO/WIC HEIC paths also have
 native platform tests and hosted HEIC smokes; the realistic large-image machine
 pass remains manual because its purpose is to observe actual memory pressure
@@ -93,7 +97,7 @@ rather than consume every CI runner's memory.
 
 For every direct package architecture, use a clean VM or a test user profile:
 
-1. Install the current package and convert JPEG, PNG, WebP, and AVIF.
+1. Install the current package and convert JPEG, PNG, WebP, AVIF, SVG, static GIF, and BMP.
 2. Install the current package over the prior released package of the same
    channel and verify that the new version launches and retains expected user
    settings.
@@ -114,9 +118,13 @@ uses a disposable DevSmoke identity and removes the test package afterwards.
   Silicon Macs. Exercise file selection, output-directory selection, conversion,
   relaunch, then select the output directory again before converting under the
   sandbox. On a clean macOS test user, also exercise a selected folder in the
-  Media Library privacy domain and verify that any resulting prompt shows the
-  current `NSAppleMusicUsageDescription`; capture both Allow and Don't Allow
-  behavior without requiring the rest of the app to stop working.
+  Media Library privacy domain. Run
+  `tccutil reset MediaLibrary com.ivmm.imgconvert` before each permission path,
+  verify that any resulting prompt shows the current
+  `NSAppleMusicUsageDescription`, and capture both Allow and Don't Allow
+  behavior without requiring the rest of the app to stop working. Follow
+  [`MAS_APP_REVIEW_SUBMISSION.md`](MAS_APP_REVIEW_SUBMISSION.md) for the
+  required recording and App Store Connect checks.
 - Flatpak: use the portal file picker to select an input, then select an output
   folder before converting. Confirm no broad host filesystem permission is
   required, the output is created through the portal path, and the saved output

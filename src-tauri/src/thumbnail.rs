@@ -5,7 +5,8 @@
 //!
 //! 前端只传用户已显式导入的本机路径；这里读取文件并调用 core 生成小 PNG。
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -47,7 +48,10 @@ pub fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailR
     let source = if external_codecs::is_heic_path(input) {
         external_codecs::decode_heic_to_png(input)?
     } else {
-        fs::read(input).map_err(|e| format!("无法读取输入文件: {e}"))?
+        let Some(bytes) = read_limited_thumbnail_source(input)? else {
+            return Ok(None);
+        };
+        bytes
     };
     let max_edge = options
         .max_edge
@@ -66,6 +70,21 @@ pub fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailR
         height: thumbnail.height,
         bytes: thumbnail.png,
     }))
+}
+
+/// The metadata preflight above handles ordinary files; this second cap closes
+/// the race where a selected file grows between that check and the read.
+fn read_limited_thumbnail_source(input: &Path) -> Result<Option<Vec<u8>>, String> {
+    let file = File::open(input).map_err(|error| format!("无法读取输入文件: {error}"))?;
+    let mut reader = file.take(MAX_THUMBNAIL_SOURCE_BYTES.saturating_add(1));
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("无法读取输入文件: {error}"))?;
+    if bytes.len() as u64 > MAX_THUMBNAIL_SOURCE_BYTES {
+        return Ok(None);
+    }
+    Ok(Some(bytes))
 }
 
 #[cfg(test)]
@@ -194,6 +213,7 @@ mod tests {
         .unwrap();
 
         assert!(result.is_none());
+        assert!(read_limited_thumbnail_source(&input).unwrap().is_none());
 
         fs::remove_dir_all(dir).unwrap();
     }

@@ -114,7 +114,7 @@
 
 | Capability          | Details                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Conversion          | In-process AVIF, WebP, JPEG, and PNG with true lossless AVIF support                                                |
+| Conversion          | SVG, static GIF, BMP, AVIF, WebP, JPEG, and PNG input; JPEG/PNG/WebP/AVIF output with true lossless AVIF support    |
 | Batch workflow      | Files, folders, recursive and clipboard imports; deduplication, asynchronous thumbnails, progress, and cancellation |
 | Performance         | Rust batch conversion, controlled concurrency, memory-aware throttling, and channel-based progress reporting        |
 | Compression         | `skip-if-larger`, smallest-candidate selection, automatic quality, and generation-loss protection                   |
@@ -148,7 +148,7 @@ remaining work.
 | ------------- | ------------------------------------------------------------------------------- |
 | Desktop shell | Tauri 2                                                                         |
 | Frontend      | Svelte 5 runes, shadcn-svelte, Tailwind CSS v4, Phosphor Icons                  |
-| Image core    | Rust, `mozjpeg`, `oxipng`, `webp`, `libavif-sys`, `image`                       |
+| Image core    | Rust, `resvg`, `mozjpeg`, `oxipng`, `webp`, `libavif-sys`, `image`              |
 | HEIC          | No bundled HEIC codec; system provider or optional helper depending on platform |
 | Toolchain     | pnpm, Node LTS, Rust toolchain, CMake, Meson, Ninja, NASM                       |
 
@@ -156,6 +156,10 @@ The image engine combines permissively licensed in-process Rust codecs with plat
 HEIC providers. The main application neither distributes x265 nor exports HEIC. See
 [docs/ENGINE.md](docs/ENGINE.md) and [docs/LEGAL.md](docs/LEGAL.md) for the design and
 licensing boundaries.
+
+SVG, GIF, and BMP are input-only: SVG is rasterized locally at its declared canvas
+size, GIF must contain exactly one frame, and all three can be converted or compressed
+to JPEG, PNG, WebP, or AVIF.
 
 ## Quick start
 

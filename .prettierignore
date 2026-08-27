@@ -1,5 +1,6 @@
 dist
 node_modules
+.codex
 src-tauri/target
 target
 docs-site/.next

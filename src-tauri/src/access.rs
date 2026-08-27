@@ -3,9 +3,10 @@
 
 //! 用户显式授权路径边界。
 //!
-//! Tauri 直发包当前拿到的是本机路径；Flatpak portal 可能给 portal 映射路径，
-//! macOS App Sandbox 还需要 security-scoped bookmark 生命周期。上层导入/转换
-//! 只依赖这里产出的 grant，避免后续把平台授权逻辑散落到业务代码。
+//! Tauri 直发包当前拿到的是本机路径；Flatpak portal 可能给 portal 映射路径。
+//! macOS App Sandbox 当前依赖用户在本进程中通过原生选择器授予的访问范围，
+//! 不把路径持久化伪装成 security-scoped bookmark。上层导入/转换只依赖这里产出
+//! 的 grant，避免后续把平台授权逻辑散落到业务代码。
 
 use std::path::{Path, PathBuf};
 

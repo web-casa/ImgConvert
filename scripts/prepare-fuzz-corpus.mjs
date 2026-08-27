@@ -109,7 +109,7 @@ function importRealCorpus() {
       if (!stat.isFile() || stat.size === 0 || stat.size > options.maxBytes) {
         continue;
       }
-      const head = readHead(file, 64);
+      const head = readHead(file, 64 * 1024);
       const format = formatFromMagic(head);
       if (!format) {
         continue;
@@ -235,6 +235,12 @@ function formatFromMagic(bytes) {
   ) {
     return "png";
   }
+  if (bytes.length >= 6 && ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii"))) {
+    return "gif";
+  }
+  if (bytes.length >= 2 && bytes.subarray(0, 2).toString("ascii") === "BM") {
+    return "bmp";
+  }
   if (
     bytes.length >= 16 &&
     bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
@@ -250,6 +256,9 @@ function formatFromMagic(bytes) {
       bytes.subarray(8).includes(Buffer.from("avis")))
   ) {
     return "avif";
+  }
+  if (/<svg(?=[\s/>:])/i.test(bytes.toString("latin1"))) {
+    return "svg";
   }
   return undefined;
 }

@@ -338,7 +338,7 @@ export interface Settings {
 
 // ---- 常量 ----
 const CORE_CAPABILITIES: Capabilities = {
-  readable: ["jpeg", "png", "webp", "avif"],
+  readable: ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp"],
   writable: ["jpeg", "png", "webp", "avif"],
   lossless: ["png", "webp", "avif"],
   colorPipeline: {
@@ -357,12 +357,24 @@ const FORMAT_EXTENSIONS: Record<string, string[]> = {
   png: ["png"],
   webp: ["webp"],
   avif: ["avif"],
+  svg: ["svg"],
+  gif: ["gif"],
+  bmp: ["bmp"],
   heic: ["heic", "heif", "hif"],
 };
 const THUMBNAIL_MAX_EDGE = 180;
 const THUMBNAIL_CONCURRENCY = 2;
 const CLIPBOARD_MAX_BYTES = 128 * 1024 * 1024;
-const CLIPBOARD_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/avif"]);
+const CLIPBOARD_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/avif",
+  "image/svg+xml",
+  "image/gif",
+  "image/bmp",
+  "image/x-ms-bmp",
+]);
 export const OUTPUT_SUFFIX_MAX_CHARS = 48;
 const OUTPUT_SUFFIX_MAX_BYTES = 128;
 export const DEFAULT_OUTPUT_SUFFIX = "_done";
@@ -740,7 +752,7 @@ export async function pickSystemPaths(options: PickPathOptions): Promise<string[
 
   const access = await runtimeFileAccess();
   if (!access.useHostLinuxPicker) {
-    return pickWithTauriDialog(options, access);
+    return pickWithTauriDialog(options);
   }
 
   return invoke<string[]>("pick_paths", {
@@ -854,17 +866,6 @@ export function outputSuffixForRequest(enabled: boolean, suffix: string): string
 }
 
 /**
- * macOS document pickers must return security-scoped URLs rather than copied
- * sandbox files. The runtime policy intentionally uses the session-grant flag
- * as the platform-neutral signal for this requirement.
- */
-export function scopedDialogFileAccessMode(
-  requiresOutputDirectorySessionGrant: boolean,
-): "scoped" | undefined {
-  return requiresOutputDirectorySessionGrant ? "scoped" : undefined;
-}
-
-/**
  * Selects an output folder and records the current macOS process grant.
  *
  * The folder is kept as a convenience default for a later launch, but macOS
@@ -907,10 +908,7 @@ async function runtimeFileAccess(): Promise<RuntimeFileAccess> {
   return getRuntimeFileAccess();
 }
 
-async function pickWithTauriDialog(
-  options: PickPathOptions,
-  access: RuntimeFileAccess,
-): Promise<string[]> {
+async function pickWithTauriDialog(options: PickPathOptions): Promise<string[]> {
   const extensions = sanitizedDialogExtensions(options.extensions ?? []);
   const selected = await openDialog({
     directory: options.directory ?? false,
@@ -918,7 +916,6 @@ async function pickWithTauriDialog(
     title: options.title || undefined,
     defaultPath: options.defaultPath,
     recursive: options.recursive ?? false,
-    fileAccessMode: scopedDialogFileAccessMode(access.requiresOutputDirectorySessionGrant),
     filters:
       !options.directory && extensions.length
         ? [
@@ -1778,6 +1775,14 @@ async function convertAllWithBatch() {
   try {
     if (!(await applyOutputSafetyDecisions(jobs))) {
       if (ui.cancelRequested) finalizeCancelledJobs(jobs);
+      return;
+    }
+    // Cancellation may have occurred while `plan_conversions` or a user-facing
+    // overwrite confirmation was pending. At that point no backend batch exists
+    // yet, so `cancel_batch` cannot cancel it; honour the local signal before
+    // creating one.
+    if (ui.cancelRequested) {
+      finalizeCancelledJobs(jobs);
       return;
     }
 

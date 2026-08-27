@@ -11,7 +11,7 @@
     <name>ImgConvert contributors</name>
   </developer>
   <description>
-    <p>Convert batches of JPEG, PNG, WebP, and AVIF images locally without uploading files.</p>
+    <p>Convert batches of JPEG, PNG, WebP, and AVIF images locally, and import SVG, static GIF, and BMP files, without uploading files.</p>
     <p>Choose the input files, output format, and destination; ImgConvert performs the conversion on your device.</p>
   </description>
   <launchable type="desktop-id">ImgConvert.desktop</launchable>
@@ -25,11 +25,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.17/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.18/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.18" date="2026-08-27">
+      <description>
+        <p>Adds SVG, static GIF, and BMP import, and hardens image resource limits and Mac App Store privacy safeguards.</p>
+      </description>
+    </release>
     <release version="0.2.17" date="2026-08-26">
       <description>
         <p>Clarifies the local image-import purpose of the macOS Media Library permission and validates it in release artifacts.</p>

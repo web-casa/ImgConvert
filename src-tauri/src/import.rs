@@ -3,8 +3,8 @@
 
 //! 用户显式授权路径的导入扫描。
 //!
-//! 当前阶段只处理 Tauri 拖拽/文件选择返回的本机路径；后续 Flatpak portal
-//! 与 macOS security-scoped bookmark 应接在这一层之下，而不是散落到前端。
+//! 当前阶段只处理 Tauri 拖拽/文件选择返回的本机路径；Flatpak portal 与未来
+//! 可能的 macOS security-scoped bookmark 都应接在这一层之下，而不是散落到前端。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
@@ -142,6 +142,9 @@ struct PendingPath {
     path: PathBuf,
     depth: usize,
     relative_base: Option<PathBuf>,
+    /// Canonical root of a recursively selected directory. Directly selected
+    /// files deliberately have no root: the user explicitly chose that path.
+    directory_root: Option<PathBuf>,
 }
 
 struct ScannedFile {
@@ -398,6 +401,15 @@ fn readable_extensions_with_heic(heic_available: bool) -> BTreeSet<String> {
             Format::Avif => {
                 extensions.insert("avif".to_string());
             }
+            Format::Svg => {
+                extensions.insert("svg".to_string());
+            }
+            Format::Gif => {
+                extensions.insert("gif".to_string());
+            }
+            Format::Bmp => {
+                extensions.insert("bmp".to_string());
+            }
         }
     }
     if heic_available {
@@ -434,7 +446,9 @@ impl Scanner {
             .collect::<Vec<_>>();
         let mut stack = Vec::new();
         for grant in paths.into_iter().rev() {
-            if !self.push_path(&mut stack, grant.into_path_buf(), 0, None) {
+            let path = grant.into_path_buf();
+            let directory_root = canonical_directory(&path);
+            if !self.push_path(&mut stack, path, 0, None, directory_root) {
                 break;
             }
         }
@@ -453,6 +467,7 @@ impl Scanner {
         path: PathBuf,
         depth: usize,
         relative_base: Option<PathBuf>,
+        directory_root: Option<PathBuf>,
     ) -> bool {
         if self.should_stop() {
             return false;
@@ -472,6 +487,7 @@ impl Scanner {
             path,
             depth,
             relative_base,
+            directory_root,
         });
         true
     }
@@ -487,17 +503,32 @@ impl Scanner {
 
         let file_type = metadata.file_type();
         if file_type.is_symlink() {
-            self.scan_symlink(pending.path, pending.relative_base.as_deref());
+            self.scan_symlink(
+                pending.path,
+                pending.relative_base.as_deref(),
+                pending.directory_root.as_deref(),
+            );
         } else if file_type.is_file() {
             self.consider_file(pending.path, pending.relative_base.as_deref());
         } else if file_type.is_dir() {
-            self.scan_dir(pending.path, pending.depth, pending.relative_base, stack);
+            self.scan_dir(
+                pending.path,
+                pending.depth,
+                pending.relative_base,
+                pending.directory_root,
+                stack,
+            );
         } else {
             self.skipped += 1;
         }
     }
 
-    fn scan_symlink(&mut self, path: PathBuf, relative_base: Option<&Path>) {
+    fn scan_symlink(
+        &mut self,
+        path: PathBuf,
+        relative_base: Option<&Path>,
+        directory_root: Option<&Path>,
+    ) {
         let metadata = match fs::metadata(&path) {
             Ok(metadata) => metadata,
             Err(error) => {
@@ -507,6 +538,23 @@ impl Scanner {
         };
 
         if metadata.is_file() {
+            if let Some(directory_root) = directory_root {
+                let target = match fs::canonicalize(&path) {
+                    Ok(target) => target,
+                    Err(error) => {
+                        self.error(&path, format!("无法验证符号链接目标: {error}"));
+                        return;
+                    }
+                };
+                if !target.starts_with(directory_root) {
+                    // A recursive directory import authorizes the selected
+                    // tree, not arbitrary targets that a symlink happens to
+                    // reference. Directly selected symlink files retain the
+                    // existing explicit-user-selection behavior above.
+                    self.skipped += 1;
+                    return;
+                }
+            }
             self.consider_file(path, relative_base);
         } else {
             // 不递归符号链接目录，避免循环和越过用户明确选择的目录边界。
@@ -519,6 +567,7 @@ impl Scanner {
         path: PathBuf,
         depth: usize,
         relative_base: Option<PathBuf>,
+        directory_root: Option<PathBuf>,
         stack: &mut Vec<PendingPath>,
     ) {
         if !self.recursive {
@@ -553,6 +602,7 @@ impl Scanner {
                         entry.path(),
                         child_depth,
                         Some(child_relative_base.clone()),
+                        directory_root.clone(),
                     ) {
                         break;
                     }
@@ -656,6 +706,11 @@ impl Scanner {
     }
 }
 
+fn canonical_directory(path: &Path) -> Option<PathBuf> {
+    let path = fs::canonicalize(path).ok()?;
+    fs::metadata(&path).ok()?.is_dir().then_some(path)
+}
+
 fn relative_dir_for(path: &Path, relative_base: Option<&Path>) -> Option<PathBuf> {
     let base = relative_base?;
     let parent = path.parent()?;
@@ -697,7 +752,14 @@ fn validate_clipboard_mime_type(mime_type: &str) -> Result<(), String> {
     if normalized.is_empty()
         || matches!(
             normalized.as_str(),
-            "image/png" | "image/jpeg" | "image/webp" | "image/avif"
+            "image/png"
+                | "image/jpeg"
+                | "image/webp"
+                | "image/avif"
+                | "image/svg+xml"
+                | "image/gif"
+                | "image/bmp"
+                | "image/x-ms-bmp"
         )
     {
         Ok(())
@@ -712,6 +774,9 @@ fn format_extension(format: Format) -> &'static str {
         Format::Png => "png",
         Format::WebP => "webp",
         Format::Avif => "avif",
+        Format::Svg => "svg",
+        Format::Gif => "gif",
+        Format::Bmp => "bmp",
     }
 }
 
@@ -884,6 +949,9 @@ mod tests {
         let without_heic = readable_extensions_with_heic(false);
         let with_heic = readable_extensions_with_heic(true);
 
+        assert!(without_heic.contains("svg"));
+        assert!(without_heic.contains("gif"));
+        assert!(without_heic.contains("bmp"));
         assert!(!without_heic.contains("heic"));
         assert!(with_heic.contains("heic"));
         assert!(with_heic.contains("heif"));
@@ -1009,12 +1077,24 @@ mod tests {
     fn clipboard_import_rejects_unsupported_mime() {
         let err = import_clipboard_image(ClipboardImageImportOptions {
             bytes: png_with_dimensions(1, 1),
-            mime_type: Some("image/bmp".to_string()),
+            mime_type: Some("image/tiff".to_string()),
             suggested_name: None,
         })
         .unwrap_err();
 
         assert!(err.contains("剪贴板图片类型暂不支持"));
+    }
+
+    #[test]
+    fn clipboard_mime_validation_accepts_new_read_only_formats() {
+        for mime_type in [
+            "image/svg+xml",
+            "image/gif",
+            "image/bmp",
+            "image/x-ms-bmp; charset=binary",
+        ] {
+            assert!(validate_clipboard_mime_type(mime_type).is_ok(), "{mime_type}");
+        }
     }
 
     #[test]
@@ -1107,6 +1187,49 @@ mod tests {
         assert!(result.errors.is_empty());
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_scan_skips_file_symlinks_that_escape_the_selected_root() {
+        let root = unique_test_dir("symlink-boundary-root");
+        let outside = unique_test_dir("symlink-boundary-outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        let outside_file = outside.join("private.png");
+        let link = root.join("outside.png");
+        fs::write(&outside_file, b"png").unwrap();
+        std::os::unix::fs::symlink(&outside_file, &link).unwrap();
+
+        let result = scan(options(vec![root.clone()]));
+
+        assert!(result.files.is_empty());
+        assert_eq!(result.skipped, 1);
+        assert!(result.errors.is_empty());
+
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_scan_keeps_file_symlinks_that_stay_inside_selected_root() {
+        let root = unique_test_dir("symlink-boundary-inside");
+        fs::create_dir_all(&root).unwrap();
+        let target = root.join("target.png");
+        let link = root.join("inside.png");
+        fs::write(&target, b"png").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let result = scan(options(vec![root.clone()]));
+
+        // Both paths name the same canonical file. The link must be accepted
+        // (not counted as a skipped boundary escape), then deduplicated.
+        assert_eq!(result.files.len(), 1);
+        assert_eq!(result.skipped, 0);
+        assert!(result.errors.is_empty());
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(unix)]

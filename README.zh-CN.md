@@ -112,17 +112,17 @@
 
 ## 核心能力
 
-| 能力       | 说明                                                                   |
-| ---------- | ---------------------------------------------------------------------- |
-| 格式转换   | 进程内支持 AVIF、WebP、JPEG、PNG；支持 AVIF 真无损                     |
-| 批量工作流 | 文件、目录、递归与剪贴板导入；去重、异步缩略图、进度和取消             |
-| 性能控制   | Rust 端批量转换、并发控制、内存预算降并发与 Channel 进度上报           |
-| 压缩策略   | `skip-if-larger`、多候选取最小、自动质量与代际损失防护                 |
-| 图像保真   | EXIF orientation 真旋正，保留或剥离 ICC / EXIF / XMP / IPTC            |
-| 色彩管理   | Display P3 ICC 测试、显式转 sRGB 与色彩管线 v2                         |
-| HEIC 导入  | macOS ImageIO、Windows WIC、Linux helper / Flatpak extension；只读导入 |
-| 本地隐私   | 图片处理默认在本机完成，不需要账号，不上传原始图片                     |
-| 发布工程   | Tauri updater、跨平台安装包、许可 / fuzz / benchmark / CI 护栏         |
+| 能力       | 说明                                                                                           |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| 格式转换   | 支持 SVG、静态 GIF、BMP、AVIF、WebP、JPEG、PNG 导入；JPEG/PNG/WebP/AVIF 输出，支持 AVIF 真无损 |
+| 批量工作流 | 文件、目录、递归与剪贴板导入；去重、异步缩略图、进度和取消                                     |
+| 性能控制   | Rust 端批量转换、并发控制、内存预算降并发与 Channel 进度上报                                   |
+| 压缩策略   | `skip-if-larger`、多候选取最小、自动质量与代际损失防护                                         |
+| 图像保真   | EXIF orientation 真旋正，保留或剥离 ICC / EXIF / XMP / IPTC                                    |
+| 色彩管理   | Display P3 ICC 测试、显式转 sRGB 与色彩管线 v2                                                 |
+| HEIC 导入  | macOS ImageIO、Windows WIC、Linux helper / Flatpak extension；只读导入                         |
+| 本地隐私   | 图片处理默认在本机完成，不需要账号，不上传原始图片                                             |
+| 发布工程   | Tauri updater、跨平台安装包、许可 / fuzz / benchmark / CI 护栏                                 |
 
 ## 发布与项目状态
 
@@ -142,17 +142,19 @@
 
 ## 架构与技术栈
 
-| 层级     | 技术与边界                                                     |
-| -------- | -------------------------------------------------------------- |
-| 桌面壳   | Tauri 2                                                        |
-| 前端     | Svelte 5 runes、shadcn-svelte、Tailwind CSS v4、Phosphor Icons |
-| 图像核心 | Rust、`mozjpeg`、`oxipng`、`webp`、`libavif-sys`、`image`      |
-| HEIC     | 主程序不内置 HEIC codec；按平台使用系统 provider 或可选 helper |
-| 工具链   | pnpm、Node LTS、Rust toolchain、CMake、Meson、Ninja、NASM      |
+| 层级     | 技术与边界                                                         |
+| -------- | ------------------------------------------------------------------ |
+| 桌面壳   | Tauri 2                                                            |
+| 前端     | Svelte 5 runes、shadcn-svelte、Tailwind CSS v4、Phosphor Icons     |
+| 图像核心 | Rust、`resvg`、`mozjpeg`、`oxipng`、`webp`、`libavif-sys`、`image` |
+| HEIC     | 主程序不内置 HEIC codec；按平台使用系统 provider 或可选 helper     |
+| 工具链   | pnpm、Node LTS、Rust toolchain、CMake、Meson、Ninja、NASM          |
 
 图像引擎采用“进程内宽松许可 Rust 编解码器 + 平台系统 HEIC”的混合架构。
 主程序不分发 x265，也不输出 HEIC。具体设计与许可边界见
 [docs/ENGINE.md](docs/ENGINE.md) 和 [docs/LEGAL.md](docs/LEGAL.md)。
+
+SVG、GIF、BMP 仅作为输入：SVG 会按声明画布在本地栅格化，GIF 必须恰好一帧；三者均可转换或压缩为 JPEG、PNG、WebP、AVIF。
 
 ## 快速开始
 

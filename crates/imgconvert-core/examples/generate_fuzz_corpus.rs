@@ -32,6 +32,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    for (name, bytes) in [
+        ("vector.svg", simple_svg()),
+        ("static.gif", static_gif()),
+        // A multi-frame GIF is a valid input shape but intentionally unsupported;
+        // keep it in both targets to guard against a future first-frame fallback.
+        ("animated.gif", animated_gif()),
+        ("one-pixel.bmp", one_pixel_bmp()?),
+    ] {
+        write_seed(&decode_dir.join(name), &bytes)?;
+        write_seed(&convert_dir.join(name), &bytes)?;
+    }
+
     write_seed(
         &decode_dir.join("truncated-png.bin"),
         b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR",
@@ -78,6 +90,32 @@ fn seed_options(format: Format) -> EncodeOptions {
         avif_subsample: AvifSubsample::Yuv444,
         ..EncodeOptions::default()
     }
+}
+
+fn simple_svg() -> Vec<u8> {
+    br##"<svg xmlns="http://www.w3.org/2000/svg" width="6" height="4"><rect width="6" height="4" fill="#f06"/></svg>"##.to_vec()
+}
+
+fn static_gif() -> Vec<u8> {
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;".to_vec()
+}
+
+fn animated_gif() -> Vec<u8> {
+    let mut gif = static_gif();
+    assert_eq!(gif.pop(), Some(b';'));
+    gif.extend_from_slice(b",\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;");
+    gif
+}
+
+fn one_pixel_bmp() -> Result<Vec<u8>, image::ImageError> {
+    let mut bmp = Vec::new();
+    image::codecs::bmp::BmpEncoder::new(&mut bmp).encode(
+        &[255, 0, 0, 255],
+        1,
+        1,
+        image::ExtendedColorType::Rgba8,
+    )?;
+    Ok(bmp)
 }
 
 fn alpha_gradient(width: u32, height: u32) -> Result<ImageData, imgconvert_core::Error> {

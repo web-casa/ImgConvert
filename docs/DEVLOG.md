@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-08-27 — SVG、静态 GIF 与 BMP 受控导入
+
+- **格式能力**：core 可读取 SVG、静态 GIF 与 BMP，并将其转换或压缩为既有 JPEG、PNG、WebP、AVIF 输出；三种新格式不进入 `WRITABLE_FORMATS`，因此不会在输出格式选择器中被误选。
+- **SVG 边界**：接入 `resvg` 的最小 feature 集；SVG 源码限制为 16 MiB、画布继续受 64 MP 上限约束。携带 `<image>` `href`（本地路径或 data URI）的 SVG 会明确拒绝，绝不静默丢失嵌入图像；文本只使用一次加载的系统字体索引，避免一个被选中的 SVG 扩大文件读取范围。
+- **GIF 边界**：在 LZW 像素解码前遍历容器块并统计 image descriptor；检测到第二帧即明确拒绝，不再存在“只转换第一帧”的静默数据丢失路径。
+- **入口与验证**：文件选择、目录扫描、拖拽、剪贴板 MIME、缩略图和 capability 契约均已接入。新增 core、Tauri、前端测试和 fuzz corpus 种子（SVG、静态/动画 GIF、BMP）；动画 GIF seed 预期干净拒绝。
+- **资源与边界复核**：AVIF 在 `avifDecoderNextImage` 前、macOS ImageIO/Windows WIC HEIC 在构建像素面前统一做 64 MP 尺寸预检；core、HEIC 与缩略图的源文件读取均限制为 256 MiB（缩略图和 Windows WIC 在 metadata 检查后仍使用有界读取，避免文件增长竞态）。批处理预算还会计入完整输入缓冲；HEIC 系统桥接先转 PNG，故同一时间只运行一个 HEIC 任务且桥接 PNG 同样限制为 256 MiB。递归导入会跳过解析后位于用户所选目录之外的文件符号链接；手动 HEIC helper 也改为复用 manifest/PATH 的 canonical 父目录信任规则。取消在转换计划阶段同样会阻止后续启动实际 batch。
+
+---
+
+## 2026-08-27 — MAS 审核复核：隐私清单、最小 entitlement 与复测闭环
+
+- **隐私声明**：新增 `PrivacyInfo.xcprivacy`，声明不跟踪、不收集数据，并为用户显式选择的文件时间元数据声明 `NSPrivacyAccessedAPICategoryFileTimestamp` / `3B52.1`。Tauri `bundle.resources` 打包该文件，MAS artifact verifier 在最终 `.app/Contents/Resources/` 中复核它。
+- **最小权限**：移除没有 bookmark 创建/恢复实现支撑的 `com.apple.security.files.bookmarks.app-scope`。保留 App Sandbox、user-selected read/write，以及已为 sandboxed WKWebView 本地 IPC 验证的 network client；不扩展到 network server 或 broad filesystem。
+- **纠正 Tauri 语义**：当前 `tauri-plugin-dialog` 的 desktop `fileAccessMode` 实际被上游忽略，因此删除前端的无效 `scoped` 参数。`tauri-plugin-persisted-scope` 只保存 Tauri 虚拟范围，绝不当作 macOS security-scoped bookmark；每次启动仍要求重新选择输出目录。
+- **审核与真机步骤**：新增 `MAS_APP_REVIEW_SUBMISSION.md`，固定 Review Notes、`tccutil reset MediaLibrary com.ivmm.imgconvert` 的干净账户复测、Allow/Don't Allow、重启后输出目录和 App Store Connect 年龄分级/隐私标签/截图/构建号清单。真实 TCC 录屏和账户侧提交仍须在物理 Mac 与 App Store Connect 中完成。
+
+---
+
 ## 2026-08-19 — v0.2.0 双渠道发布契约已确认
 
 - **目标**：后续 `v0.2.0` 从同一不可变 tag 构建 GitHub 直发的已签名/公证 Apple Silicon DMG 与 Microsoft Store x64 MSIX submission artifact。
@@ -1248,7 +1267,7 @@ Codex 完成插件诊断 UI 的第一版:
 - **诊断信息粒度**:manifest 目录会区分 missing / empty / ready / rejected / untrusted / unreadable;manifest 文件返回具体拒绝原因,包括许可、协议、可写 HEIC、路径逃逸、helper 不可执行等错误码前缀。
 - **前端入口**:顶栏新增「插件诊断」按钮;弹层展示 HEIC 状态、active provider 执行文件与 argv、探测摘要、系统 helper 列表和 manifest 搜索明细。
 - **运行边界**:网页预览返回空诊断;Tauri 桌面端执行本机只读探测,不启动 helper、不解码文件。
-- **review 修复**:helper stdout 直接丢弃,stderr 走管道并限制为 64 KiB;helper 生成的临时 PNG 读取限制为 512 MiB,避免异常 helper 填满磁盘或内存。非 Unix 平台在尚未实现平台信任模型前不启用外部 HEIC helper/manifest 自动发现;诊断弹层每次打开都会刷新,顶栏引擎文案在窄屏截断。
+- **review 修复**:helper stdout 直接丢弃,stderr 走管道并限制为 64 KiB;helper 生成的临时 PNG 读取当时限制为 512 MiB,后续已统一收紧为 256 MiB,避免异常 helper 填满磁盘或内存。非 Unix 平台在尚未实现平台信任模型前不启用外部 HEIC helper/manifest 自动发现;诊断弹层每次打开都会刷新,顶栏引擎文案在窄屏截断。
 
 验证:
 

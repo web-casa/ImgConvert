@@ -4,7 +4,8 @@
 //! ImgConvert 进程内编解码核心。
 //!
 //! 设计(参考 slimg,MIT):统一中间表示 `ImageData`(`PixelBuffer`)+ `Codec` trait +
-//! `Format` 检测 + 顶层 `convert` 管线。P0.5 已跑通 **JPEG / PNG / WebP / AVIF**。
+//! `Format` 检测 + 顶层 `convert` 管线。核心可双向转换 **JPEG / PNG / WebP / AVIF**，
+//! 并可把 **SVG / 静态 GIF / BMP** 栅格化或解码为这些输出格式。
 //! HEIC(系统原生)、更深层的色彩/元数据语义处理为后续尖刺/阶段。
 //!
 //! 色彩管线:v2 支持 RGBA8/RGBA16/RGBAF32 中间表示、LittleCMS ICC→sRGB 转换、
@@ -14,6 +15,8 @@ use std::borrow::Cow;
 use std::fmt;
 use std::io::{Cursor, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
@@ -30,6 +33,9 @@ use ssimulacra2::{compute_frame_ssimulacra2, ColorPrimaries, Rgb, TransferCharac
 /// estimate within the 768 MiB batch budget instead of accepting a 100 MP image
 /// that can exhaust memory before the batch scheduler has a chance to help.
 pub const MAX_PIXELS: usize = 64_000_000;
+
+/// SVG 是文本格式；单独限制源码大小，避免向 XML/CSS 解析器交付异常大的文档。
+pub const MAX_SVG_SOURCE_BYTES: usize = 16 * 1024 * 1024;
 
 /// 单个原始 metadata blob 上限。与 HEIC helper sidecar 上限保持一致,防容器 metadata 炸弹。
 pub const MAX_METADATA_BLOB_BYTES: usize = 16 * 1024 * 1024;
@@ -58,6 +64,10 @@ const WEBP_BLOCK_ARTIFACT_MIN_DIMENSION: u32 = 32;
 const WEBP_BLOCK_ARTIFACT_MIN_BOUNDARY_DELTA: f64 = 8.0;
 const WEBP_BLOCK_ARTIFACT_SCORE_THRESHOLD: f64 = 1.5;
 const ICC_TRANSFORM_CHUNK_PIXELS: usize = 65_536;
+const SVG_MAGIC_SCAN_BYTES: usize = 64 * 1024;
+
+/// SVG 文本需要字体时复用一次系统字体索引，避免批量转换时反复扫描系统目录。
+static SVG_FONT_DATABASE: OnceLock<Arc<resvg::usvg::fontdb::Database>> = OnceLock::new();
 
 /// 校验尺寸并返回像素数(checked,拒绝 0 / 溢出 / 超上限)。
 fn pixel_count(width: u32, height: u32) -> Result<usize> {
@@ -85,6 +95,17 @@ fn rgba_sample_len(width: u32, height: u32) -> Result<usize> {
 /// 校验尺寸并返回期望的 RGBA8 字节数(checked,拒绝 0 / 溢出 / 超上限)。
 fn rgba_byte_len(width: u32, height: u32) -> Result<usize> {
     rgba_sample_len(width, height)
+}
+
+/// Validate image dimensions before a platform or third-party decoder is asked
+/// to allocate its pixel buffer.
+///
+/// This is intentionally public for the system HEIC bridges. Keeping their
+/// preflight on the same 64 MP boundary as the Rust codecs prevents one input
+/// format from bypassing the batch memory budget merely because it is decoded
+/// by ImageIO or WIC.
+pub fn validate_image_dimensions(width: u32, height: u32) -> Result<()> {
+    rgba_byte_len(width, height).map(|_| ())
 }
 
 /// 像素采样类型。PNG 可保留 RGBA16;JPEG/WebP/AVIF 编码入口仍会显式降到 RGBA8。
@@ -597,17 +618,28 @@ pub struct Thumbnail {
     pub png: Vec<u8>,
 }
 
-/// 支持的格式(P0.5 范围)。
+/// 支持的格式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Jpeg,
     Png,
     WebP,
     Avif,
+    Svg,
+    Gif,
+    Bmp,
 }
 
 /// 进程内 core 当前可读格式。
-pub const READABLE_FORMATS: &[Format] = &[Format::Jpeg, Format::Png, Format::WebP, Format::Avif];
+pub const READABLE_FORMATS: &[Format] = &[
+    Format::Jpeg,
+    Format::Png,
+    Format::WebP,
+    Format::Avif,
+    Format::Svg,
+    Format::Gif,
+    Format::Bmp,
+];
 
 /// 进程内 core 当前可写格式。
 pub const WRITABLE_FORMATS: &[Format] = &[Format::Jpeg, Format::Png, Format::WebP, Format::Avif];
@@ -623,6 +655,9 @@ impl Format {
             Format::Png => "png",
             Format::WebP => "webp",
             Format::Avif => "avif",
+            Format::Svg => "svg",
+            Format::Gif => "gif",
+            Format::Bmp => "bmp",
         }
     }
 
@@ -633,6 +668,9 @@ impl Format {
             Format::Png => "png",
             Format::WebP => "webp",
             Format::Avif => "avif",
+            Format::Svg => "svg",
+            Format::Gif => "gif",
+            Format::Bmp => "bmp",
         }
     }
 
@@ -648,6 +686,12 @@ impl Format {
         }
         if bytes.len() >= 8 && bytes[0..8] == [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'] {
             return Some(Format::Png);
+        }
+        if bytes.len() >= 6 && matches!(&bytes[0..6], b"GIF87a" | b"GIF89a") {
+            return Some(Format::Gif);
+        }
+        if bytes.len() >= 2 && &bytes[0..2] == b"BM" {
+            return Some(Format::Bmp);
         }
         // RIFF....WEBP + 首个 chunk FourCC(VP8 / VP8L / VP8X),避免误判普通 RIFF。
         if bytes.len() >= 16
@@ -667,6 +711,9 @@ impl Format {
                 return Some(Format::Avif);
             }
         }
+        if looks_like_svg(bytes) {
+            return Some(Format::Svg);
+        }
         None
     }
 
@@ -677,6 +724,9 @@ impl Format {
             "png" => Some(Format::Png),
             "webp" => Some(Format::WebP),
             "avif" => Some(Format::Avif),
+            "svg" => Some(Format::Svg),
+            "gif" => Some(Format::Gif),
+            "bmp" => Some(Format::Bmp),
             _ => None,
         }
     }
@@ -902,6 +952,9 @@ pub fn codec_for(format: Format) -> Box<dyn Codec> {
         Format::Png => Box::new(PngCodec),
         Format::WebP => Box::new(WebpCodec),
         Format::Avif => Box::new(AvifCodec),
+        Format::Svg => Box::new(SvgCodec),
+        Format::Gif => Box::new(GifCodec),
+        Format::Bmp => Box::new(BmpCodec),
     }
 }
 
@@ -1657,6 +1710,9 @@ pub fn probe(input: &[u8]) -> Result<ImageProbe> {
         Format::Png => probe_png(input)?,
         Format::WebP => probe_webp(input)?,
         Format::Avif => probe_avif(input)?,
+        Format::Svg => probe_svg(input)?,
+        Format::Gif => probe_gif(input)?,
+        Format::Bmp => probe_bmp(input)?,
     };
     rgba_byte_len(width, height)?;
     Ok(ImageProbe {
@@ -2294,9 +2350,215 @@ fn probe_avif_exif_dpi(image: *const avif::avifImage) -> Option<Dpi> {
     parse_exif_dpi(&exif)
 }
 
+// ---------- SVG / GIF / BMP 输入----------
+
+/// SVG 的 magic 识别只是导入路由；真正的语法和尺寸校验由 `parse_svg` 完成。
+fn looks_like_svg(bytes: &[u8]) -> bool {
+    let scan = &bytes[..bytes.len().min(SVG_MAGIC_SCAN_BYTES)];
+    scan.windows(4).enumerate().any(|(index, tag)| {
+        tag.eq_ignore_ascii_case(b"<svg")
+            && matches!(
+                scan.get(index + 4),
+                Some(b'>')
+                    | Some(b'/')
+                    | Some(b':')
+                    | Some(b' ')
+                    | Some(b'\t')
+                    | Some(b'\r')
+                    | Some(b'\n')
+            )
+    })
+}
+
+fn svg_options(blocked_image_reference: Arc<AtomicBool>) -> resvg::usvg::Options<'static> {
+    // SVG 的 `<image href>` 默认 resolver 可以访问相对/绝对本地路径。导入文件是
+    // 用户显式选中的单个文件，不应借此扩大到任意本地资源；data URL 也一并禁用。
+    // resolver 同时记录该引用，调用方会明确拒绝 SVG，不能静默丢失 image 内容。
+    let data_reference = Arc::clone(&blocked_image_reference);
+    let string_reference = blocked_image_reference;
+    resvg::usvg::Options {
+        image_href_resolver: resvg::usvg::ImageHrefResolver {
+            resolve_data: Box::new(move |_, _, _| {
+                data_reference.store(true, Ordering::Relaxed);
+                None
+            }),
+            resolve_string: Box::new(move |_, _| {
+                string_reference.store(true, Ordering::Relaxed);
+                None
+            }),
+        },
+        fontdb: SVG_FONT_DATABASE
+            .get_or_init(|| {
+                let mut database = resvg::usvg::fontdb::Database::new();
+                database.load_system_fonts();
+                Arc::new(database)
+            })
+            .clone(),
+        ..Default::default()
+    }
+}
+
+fn parse_svg(bytes: &[u8]) -> Result<resvg::usvg::Tree> {
+    if bytes.len() > MAX_SVG_SOURCE_BYTES {
+        return Err(Error::Unsupported(format!(
+            "SVG 源文件超过 {} MiB 上限",
+            MAX_SVG_SOURCE_BYTES / (1024 * 1024)
+        )));
+    }
+    if !looks_like_svg(bytes) {
+        return Err(Error::Decode("SVG 根元素缺失或不在前 64 KiB 内".into()));
+    }
+    let blocked_image_reference = Arc::new(AtomicBool::new(false));
+    let options = svg_options(Arc::clone(&blocked_image_reference));
+    let tree = resvg::usvg::Tree::from_data(bytes, &options)
+        .map_err(|error| Error::Decode(format!("SVG 解析失败: {error}")))?;
+    if blocked_image_reference.load(Ordering::Relaxed) {
+        return Err(Error::Unsupported(
+            "SVG 包含 <image> 引用；为保护文件访问边界，当前仅支持纯矢量和文本 SVG".into(),
+        ));
+    }
+    Ok(tree)
+}
+
+fn svg_dimensions(tree: &resvg::usvg::Tree) -> (u32, u32) {
+    let size = tree.size().to_int_size();
+    (size.width(), size.height())
+}
+
+fn probe_svg(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
+    let tree = parse_svg(bytes)?;
+    let (width, height) = svg_dimensions(&tree);
+    rgba_byte_len(width, height)?;
+    Ok((width, height, None))
+}
+
+fn skip_gif_sub_blocks(bytes: &[u8], offset: &mut usize) -> Result<()> {
+    loop {
+        let Some(&length) = bytes.get(*offset) else {
+            return Err(Error::Decode("GIF 子块长度缺失".into()));
+        };
+        *offset += 1;
+        if length == 0 {
+            return Ok(());
+        }
+        let end = offset
+            .checked_add(length as usize)
+            .ok_or_else(|| Error::Decode("GIF 子块长度溢出".into()))?;
+        if end > bytes.len() {
+            return Err(Error::Decode("GIF 子块不完整".into()));
+        }
+        *offset = end;
+    }
+}
+
+/// 只做容器遍历，不解码 LZW 像素。返回 GIF 的逻辑屏幕尺寸及 image descriptor 数量。
+fn gif_header_and_frame_count(bytes: &[u8]) -> Result<(u32, u32, usize)> {
+    if bytes.len() < 13 || !matches!(&bytes[0..6], b"GIF87a" | b"GIF89a") {
+        return Err(Error::Decode("GIF 头不完整或签名非法".into()));
+    }
+    let width = le_u16(&bytes[6..8]).ok_or_else(|| Error::Decode("GIF 宽度缺失".into()))?;
+    let height = le_u16(&bytes[8..10]).ok_or_else(|| Error::Decode("GIF 高度缺失".into()))?;
+    // `probe` is used before a conversion is scheduled, so the GIF logical
+    // screen must obey the same resource ceiling as every decoder.  Do this
+    // before walking extension blocks: an invalid huge canvas should not be
+    // surfaced to the import UI or batch-memory estimator just because no
+    // pixels have been decoded yet.
+    rgba_byte_len(u32::from(width), u32::from(height))?;
+    let mut offset = 13usize;
+    let global_color_table = bytes[10];
+    if global_color_table & 0x80 != 0 {
+        let table_len = 3usize
+            .checked_mul(1usize << ((global_color_table & 0x07) + 1))
+            .ok_or_else(|| Error::Decode("GIF 全局色表长度溢出".into()))?;
+        offset = offset
+            .checked_add(table_len)
+            .ok_or_else(|| Error::Decode("GIF 全局色表长度溢出".into()))?;
+        if offset > bytes.len() {
+            return Err(Error::Decode("GIF 全局色表不完整".into()));
+        }
+    }
+
+    let mut frames = 0usize;
+    while let Some(&block) = bytes.get(offset) {
+        match block {
+            0x3b => return Ok((u32::from(width), u32::from(height), frames)),
+            0x21 => {
+                // extension introducer + extension label，后跟 GIF sub-block 序列。
+                offset = offset
+                    .checked_add(2)
+                    .ok_or_else(|| Error::Decode("GIF extension 长度溢出".into()))?;
+                if offset > bytes.len() {
+                    return Err(Error::Decode("GIF extension 不完整".into()));
+                }
+                skip_gif_sub_blocks(bytes, &mut offset)?;
+            }
+            0x2c => {
+                // image descriptor 为 separator 后的 9 个字节。
+                let descriptor_end = offset
+                    .checked_add(10)
+                    .ok_or_else(|| Error::Decode("GIF image descriptor 长度溢出".into()))?;
+                if descriptor_end > bytes.len() {
+                    return Err(Error::Decode("GIF image descriptor 不完整".into()));
+                }
+                let local_color_table = bytes[offset + 9];
+                offset = descriptor_end;
+                if local_color_table & 0x80 != 0 {
+                    let table_len = 3usize
+                        .checked_mul(1usize << ((local_color_table & 0x07) + 1))
+                        .ok_or_else(|| Error::Decode("GIF 局部色表长度溢出".into()))?;
+                    offset = offset
+                        .checked_add(table_len)
+                        .ok_or_else(|| Error::Decode("GIF 局部色表长度溢出".into()))?;
+                    if offset > bytes.len() {
+                        return Err(Error::Decode("GIF 局部色表不完整".into()));
+                    }
+                }
+                // LZW minimum code size。
+                if bytes.get(offset).is_none() {
+                    return Err(Error::Decode("GIF LZW code size 缺失".into()));
+                }
+                offset += 1;
+                skip_gif_sub_blocks(bytes, &mut offset)?;
+                frames = frames
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Decode("GIF 帧数溢出".into()))?;
+                if frames > 1 {
+                    // 无需继续扫描攻击者提供的超大尾部；调用方只关心是否是动画。
+                    return Ok((u32::from(width), u32::from(height), frames));
+                }
+            }
+            _ => return Err(Error::Decode(format!("GIF 包含未知 block: 0x{block:02x}"))),
+        }
+    }
+    Err(Error::Decode("GIF 缺少 trailer".into()))
+}
+
+fn ensure_static_gif(bytes: &[u8]) -> Result<(u32, u32)> {
+    let (width, height, frames) = gif_header_and_frame_count(bytes)?;
+    if frames == 0 {
+        return Err(Error::Decode("GIF 不包含图像帧".into()));
+    }
+    if frames > 1 {
+        return Err(Error::Unsupported(
+            "动画 GIF 暂不支持；请先导出单帧静态 GIF".into(),
+        ));
+    }
+    Ok((width, height))
+}
+
+fn probe_gif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
+    let (width, height) = ensure_static_gif(bytes)?;
+    Ok((width, height, None))
+}
+
+fn probe_bmp(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
+    let (width, height) = probe_via_image(bytes, image::ImageFormat::Bmp)?;
+    Ok((width, height, None))
+}
+
 // ---------- 通用解码(image crate)----------
 
-fn decode_via_image(bytes: &[u8], format: image::ImageFormat) -> Result<ImageData> {
+fn probe_via_image(bytes: &[u8], format: image::ImageFormat) -> Result<(u32, u32)> {
     let mut header_limits = image::Limits::default();
     header_limits.max_image_width = Some(MAX_PIXELS as u32);
     header_limits.max_image_height = Some(MAX_PIXELS as u32);
@@ -2305,6 +2567,12 @@ fn decode_via_image(bytes: &[u8], format: image::ImageFormat) -> Result<ImageDat
     let (width, height) = header_reader
         .into_dimensions()
         .map_err(|e| Error::Decode(e.to_string()))?;
+    rgba_byte_len(width, height)?;
+    Ok((width, height))
+}
+
+fn decode_via_image(bytes: &[u8], format: image::ImageFormat) -> Result<ImageData> {
+    let (width, height) = probe_via_image(bytes, format)?;
     let expected_rgba_len = rgba_byte_len(width, height)?;
     let max_decode_alloc = match format {
         image::ImageFormat::Png => (expected_rgba_len as u64)
@@ -2848,6 +3116,7 @@ fn metadata_from_image_format(bytes: &[u8], format: Format) -> Metadata {
         Format::Png => extract_png_metadata(bytes, true),
         Format::WebP => extract_webp_metadata(bytes),
         Format::Avif => extract_avif_metadata(bytes),
+        Format::Svg | Format::Gif | Format::Bmp => Metadata::default(),
     }
 }
 
@@ -3823,6 +4092,62 @@ impl Codec for WebpCodec {
     }
 }
 
+// ---------- SVG / GIF / BMP（仅输入）----------
+
+struct SvgCodec;
+
+impl Codec for SvgCodec {
+    fn decode(&self, bytes: &[u8]) -> Result<ImageData> {
+        let tree = parse_svg(bytes)?;
+        let (width, height) = svg_dimensions(&tree);
+        rgba_byte_len(width, height)?;
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height)
+            .ok_or_else(|| Error::Decode("无法为 SVG 分配栅格画布".into()))?;
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::identity(),
+            &mut pixmap.as_mut(),
+        );
+        // tiny-skia 内部是 premultiplied RGBA；编码管线需要 straight alpha。
+        ImageData::new(width, height, pixmap.take_demultiplied())
+    }
+
+    fn encode(&self, _img: &ImageData, _opts: &EncodeOptions) -> Result<Vec<u8>> {
+        Err(Error::Unsupported(
+            "SVG 目前仅支持导入；请选择 JPEG、PNG、WebP 或 AVIF 输出".into(),
+        ))
+    }
+}
+
+struct GifCodec;
+
+impl Codec for GifCodec {
+    fn decode(&self, bytes: &[u8]) -> Result<ImageData> {
+        ensure_static_gif(bytes)?;
+        decode_via_image(bytes, image::ImageFormat::Gif)
+    }
+
+    fn encode(&self, _img: &ImageData, _opts: &EncodeOptions) -> Result<Vec<u8>> {
+        Err(Error::Unsupported(
+            "GIF 目前仅支持导入静态图片；请选择 JPEG、PNG、WebP 或 AVIF 输出".into(),
+        ))
+    }
+}
+
+struct BmpCodec;
+
+impl Codec for BmpCodec {
+    fn decode(&self, bytes: &[u8]) -> Result<ImageData> {
+        decode_via_image(bytes, image::ImageFormat::Bmp)
+    }
+
+    fn encode(&self, _img: &ImageData, _opts: &EncodeOptions) -> Result<Vec<u8>> {
+        Err(Error::Unsupported(
+            "BMP 目前仅支持导入；请选择 JPEG、PNG、WebP 或 AVIF 输出".into(),
+        ))
+    }
+}
+
 // ---------- AVIF(libavif-sys:rav1e 有损编码 + aom 无损编码 + dav1d 解码)----------
 
 use libavif_sys as avif;
@@ -3876,6 +4201,14 @@ impl Codec for AvifCodec {
             if avif::avifDecoderParse(decoder.0) != avif::AVIF_RESULT_OK {
                 return Err(Error::Decode("avifDecoderParse 失败".into()));
             }
+            // `Parse` 已暴露 image dimensions；必须在 `NextImage` 触发 YUV
+            // 解码/分配之前拒绝异常 canvas，不能等 RGB 转换阶段才检查。
+            let parsed_image = (*decoder.0).image;
+            if parsed_image.is_null() {
+                return Err(Error::Decode("decoder.image 为 null".into()));
+            }
+            let (width, height) = ((*parsed_image).width, (*parsed_image).height);
+            rgba_byte_len(width, height)?;
             if avif::avifDecoderNextImage(decoder.0) != avif::AVIF_RESULT_OK {
                 return Err(Error::Decode("avifDecoderNextImage 失败".into()));
             }
@@ -3883,8 +4216,10 @@ impl Codec for AvifCodec {
             if image.is_null() {
                 return Err(Error::Decode("decoder.image 为 null".into()));
             }
-            let (width, height) = ((*image).width, (*image).height);
-            rgba_byte_len(width, height)?; // 尺寸/上限守卫,防超大分配
+            let (decoded_width, decoded_height) = ((*image).width, (*image).height);
+            if (decoded_width, decoded_height) != (width, height) {
+                return Err(Error::Decode("AVIF 帧尺寸在解码前后不一致".into()));
+            }
 
             let mut rgb: avif::avifRGBImage = std::mem::zeroed();
             avif::avifRGBImageSetDefaults(&mut rgb, image);
@@ -4076,6 +4411,31 @@ mod tests {
             }
         }
         ImageData::new(width, height, rgba).unwrap()
+    }
+
+    fn static_gif() -> Vec<u8> {
+        // 1×1 GIF89a，带全局色表和一个合法 LZW 图像块。
+        b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;".to_vec()
+    }
+
+    fn animated_gif() -> Vec<u8> {
+        let mut gif = static_gif();
+        assert_eq!(gif.pop(), Some(b';'));
+        // 加入第二个 image descriptor。探测器必须在真正像素解码前拒绝它。
+        gif.extend_from_slice(b",\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02L\x01\x00;");
+        gif
+    }
+
+    fn one_pixel_bmp() -> Vec<u8> {
+        let mut bmp = Vec::new();
+        image::codecs::bmp::BmpEncoder::new(&mut bmp)
+            .encode(&[255, 0, 0, 255], 1, 1, image::ExtendedColorType::Rgba8)
+            .unwrap();
+        bmp
+    }
+
+    fn simple_svg() -> &'static [u8] {
+        br##"<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2"><rect width="3" height="2" fill="#f00" fill-opacity="0.5"/></svg>"##
     }
 
     fn quadrant_image(width: u32, height: u32) -> ImageData {
@@ -5290,6 +5650,89 @@ mod tests {
         assert_eq!(Format::from_magic(&webp), Some(Format::WebP));
         assert_eq!(Format::from_magic(b"not an image"), None);
         assert_eq!(Format::from_magic(b"RIFFxxxxWEBPxxxx"), None); // 错误 FourCC 不误判
+    }
+
+    #[test]
+    fn svg_gif_bmp_are_readable_but_not_writable() {
+        assert!(READABLE_FORMATS.contains(&Format::Svg));
+        assert!(READABLE_FORMATS.contains(&Format::Gif));
+        assert!(READABLE_FORMATS.contains(&Format::Bmp));
+        assert!(!WRITABLE_FORMATS.contains(&Format::Svg));
+        assert!(!WRITABLE_FORMATS.contains(&Format::Gif));
+        assert!(!WRITABLE_FORMATS.contains(&Format::Bmp));
+
+        assert_eq!(Format::from_magic(simple_svg()), Some(Format::Svg));
+        assert_eq!(Format::from_magic(&static_gif()), Some(Format::Gif));
+        assert_eq!(Format::from_magic(&one_pixel_bmp()), Some(Format::Bmp));
+        assert_eq!(Format::from_ext("SVG"), Some(Format::Svg));
+        assert_eq!(Format::from_ext("gif"), Some(Format::Gif));
+        assert_eq!(Format::from_ext("BMP"), Some(Format::Bmp));
+    }
+
+    #[test]
+    fn svg_gif_bmp_probe_and_convert_to_png() {
+        for (input, expected_format, expected_dimensions) in [
+            (simple_svg().to_vec(), Format::Svg, (3, 2)),
+            (static_gif(), Format::Gif, (1, 1)),
+            (one_pixel_bmp(), Format::Bmp, (1, 1)),
+        ] {
+            let info = probe(&input).unwrap();
+            assert_eq!(info.format, expected_format);
+            assert_eq!((info.width, info.height), expected_dimensions);
+
+            let png = convert(&input, Format::Png, &EncodeOptions::default()).unwrap();
+            assert_eq!(Format::from_magic(&png), Some(Format::Png));
+            let decoded = PngCodec.decode(&png).unwrap();
+            assert_eq!((decoded.width, decoded.height), expected_dimensions);
+        }
+    }
+
+    #[test]
+    fn svg_uses_a_bounded_pure_vector_input_policy() {
+        let too_large = vec![b' '; MAX_SVG_SOURCE_BYTES + 1];
+        assert!(matches!(
+            SvgCodec.decode(&too_large),
+            Err(Error::Unsupported(message)) if message.contains("源文件超过")
+        ));
+
+        // data URI 是 SVG 默认允许的 raster/image 子资源。我们必须明确拒绝它，
+        // 而非让 resolver 返回 None 后把图像悄悄渲染成透明内容。
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><image width="1" height="1" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InJlZCIvPjwvc3ZnPg=="/></svg>"#;
+        assert!(matches!(
+            SvgCodec.decode(svg),
+            Err(Error::Unsupported(message)) if message.contains("<image> 引用")
+        ));
+
+        let external = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><image width="1" height="1" href="/private/example.png"/></svg>"#;
+        assert!(matches!(
+            SvgCodec.decode(external),
+            Err(Error::Unsupported(message)) if message.contains("<image> 引用")
+        ));
+
+        // `feImage` uses the same resolver internally. Keep this assertion so
+        // a future refactor cannot secure only ordinary `<image>` nodes while
+        // leaving filter-backed image references able to load a data payload.
+        let filter_image = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><defs><filter id="f"><feImage href="data:image/png;base64,AA=="/></filter></defs><rect width="1" height="1" filter="url(#f)"/></svg>"#;
+        assert!(matches!(
+            SvgCodec.decode(filter_image),
+            Err(Error::Unsupported(message)) if message.contains("<image> 引用")
+        ));
+    }
+
+    #[test]
+    fn animated_gif_is_rejected_before_decode() {
+        let err = probe(&animated_gif()).unwrap_err();
+        assert!(matches!(err, Error::Unsupported(message) if message.contains("动画 GIF")));
+    }
+
+    #[test]
+    fn gif_probe_rejects_huge_logical_screen_before_scanning_blocks() {
+        // A 65,535 × 65,535 logical screen exceeds the shared 64 MP limit.
+        // The deliberately minimal body proves the header preflight happens
+        // before the GIF walker reaches image data or a trailer.
+        let gif = b"GIF89a\xff\xff\xff\xff\x00\x00\x00";
+        let err = probe(gif).unwrap_err();
+        assert!(matches!(err, Error::Unsupported(message) if message.contains("超过上限")));
     }
 
     #[test]

@@ -4,9 +4,10 @@
 //! macOS security-scoped resource lifecycle.
 //!
 //! This is intentionally a best-effort RAII hook. Direct Linux/Windows builds
-//! use a no-op implementation. MAS builds still need real bookmark data from
-//! the file dialog layer for persistent access, but all file work can already
-//! route through the same start/stop boundary.
+//! use a no-op implementation. The current MAS design relies on a fresh
+//! user-selected `NSOpenPanel` grant each process lifetime; it does not create
+//! or restore macOS bookmark data. Any future cross-launch bookmark feature
+//! must resolve real bookmark data to an NSURL before using this boundary.
 
 use std::path::Path;
 

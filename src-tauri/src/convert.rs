@@ -51,6 +51,10 @@ const OUTPUT_NOT_SMALLER_PREFIX: &str = "候选输出不小于源文件";
 const GENERATION_LOSS_GUARD_PREFIX: &str = "代际损失防护:";
 const MAX_OUTPUT_SUFFIX_CHARS: usize = 48;
 const MAX_OUTPUT_SUFFIX_BYTES: usize = 128;
+// Core decoders receive byte slices, so do not use `fs::read` on an arbitrary
+// user file before any resource guard can run. This matches the thumbnail
+// source ceiling and stays below the per-image RGBA working-set budget.
+const MAX_CORE_SOURCE_FILE_BYTES: u64 = 256 * 1024 * 1024;
 // Most commonly used filesystems allow a 255-byte filename component. Leave a
 // safety margin for platform and encoding differences while preserving both
 // the original stem and a user-entered suffix when a name is unusually long.
@@ -1573,7 +1577,10 @@ fn encode_option_candidates(base: EncodeOptions, target: Format) -> Vec<EncodeOp
                 push_unique_candidate(&mut candidates, alternate);
             }
         }
-        Format::Avif => {}
+        // SVG/GIF/BMP are read-only source formats. `parse_format` never hands
+        // them to this encoder-candidate helper, but keep the match exhaustive
+        // so a future caller cannot accidentally select format-specific knobs.
+        Format::Avif | Format::Svg | Format::Gif | Format::Bmp => {}
     }
 
     candidates
@@ -1619,12 +1626,39 @@ fn read_source_for_core(input: &Path) -> Result<SourceForCore, String> {
             metadata_override: decoded.metadata,
         });
     }
-    let bytes =
-        fs::read(input).map_err(|e| format!("无法读取输入文件 {}: {e}", input.display()))?;
+    let bytes = read_core_source_file(input)?;
     Ok(SourceForCore {
         bytes,
         metadata_override: None,
     })
+}
+
+fn read_core_source_file(input: &Path) -> Result<Vec<u8>, String> {
+    let metadata = fs::metadata(input)
+        .map_err(|error| format!("无法读取输入文件 {}: {error}", input.display()))?;
+    if metadata.len() > MAX_CORE_SOURCE_FILE_BYTES {
+        return Err(format!(
+            "输入文件超过 {} MiB 上限: {}",
+            MAX_CORE_SOURCE_FILE_BYTES / (1024 * 1024),
+            input.display()
+        ));
+    }
+
+    let file = File::open(input)
+        .map_err(|error| format!("无法读取输入文件 {}: {error}", input.display()))?;
+    let mut reader = file.take(MAX_CORE_SOURCE_FILE_BYTES.saturating_add(1));
+    let mut bytes = Vec::new();
+    reader
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("无法读取输入文件 {}: {error}", input.display()))?;
+    if bytes.len() as u64 > MAX_CORE_SOURCE_FILE_BYTES {
+        return Err(format!(
+            "输入文件超过 {} MiB 上限: {}",
+            MAX_CORE_SOURCE_FILE_BYTES / (1024 * 1024),
+            input.display()
+        ));
+    }
+    Ok(bytes)
 }
 
 pub fn path_conversion_smoke_options(
@@ -2164,8 +2198,33 @@ fn apply_memory_budget<'a>(
 }
 
 fn estimated_job_memory_bytes(options: &ConvertOptions) -> u64 {
-    estimate_from_dimensions(options.source_width, options.source_height)
-        .unwrap_or(UNKNOWN_JOB_MEMORY_BYTES)
+    // `read_source_for_core` retains the complete source byte buffer while
+    // core decodes and encodes it. Pixel dimensions alone therefore
+    // underestimate batches of small-canvas files with unusually large
+    // compressed payloads or metadata. Use the current file length when it is
+    // available, and reserve the read ceiling if it is not, so an unreadable
+    // or changing input cannot make the scheduler overcommit memory.
+    let source_bytes = source_bytes_for_memory_budget(Path::new(&options.input));
+    let image_working_set = estimate_from_dimensions(options.source_width, options.source_height)
+        .unwrap_or(UNKNOWN_JOB_MEMORY_BYTES);
+    image_working_set.saturating_add(source_bytes)
+}
+
+fn source_bytes_for_memory_budget(input: &Path) -> u64 {
+    if external_codecs::is_heic_path(input) {
+        // ImageIO/WIC first materializes a decoded frame and a PNG bridge in
+        // addition to the core working set. Until a platform-neutral header
+        // probe exists here, run HEIC jobs one at a time rather than allowing
+        // several system decoders to allocate concurrently.
+        return BATCH_MEMORY_BUDGET_BYTES;
+    }
+
+    let _scope = access::scoped_path_access(input);
+    fs::metadata(input)
+        .ok()
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len().min(MAX_CORE_SOURCE_FILE_BYTES))
+        .unwrap_or(MAX_CORE_SOURCE_FILE_BYTES)
 }
 
 fn estimate_from_dimensions(width: Option<u32>, height: Option<u32>) -> Option<u64> {
@@ -2591,6 +2650,20 @@ mod tests {
         assert_eq!(done, "done");
     }
 
+    #[test]
+    fn core_source_reader_rejects_oversized_file_before_reading_it() {
+        let dir = unique_test_dir("oversized-source");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("oversized.png");
+        let file = File::create(&input).unwrap();
+        file.set_len(MAX_CORE_SOURCE_FILE_BYTES + 1).unwrap();
+
+        let error = read_core_source_file(&input).unwrap_err();
+
+        assert!(error.contains("输入文件超过"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     fn unique_test_dir(name: &str) -> PathBuf {
         let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         std::env::temp_dir().join(format!(
@@ -2902,6 +2975,29 @@ mod tests {
         assert!(Path::new(&result.output).exists());
         assert!(result.out_size > 0);
 
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn convert_accepts_svg_input_and_writes_a_supported_output_format() {
+        let dir = unique_test_dir("svg-input");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.svg");
+        fs::write(
+            &input,
+            br##"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="3"><rect width="4" height="3" fill="#4c91d9"/></svg>"##,
+        )
+        .unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(out_dir.to_string_lossy().to_string());
+        options.format = "webp".to_string();
+
+        let result = convert(&options).unwrap();
+        let encoded = fs::read(&result.output).unwrap();
+
+        assert_eq!(Format::from_magic(&encoded), Some(Format::WebP));
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -4431,9 +4527,13 @@ mod tests {
 
     #[test]
     fn memory_budget_reduces_parallelism_for_large_sources() {
+        let dir = unique_test_dir("memory-budget-large");
+        fs::create_dir_all(&dir).unwrap();
         let jobs = (0..4)
             .map(|index| {
-                let mut options = test_convert_options(format!("sample-{index}.png"));
+                let input = dir.join(format!("sample-{index}.png"));
+                File::create(&input).unwrap();
+                let mut options = test_convert_options(input.to_string_lossy().into_owned());
                 options.source_width = Some(6000);
                 options.source_height = Some(4000);
                 IndexedConvertOptions { index, options }
@@ -4441,13 +4541,18 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(apply_memory_budget(4, jobs.iter()), 2);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn memory_budget_forces_single_worker_for_oversized_sources() {
+        let dir = unique_test_dir("memory-budget-oversized");
+        fs::create_dir_all(&dir).unwrap();
         let jobs = (0..2)
             .map(|index| {
-                let mut options = test_convert_options(format!("huge-{index}.png"));
+                let input = dir.join(format!("huge-{index}.png"));
+                File::create(&input).unwrap();
+                let mut options = test_convert_options(input.to_string_lossy().into_owned());
                 options.source_width = Some(12_000);
                 options.source_height = Some(8000);
                 IndexedConvertOptions { index, options }
@@ -4455,6 +4560,45 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(apply_memory_budget(2, jobs.iter()), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn memory_budget_accounts_for_retained_source_bytes() {
+        let dir = unique_test_dir("memory-budget-source-bytes");
+        fs::create_dir_all(&dir).unwrap();
+        let jobs = (0..3)
+            .map(|index| {
+                let input = dir.join(format!("large-payload-{index}.png"));
+                File::create(&input)
+                    .unwrap()
+                    .set_len(MAX_CORE_SOURCE_FILE_BYTES)
+                    .unwrap();
+                let mut options = test_convert_options(input.to_string_lossy().into_owned());
+                options.source_width = Some(1);
+                options.source_height = Some(1);
+                IndexedConvertOptions { index, options }
+            })
+            .collect::<Vec<_>>();
+
+        // Three 256 MiB retained inputs exceed the 768 MiB batch budget;
+        // two still fit alongside their small decoded working sets.
+        assert_eq!(apply_memory_budget(3, jobs.iter()), 2);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn memory_budget_serializes_heic_system_decode_jobs() {
+        let jobs = (0..3)
+            .map(|index| {
+                let mut options = test_convert_options(format!("sample-{index}.heic"));
+                options.source_width = Some(1);
+                options.source_height = Some(1);
+                IndexedConvertOptions { index, options }
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(apply_memory_budget(3, jobs.iter()), 1);
     }
 
     #[test]

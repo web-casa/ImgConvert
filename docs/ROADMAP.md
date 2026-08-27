@@ -9,7 +9,7 @@
 > - **引擎**:放弃 libvips CLI,改为**进程内宽松许可 Rust 编解码 crate**——JPEG `mozjpeg`、PNG `oxipng`、WebP `webp`(libwebp)、**AVIF `libavif-sys`(rav1e 有损 + aom 无损,采 DropWebP 路线)**、解码/容器 `image`。C 编解码器构建期静态链接。**主程序不内置 HEIC**;macOS/Windows 可走系统原生,另预留独立进程 HEIC 插件/helper(单独 LGPL 分发,decode-only)。
 > - **平台优先级(已改)**:**Linux 优先**。第一期只在 **GitHub Releases** 发布 `.deb/.rpm/AppImage` 与 updater 资产;Flathub、macOS、Windows 商店均后移。**但架构必须为商店留门**:主程序核心无子进程、纯宽松许可、文件访问抽象成「用户显式授权目录」(兼容 macOS security-scoped bookmark / Flatpak portal)。可选 HEIC helper 属主包外直发增强,商店构建默认禁用。
 > - **许可证**:**Apache-2.0**(已从 AGPL 切换完毕);`deny.toml` 禁止 GPL/AGPL/LGPL;`imagequant`(GPL)→ `color_quant`,`dssim`(AGPL)→ `ssimulacra2`。
-> - **格式(v1)**:JPEG/PNG/WebP/AVIF(全平台 crate);HEIC 主包不内置,可选插件作为后续增强;TIFF/JXL 推后。
+> - **格式(v1)**:JPEG/PNG/WebP/AVIF 为全平台可读可写格式；SVG、静态 GIF、BMP 为全平台只读导入；HEIC 主包不内置,可选插件作为后续增强;TIFF/JXL 推后。
 > - **三方评审已纳入的修正**:见文末「评审修正清单」。
 
 ## 阶段总览
@@ -120,7 +120,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] 剪贴板粘贴导入
 - [x] 递归目录扫描 + 扩展名过滤 + 去重 + 扫描上限/取消(改写自 DropWebP)
 - [x] **Rust 端并发批量最小闭环**(全局任务队列 + worker 上限)——已替换 skip/overwrite 路径的串行批量。
-  - 外层全局并发上限(默认 `(available_parallelism-1).clamp(1,8)`)+ 用户可调并发已落地;大图场景按导入尺寸提示做内存预算降并发。
+  - 外层全局并发上限(默认 `(available_parallelism-1).clamp(1,8)`)+ 用户可调并发已落地;大图场景按导入尺寸提示和实际输入文件字节数做内存预算降并发；HEIC 系统解码任务串行化，避免多个平台桥接缓冲同时分配。
   - 进程内无子进程,不存在 vips「多进程×多线程」过度并发问题,但 `libavif`(rav1e)/`oxipng` 本身吃内存且内部多线程(设 maxThreads=1),仍需控流。
 - [x] **进度/取消统一走 Tauri Channel**(有序、低延迟、按调用作用域;`{index, percent, stage, status}`)。取消 = `CancellationToken`(见 ENGINE.md §7)。ask 覆盖策略已通过 `plan_conversions` 前置确认,实际转换统一走 batch Channel。
 - [x] 批处理三态(成功/跳过/错误)+ 单张失败不中断 + 末尾汇总
@@ -141,9 +141,9 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] **插件协议(v1 manifest 最小闭环)**:已定义并实现 manifest(`id/protocol/license/readable/writable/mode/decode`)、能力发现、版本兼容、错误码前缀;主程序把插件能力合并到 `capabilities().codecProviders` 并标记为 optional/provider。
 - [x] **插件诊断 UI**:新增 `codec_diagnostics()` 与顶栏诊断弹层,显示 active provider、手动 helper、manifest 搜索目录/拒绝原因、系统 helper 探测结果;弹层每次打开刷新,顶栏能力文案在窄屏截断。
 - [x] **独立进程 helper 调用**:当前已禁止 `dlopen` 到主进程,通过 argv + 受控临时 PNG 文件调用外部 helper,不走 shell;已做 helper 超时、HEIF/HEIC magic 校验、Unix 私有临时目录、stderr/输出文件大小上限。
-- [x] **用户显式 helper 白名单**:诊断 UI 可选择/清除本机 helper;后端保存 canonical 可执行文件路径并在每次使用前校验,失效路径显示为不可用但不会执行。发现优先级为手动 helper → manifest provider → 系统 PATH helper。
+- [x] **用户显式 helper 白名单**:诊断 UI 可选择/清除本机 helper;后端保存 canonical 可执行文件路径并在每次使用前校验，且手动选择不能绕过父目录/祖先信任规则（Linux）或批准安装根规则（Windows）；失效或不受信任路径显示为不可用但不会执行。发现优先级为手动 helper → manifest provider → 系统 PATH helper。
 - [x] **Linux helper(系统 PATH 探测最小闭环)**:当前优先调用系统 `heif-convert`/`heif-dec`;Debian/Ubuntu 提示安装 `libheif-examples`,Fedora 提示可能需要 RPM Fusion `libheif-freeworld`;`heif-gdk-pixbuf`/`heif-thumbnailer` 继续只作为文件管理器能力,不当作 core 能力。
-- [x] **Windows 外部 helper**:免费插件路线可自带 `imgconvert-heic-helper.exe + libheif/libde265` decode-only 动态库;主程序支持用户手动选择 helper、manifest provider 与受信任 PATH 探测。不要直接打包现成 MSYS2 `libheif` 发行包,因依赖组合可能带 `x265`/GPL;必须自建并审计。Windows WIC + HEIF/HEVC 扩展探测已在 P3 平台发布阶段落地为 `system-wic` read-only provider。
+- [x] **Windows 外部 helper**:免费插件路线可自带 `imgconvert-heic-helper.exe + libheif/libde265` decode-only 动态库;主程序支持用户选择位于批准安装根中的 helper、manifest provider 与受信任 PATH 探测。不要直接打包现成 MSYS2 `libheif` 发行包,因依赖组合可能带 `x265`/GPL;必须自建并审计。Windows WIC + HEIF/HEVC 扩展探测已在 P3 平台发布阶段落地为 `system-wic` read-only provider。
 - [x] **许可与专利文案**:插件单独 LGPL 分发并提供源码/NOTICE;第一版只声明 HEIC/HEIF 输入,不提供 HEIC 输出;UI 文案写「HEIC 可选导入」,不写“开箱支持 HEIC”。
 - [x] **渠道边界**:外部 helper 默认只面向直发包/用户自行安装场景;App Store/MS Store/Flathub 构建可通过 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` 禁用外部 codec/helper 自动发现,除非后续证明渠道允许这种扩展模型。
 
@@ -182,7 +182,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] **平台质量 benchmark harness**:新增 `pnpm run bench:platform`,隐藏入口输出 AVIF/WebP JSON lines,支持平台、宽高、轮数、quality、AVIF speeds、WebP methods 参数化;`bench:avif:macos` 继续兼容 Apple Silicon AVIF 专项。
 - [x] **图像质量测试体系第一批**:新增 `pnpm run test:image-quality` 和 core integration test suite,覆盖 golden lossless 像素一致性、高质量有损 PSNR/MAE 下限、corrupted input 干净失败、输出确定性与 JPEG 网格 artifact hint。
 - [x] **平台质量 benchmark 数据闭环第一批**:`bench:platform` 默认改为 release profile 并生成 `target/benchmarks/*.json` 汇总报告/默认参数建议;本机 Linux arm64 release 数据复核后继续保留 AVIF speed=8 与 WebP method=4;2026-08-19 的 macOS `macos-15` arm64 runner 数据也确认 AVIF speed=8，并上传同格式 JSON artifact 供 14 天复核。core/Tauri 已接 per-file 180s wall-clock 软超时(`IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 可覆盖),多候选/自动质量在候选边界停止。Windows 真实 runner 数据留到对应发布验收时用同一报告格式补齐，公共仓库只使用免费标准 runner。
-- [x] **Fuzz + 真实图片 corpus 第一批**:新增 `fuzz/` cargo-fuzz crate,覆盖 decode/probe/thumbnail、bounded convert、metadata semantics 三个 target;新增 `pnpm run fuzz:prepare` 生成 deterministic seeds 并从本地 `corpus/real` / `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF 到 ignored corpus,写 `target/fuzz-corpus/real-corpus-manifest.json`;`pnpm run fuzz:check` 编译 fuzz targets。真实图片不入仓库,避免版权/隐私污染。
+- [x] **Fuzz + 真实图片 corpus 第一批**:新增 `fuzz/` cargo-fuzz crate,覆盖 decode/probe/thumbnail、bounded convert、metadata semantics 三个 target;新增 `pnpm run fuzz:prepare` 生成 deterministic seeds 并从本地 `corpus/real` / `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF/SVG/GIF/BMP 到 ignored corpus,写 `target/fuzz-corpus/real-corpus-manifest.json`;`pnpm run fuzz:check` 编译 fuzz targets。真实图片不入仓库,避免版权/隐私污染。
 - [x] **Fuzz corpus replay 回归入口**:新增 `pnpm run fuzz:replay`,不依赖 `cargo-fuzz` 即可把 prepared corpus 和 `fuzz/artifacts/<target>/` crash inputs 走 core decode/convert/metadata 路径并生成 `target/fuzz-corpus/replay-report.json`;`pnpm run fuzz:smoke` 已升级为 prepare + compile + replay,适合低成本本机/CI 守门。
 - [x] **Fuzz crash artifact 最小化入口**:新增 `pnpm run fuzz:minimize` dry-run 报告和显式 `pnpm run fuzz:minimize:run`。后者调用 `cargo fuzz tmin <target> <artifact>` 后复跑 artifacts;报告不泄漏外部绝对路径。长期 fuzz 运行与真实 crash 样本积累仍需开发者显式执行。
 
@@ -207,7 +207,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 
 **后续阶段(留门,不阻塞 v1):**
 - [x] **macOS/Windows 发布护栏第一批**:新增 `release:platform:check` / `release:macos:check` / `release:windows:check` / `release:store-env:check`,静态校验发布元数据、平台图标、Apache-2.0 许可证和 store build 的 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1` 外部 helper 禁用机制。
-- [x] **macOS 打包/沙盒护栏第一批**:新增 `tauri.macos.conf.json`、`tauri.macos.mas.conf.json`、direct/MAS entitlements plist 与 `packaging/macos/README.md`;`release:macos:check` 会验证直发 hardened runtime、MAS App Sandbox、用户选择文件读写与 app-scoped bookmark entitlement,并拒绝 broad temporary entitlement。
+- [x] **macOS 打包/沙盒护栏第一批**:新增 `tauri.macos.conf.json`、`tauri.macos.mas.conf.json`、direct/MAS entitlements plist 与 `packaging/macos/README.md`;`release:macos:check` 会验证直发 hardened runtime、MAS App Sandbox、WKWebView 本地 IPC 所需的 network client、用户选择文件读写和 `PrivacyInfo.xcprivacy`，并拒绝 broad temporary entitlement 与未实现的 app-scoped bookmark entitlement。
 - [x] **Windows 打包/Store 护栏第一批**:新增 `tauri.windows.conf.json` 与 `packaging/windows/README.md`;`release:windows:direct:check` 校验 direct installer 不允许降级、WebView2 silent embedded bootstrapper、最低 WebView2 版本、稳定 WiX `upgradeCode` 和 NSIS current-user 默认安装;Store preflight 继续强制 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1`,真实 MSIX/`runFullTrust`/Partner Center 留到 Windows 实测阶段。
 - [x] **macOS 发布闭环(repo 侧)**:直分发 `.dmg` 构建/校验脚本、显式 `notarytool` 公证/`stapler`/Gatekeeper verifier、MAS generated entitlements/provisioning config、signed `.app`、Installer-signed `.pkg`、App Store Connect 包验证/可选上传入口、GitHub-hosted HEIC smoke 与 artifact upload 已落地。Developer ID 公证和 MAS 真实签名已经通过 GitHub runner；MAS GUI 授权验收、商店资料与 App Review 仍由账户负责人完成。
 - [x] **Windows 阶段第一批**:新增 Windows Smoke workflow,GitHub-hosted `windows-latest` 默认跑前端 typecheck、Windows release guardrail、Tauri backend fmt/clippy/test 与隐藏真实转换 smoke;手动触发可构建 unsigned `.msi`/NSIS `.exe` 并上传 artifact。

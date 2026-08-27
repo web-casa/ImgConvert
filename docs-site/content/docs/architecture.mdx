@@ -21,7 +21,7 @@ description: ImgConvert 的前端、Tauri 后端和 Rust 图像核心边界。
 
 ## 质量边界
 
-`imgconvert-core` 已覆盖 JPEG、PNG、WebP、AVIF。AVIF 真无损已对外启用，但仍保留质量测试和 guardrail，避免错误能力宣称。
+`imgconvert-core` 可读 JPEG、PNG、WebP、AVIF、SVG、静态 GIF、BMP；可写格式仍为 JPEG、PNG、WebP、AVIF。SVG 会在受限画布中本地栅格化，不加载外部或 data-URI 图像资源；动画 GIF 明确拒绝，不会偷偷输出第一帧。AVIF 真无损已对外启用，但仍保留质量测试和 guardrail，避免错误能力宣称。
 
 发布相关状态由以下命令汇总：
 

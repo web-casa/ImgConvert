@@ -20,7 +20,6 @@ import {
   outputSuffixForRequest,
   qualityFloorFor,
   queue,
-  scopedDialogFileAccessMode,
   setImportCommandError,
   setImportMessage,
   settings,
@@ -31,7 +30,7 @@ import { initI18n, setAppLocale } from "../src/lib/i18n";
 describe("state helpers", () => {
   beforeEach(() => {
     clearQueue();
-    capabilities.readable = ["jpeg", "png", "webp", "avif"];
+    capabilities.readable = ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp"];
     capabilities.writable = ["jpeg", "png", "webp", "avif"];
     capabilities.lossless = ["png", "webp"];
     capabilities.heic = false;
@@ -48,6 +47,9 @@ describe("state helpers", () => {
 
   it("maps extensions and labels through the capability model", () => {
     expect(formatFromExt("JPG")).toBe("jpeg");
+    expect(formatFromExt("SVG")).toBe("svg");
+    expect(formatFromExt("gif")).toBe("gif");
+    expect(formatFromExt("BMP")).toBe("bmp");
     expect(formatFromExt("unknown")).toBeNull();
     expect(formatLabel("webp")).toBe("WebP");
   });
@@ -111,11 +113,6 @@ describe("state helpers", () => {
   it("sends a suffix only while the suffix switch is enabled", () => {
     expect(outputSuffixForRequest(true, "-min")).toBe("-min");
     expect(outputSuffixForRequest(false, "-min")).toBeNull();
-  });
-
-  it("keeps macOS file picker access security-scoped", () => {
-    expect(scopedDialogFileAccessMode(true)).toBe("scoped");
-    expect(scopedDialogFileAccessMode(false)).toBeUndefined();
   });
 
   it("adds readable paths and reports duplicates/skips", () => {

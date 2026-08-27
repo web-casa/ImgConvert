@@ -10,7 +10,9 @@
 
 use std::path::Path;
 
-use crate::external_codecs::{CodecProviderDiagnostic, CodecProviderInfo, DiagnosticMessage};
+use crate::external_codecs::{
+    validate_system_heic_dimensions, CodecProviderDiagnostic, CodecProviderInfo, DiagnosticMessage,
+};
 
 const HEIC_EXTENSIONS: &[&str] = &["heic", "heif", "hif"];
 const WIC_PROVIDER_ID: &str = "windows-wic-heic";
@@ -293,6 +295,7 @@ mod platform {
             frame
                 .GetSize(&mut width, &mut height)
                 .map_err(|error| format!("Windows WIC 无法读取 HEIC 尺寸: {error}"))?;
+            validate_system_heic_dimensions(width, height)?;
 
             let converter = factory
                 .CreateFormatConverter()
@@ -436,12 +439,35 @@ mod platform {
                 output.display()
             ));
         }
-        fs::read(output).map_err(|error| {
+        // Keep the post-encode read bounded as well. The metadata check is a
+        // fast path, but the output can still change between that check and
+        // opening the file.
+        let file = File::open(output).map_err(|error| {
             format!(
                 "无法读取 Windows WIC PNG 输出 {}: {error}",
                 output.display()
             )
-        })
+        })?;
+        let mut reader = file.take(MAX_HEIC_DECODED_PNG_BYTES as u64 + 1);
+        let mut bytes = Vec::with_capacity(
+            metadata
+                .len()
+                .min(MAX_HEIC_DECODED_PNG_BYTES as u64) as usize,
+        );
+        reader.read_to_end(&mut bytes).map_err(|error| {
+            format!(
+                "无法读取 Windows WIC PNG 输出 {}: {error}",
+                output.display()
+            )
+        })?;
+        if bytes.len() > MAX_HEIC_DECODED_PNG_BYTES {
+            return Err(format!(
+                "Windows WIC PNG 输出超过上限 {} bytes: {}",
+                MAX_HEIC_DECODED_PNG_BYTES,
+                output.display()
+            ));
+        }
+        Ok(bytes)
     }
 
     fn create_temp_png() -> Result<TempPng, String> {
@@ -533,4 +559,5 @@ mod tests {
         assert!(error.contains("多帧 HEIC/HEIF 暂不支持"));
         assert!(error.contains("3 帧"));
     }
+
 }

@@ -77,8 +77,9 @@ cargo fuzz run metadata_semantics
 
 - Do not commit real photos or third-party fixtures.
 - Keep private/copyrighted images only under ignored local corpus directories.
-- The import script copies only JPEG/PNG/WebP/AVIF files recognized by magic
-  bytes.
+- The import script copies JPEG/PNG/WebP/AVIF/SVG/GIF/BMP files recognized by
+  magic bytes. Animated GIF samples are expected to be cleanly rejected rather
+  than converted as a first frame.
 - Default import limits are 32 MiB per file and 256 files. Override with
   `IMGCONVERT_REAL_CORPUS_MAX_BYTES` and `IMGCONVERT_REAL_CORPUS_MAX_FILES`.
 - A local manifest is written to

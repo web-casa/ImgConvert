@@ -38,6 +38,7 @@ const tauriConfig = readJson(tauriConfigPath);
 const srcTauriRoot = path.join(repoRoot, "src-tauri");
 const macosMasMinimumSystemVersion = "12.0";
 const macosPrivacyInfoPlist = "Info.macos.privacy.plist";
+const macosPrivacyManifest = "PrivacyInfo.xcprivacy";
 const macosMediaLibraryUsageDescription =
   "ImgConvert scans the contents of folders you explicitly select, including a selected folder in your media library, to find image files for the local conversion queue. For example, it can convert album-art images in that folder locally; it does not read Apple Music playback or listening activity.";
 const failures = [];
@@ -115,8 +116,17 @@ function checkCommonBundleMetadata() {
   const developmentCsp = tauriConfig.app?.security?.devCsp;
   if (typeof productionCsp !== "string" || !productionCsp.includes("connect-src 'self' ipc:")) {
     failures.push("tauri.conf.json must define a restrictive production connect-src CSP");
-  } else if (/\b(?:https?|wss?):\/\/localhost(?::\d+)?/iu.test(productionCsp)) {
-    failures.push("production CSP must not allow localhost network connections");
+  } else {
+    const connectSources = cspSources(productionCsp, "connect-src");
+    const allowedConnectSources = new Set(["'self'", "ipc:", "http://ipc.localhost"]);
+    if (
+      connectSources.length !== allowedConnectSources.size ||
+      connectSources.some((source) => !allowedConnectSources.has(source))
+    ) {
+      failures.push(
+        "production CSP connect-src must allow only self, ipc:, and Tauri's local http://ipc.localhost bridge",
+      );
+    }
   }
   if (
     typeof developmentCsp !== "string" ||
@@ -1136,6 +1146,8 @@ function checkLinux() {
 
 function checkMacos() {
   requireBundleIcon(".icns", "macOS");
+  checkMacosPrivacyManifest();
+  checkMacosReviewSubmissionGuide();
   checkMacosRuntimeGuardrails();
   const directSelected = options.channels.includes("direct");
   const storeSelected = options.channels.includes("store");
@@ -1150,6 +1162,55 @@ function checkMacos() {
   }
   if (storeSelected) {
     checkMacosStoreConfig();
+  }
+}
+
+function checkMacosReviewSubmissionGuide() {
+  const guide = readText(path.join(repoRoot, "docs", "MAS_APP_REVIEW_SUBMISSION.md"));
+  if (!guide) {
+    failures.push("docs/MAS_APP_REVIEW_SUBMISSION.md is required for MAS resubmission");
+    return;
+  }
+  for (const expected of [
+    "Review Notes",
+    "com.apple.security.network.client",
+    "tccutil reset MediaLibrary com.ivmm.imgconvert",
+    "Don't Allow",
+    "CFBundleVersion",
+    "age-rating questionnaire",
+    "PrivacyInfo.xcprivacy",
+  ]) {
+    if (!guide.includes(expected)) {
+      failures.push(`MAS resubmission guide must document ${expected}`);
+    }
+  }
+}
+
+function checkMacosPrivacyManifest() {
+  const manifestPath = path.join(srcTauriRoot, macosPrivacyManifest);
+  const manifest = readText(manifestPath);
+  const resources = tauriConfig.bundle?.resources;
+  if (!Array.isArray(resources) || !resources.includes(macosPrivacyManifest)) {
+    failures.push(
+      `tauri.conf.json bundle.resources must package ${macosPrivacyManifest} into the macOS app resources`,
+    );
+  }
+  if (!manifest) {
+    failures.push(`${macosPrivacyManifest} is required for privacy declarations`);
+    return;
+  }
+  for (const expected of [
+    "NSPrivacyTracking",
+    "<false/>",
+    "NSPrivacyCollectedDataTypes",
+    "<array/>",
+    "NSPrivacyAccessedAPICategoryFileTimestamp",
+    "NSPrivacyAccessedAPITypeReasons",
+    "3B52.1",
+  ]) {
+    if (!manifest.includes(expected)) {
+      failures.push(`${macosPrivacyManifest} must declare ${expected}`);
+    }
   }
 }
 
@@ -1228,6 +1289,7 @@ function checkMacosRuntimeGuardrails() {
     "ImageIO.framework",
     "osakit.framework",
     "NSAppleMusicUsageDescription",
+    "PrivacyInfo.xcprivacy",
   ]) {
     if (!bundleArtifactScript.includes(expected)) {
       failures.push(`macOS bundle verification must inspect every Mach-O binary: ${expected}`);
@@ -1439,8 +1501,10 @@ function checkMacosRuntimeGuardrails() {
   if (!stateTs.includes("needsOutputDirectoryGrant")) {
     failures.push("macOS conversions must require a fresh output-directory grant per app session");
   }
-  if (!stateTs.includes("fileAccessMode: scopedDialogFileAccessMode(")) {
-    failures.push("macOS file selection must keep the dialog security-scoped");
+  if (stateTs.includes("fileAccessMode:")) {
+    failures.push(
+      "macOS desktop dialog must not use Tauri's iOS-only fileAccessMode option for sandbox authorization",
+    );
   }
   if (!stateTs.includes("recursive: true")) {
     failures.push("macOS output-directory picker must grant recursive folder access");
@@ -1859,12 +1923,11 @@ function checkMacosStoreConfig() {
     true,
     "macOS MAS",
   );
-  requireEntitlement(
-    entitlements,
-    "com.apple.security.files.bookmarks.app-scope",
-    true,
-    "macOS MAS",
-  );
+  if (entitlements.has("com.apple.security.files.bookmarks.app-scope")) {
+    failures.push(
+      "macOS MAS entitlements must not include app-scoped bookmarks without bookmark creation and restoration code",
+    );
+  }
   if (!prepare.includes("entitlements.macos.mas.plist")) {
     failures.push(
       "prepare-macos-mas-release.mjs must use entitlements.macos.mas.plist as its MAS entitlement template",
@@ -2127,6 +2190,12 @@ function parseBooleanPlist(text) {
     values.set(match[1], match[2] === "true");
   }
   return values;
+}
+
+function cspSources(csp, directive) {
+  const escapedDirective = directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = csp.match(new RegExp(`(?:^|;)\\s*${escapedDirective}\\s+([^;]+)`, "u"));
+  return match?.[1].trim().split(/\s+/).filter(Boolean) ?? [];
 }
 
 function requireEntitlement(values, key, expected, label) {

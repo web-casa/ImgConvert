@@ -29,7 +29,11 @@ const HEIC_HELPERS: &[&str] = &["heif-convert", "heif-dec", "imgconvert-heic-hel
 const HEIC_EXTENSIONS: &[&str] = &["heic", "heif", "hif"];
 const HEIC_DECODE_TIMEOUT: Duration = Duration::from_secs(120);
 const HEIC_HELPER_STDERR_DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
-pub(crate) const MAX_HEIC_DECODED_PNG_BYTES: usize = 512 * 1024 * 1024;
+// The system/helper bridge hands this PNG back to the core as an in-memory
+// source. Keep it at the same ceiling as other core sources; otherwise HEIC
+// could bypass the generic bounded-read policy with a larger buffer.
+pub(crate) const MAX_HEIC_DECODED_PNG_BYTES: usize = 256 * 1024 * 1024;
+const MAX_HEIC_SOURCE_FILE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_HEIC_HELPER_STDERR_BYTES: usize = 64 * 1024;
 const MAX_HEIC_METADATA_SIDECAR_BYTES: usize = 64 * 1024;
 const MAX_HEIC_METADATA_BLOB_BYTES: usize = 16 * 1024 * 1024;
@@ -48,6 +52,19 @@ const PLUGIN_DECODE_KIND_HEIC_TO_PNG: &str = "heic-to-png-file";
 const ARG_INPUT: &str = "{input}";
 const ARG_OUTPUT: &str = "{output}";
 const ARG_METADATA: &str = "{metadata}";
+
+/// Apply the core image pixel budget before a platform decoder materializes a
+/// HEIC frame. Keeping this here gives ImageIO and WIC the exact same policy
+/// and lets the boundary be tested on every supported host platform.
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
+pub(crate) fn validate_system_heic_dimensions(width: u32, height: u32) -> Result<(), String> {
+    imgconvert_core::validate_image_dimensions(width, height).map_err(|error| {
+        format!(
+            "HEIC 尺寸超过 ImgConvert 的 {} MP 解码上限（{width}×{height}）: {error}",
+            imgconvert_core::MAX_PIXELS / 1_000_000
+        )
+    })
+}
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 static SELECTED_HEIC_HELPER: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -344,6 +361,7 @@ pub fn is_heic_magic(bytes: &[u8]) -> bool {
 }
 
 pub fn decode_heic(input: &Path) -> Result<DecodedExternalImage, String> {
+    validate_heic_source_file(input)?;
     if system_heic_available() {
         return system_decode_heic_to_png(input).map(|image_bytes| DecodedExternalImage {
             image_bytes,
@@ -354,6 +372,22 @@ pub fn decode_heic(input: &Path) -> Result<DecodedExternalImage, String> {
         "未检测到 HEIC 解码能力。macOS 使用系统 ImageIO; Linux 可安装 libheif-examples; Fedora 的 HEVC HEIC 可能还需要 RPM Fusion libheif-freeworld。".to_string()
     })?;
     decode_heic_to_png_with_helper(input, &helper)
+}
+
+fn validate_heic_source_file(input: &Path) -> Result<(), String> {
+    let metadata = fs::metadata(input)
+        .map_err(|error| format!("无法读取 HEIC 输入 {}: {error}", input.display()))?;
+    if !metadata.is_file() {
+        return Err(format!("HEIC 输入不是普通文件: {}", input.display()));
+    }
+    if metadata.len() > MAX_HEIC_SOURCE_FILE_BYTES {
+        return Err(format!(
+            "HEIC 输入文件超过 {} MiB 上限: {}",
+            MAX_HEIC_SOURCE_FILE_BYTES / (1024 * 1024),
+            input.display()
+        ));
+    }
+    Ok(())
 }
 
 pub fn decode_heic_to_png(input: &Path) -> Result<Vec<u8>, String> {
@@ -693,11 +727,13 @@ fn find_selected_heic_helper() -> Option<Helper> {
 }
 
 fn selected_helper_from_path(path: &Path) -> Result<Helper, String> {
-    let (path, metadata) = canonical_regular_file(path).map_err(|error| {
-        format!(
-            "HEIC_SELECTED_HELPER_NOT_FOUND: {}: {error}",
-            path.display()
-        )
+    let (path, metadata) = canonical_trusted_file(path).map_err(|error| {
+        let code = if error.kind() == std::io::ErrorKind::PermissionDenied {
+            "HEIC_SELECTED_HELPER_UNTRUSTED"
+        } else {
+            "HEIC_SELECTED_HELPER_NOT_FOUND"
+        };
+        format!("{code}: {}: {error}", path.display())
     })?;
     if !is_supported_helper_binary(&path) {
         return Err(format!(
@@ -711,13 +747,6 @@ fn selected_helper_from_path(path: &Path) -> Result<Helper, String> {
             path.display()
         ));
     }
-    if has_unsafe_write_bit(&metadata) {
-        return Err(format!(
-            "HEIC_SELECTED_HELPER_UNTRUSTED: {}",
-            path.display()
-        ));
-    }
-
     Ok(Helper::selected(path))
 }
 
@@ -2030,6 +2059,29 @@ mod tests {
     }
 
     #[test]
+    fn system_heic_dimensions_use_the_core_pixel_budget() {
+        assert!(validate_system_heic_dimensions(8_000, 8_000).is_ok());
+        let error = validate_system_heic_dimensions(8_001, 8_000).unwrap_err();
+        assert!(error.contains("解码上限"));
+    }
+
+    #[test]
+    fn heic_source_file_limit_rejects_oversized_input_before_decode() {
+        let dir = unique_test_dir("oversized-heic-source");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("huge.heic");
+        File::create(&input)
+            .unwrap()
+            .set_len(MAX_HEIC_SOURCE_FILE_BYTES + 1)
+            .unwrap();
+
+        let error = decode_heic(&input).unwrap_err();
+
+        assert!(error.contains("HEIC 输入文件超过"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn detects_heic_magic_brands() {
         let mut bytes = vec![0, 0, 0, 24];
         bytes.extend_from_slice(b"ftyp");
@@ -2083,15 +2135,20 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn helper_search_rejects_world_writable_ancestors() {
-        let dir = unique_test_dir("world-writable-parent").join("bin");
+        // Do not infer `/tmp` permissions from the host. Containers commonly
+        // mount it as 0755, while the trust rule must be exercised against an
+        // explicitly unsafe ancestor in every test environment.
+        let root = unique_test_dir("world-writable-parent");
+        let dir = root.join("bin");
         fs::create_dir_all(&dir).unwrap();
+        set_mode(&root, 0o777);
         let helper = dir.join("heif-convert");
         fs::write(&helper, b"#!/bin/sh\nexit 0\n").unwrap();
         make_executable(&helper);
 
         assert!(find_heic_helper_in_path(dir.as_os_str()).is_none());
 
-        fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(target_os = "linux")]
@@ -2159,6 +2216,23 @@ mod tests {
         assert!(err.contains("HEIC_SELECTED_HELPER_UNTRUSTED"));
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn selected_helper_rejects_world_writable_parent() {
+        let root = unique_test_dir("selected-world-writable-parent");
+        let dir = root.join("bin");
+        fs::create_dir_all(&dir).unwrap();
+        set_mode(&root, 0o777);
+        let helper = dir.join("heif-selected");
+        fs::write(&helper, b"#!/bin/sh\nexit 0\n").unwrap();
+        make_executable(&helper);
+
+        let err = selected_helper_from_path(&helper).unwrap_err();
+
+        assert!(err.contains("HEIC_SELECTED_HELPER_UNTRUSTED"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(target_os = "linux")]
