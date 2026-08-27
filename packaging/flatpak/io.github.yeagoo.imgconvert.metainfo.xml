@@ -24,11 +24,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.18/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.19/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.19" date="2026-08-27">
+      <description>
+        <p>Publishes the verified Mac App Store candidate with the SVG, static GIF, BMP, privacy, and resource-safety improvements.</p>
+      </description>
+    </release>
     <release version="0.2.18" date="2026-08-27">
       <description>
         <p>Adds SVG, static GIF, and BMP import, and hardens image resource limits and Mac App Store privacy safeguards.</p>

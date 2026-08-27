@@ -1093,7 +1093,10 @@ mod tests {
             "image/bmp",
             "image/x-ms-bmp; charset=binary",
         ] {
-            assert!(validate_clipboard_mime_type(mime_type).is_ok(), "{mime_type}");
+            assert!(
+                validate_clipboard_mime_type(mime_type).is_ok(),
+                "{mime_type}"
+            );
         }
     }
 

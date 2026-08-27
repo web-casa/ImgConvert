@@ -269,16 +269,8 @@ mod imageio {
             CGImageSourceCopyPropertiesAtIndex(source, 0, std::ptr::null()),
             "HEIC 图像属性",
         )?;
-        let width = image_property_u32(
-            properties.as_cf(),
-            kCGImagePropertyPixelWidth,
-            "宽度",
-        )?;
-        let height = image_property_u32(
-            properties.as_cf(),
-            kCGImagePropertyPixelHeight,
-            "高度",
-        )?;
+        let width = image_property_u32(properties.as_cf(), kCGImagePropertyPixelWidth, "宽度")?;
+        let height = image_property_u32(properties.as_cf(), kCGImagePropertyPixelHeight, "高度")?;
         super::validate_system_heic_dimensions(width, height)
     }
 

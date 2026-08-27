@@ -449,11 +449,8 @@ mod platform {
             )
         })?;
         let mut reader = file.take(MAX_HEIC_DECODED_PNG_BYTES as u64 + 1);
-        let mut bytes = Vec::with_capacity(
-            metadata
-                .len()
-                .min(MAX_HEIC_DECODED_PNG_BYTES as u64) as usize,
-        );
+        let mut bytes =
+            Vec::with_capacity(metadata.len().min(MAX_HEIC_DECODED_PNG_BYTES as u64) as usize);
         reader.read_to_end(&mut bytes).map_err(|error| {
             format!(
                 "无法读取 Windows WIC PNG 输出 {}: {error}",
@@ -559,5 +556,4 @@ mod tests {
         assert!(error.contains("多帧 HEIC/HEIF 暂不支持"));
         assert!(error.contains("3 帧"));
     }
-
 }
