@@ -2303,7 +2303,12 @@ fn candidate_policy_error(
     opts: &ConvertOptions,
     check: CandidatePolicyCheck<'_>,
 ) -> Option<String> {
-    if should_skip_larger_candidate(opts, check.source_size, check.candidate_size) {
+    // SVG is a vector source, whereas every supported target is raster. Comparing the
+    // compact SVG markup with raster bytes makes "skip if larger" reject legitimate
+    // conversions almost every time, so size-based compression policy is not applicable.
+    if check.source_format != Some(Format::Svg)
+        && should_skip_larger_candidate(opts, check.source_size, check.candidate_size)
+    {
         return Some(skip_larger_message(check.source_size, check.candidate_size));
     }
     if should_skip_generation_loss(
@@ -3002,6 +3007,28 @@ mod tests {
     }
 
     #[test]
+    fn convert_writes_svg_raster_output_when_skip_if_larger_is_enabled() {
+        let dir = unique_test_dir("svg-skip-larger");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.svg");
+        let source = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>"#;
+        fs::write(&input, source).unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(out_dir.to_string_lossy().to_string());
+        options.skip_if_larger = true;
+        options.multi_candidate = false;
+
+        let result = convert(&options).unwrap();
+        let encoded = fs::read(&result.output).unwrap();
+
+        assert_eq!(Format::from_magic(&encoded), Some(Format::Jpeg));
+        assert!(encoded.len() > source.len());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn convert_writes_avif_lossless_when_requested() {
         let dir = unique_test_dir("avif-lossless-output");
         let out_dir = dir.join("out");
@@ -3524,6 +3551,28 @@ mod tests {
         .unwrap();
 
         assert!(message.contains("不小于源文件"));
+    }
+
+    #[test]
+    fn candidate_policy_does_not_compare_svg_source_bytes_with_raster_output() {
+        let mut options = test_convert_options("/tmp/input.svg".to_string());
+        options.skip_if_larger = true;
+        let encode = encode_options_for(&options, Format::Jpeg);
+
+        let message = candidate_policy_error(
+            &options,
+            CandidatePolicyCheck {
+                source: br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>"#,
+                source_format: Some(Format::Svg),
+                target: Format::Jpeg,
+                encode_options: &encode,
+                dimensions: Some((1, 1)),
+                source_size: 96,
+                candidate_size: 512,
+            },
+        );
+
+        assert!(message.is_none());
     }
 
     #[test]

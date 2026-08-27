@@ -90,7 +90,7 @@ export const enUS = {
     skipLarger: {
       label: "Skip larger outputs",
       description:
-        "Do not write when the candidate is not smaller than the source, avoiding larger files.",
+        "Do not write a larger raster conversion. This setting doesn't skip SVG rasterization because vector and raster file sizes aren't comparable.",
     },
     multiCandidate: {
       label: "Try smallest candidate",

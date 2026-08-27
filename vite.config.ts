@@ -14,6 +14,23 @@ export default defineConfig(async () => ({
     "import.meta.env.VITE_IMGCONVERT_DISABLE_UPDATER": JSON.stringify(disableUpdater ? "1" : ""),
   },
 
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              // Keep this sizeable, stable dependency independently cacheable.
+              // Low-frequency dialogs are loaded dynamically from App.svelte.
+              name: "icons",
+              test: /node_modules[\\/]phosphor-svelte[\\/]/,
+            },
+          ],
+        },
+      },
+    },
+  },
+
   resolve: {
     alias: {
       $lib: resolve("./src/lib"),

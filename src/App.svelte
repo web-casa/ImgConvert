@@ -15,14 +15,10 @@
   } from "phosphor-svelte";
   import { Button } from "$lib/components/ui/button";
   import Dropzone from "$lib/components/Dropzone.svelte";
-  import LegalDialog from "$lib/components/LegalDialog.svelte";
-  import PrivacySupportDialog from "$lib/components/PrivacySupportDialog.svelte";
-  import PluginDiagnosticsDialog from "$lib/components/PluginDiagnosticsDialog.svelte";
   import QueueItem from "$lib/components/QueueItem.svelte";
   import OutputDestinationControl from "$lib/components/OutputDestinationControl.svelte";
   import SettingsBar from "$lib/components/SettingsBar.svelte";
   import Topbar from "$lib/components/Topbar.svelte";
-  import UpdateDialog from "$lib/components/UpdateDialog.svelte";
   import {
     addDemoItems,
     cancelConversion,
@@ -260,10 +256,29 @@
       </footer>
     </main>
 
-    <PluginDiagnosticsDialog bind:open={pluginDiagnosticsOpen} />
-    <UpdateDialog bind:open={updateOpen} />
-    <PrivacySupportDialog bind:open={privacySupportOpen} />
-    <LegalDialog bind:open={legalOpen} />
+    {#if pluginDiagnosticsOpen}
+      {#await import("$lib/components/PluginDiagnosticsDialog.svelte") then { default: PluginDiagnosticsDialog }}
+        <PluginDiagnosticsDialog bind:open={pluginDiagnosticsOpen} />
+      {/await}
+    {/if}
+
+    {#if updateOpen}
+      {#await import("$lib/components/UpdateDialog.svelte") then { default: UpdateDialog }}
+        <UpdateDialog bind:open={updateOpen} />
+      {/await}
+    {/if}
+
+    {#if privacySupportOpen}
+      {#await import("$lib/components/PrivacySupportDialog.svelte") then { default: PrivacySupportDialog }}
+        <PrivacySupportDialog bind:open={privacySupportOpen} />
+      {/await}
+    {/if}
+
+    {#if legalOpen}
+      {#await import("$lib/components/LegalDialog.svelte") then { default: LegalDialog }}
+        <LegalDialog bind:open={legalOpen} />
+      {/await}
+    {/if}
   {:else}
     <div class="grid h-dvh place-items-center bg-background text-sm text-muted-foreground">
       {$t("app.loading")}

@@ -85,7 +85,8 @@ export const zhCN = {
     },
     skipLarger: {
       label: "跳过变大输出",
-      description: "候选输出不小于源文件时不写入，避免转换后文件反而变大。",
+      description:
+        "位图候选输出不小于位图源文件时不写入；SVG 栅格化不受此设置影响，因为矢量与位图文件大小不可直接比较。",
     },
     multiCandidate: {
       label: "多候选取最小",

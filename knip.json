@@ -7,7 +7,8 @@
     "playwright.config.ts",
     "scripts/*.mjs",
     "tests/**/*.test.ts",
-    "e2e/**/*.spec.ts"
+    "e2e/**/*.spec.ts",
+    "src/lib/components/{LegalDialog,PluginDiagnosticsDialog,PrivacySupportDialog,UpdateDialog}.svelte"
   ],
   "project": [
     "src/**/*.{ts,svelte}",

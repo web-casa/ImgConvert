@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
+use std::io::Read;
 use std::path::Path;
-use std::process::{Command, ExitStatus};
+use std::process::{Command, Output, Stdio};
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
@@ -20,6 +24,11 @@ pub struct NativePickOptions {
     pub extensions: Vec<String>,
     pub filter_name: Option<String>,
     pub all_files_name: Option<String>,
+}
+
+struct DialogOutputReader {
+    receiver: mpsc::Receiver<std::io::Result<Vec<u8>>>,
+    handle: thread::JoinHandle<()>,
 }
 
 const HOST_DIALOG_ENV_REMOVE: &[&str] = &[
@@ -46,6 +55,12 @@ const HOST_DIALOG_ENV_REMOVE: &[&str] = &[
     "QT_PLUGIN_PATH",
     "XDG_DATA_DIRS",
 ];
+
+// A host dialog is allowed to remain open while the user browses files, but it
+// must not hold the blocking command indefinitely if the helper becomes stuck.
+const HOST_DIALOG_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+const DIALOG_COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(50);
+const DIALOG_OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub fn pick_paths(options: &NativePickOptions) -> Result<Vec<String>, String> {
     if !access::runtime_file_access().use_host_linux_picker {
@@ -116,11 +131,24 @@ fn run_zenity(command: &str, options: &NativePickOptions) -> Result<Vec<String>,
 }
 
 fn run_kdialog(command: &str, options: &NativePickOptions) -> Result<Vec<String>, String> {
+    run_dialog_command(kdialog_command(command, options), "kdialog")
+}
+
+fn kdialog_command(command: &str, options: &NativePickOptions) -> Command {
     let mut cmd = host_dialog_command(command);
     if let Some(title) = options.title.as_deref().filter(|title| !title.is_empty()) {
         cmd.arg("--title").arg(title);
     }
-    if options.directory {
+    if options.directory && options.multiple {
+        // KDialog only supports --multiple with its file-open dialog. Its
+        // documented inode/directory MIME filter makes that dialog select
+        // directories, so this preserves the caller's multi-directory request.
+        cmd.arg("--getopenfilename")
+            .arg(".")
+            .arg("inode/directory")
+            .arg("--multiple")
+            .arg("--separate-output");
+    } else if options.directory {
         cmd.arg("--getexistingdirectory").arg(".");
     } else {
         cmd.arg("--getopenfilename").arg(".");
@@ -133,22 +161,30 @@ fn run_kdialog(command: &str, options: &NativePickOptions) -> Result<Vec<String>
             cmd.arg("--multiple").arg("--separate-output");
         }
     }
-    run_dialog_command(cmd, "kdialog")
+    cmd
 }
 
-fn run_dialog_command(mut cmd: Command, label: &str) -> Result<Vec<String>, String> {
-    let output = cmd
-        .output()
-        .map_err(|error| format!("{label} 启动失败:{error}"))?;
-    if is_cancelled(output.status) {
+fn run_dialog_command(cmd: Command, label: &str) -> Result<Vec<String>, String> {
+    run_dialog_command_with_timeout(cmd, label, HOST_DIALOG_TIMEOUT)
+}
+
+fn run_dialog_command_with_timeout(
+    mut cmd: Command,
+    label: &str,
+    timeout: Duration,
+) -> Result<Vec<String>, String> {
+    let output = dialog_command_output(&mut cmd, label, timeout)?;
+    if is_cancelled(output.status.code(), &output.stdout, &output.stderr) {
         return Ok(Vec::new());
     }
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if stderr.is_empty() {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if stderr.is_empty() { stdout } else { stderr };
+        return Err(if detail.is_empty() {
             format!("{label} 退出码 {}", output.status)
         } else {
-            format!("{label}: {stderr}")
+            format!("{label}: {detail}")
         });
     }
 
@@ -161,8 +197,100 @@ fn run_dialog_command(mut cmd: Command, label: &str) -> Result<Vec<String>, Stri
         .collect())
 }
 
-fn is_cancelled(status: ExitStatus) -> bool {
-    matches!(status.code(), Some(1))
+fn dialog_command_output(
+    cmd: &mut Command,
+    label: &str,
+    timeout: Duration,
+) -> Result<Output, String> {
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|error| format!("{label} 启动失败:{error}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("{label} 无法读取标准输出管道"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("{label} 无法读取错误输出管道"))?;
+    let stdout_reader = spawn_dialog_output_reader(stdout);
+    let stderr_reader = spawn_dialog_output_reader(stderr);
+    let started = Instant::now();
+
+    let status = loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("{label} 等待响应失败:{error}"))?
+        {
+            Some(status) => break status,
+            None if started.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("{label} 响应超时，请关闭后重试。"));
+            }
+            None => {
+                let remaining = timeout.saturating_sub(started.elapsed());
+                thread::sleep(DIALOG_COMMAND_POLL_INTERVAL.min(remaining));
+            }
+        }
+    };
+
+    let stdout = join_dialog_output_reader(stdout_reader, label, "标准输出")?;
+    let stderr = join_dialog_output_reader(stderr_reader, label, "错误输出")?;
+
+    Ok(Output {
+        status,
+        stdout,
+        stderr,
+    })
+}
+
+fn spawn_dialog_output_reader<R>(mut reader: R) -> DialogOutputReader
+where
+    R: Read + Send + 'static,
+{
+    let (sender, receiver) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let mut output = Vec::new();
+        let result = reader.read_to_end(&mut output).map(|_| output);
+        let _ = sender.send(result);
+    });
+    DialogOutputReader { receiver, handle }
+}
+
+fn join_dialog_output_reader(
+    reader: DialogOutputReader,
+    label: &str,
+    stream_name: &str,
+) -> Result<Vec<u8>, String> {
+    match reader.receiver.recv_timeout(DIALOG_OUTPUT_DRAIN_TIMEOUT) {
+        Ok(Ok(output)) => {
+            let _ = reader.handle.join();
+            Ok(output)
+        }
+        Ok(Err(error)) => {
+            let _ = reader.handle.join();
+            Err(format!("{label} 读取{stream_name}失败:{error}"))
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => Err(format!("{label} 读取{stream_name}超时。")),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Err(format!("{label} 读取{stream_name}线程异常退出。"))
+        }
+    }
+}
+
+fn is_cancelled(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> bool {
+    // Zenity and KDialog both reserve exit code 1 for a user cancellation.
+    // If either stream has a diagnostic, preserve it as an actionable failure
+    // instead of silently treating it as a cancellation.
+    exit_code == Some(1) && output_is_blank(stdout) && output_is_blank(stderr)
+}
+
+fn output_is_blank(output: &[u8]) -> bool {
+    output.iter().all(|byte| byte.is_ascii_whitespace())
 }
 
 fn zenity_image_filter(extensions: &[String], filter_name: Option<&str>) -> Option<String> {
@@ -308,5 +436,73 @@ mod tests {
         assert!(!should_remove_dynamic_host_dialog_env_key(
             "GSETTINGS_SCHEMA_DIR"
         ));
+    }
+
+    #[test]
+    fn kdialog_uses_the_directory_filter_for_multiple_directory_selection() {
+        let options = NativePickOptions {
+            directory: true,
+            multiple: true,
+            title: Some("Choose folders".into()),
+            extensions: Vec::new(),
+            filter_name: None,
+            all_files_name: None,
+        };
+        let command = kdialog_command("/usr/bin/kdialog", &options);
+        let arguments: Vec<_> = command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().to_string())
+            .collect();
+
+        assert_eq!(
+            arguments,
+            vec![
+                "--title",
+                "Choose folders",
+                "--getopenfilename",
+                ".",
+                "inode/directory",
+                "--multiple",
+                "--separate-output",
+            ]
+        );
+    }
+
+    #[test]
+    fn cancellation_requires_the_expected_exit_code_without_diagnostics() {
+        assert!(is_cancelled(Some(1), b"", b""));
+        assert!(is_cancelled(Some(1), b" \n", b"\t"));
+        assert!(!is_cancelled(Some(0), b"", b""));
+        assert!(!is_cancelled(Some(1), b"selected-path", b""));
+        assert!(!is_cancelled(Some(1), b"", b"dialog backend failed"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dialog_command_times_out_and_returns_an_error() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "while :; do :; done"]);
+
+        let error =
+            run_dialog_command_with_timeout(command, "test dialog", Duration::from_millis(10))
+                .expect_err("a non-terminating dialog command must time out");
+
+        assert!(error.contains("响应超时"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dialog_command_drains_output_while_waiting_for_exit() {
+        let mut command = Command::new("/bin/sh");
+        command.args([
+            "-c",
+            "i=0; while [ \"$i\" -lt 10000 ]; do printf 0123456789; i=$((i + 1)); done",
+        ]);
+
+        let paths = run_dialog_command_with_timeout(command, "test dialog", Duration::from_secs(1))
+            .expect("a large dialog result must not block on a full output pipe");
+
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0].len(), 100_000);
     }
 }
