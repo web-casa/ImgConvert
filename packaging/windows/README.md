@@ -5,9 +5,9 @@
 This directory documents the first Windows release surface.
 
 - Direct distribution uses Tauri's automatic `src-tauri/tauri.windows.conf.json` merge on Windows.
-- The direct installer guardrails are intentionally explicit: no downgrade installs, SHA-256 signing digest, a silent embedded WebView2 bootstrapper, a minimum WebView2 runtime version, a pinned WiX `upgradeCode`, and a current-user NSIS default install.
+- The direct installer guardrails are intentionally explicit: no downgrade installs, a silent embedded WebView2 bootstrapper, a minimum WebView2 runtime version, a pinned WiX `upgradeCode`, and a current-user NSIS default install.
 - WiX builds separate `en-US` and `zh-CN` MSI packages. NSIS builds one installer containing English and Simplified Chinese and follows the Windows display language because its language selector is disabled.
-- The repository does not store signing certificates, certificate thumbprints, Partner Center credentials, or timestamping secrets. Configure those only in the Windows release runner or signing environment.
+- GitHub Release MSI/NSIS installers are intentionally unsigned. They must pass install smoke, be covered by the merged `SHA256SUMS`, and carry a visible SmartScreen warning. Trusted Windows signing is provided only by Microsoft Store for accepted MSIX submissions; the repository does not store Partner Center credentials.
 
 Local preflight from any host:
 
@@ -37,22 +37,11 @@ checks, and a hidden real conversion smoke. Manual runs can enable
 to install each generated installer and run the hidden package smoke from the
 installed `ImgConvert.exe`.
 
-Signed direct distribution:
+Do not enable `sign_direct` for GitHub Release builds. The legacy signing helper
+remains available for private diagnostics, but it is not part of the project's
+release channel or publication criteria.
 
-```powershell
-$env:WINDOWS_CERTIFICATE_BASE64 = "<base64 pfx>"
-$env:WINDOWS_CERTIFICATE_PASSWORD = "<pfx password>"
-$env:WINDOWS_TIMESTAMP_URL = "http://timestamp.digicert.com"
-pnpm run release:windows
-pnpm run release:windows:sign
-pnpm run release:windows:install-smoke
-```
-
-`release:windows:sign` also accepts `WINDOWS_CERTIFICATE_PATH` or
-`WINDOWS_CERTIFICATE_SHA1`. The script signs with SHA-256 and RFC3161 timestamp
-metadata, then verifies Authenticode with `signtool verify /pa /all`.
-
-Microsoft Store is a separate candidate path. Tauri does not make MSIX a
+Microsoft Store is the only trusted signed Windows channel. Tauri does not make MSIX a
 first-class bundle target for this repo, so the store route uses an explicit
 MSIX manifest template with `runFullTrust`. The Partner Center package identity
 is committed as the default in `scripts/prepare-windows-msix-release.mjs`

@@ -15,13 +15,16 @@ verified:
 
 - Linux amd64 and arm64: `.deb`, `.rpm`, and AppImage.
 - macOS x64 and arm64: Developer ID signed, Apple-notarized, stapled DMG.
-- Windows x64 and arm64: Authenticode-signed and timestamped MSI/NSIS EXE that
-  passed install and conversion smoke.
+- Windows x64 and arm64: intentionally unsigned MSI/NSIS EXE that passed install
+  and conversion smoke, is covered by the merged `SHA256SUMS`, and is accompanied
+  by a visible Microsoft Defender SmartScreen warning.
 
 Mac App Store PKG and Microsoft Store MSIX artifacts are separate delivery
-channels and do not substitute for the GitHub direct packages. Missing signing
-credentials, notarization, platform runners, finalizers, or required smoke
-evidence block publication: keep the Release as a draft and report the blocker.
+channels and do not substitute for the GitHub direct packages. GitHub Windows
+installers are not Authenticode-signed; trusted Windows signing is provided only
+by Microsoft Store for accepted MSIX submissions. Missing required macOS/updater
+signing credentials, notarization, platform runners, finalizers, or smoke evidence
+blocks publication: keep the Release as a draft and report the blocker.
 A partial public Release is allowed only after the user explicitly approves a
 platform exception for that specific release.
 

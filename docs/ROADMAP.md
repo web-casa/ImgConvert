@@ -194,9 +194,11 @@ Release。已确认的 `v0.2.0` 交付目标是：
 >
 > **后续发布策略（自本策略记录之时起，包括当前 v0.2.22 草稿）**：历史上的 Linux-first
 > 范围不再作为公开 GitHub Release 的完成标准。每个 GitHub Release 必须保持 draft，
-> 直到 Linux、macOS、Windows 的 x64/arm64 正式直发包均完成签名/公证、运行验证、
-> 来源校验并附加到同一 Release；任何平台缺失都必须阻止公开发布，除非用户针对该版本
-> 明确批准例外。商店 PKG/MSIX 仍是独立渠道，不能替代 GitHub 直发包。
+> 直到 Linux、macOS、Windows 的 x64/arm64 正式直发包均完成各渠道所需验证、运行验证、
+> 来源校验并附加到同一 Release；macOS DMG 必须签名和公证，Windows GitHub MSI/NSIS
+> 则明确保持未签名并提示 SmartScreen，受信任的 Windows 签名分发只依靠 Microsoft Store。
+> 任何平台缺失都必须阻止公开发布，除非用户针对该版本明确批准例外。商店 PKG/MSIX
+> 仍是独立渠道，不能替代 GitHub 直发包。
 
 **第一期(GitHub Releases only):**
 - [x] **CI 矩阵第一批**:GitHub Actions Tauri build smoke 改为 Linux **amd64 + arm64** 原生 runner;继续跑 C 工具链预检(NASM + cmake/meson/ninja)并上传 debug `.deb` artifact。
@@ -217,8 +219,8 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] **Windows 打包/Store 护栏第一批**:新增 `tauri.windows.conf.json` 与 `packaging/windows/README.md`;`release:windows:direct:check` 校验 direct installer 不允许降级、WebView2 silent embedded bootstrapper、最低 WebView2 版本、稳定 WiX `upgradeCode` 和 NSIS current-user 默认安装;Store preflight 继续强制 `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1`,真实 MSIX/`runFullTrust`/Partner Center 留到 Windows 实测阶段。
 - [x] **macOS 发布闭环(repo 侧)**:直分发 `.dmg` 构建/校验脚本、显式 `notarytool` 公证/`stapler`/Gatekeeper verifier、MAS generated entitlements/provisioning config、signed `.app`、Installer-signed `.pkg`、App Store Connect 包验证/可选上传入口、GitHub-hosted HEIC smoke 与 artifact upload 已落地。Developer ID 公证和 MAS 真实签名已经通过 GitHub runner；MAS GUI 授权验收、商店资料与 App Review 仍由账户负责人完成。
 - [x] **Windows 阶段第一批**:新增 Windows Smoke workflow,GitHub-hosted `windows-latest` 默认跑前端 typecheck、Windows release guardrail、Tauri backend fmt/clippy/test 与隐藏真实转换 smoke;手动触发可构建 unsigned `.msi`/NSIS `.exe` 并上传 artifact。
-- [x] **Windows repo 侧发布闭环**:直分发 `.msi/.exe` 起步;Windows Smoke 手动 workflow 可构建 direct installers,签名/timestamp 脚本、安装后启动 smoke、WIC HEIC read-only provider 与 MSIX `runFullTrust` manifest prepare 已落地。HEIC **仅解码**,运行时探测 HEIF/HEVC 扩展,缺失则引导安装,**不承诺开箱即用**。
-- [ ] **Windows 实签/Store 实跑**:需要真实 Windows 代码签名证书、timestamp 后 SmartScreen 声誉积累、安装 smoke runner 实跑、Partner Center identity、MSIX packaging/signing、Store assets/隐私/年龄分级元数据与商店提交验收。
+- [x] **Windows repo 侧发布闭环**:直分发 `.msi/.exe` 起步;Windows Smoke 手动 workflow 可构建 intentionally unsigned direct installers 并执行安装后启动 smoke，WIC HEIC read-only provider 与 MSIX `runFullTrust` manifest prepare 已落地。GitHub 资产通过合并 `SHA256SUMS` 校验并明确提示 SmartScreen，不建立 Authenticode 直签渠道。HEIC **仅解码**,运行时探测 HEIF/HEVC 扩展,缺失则引导安装,**不承诺开箱即用**。
+- [ ] **Windows Store 实跑**:Windows 受信任签名分发仅依靠 Microsoft Store 对接受的 MSIX 签名；仍需 Partner Center identity、MSIX packaging、Store assets/隐私/年龄分级元数据与商店提交验收。
 - [x] ⚠️ **架构前提静态护栏(全程保持)**:`pnpm run architecture:check` 已把主程序核心无 HEIC/无 libvips/libheif/x265/imagequant/dssim、Apache-2.0、`image`/关键 codec `default-features=false`、依赖许可 deny、文件访问显式授权抽象、store build 禁外部 helper 和 Flatpak 主包不含 HEIC helper 变成发布前检查。P1.5 HEIC helper 仍是主包外直发/用户安装增强,商店构建默认禁用;该 invariant 后续仍需随新依赖/新格式持续维护。
 
 ---

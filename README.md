@@ -71,15 +71,16 @@
 | Platform            | Package                                                                           | Status                                           |
 | ------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------ |
 | macOS arm64 / x64   | [DMG][latest-release]                                                             | Signed, notarized, and published                 |
-| Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                                                     | Dual-architecture CI validation                  |
+| Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                                                     | Unsigned direct packages; checksum verified      |
 | Linux amd64 / arm64 | [GitHub packages][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`, RPM, and AppImage published; Snap stable |
 | Microsoft Store     | MSIX                                                                              | x64 in Partner Center; arm64 pending             |
 | Mac App Store       | MAS package                                                                       | Pending validation and review                    |
 
 > [!WARNING]
-> Windows EXE/MSI candidates produced by Actions are not currently Authenticode-signed
-> and may trigger Microsoft Defender SmartScreen. Do not treat them as published release
-> installers until a release includes the matching `SHA256SUMS-windows.txt`.
+> GitHub Release Windows EXE/MSI packages are intentionally not Authenticode-signed
+> and may trigger Microsoft Defender SmartScreen. Verify them against the release's
+> merged `SHA256SUMS`. Trusted signed Windows distribution is available only through
+> Microsoft Store after Store acceptance.
 
 ## Interface preview
 
@@ -129,14 +130,14 @@
 - ✅ **GitHub Release v0.2.11**: provides Linux amd64/arm64 direct packages, signed
   Linux x86_64 updater metadata, and notarized macOS arm64/x64 DMGs. Snap Store stable
   independently serves amd64 and arm64.
-- 🚧 **Windows direct packages**: native arm64/x64 workflows are configured; public
-  EXE/MSI publication waits for Authenticode signing.
+- ✅ **Windows direct packages**: native arm64/x64 workflows build intentionally
+  unsigned EXE/MSI packages, run install smoke, and publish checksum evidence.
 - ✅ **Core product**: the P0–P3 UI, Rust engine, batch processing, compression,
   metadata, color, fuzzing, and cross-platform packaging entrypoints are implemented.
 - 🚧 **Real release validation**: the MAS build, sandbox, and signing checks pass;
   App Store Connect setup, upload, and App Review remain. Microsoft Store submission
   is handled by the authorized account owner.
-- 🚧 **External validation**: Flathub review, direct Windows signing, long-running
+- 🚧 **External validation**: Flathub review, Microsoft Store acceptance, long-running
   fuzzing with a real-image corpus, and Windows benchmark data are still in progress.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for the full plan, acceptance evidence, and
