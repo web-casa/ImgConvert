@@ -295,7 +295,7 @@ mod platform {
             frame
                 .GetSize(&mut width, &mut height)
                 .map_err(|error| format!("Windows WIC 无法读取 HEIC 尺寸: {error}"))?;
-            validate_system_heic_dimensions(width, height)?;
+            super::validate_system_heic_dimensions(width, height)?;
 
             let converter = factory
                 .CreateFormatConverter()

@@ -24,11 +24,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.21/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.22/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.22" date="2026-08-28">
+      <description>
+        <p>Fixes Windows HEIC CI coverage for the shared decoded-image dimension guardrail and publishes the conversion-first direct packages.</p>
+      </description>
+    </release>
     <release version="0.2.21" date="2026-08-27">
       <description>
         <p>Makes requested format conversion the default: larger outputs and lossy re-encodes are skipped only when their optional compression policies are enabled.</p>

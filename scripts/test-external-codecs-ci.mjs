@@ -50,6 +50,10 @@ windows = { version = "0.61.3", features = [
 
   const source = readFileSync(externalCodecsPath, "utf8")
     .replace(/^\/\/!/gm, "//")
+    .replace(
+      "use imgconvert_core::{validate_image_dimensions, MAX_PIXELS};",
+      "use crate::imgconvert_core::{validate_image_dimensions, MAX_PIXELS};",
+    )
     .replace("use imgconvert_core::RawMetadata;", "use crate::imgconvert_core::RawMetadata;");
   const windowsSystemCodecs = readFileSync(windowsSystemCodecsPath, "utf8").replace(
     /^\/\/!/gm,
@@ -59,6 +63,8 @@ windows = { version = "0.61.3", features = [
     join(tempRoot, "lib.rs"),
     `#![allow(dead_code)]
 pub mod imgconvert_core {
+    pub const MAX_PIXELS: usize = 64_000_000;
+
     #[derive(Debug, Clone)]
     pub struct RawMetadata {
         pub icc: Option<Vec<u8>>,
@@ -84,6 +90,19 @@ pub mod imgconvert_core {
                 && self.xmp.as_ref().is_none_or(Vec::is_empty)
                 && self.iptc.as_ref().is_none_or(Vec::is_empty)
         }
+    }
+
+    pub fn validate_image_dimensions(width: u32, height: u32) -> Result<(), &'static str> {
+        if width == 0 || height == 0 {
+            return Err("image dimensions must be non-zero");
+        }
+        let pixels = (width as usize)
+            .checked_mul(height as usize)
+            .ok_or("image dimensions overflow")?;
+        if pixels > MAX_PIXELS {
+            return Err("image exceeds the decoded-pixel budget");
+        }
+        Ok(())
     }
 
     fn strip_xmp_orientation_attributes(input: &str) -> String {

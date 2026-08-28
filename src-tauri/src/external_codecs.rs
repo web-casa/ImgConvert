@@ -18,6 +18,8 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use imgconvert_core::RawMetadata;
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
+use imgconvert_core::{validate_image_dimensions, MAX_PIXELS};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "macos")]
@@ -58,10 +60,10 @@ const ARG_METADATA: &str = "{metadata}";
 /// and lets the boundary be tested on every supported host platform.
 #[cfg(any(target_os = "macos", target_os = "windows", test))]
 pub(crate) fn validate_system_heic_dimensions(width: u32, height: u32) -> Result<(), String> {
-    imgconvert_core::validate_image_dimensions(width, height).map_err(|error| {
+    validate_image_dimensions(width, height).map_err(|error| {
         format!(
             "HEIC 尺寸超过 ImgConvert 的 {} MP 解码上限（{width}×{height}）: {error}",
-            imgconvert_core::MAX_PIXELS / 1_000_000
+            MAX_PIXELS / 1_000_000
         )
     })
 }
