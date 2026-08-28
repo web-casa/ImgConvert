@@ -663,16 +663,10 @@ function checkWindowsSmokeWorkflow() {
     "- msi,nsis",
     "- msi",
     "- nsis",
+    "Build unsigned Windows direct installers.",
     "SMOKE_BUNDLES: ${{ inputs.bundles }}",
-    "SMOKE_SIGN_DIRECT: ${{ inputs.sign_direct }}",
     "SMOKE_INSTALL_SMOKE: ${{ inputs.install_smoke }}",
     "$env:SMOKE_BUNDLES -notin $allowedBundles",
-    "WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}",
-    "WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}",
-    "WINDOWS_CERTIFICATE_SHA1: ${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}",
-    "$env:WINDOWS_CERTIFICATE_BASE64",
-    "$env:WINDOWS_CERTIFICATE_PASSWORD",
-    "$env:WINDOWS_CERTIFICATE_SHA1",
   ]) {
     if (!windowsSmoke.includes(marker)) {
       failures.push(`windows-smoke.yml missing safe direct-build marker: ${marker}`);
@@ -680,11 +674,12 @@ function checkWindowsSmokeWorkflow() {
   }
 
   for (const forbidden of [
-    '"${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}"',
-    '"${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}"',
-    '"${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}"',
+    "sign_direct",
+    "SMOKE_SIGN_DIRECT",
+    "WINDOWS_CERTIFICATE_BASE64",
+    "WINDOWS_CERTIFICATE_PASSWORD",
+    "WINDOWS_CERTIFICATE_SHA1",
     '"--bundles=${{ inputs.bundles }}"',
-    '"${{ inputs.sign_direct }}"',
     '"${{ inputs.install_smoke }}"',
   ]) {
     if (windowsSmoke.includes(forbidden)) {

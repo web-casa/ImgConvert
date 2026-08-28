@@ -85,7 +85,7 @@ function buildReport() {
     externalPrerequisites.unshift(
       macosDirectPrerequisite(),
       macosMasPrerequisite(),
-      windowsSigningPrerequisite(),
+      windowsDirectPrerequisite(),
       windowsStorePrerequisite(),
     );
     externalPrerequisites.push(
@@ -101,7 +101,7 @@ function buildReport() {
       flathubHeicPrerequisite(),
       macosDirectPrerequisite(),
       macosMasPrerequisite(),
-      windowsSigningPrerequisite(),
+      windowsDirectPrerequisite(),
       windowsStorePrerequisite(),
       macosBenchmarkPrerequisite(),
       windowsBenchmarkPrerequisite(),
@@ -436,26 +436,17 @@ function macosMasPrerequisite() {
   };
 }
 
-function windowsSigningPrerequisite() {
-  const hasCertificate =
-    envIsSet("WINDOWS_CERTIFICATE_BASE64") ||
-    envIsSet("WINDOWS_CERTIFICATE_PATH") ||
-    envIsSet("WINDOWS_CERTIFICATE_SHA1");
+function windowsDirectPrerequisite() {
   return {
-    id: "windows-codesign",
-    label: "Windows installer code signing",
-    status: process.platform === "win32" && hasCertificate ? "ready" : "external",
-    description: "Requires a Windows host, Authenticode certificate, and timestamp service.",
-    command: "pnpm run release:windows && pnpm run release:windows:sign",
+    id: "windows-direct-installers",
+    label: "Windows unsigned direct installers",
+    status: process.platform === "win32" ? "ready" : "external",
+    description:
+      "Requires a Windows host for intentionally unsigned MSI/NSIS builds and install smoke.",
+    command: "pnpm run release:windows && pnpm run release:windows:install-smoke",
     detail:
       process.platform === "win32"
-        ? envDetail([
-            "WINDOWS_CERTIFICATE_BASE64",
-            "WINDOWS_CERTIFICATE_PATH",
-            "WINDOWS_CERTIFICATE_SHA1",
-            "WINDOWS_CERTIFICATE_PASSWORD",
-            "WINDOWS_TIMESTAMP_URL",
-          ])
+        ? "no Authenticode certificate required; verify merged SHA256SUMS before publication"
         : "requires Windows runner or real Windows machine",
   };
 }
@@ -466,7 +457,7 @@ function windowsStorePrerequisite() {
     label: "Microsoft Store/MSIX submission",
     status: "external",
     description:
-      "Requires Partner Center identity, MSIX signing, runFullTrust validation, assets, and store review.",
+      "Requires Partner Center identity, MSIX packaging, runFullTrust validation, assets, and store review; Microsoft Store signs accepted submissions.",
     command: "IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 pnpm run release:windows:store:check",
     detail: "repo-side preflight is wired; real Partner Center submission is external",
   };

@@ -190,7 +190,8 @@ function checkReleaseReadinessGuardrails() {
     "docs:check",
     "TAURI_UPDATER_PUBKEY",
     "TAURI_SIGNING_PRIVATE_KEY",
-    "WINDOWS_CERTIFICATE_BASE64",
+    "windows-direct-installers",
+    "no Authenticode certificate required",
     "IMGCONVERT_MAS_PROVISION_PROFILE",
     "flathub-main-submission",
     "real-image-corpus-fuzz",
@@ -1608,9 +1609,6 @@ function checkWindowsRuntimeGuardrails() {
   if (!packageScripts["release:windows"]?.includes("check-windows-bundle-artifacts.mjs")) {
     failures.push("package.json must expose release:windows with installer artifact verification");
   }
-  if (!packageScripts["release:windows:sign"]?.includes("sign-windows-installers.mjs")) {
-    failures.push("package.json must expose release:windows:sign for Authenticode signing");
-  }
   if (!packageScripts["release:windows:install-smoke"]?.includes("smoke-windows-installers.mjs")) {
     failures.push("package.json must expose release:windows:install-smoke for install/start smoke");
   }
@@ -1632,7 +1630,6 @@ function checkWindowsRuntimeGuardrails() {
     "scripts/smoke-windows-runtime.mjs",
     "scripts/clean-windows-bundles.mjs",
     "scripts/check-windows-bundle-artifacts.mjs",
-    "scripts/sign-windows-installers.mjs",
     "scripts/smoke-windows-installers.mjs",
     "scripts/prepare-windows-msix-release.mjs",
     "scripts/pack-windows-msix.mjs",
@@ -1648,7 +1645,11 @@ function checkWindowsRuntimeGuardrails() {
   const windowsStoreWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "windows-store-release.yml"),
   );
-  for (const expected of ["sign_direct", "install_smoke", "WINDOWS_CERTIFICATE_BASE64"]) {
+  for (const expected of [
+    "Build unsigned Windows direct installers.",
+    "build_direct",
+    "install_smoke",
+  ]) {
     if (!windowsWorkflow.includes(expected)) {
       failures.push(`Windows Smoke workflow must support ${expected}`);
     }
@@ -1998,6 +1999,18 @@ function checkWindowsDirectConfig() {
   }
   if (windows.nsis?.displayLanguageSelector !== false) {
     failures.push("Windows direct NSIS config must follow the OS language without a selector");
+  }
+
+  const readme = readText(path.join(repoRoot, "packaging", "windows", "README.md"));
+  for (const expected of [
+    "intentionally unsigned",
+    "merged `SHA256SUMS`",
+    "SmartScreen warning",
+    "Microsoft Store is the only trusted signed Windows channel",
+  ]) {
+    if (!readme.includes(expected)) {
+      failures.push(`packaging/windows/README.md must document ${expected}`);
+    }
   }
 }
 

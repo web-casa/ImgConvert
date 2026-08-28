@@ -37,9 +37,9 @@ checks, and a hidden real conversion smoke. Manual runs can enable
 to install each generated installer and run the hidden package smoke from the
 installed `ImgConvert.exe`.
 
-Do not enable `sign_direct` for GitHub Release builds. The legacy signing helper
-remains available for private diagnostics, but it is not part of the project's
-release channel or publication criteria.
+The `Windows Smoke` workflow does not expose a direct-signing input. The legacy
+signing helper remains available for private diagnostics, but it is not part of
+the project's release channel or publication criteria.
 
 Microsoft Store is the only trusted signed Windows channel. Tauri does not make MSIX a
 first-class bundle target for this repo, so the store route uses an explicit

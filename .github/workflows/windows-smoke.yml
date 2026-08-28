@@ -8,11 +8,6 @@ on:
         required: true
         default: false
         type: boolean
-      sign_direct:
-        description: Sign direct installers with Windows certificate secrets.
-        required: true
-        default: false
-        type: boolean
       install_smoke:
         description: Install built direct installers and run hidden package smoke.
         required: true
@@ -285,21 +280,6 @@ jobs:
       - name: Tauri backend Windows tests
         run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
 
-      - name: Check Windows signing secrets
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_direct }}
-        env:
-          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          WINDOWS_CERTIFICATE_SHA1: ${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}
-        shell: pwsh
-        run: |
-          if (-not $env:WINDOWS_CERTIFICATE_BASE64 -and -not $env:WINDOWS_CERTIFICATE_SHA1) {
-            throw "WINDOWS_CERTIFICATE_BASE64 or WINDOWS_CERTIFICATE_SHA1 is required for signed Windows installers"
-          }
-          if ($env:WINDOWS_CERTIFICATE_BASE64 -and -not $env:WINDOWS_CERTIFICATE_PASSWORD) {
-            throw "WINDOWS_CERTIFICATE_PASSWORD is required when WINDOWS_CERTIFICATE_BASE64 is used"
-          }
-
       - name: Windows runtime smoke
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.build_direct }}
         run: pnpm run release:windows:smoke
@@ -307,12 +287,7 @@ jobs:
       - name: Windows runtime smoke with direct installer build
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_direct }}
         env:
-          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          WINDOWS_CERTIFICATE_SHA1: ${{ secrets.WINDOWS_CERTIFICATE_SHA1 }}
-          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
           SMOKE_BUNDLES: ${{ inputs.bundles }}
-          SMOKE_SIGN_DIRECT: ${{ inputs.sign_direct }}
           SMOKE_INSTALL_SMOKE: ${{ inputs.install_smoke }}
         shell: pwsh
         run: |
@@ -321,9 +296,6 @@ jobs:
             throw "Unsupported direct installer bundle selection: $env:SMOKE_BUNDLES"
           }
           $smokeArgs = @("--build-direct", "--bundles=$env:SMOKE_BUNDLES")
-          if ($env:SMOKE_SIGN_DIRECT -eq "true") {
-            $smokeArgs += "--sign-direct"
-          }
           if ($env:SMOKE_INSTALL_SMOKE -eq "true") {
             $smokeArgs += "--install-smoke"
           }

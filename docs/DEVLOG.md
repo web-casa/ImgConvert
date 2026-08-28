@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-08-28 — Windows GitHub 直发改为未签名，受信任签名仅走 Store
+
+- **渠道决策**：GitHub Release 继续提供 Windows x64/arm64 的 MSI（en-US/zh-CN）和 NSIS EXE，但明确保持未签名并提示 Microsoft Defender SmartScreen；完整性由合并后的 `SHA256SUMS` 提供。
+- **签名边界**：不再采购或配置 GitHub 直发 Authenticode 证书。Windows 的受信任签名分发只依靠 Microsoft Store 对接受的 MSIX submission 签名；MSIX 仍是独立渠道，不能替代 GitHub 的双架构直发资产。
+- **自动化约束**：`Windows Smoke` 不再暴露 `sign_direct` 或读取证书 Secrets，正式直发要求双架构安装器完成安装、启动与隐藏转换 smoke。发布 readiness 和 CI 护栏同步拒绝签名输入回流。
+
+---
+
 ## 2026-08-27 — 转换优先策略与发布 metadata 复核
 
 - **转换语义**：指定 JPEG、PNG、WebP 或 AVIF 目标时，默认始终写出该格式，即使候选文件大于源文件。`skip-if-larger` 与代际损失防护保留为用户显式开启的压缩策略；旧版持久化设置会在首次启动时一次性迁移为这两个开关关闭，避免历史默认值继续悄悄导致 `skipped`。
