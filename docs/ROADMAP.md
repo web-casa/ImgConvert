@@ -191,6 +191,12 @@ Release。已确认的 `v0.2.0` 交付目标是：
 ## P3 — 发布(Linux 优先,GitHub Releases 第一期)
 
 > 评审一致:个人/小团队不要四渠道并行。第一期只做 GitHub Releases 直发包,验证需求后再逐步推进 Flathub、macOS / Windows 直发与商店。
+>
+> **后续发布策略（自本策略记录之时起，包括当前 v0.2.22 草稿）**：历史上的 Linux-first
+> 范围不再作为公开 GitHub Release 的完成标准。每个 GitHub Release 必须保持 draft，
+> 直到 Linux、macOS、Windows 的 x64/arm64 正式直发包均完成签名/公证、运行验证、
+> 来源校验并附加到同一 Release；任何平台缺失都必须阻止公开发布，除非用户针对该版本
+> 明确批准例外。商店 PKG/MSIX 仍是独立渠道，不能替代 GitHub 直发包。
 
 **第一期(GitHub Releases only):**
 - [x] **CI 矩阵第一批**:GitHub Actions Tauri build smoke 改为 Linux **amd64 + arm64** 原生 runner;继续跑 C 工具链预检(NASM + cmake/meson/ninja)并上传 debug `.deb` artifact。

@@ -7,6 +7,24 @@ proves that each supported architecture can build and that packaged artifacts
 have the expected binary shape; it does not replace a real installation or an
 App Store review device pass.
 
+## Mandatory GitHub Release scope
+
+Every future public GitHub Release must remain a draft until the same-tag
+direct-distribution packages for all desktop platforms are attached and
+verified:
+
+- Linux amd64 and arm64: `.deb`, `.rpm`, and AppImage.
+- macOS x64 and arm64: Developer ID signed, Apple-notarized, stapled DMG.
+- Windows x64 and arm64: Authenticode-signed and timestamped MSI/NSIS EXE that
+  passed install and conversion smoke.
+
+Mac App Store PKG and Microsoft Store MSIX artifacts are separate delivery
+channels and do not substitute for the GitHub direct packages. Missing signing
+credentials, notarization, platform runners, finalizers, or required smoke
+evidence block publication: keep the Release as a draft and report the blocker.
+A partial public Release is allowed only after the user explicitly approves a
+platform exception for that specific release.
+
 ## Native build matrix
 
 | Surface | Architecture | Hosted runner | Required evidence |
