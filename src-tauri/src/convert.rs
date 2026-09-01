@@ -13,19 +13,24 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use imgconvert_core::{
-    AutoQualityOptions, AvifSubsample, ColorManagementPolicy, EncodeOptions, Format, RawMetadata,
-    LOSSLESS_FORMATS, READABLE_FORMATS, WRITABLE_FORMATS,
+    AutoQualityOptions, AvifSubsample, ColorManagementPolicy, EncodeOptions, Format,
+    MetadataPolicy, RawMetadata, ResizeMode, ResizeRule, TargetSizeOptions, WorkflowOptions,
+    WorkflowResult, WorkflowWarning, LOSSLESS_FORMATS, MAX_TARGET_SIZE_BYTES,
+    MIN_TARGET_SIZE_BYTES, READABLE_FORMATS, WRITABLE_FORMATS,
 };
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::access;
 use crate::command_error::CommandError;
 use crate::external_codecs;
+use crate::pdf::{self, PdfConvertOptions};
+use crate::result_cache;
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 const MAX_BATCH_CONCURRENCY: usize = 8;
@@ -70,9 +75,24 @@ struct IndexedConvertOptions {
     options: ConvertOptions,
 }
 
-struct SourceForCore {
-    bytes: Vec<u8>,
-    metadata_override: Option<RawMetadata>,
+pub(crate) struct SourceForCore {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) metadata_override: Option<RawMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResizeOptions {
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub value: Option<u32>,
+    #[serde(default)]
+    pub allow_upscale: bool,
 }
 
 /// A copyable file identity used only while planning a batch. Unlike
@@ -263,14 +283,27 @@ pub struct ConvertOptions {
     /// 输出文件名追加的字面后缀。存在时优先于旧的文件名模板，且不会解析模板占位符。
     #[serde(default)]
     pub output_suffix: Option<String>,
-    /// 仅由本次明确确认生成的短生命周期授权；后端仍会拒绝未授权的原图覆盖。
+    /// 前端本次请求的明确确认标记；它不是安全 token。后端仍会核对文件身份，
+    /// 并在同一请求未携带该标记时拒绝替换原图。
     #[serde(default)]
     pub allow_source_overwrite: bool,
     /// 元数据保留开关预留;core P2 才实现实际透传。
     pub preserve_metadata: Option<bool>,
+    /// 元数据隐私策略:stripAll | colorOnly | preserveAll。存在时优先于旧布尔开关。
+    #[serde(default)]
+    pub metadata_policy: Option<String>,
+    /// 批量尺寸规则；缺失表示保持原尺寸。
+    #[serde(default)]
+    pub resize: Option<ResizeOptions>,
+    /// 最终完整编码字节上限；仅支持有损 JPEG/WebP。
+    #[serde(default)]
+    pub target_size_bytes: Option<u64>,
     /// 色彩管理策略:preserve | convertToSrgb。
     #[serde(default)]
     pub color_management_policy: Option<String>,
+    /// PDF 输入专用的页范围与光栅化 DPI。非 PDF 输入会忽略此字段。
+    #[serde(default)]
+    pub pdf: Option<PdfConvertOptions>,
 }
 
 fn default_jpeg_progressive() -> bool {
@@ -337,12 +370,45 @@ pub struct ConvertResult {
     pub out_size: u64,
     /// 转换已完成但用户仍应知晓的非致命文件系统状态。
     pub warning: Option<ConvertWarning>,
+    /// 可并存的工作流/文件系统警告。`warning` 暂留一代兼容旧前端。
+    pub warnings: Vec<ConvertWarning>,
+    /// 本任务实际生成的文件数。普通图片固定为 1，PDF 可为多页。
+    pub output_count: usize,
+    /// 因 skip 覆盖策略而保留的已有 PDF 页面文件数。
+    pub skipped_output_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "code")]
 pub enum ConvertWarning {
-    PreviousOutputBackupRetained { path: String },
+    PreviousOutputBackupRetained {
+        path: String,
+    },
+    ModifiedTimeNotPreserved {
+        path: String,
+    },
+    OutputBackupRetainedAndModifiedTimeNotPreserved {
+        #[serde(rename = "backupPath")]
+        backup_path: String,
+        #[serde(rename = "outputPath")]
+        output_path: String,
+    },
+    ColorProfileConvertedForResize,
+    InvalidColorProfileDiscarded,
+    InvalidColorProfileIgnoredForPreview,
+    TargetSizeNotMet {
+        #[serde(rename = "targetBytes")]
+        target_bytes: u64,
+        #[serde(rename = "actualBytes")]
+        actual_bytes: u64,
+    },
+    PdfPagesSkippedExisting {
+        count: usize,
+    },
+    PdfRenderWarnings {
+        page: usize,
+        count: usize,
+    },
 }
 
 /// 转换前输出路径规划,用于前端 ask 覆盖策略一次性收集决策。
@@ -355,6 +421,10 @@ pub struct ConversionPlanEntry {
     pub exists: bool,
     pub same_as_source: bool,
     pub conflicts_with_queued_input: bool,
+    /// 本任务将产生的文件总数；普通图片为 1。
+    pub output_count: usize,
+    /// 规划时已存在的目标文件数。
+    pub existing_output_count: usize,
     pub error: Option<CommandError>,
 }
 
@@ -467,6 +537,13 @@ impl BatchState {
         }
         false
     }
+
+    pub fn is_active(&self) -> bool {
+        self.current
+            .lock()
+            .map(|current| current.is_some())
+            .unwrap_or(true)
+    }
 }
 
 impl BatchRegistration {
@@ -507,6 +584,7 @@ fn capabilities_with_heic_provider(
     heic_provider: Option<external_codecs::CodecProviderInfo>,
 ) -> Capabilities {
     let mut readable = format_ids(READABLE_FORMATS);
+    readable.push("pdf");
     let mut codec_providers = Vec::new();
     if let Some(provider) = heic_provider {
         readable.push("heic");
@@ -762,7 +840,7 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
         None => output_file_name(output_stem(opts, &stem, ext), ext),
     };
 
-    let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref()) {
+    let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref())? {
         Some(grant) => {
             let mut dir = grant.into_path_buf();
             if let Some(relative_dir) = safe_relative_dir(opts.relative_dir.as_deref())? {
@@ -777,6 +855,47 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
     };
 
     Ok(dir.join(output_name))
+}
+
+fn pdf_output_path(
+    base: &Path,
+    ext: &str,
+    page_index: usize,
+    document_page_count: usize,
+) -> Result<PathBuf, String> {
+    let base_stem = base
+        .file_stem()
+        .ok_or_else(|| format!("无法解析 PDF 输出文件名: {}", base.display()))?
+        .to_string_lossy();
+    let digits = document_page_count.to_string().len().max(3);
+    let page_number = page_index.saturating_add(1);
+    let stem = format!("{base_stem}-page-{page_number:0digits$}");
+    let name = output_file_name(truncate_output_stem(stem, ext), ext);
+    Ok(base.with_file_name(name))
+}
+
+fn pdf_output_paths(
+    opts: &ConvertOptions,
+    selection: &pdf::PdfSelection,
+) -> Result<Vec<PathBuf>, String> {
+    let base = output_path(opts)?;
+    let ext = ext_for_format(&opts.format)?;
+    selection
+        .pages
+        .iter()
+        .map(|page| pdf_output_path(&base, ext, *page, selection.page_count))
+        .collect()
+}
+
+fn planned_output_paths(opts: &ConvertOptions) -> Result<Vec<PathBuf>, String> {
+    let input = Path::new(&opts.input);
+    if !pdf::is_pdf_path(input) {
+        return output_path(opts).map(|path| vec![path]);
+    }
+    let bytes = pdf::read_pdf_file(input)?;
+    let document = pdf::PdfDocument::load(bytes)?;
+    let selection = document.selection(opts.pdf.as_ref())?;
+    pdf_output_paths(opts, &selection)
 }
 
 fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, String> {
@@ -830,6 +949,8 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
                     exists: false,
                     same_as_source: false,
                     conflicts_with_queued_input: false,
+                    output_count: 0,
+                    existing_output_count: 0,
                     error: Some(CommandError::output_safety_check_failed(
                         options.input.clone(),
                         error.clone(),
@@ -843,10 +964,8 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
         .enumerate()
         .map(|(index, options)| {
             let _input_scope = access::scoped_path_access(Path::new(&options.input));
-            let _output_dir_scope = access::output_directory(options.out_dir.as_deref())
-                .map(|grant| grant.scoped_access());
-            let output = match output_path(options) {
-                Ok(output) => output,
+            let output_dir_grant = match access::output_directory(options.out_dir.as_deref()) {
+                Ok(grant) => grant,
                 Err(error) => {
                     return ConversionPlanEntry {
                         index,
@@ -855,39 +974,75 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
                         exists: false,
                         same_as_source: false,
                         conflicts_with_queued_input: false,
+                        output_count: 0,
+                        existing_output_count: 0,
                         error: Some(command_error_for_conversion(options, error)),
                     };
                 }
             };
-            let _output_scope = output.parent().map(access::scoped_path_access);
-            let output_identity = match existing_file_identity(&output) {
-                Ok(identity) => identity,
+            let _output_dir_scope = output_dir_grant.as_ref().map(|grant| grant.scoped_access());
+            let outputs = match planned_output_paths(options) {
+                Ok(outputs) => outputs,
                 Err(error) => {
                     return ConversionPlanEntry {
                         index,
                         input: options.input.clone(),
-                        output: Some(output.to_string_lossy().to_string()),
-                        exists: output_entry_exists(&output),
+                        output: None,
+                        exists: false,
                         same_as_source: false,
                         conflicts_with_queued_input: false,
-                        error: Some(CommandError::output_safety_check_failed(
-                            output.to_string_lossy().to_string(),
-                            error,
-                        )),
+                        output_count: 0,
+                        existing_output_count: 0,
+                        error: Some(command_error_for_conversion(options, error)),
                     };
                 }
             };
-            let input_indexes = output_identity
-                .as_ref()
-                .and_then(|identity| input_identities.get(identity));
+            let output_count = outputs.len();
+            let mut existing_output_count = 0;
+            let mut same_as_source = false;
+            let mut conflicts_with_queued_input = false;
+            for output in &outputs {
+                let _output_scope = output.parent().map(access::scoped_path_access);
+                if output_entry_exists(output) {
+                    existing_output_count += 1;
+                }
+                let output_identity = match existing_file_identity(output) {
+                    Ok(identity) => identity,
+                    Err(error) => {
+                        return ConversionPlanEntry {
+                            index,
+                            input: options.input.clone(),
+                            output: Some(output.to_string_lossy().to_string()),
+                            exists: existing_output_count > 0,
+                            same_as_source: false,
+                            conflicts_with_queued_input: false,
+                            output_count,
+                            existing_output_count,
+                            error: Some(CommandError::output_safety_check_failed(
+                                output.to_string_lossy().to_string(),
+                                error,
+                            )),
+                        };
+                    }
+                };
+                let input_indexes = output_identity
+                    .as_ref()
+                    .and_then(|identity| input_identities.get(identity));
+                same_as_source |= input_indexes.is_some_and(|indexes| indexes.contains(&index));
+                conflicts_with_queued_input |= input_indexes
+                    .is_some_and(|indexes| indexes.iter().any(|input_index| *input_index != index));
+            }
             ConversionPlanEntry {
                 index,
                 input: options.input.clone(),
-                exists: output_entry_exists(&output),
-                same_as_source: input_indexes.is_some_and(|indexes| indexes.contains(&index)),
-                conflicts_with_queued_input: input_indexes
-                    .is_some_and(|indexes| indexes.iter().any(|input_index| *input_index != index)),
-                output: Some(output.to_string_lossy().to_string()),
+                exists: existing_output_count > 0,
+                same_as_source,
+                conflicts_with_queued_input,
+                output_count,
+                existing_output_count,
+                output: outputs
+                    .first()
+                    .map(|output| output.to_string_lossy().to_string()),
                 error: None,
             }
         })
@@ -957,8 +1112,25 @@ pub fn command_error_for_conversion(
     {
         return CommandError::output_not_smaller(output(), detail);
     }
+    if let Some(error) = command_error_for_pdf(&options.input, &detail) {
+        return error;
+    }
 
     CommandError::conversion_failed(options.input.clone(), detail)
+}
+
+pub(crate) fn command_error_for_pdf(input: &str, detail: &str) -> Option<CommandError> {
+    if detail.starts_with(pdf::PDF_PASSWORD_PROTECTED_PREFIX) {
+        Some(CommandError::pdf_password_protected(input, detail))
+    } else if detail.starts_with(pdf::PDF_SETTINGS_INVALID_PREFIX) {
+        Some(CommandError::pdf_settings_invalid(input, detail))
+    } else if detail.starts_with(pdf::PDF_RESOURCE_LIMIT_PREFIX) {
+        Some(CommandError::pdf_resource_limit(input, detail))
+    } else if detail.starts_with(pdf::PDF_INVALID_PREFIX) {
+        Some(CommandError::pdf_invalid(input, detail))
+    } else {
+        None
+    }
 }
 
 fn output_io_error(operation: &str, out: &Path, error: &std::io::Error) -> String {
@@ -1207,6 +1379,14 @@ fn cleanup_partial_note(path: &Path) -> String {
 
 /// 执行一次转换。
 pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
+    convert_with_control(opts, None, None)
+}
+
+fn convert_with_control(
+    opts: &ConvertOptions,
+    cancel: Option<&CancellationToken>,
+    pdf_progress: Option<&dyn Fn(usize, usize)>,
+) -> Result<ConvertResult, String> {
     let input = Path::new(&opts.input);
     let _input_scope = access::scoped_path_access(input);
     let input_metadata = fs::metadata(input).map_err(|error| match error.kind() {
@@ -1222,8 +1402,12 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
         return Err(format!("输入路径不是文件: {}", input.display()));
     }
 
+    if pdf::is_pdf_path(input) {
+        return convert_pdf(opts, input, &input_metadata, cancel, pdf_progress);
+    }
+
     let _output_dir_scope =
-        access::output_directory(opts.out_dir.as_deref()).map(|grant| grant.scoped_access());
+        access::output_directory(opts.out_dir.as_deref())?.map(|grant| grant.scoped_access());
     let out = output_path(opts)?;
     let _output_scope = out.parent().map(access::scoped_path_access);
     let source_modified = input_metadata.modified().ok();
@@ -1274,6 +1458,13 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
     let source_probe = imgconvert_core::probe(source).ok();
     let encode_options = encode_options_for(opts, target);
     let color_policy = color_management_policy_for(opts)?;
+    let workflow_options = workflow_options_for(opts, target, encode_options)?;
+    if let Some(probe) = source_probe.as_ref() {
+        workflow_options
+            .resize
+            .dimensions(probe.width, probe.height)
+            .map_err(|error| error.to_string())?;
+    }
     let wall_clock_timeout = convert_wall_clock_timeout()?;
     let cache_key = opts.result_cache.then(|| {
         result_cache_key(
@@ -1286,7 +1477,11 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
         )
     });
     if let Some(key) = cache_key.as_deref() {
-        if let Some(out_size) = result_cache_hit(&out, key) {
+        if let Some(hit) = result_cache::hit(&out, key) {
+            let out_size = hit.output_size;
+            let cached_dimensions_changed = source_probe.as_ref().is_some_and(|probe| {
+                (hit.workflow.width, hit.workflow.height) != (probe.width, probe.height)
+            });
             if let Some(message) = candidate_policy_error(
                 opts,
                 CandidatePolicyCheck {
@@ -1297,59 +1492,63 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
                     dimensions: source_probe
                         .as_ref()
                         .map(|probe| (probe.width, probe.height)),
+                    dimensions_changed: cached_dimensions_changed,
                     source_size: input_metadata.len(),
                     candidate_size: out_size,
                 },
             ) {
                 return Err(message);
             }
+            let warning = preserve_source_modified_time(&out, source_modified, None);
+            let mut warnings = cached_workflow_warnings(opts, hit);
+            if let Some(file_warning) = warning.clone() {
+                warnings.push(file_warning);
+            }
             return Ok(ConvertResult {
                 input: opts.input.clone(),
                 output: out.to_string_lossy().to_string(),
                 in_size: input_metadata.len(),
                 out_size,
-                warning: None,
+                warning,
+                warnings,
+                output_count: 1,
+                skipped_output_count: 0,
             });
         }
     }
-    let encoded = if should_use_auto_quality(opts, target, &encode_options) {
-        let candidates = encode_candidates_for(opts, target, encode_options);
-        convert_auto_quality_with_timeout(
+    let workflow_result = if let Some(timeout) = wall_clock_timeout {
+        imgconvert_core::convert_workflow_with_timeout(
             source,
             target,
-            &candidates,
-            AutoQualityOptions {
-                min_quality: auto_quality_min(opts.quality_floor, encode_options.quality),
-                target_score: opts.auto_quality_score.clamp(1.0, 100.0),
-            },
+            &workflow_options,
             metadata_override,
-            color_policy,
-            wall_clock_timeout,
+            timeout,
         )
-        .map(|result| result.bytes)
-        .map_err(|e| e.to_string())?
-    } else if opts.multi_candidate {
-        let candidates = encode_option_candidates(encode_options, target);
-        convert_best_of_with_timeout(
-            source,
-            target,
-            &candidates,
-            metadata_override,
-            color_policy,
-            wall_clock_timeout,
-        )
-        .map_err(|e| e.to_string())?
     } else {
-        convert_best_of_with_timeout(
-            source,
-            target,
-            &[encode_options],
-            metadata_override,
-            color_policy,
-            wall_clock_timeout,
-        )
-        .map_err(|e| e.to_string())?
+        imgconvert_core::convert_workflow(source, target, &workflow_options, metadata_override)
+    }
+    .map_err(|error| error.to_string())?;
+    let dimensions_changed = source_probe.as_ref().is_some_and(|probe| {
+        (workflow_result.width, workflow_result.height) != (probe.width, probe.height)
+    });
+    let cached_workflow_status = result_cache::CachedWorkflowStatus {
+        width: workflow_result.width,
+        height: workflow_result.height,
+        selected_quality: workflow_result.selected_quality,
+        target_size_met: workflow_result.target_size_met,
+        color_profile_converted_for_resize: workflow_result
+            .warnings
+            .contains(&WorkflowWarning::ColorProfileConvertedForResize),
+        invalid_color_profile_discarded: workflow_result
+            .warnings
+            .contains(&WorkflowWarning::InvalidColorProfileDiscarded),
     };
+    let workflow_warnings = workflow_result
+        .warnings
+        .iter()
+        .map(convert_workflow_warning)
+        .collect::<Vec<_>>();
+    let encoded = workflow_result.bytes;
     let candidate_size = u64::try_from(encoded.len()).unwrap_or(u64::MAX);
     if let Some(message) = candidate_policy_error(
         opts,
@@ -1361,6 +1560,7 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
             dimensions: source_probe
                 .as_ref()
                 .map(|probe| (probe.width, probe.height)),
+            dimensions_changed,
             source_size: input_metadata.len(),
             candidate_size,
         },
@@ -1373,15 +1573,21 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
     } else {
         WriteMode::CreateNew
     };
-    let warning = write_output(&out, &encoded, write_mode)?;
-    if let Some(modified) = source_modified {
-        let _ = set_modified_time(&out, modified);
-    }
+    let warning = preserve_source_modified_time(
+        &out,
+        source_modified,
+        write_output(&out, &encoded, write_mode)?,
+    );
 
     let in_size = input_metadata.len();
     let out_size = fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
     if let Some(key) = cache_key.as_deref() {
-        write_result_cache_record(key, &encoded, out_size);
+        result_cache::write_record(key, &encoded, out_size, cached_workflow_status);
+    }
+
+    let mut warnings = workflow_warnings;
+    if let Some(file_warning) = warning.clone() {
+        warnings.push(file_warning);
     }
 
     Ok(ConvertResult {
@@ -1390,66 +1596,324 @@ pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
         in_size,
         out_size,
         warning,
+        warnings,
+        output_count: 1,
+        skipped_output_count: 0,
     })
 }
 
-fn convert_best_of_with_timeout(
-    source: &[u8],
-    target: Format,
-    candidates: &[EncodeOptions],
-    metadata_override: Option<&RawMetadata>,
-    color_policy: ColorManagementPolicy,
-    timeout: Option<Duration>,
-) -> imgconvert_core::Result<Vec<u8>> {
-    if let Some(timeout) = timeout {
-        imgconvert_core::convert_best_of_with_color_policy_timeout(
-            source,
-            target,
-            candidates,
-            metadata_override,
-            color_policy,
-            timeout,
-        )
+fn convert_pdf(
+    opts: &ConvertOptions,
+    input: &Path,
+    input_metadata: &fs::Metadata,
+    cancel: Option<&CancellationToken>,
+    progress: Option<&dyn Fn(usize, usize)>,
+) -> Result<ConvertResult, String> {
+    let _output_dir_scope =
+        access::output_directory(opts.out_dir.as_deref())?.map(|grant| grant.scoped_access());
+    let source_modified = input_metadata.modified().ok();
+    let bytes = pdf::read_pdf_file(input)?;
+    let document = pdf::PdfDocument::load(bytes)?;
+    let selection = document.selection(opts.pdf.as_ref())?;
+    let outputs = pdf_output_paths(opts, &selection)?;
+    let target = parse_format(&opts.format)?;
+    let encode_options = encode_options_for(opts, target);
+    let workflow_options = workflow_options_for(opts, target, encode_options)?;
+    let overwrite_mode = match opts.overwrite_mode.as_deref() {
+        Some(mode @ ("ask" | "skip" | "overwrite")) => mode,
+        Some(other) => return Err(format!("不支持的覆盖策略: {other}")),
+        None if opts.overwrite => "overwrite",
+        None => "skip",
+    };
+
+    // Validate every selected page and its downstream resize before the first writer starts. A
+    // late page can still fail while interpreting malformed content, but predictable resource or
+    // settings failures must not leave an avoidable partial document conversion.
+    for page_index in &selection.pages {
+        let dimensions = document.page_dimensions(*page_index, selection.dpi)?;
+        workflow_options
+            .resize
+            .dimensions(dimensions.width, dimensions.height)
+            .map_err(|error| format!("PDF 第 {} 页尺寸规则无效: {error}", page_index + 1))?;
+    }
+
+    let input_identity = if overwrite_mode == "overwrite" {
+        Some(existing_file_identity(input)?.ok_or_else(|| {
+            format!(
+                "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取输入文件身份: {}",
+                input.display()
+            )
+        })?)
     } else {
-        imgconvert_core::convert_best_of_with_color_policy(
-            source,
+        None
+    };
+
+    let mut skipped = vec![false; outputs.len()];
+    for (position, output) in outputs.iter().enumerate() {
+        let _output_scope = output.parent().map(access::scoped_path_access);
+        if overwrite_mode == "overwrite"
+            && existing_file_identity(output)?.is_some_and(|identity| {
+                input_identity
+                    .as_ref()
+                    .is_some_and(|input_identity| &identity == input_identity)
+            })
+            && !opts.allow_source_overwrite
+        {
+            return Err(format!(
+                "{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} {}",
+                output.display()
+            ));
+        }
+        if output_entry_exists(output) && overwrite_mode != "overwrite" {
+            if overwrite_mode == "ask" {
+                return Err(format!(
+                    "{OUTPUT_EXISTS_PREFIX}(需要确认覆盖): {}",
+                    output.display()
+                ));
+            }
+            skipped[position] = true;
+        }
+    }
+    let skipped_output_count = skipped.iter().filter(|skipped| **skipped).count();
+    if skipped_output_count == outputs.len() {
+        let first = outputs.first().map_or_else(
+            || opts.input.clone(),
+            |output| output.to_string_lossy().to_string(),
+        );
+        return Err(format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {first}"));
+    }
+
+    let timeout = convert_wall_clock_timeout()?;
+    let cache = document.new_render_cache();
+    let mut output_size = 0u64;
+    let mut converted_output_count = 0usize;
+    let mut warnings = Vec::new();
+    let mut compatibility_warning = None;
+    let total = outputs.len();
+    let is_cancelled = || cancel.is_some_and(CancellationToken::is_cancelled);
+
+    for (position, ((page_index, output), skip)) in selection
+        .pages
+        .iter()
+        .zip(outputs.iter())
+        .zip(skipped.iter())
+        .enumerate()
+    {
+        if is_cancelled() {
+            return Err(pdf_partial_error(
+                *page_index,
+                converted_output_count,
+                "转换已取消",
+            ));
+        }
+        if *skip {
+            if let Some(progress) = progress {
+                progress(position + 1, total);
+            }
+            continue;
+        }
+        // A PDF page produces one independent image output. Apply the normal conversion timeout
+        // to each page instead of the whole document; otherwise a valid long document would
+        // predictably time out even though every individual page is healthy.
+        let page_started = Instant::now();
+        ensure_pdf_page_time_remaining(timeout, page_started, *page_index, converted_output_count)?;
+        let rendered = document
+            .render_page(*page_index, selection.dpi, &cache)
+            .map_err(|error| pdf_partial_error(*page_index, converted_output_count, &error))?;
+        if rendered.warning_count > 0 {
+            warnings.push(ConvertWarning::PdfRenderWarnings {
+                page: page_index + 1,
+                count: rendered.warning_count,
+            });
+        }
+        ensure_pdf_page_time_remaining(timeout, page_started, *page_index, converted_output_count)?;
+        let remaining = timeout.and_then(|limit| limit.checked_sub(page_started.elapsed()));
+        let workflow = imgconvert_core::convert_image_workflow_with_control(
+            rendered.image,
             target,
-            candidates,
-            metadata_override,
-            color_policy,
+            &workflow_options,
+            remaining,
+            Some(&is_cancelled),
         )
+        .map_err(|error| {
+            pdf_partial_error(*page_index, converted_output_count, &error.to_string())
+        })?;
+        if is_cancelled() {
+            return Err(pdf_partial_error(
+                *page_index,
+                converted_output_count,
+                "转换已取消",
+            ));
+        }
+        ensure_pdf_page_time_remaining(timeout, page_started, *page_index, converted_output_count)?;
+        let write_mode = if overwrite_mode == "overwrite" {
+            WriteMode::Replace
+        } else {
+            WriteMode::CreateNew
+        };
+        let file_warning = preserve_source_modified_time(
+            output,
+            source_modified,
+            write_output(output, &workflow.bytes, write_mode)
+                .map_err(|error| pdf_partial_error(*page_index, converted_output_count, &error))?,
+        );
+        output_size = output_size.saturating_add(
+            fs::metadata(output)
+                .map(|metadata| metadata.len())
+                .unwrap_or_else(|_| u64::try_from(workflow.bytes.len()).unwrap_or(u64::MAX)),
+        );
+        for workflow_warning in &workflow.warnings {
+            let warning = convert_workflow_warning(workflow_warning);
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
+        if let Some(warning) = file_warning {
+            compatibility_warning.get_or_insert_with(|| warning.clone());
+            warnings.push(warning);
+        }
+        converted_output_count += 1;
+        if let Some(progress) = progress {
+            progress(position + 1, total);
+        }
+    }
+
+    if skipped_output_count > 0 {
+        warnings.push(ConvertWarning::PdfPagesSkippedExisting {
+            count: skipped_output_count,
+        });
+    }
+    let output = outputs
+        .iter()
+        .zip(skipped.iter())
+        .find_map(|(output, skipped)| (!*skipped).then_some(output))
+        .or_else(|| outputs.first())
+        .map_or_else(
+            || opts.input.clone(),
+            |path| path.to_string_lossy().to_string(),
+        );
+
+    Ok(ConvertResult {
+        input: opts.input.clone(),
+        output,
+        in_size: input_metadata.len(),
+        out_size: output_size,
+        warning: compatibility_warning,
+        warnings,
+        output_count: converted_output_count,
+        skipped_output_count,
+    })
+}
+
+fn ensure_pdf_page_time_remaining(
+    timeout: Option<Duration>,
+    started: Instant,
+    page_index: usize,
+    completed: usize,
+) -> Result<(), String> {
+    if timeout.is_some_and(|limit| started.elapsed() >= limit) {
+        return Err(pdf_partial_error(
+            page_index,
+            completed,
+            "此页面转换超过时间限制",
+        ));
+    }
+    Ok(())
+}
+
+fn pdf_partial_error(page_index: usize, completed: usize, detail: &str) -> String {
+    let typed_prefix = [
+        pdf::PDF_PASSWORD_PROTECTED_PREFIX,
+        pdf::PDF_SETTINGS_INVALID_PREFIX,
+        pdf::PDF_RESOURCE_LIMIT_PREFIX,
+        pdf::PDF_INVALID_PREFIX,
+    ]
+    .into_iter()
+    .find(|prefix| detail.starts_with(prefix));
+    let detail = typed_prefix.map_or(detail, |prefix| detail[prefix.len()..].trim_start());
+    let context = if completed == 0 {
+        format!("PDF 第 {} 页转换失败: {detail}", page_index + 1)
+    } else {
+        format!(
+            "PDF 第 {} 页转换失败: {detail}；此前已完成 {completed} 页，输出文件已保留",
+            page_index + 1
+        )
+    };
+    if let Some(prefix) = typed_prefix {
+        format!("{prefix} {context}")
+    } else {
+        context
     }
 }
 
-fn convert_auto_quality_with_timeout(
-    source: &[u8],
-    target: Format,
-    candidates: &[EncodeOptions],
-    auto: AutoQualityOptions,
-    metadata_override: Option<&RawMetadata>,
-    color_policy: ColorManagementPolicy,
-    timeout: Option<Duration>,
-) -> imgconvert_core::Result<imgconvert_core::AutoQualityResult> {
-    if let Some(timeout) = timeout {
-        imgconvert_core::convert_auto_quality_with_color_policy_timeout(
-            source,
-            target,
-            candidates,
-            &auto,
-            metadata_override,
-            color_policy,
-            timeout,
-        )
-    } else {
-        imgconvert_core::convert_auto_quality_with_color_policy(
-            source,
-            target,
-            candidates,
-            &auto,
-            metadata_override,
-            color_policy,
-        )
+fn preserve_source_modified_time(
+    out: &Path,
+    source_modified: Option<SystemTime>,
+    warning: Option<ConvertWarning>,
+) -> Option<ConvertWarning> {
+    if let Some(modified) = source_modified {
+        if let Err(error) = set_modified_time(out, modified) {
+            eprintln!(
+                "ImgConvert could not preserve the output modified time {}: {error}",
+                out.display()
+            );
+            let output_path = out.to_string_lossy().to_string();
+            return Some(match warning {
+                Some(ConvertWarning::PreviousOutputBackupRetained { path }) => {
+                    ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
+                        backup_path: path,
+                        output_path,
+                    }
+                }
+                Some(warning) => warning,
+                None => ConvertWarning::ModifiedTimeNotPreserved { path: output_path },
+            });
+        }
     }
+    warning
+}
+
+pub(crate) fn convert_workflow_warning(warning: &WorkflowWarning) -> ConvertWarning {
+    match warning {
+        WorkflowWarning::ColorProfileConvertedForResize => {
+            ConvertWarning::ColorProfileConvertedForResize
+        }
+        WorkflowWarning::InvalidColorProfileDiscarded => {
+            ConvertWarning::InvalidColorProfileDiscarded
+        }
+        WorkflowWarning::InvalidColorProfileIgnoredForPreview => {
+            ConvertWarning::InvalidColorProfileIgnoredForPreview
+        }
+        WorkflowWarning::TargetSizeNotMet {
+            target_bytes,
+            actual_bytes,
+        } => ConvertWarning::TargetSizeNotMet {
+            target_bytes: *target_bytes,
+            actual_bytes: *actual_bytes,
+        },
+    }
+}
+
+fn cached_workflow_warnings(
+    opts: &ConvertOptions,
+    hit: result_cache::CacheHit,
+) -> Vec<ConvertWarning> {
+    let mut warnings = Vec::new();
+    if hit.workflow.color_profile_converted_for_resize {
+        warnings.push(ConvertWarning::ColorProfileConvertedForResize);
+    }
+    if hit.workflow.invalid_color_profile_discarded {
+        warnings.push(ConvertWarning::InvalidColorProfileDiscarded);
+    }
+    if hit.workflow.target_size_met == Some(false) {
+        if let Some(target_bytes) = opts.target_size_bytes {
+            warnings.push(ConvertWarning::TargetSizeNotMet {
+                target_bytes,
+                actual_bytes: hit.output_size,
+            });
+        }
+    }
+    warnings
 }
 
 fn convert_wall_clock_timeout() -> Result<Option<Duration>, String> {
@@ -1507,6 +1971,121 @@ fn encode_options_for(opts: &ConvertOptions, target: Format) -> EncodeOptions {
         jpeg_trellis: opts.jpeg_trellis,
         preserve_metadata: opts.preserve_metadata.unwrap_or(false),
     }
+}
+
+fn metadata_policy_for(opts: &ConvertOptions) -> Result<MetadataPolicy, String> {
+    match opts.metadata_policy.as_deref() {
+        Some("stripAll" | "strip-all" | "strip") => Ok(MetadataPolicy::StripAll),
+        Some("colorOnly" | "color-only" | "color") => Ok(MetadataPolicy::ColorOnly),
+        Some("preserveAll" | "preserve-all" | "preserve") => Ok(MetadataPolicy::PreserveAll),
+        Some(other) => Err(format!("不支持的元数据隐私策略: {other}")),
+        None if opts.preserve_metadata.unwrap_or(false) => Ok(MetadataPolicy::PreserveAll),
+        None => Ok(MetadataPolicy::StripAll),
+    }
+}
+
+fn resize_rule_for(opts: &ConvertOptions) -> Result<ResizeRule, String> {
+    let Some(resize) = opts.resize.as_ref() else {
+        return Ok(ResizeRule::default());
+    };
+    let mode = match resize.mode.as_deref().unwrap_or("none") {
+        "none" => ResizeMode::None,
+        "fit" => ResizeMode::Fit,
+        "width" => ResizeMode::Width,
+        "height" => ResizeMode::Height,
+        "longestEdge" | "longest-edge" => ResizeMode::LongestEdge,
+        "percentage" | "percent" => ResizeMode::Percentage,
+        other => return Err(format!("不支持的尺寸规则: {other}")),
+    };
+    Ok(ResizeRule {
+        mode,
+        width: resize.width,
+        height: resize.height,
+        value: resize.value,
+        allow_upscale: resize.allow_upscale,
+    })
+}
+
+fn workflow_options_for(
+    opts: &ConvertOptions,
+    target: Format,
+    base: EncodeOptions,
+) -> Result<WorkflowOptions, String> {
+    if opts.target_size_bytes.is_some() && opts.auto_quality {
+        return Err("自动质量与目标文件体积不能同时启用".to_string());
+    }
+    if let Some(max_bytes) = opts.target_size_bytes {
+        if !(MIN_TARGET_SIZE_BYTES..=MAX_TARGET_SIZE_BYTES).contains(&max_bytes) {
+            return Err(format!(
+                "目标文件体积必须在 {MIN_TARGET_SIZE_BYTES}..={MAX_TARGET_SIZE_BYTES} 字节之间"
+            ));
+        }
+        if !matches!(target, Format::Jpeg | Format::WebP) {
+            return Err("目标文件体积仅支持有损 JPEG/WebP".to_string());
+        }
+        if base.lossless {
+            return Err("目标文件体积不能与无损编码同时启用".to_string());
+        }
+    }
+    let target_size = opts.target_size_bytes.map(|max_bytes| TargetSizeOptions {
+        max_bytes,
+        min_quality: auto_quality_min(opts.quality_floor, base.quality),
+    });
+    let auto_quality = should_use_auto_quality(opts, target, &base).then_some(AutoQualityOptions {
+        min_quality: auto_quality_min(opts.quality_floor, base.quality),
+        target_score: opts.auto_quality_score.clamp(1.0, 100.0),
+    });
+    Ok(WorkflowOptions {
+        encoders: encode_candidates_for(opts, target, base),
+        auto_quality,
+        resize: resize_rule_for(opts)?,
+        metadata_policy: metadata_policy_for(opts)?,
+        target_size,
+        color_policy: color_management_policy_for(opts)?,
+        preview_max_edge: None,
+    })
+}
+
+pub(crate) fn convert_source_workflow(
+    opts: &ConvertOptions,
+    source: &[u8],
+    metadata_override: Option<&RawMetadata>,
+    preview_max_edge: Option<u32>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult, String> {
+    let target = parse_format(&opts.format)?;
+    let base = encode_options_for(opts, target);
+    let mut workflow = workflow_options_for(opts, target, base)?;
+    workflow.preview_max_edge = preview_max_edge;
+    imgconvert_core::convert_workflow_with_control(
+        source,
+        target,
+        &workflow,
+        metadata_override,
+        convert_wall_clock_timeout()?,
+        cancelled,
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub(crate) fn convert_image_workflow(
+    opts: &ConvertOptions,
+    image: imgconvert_core::ImageData,
+    preview_max_edge: Option<u32>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult, String> {
+    let target = parse_format(&opts.format)?;
+    let base = encode_options_for(opts, target);
+    let mut workflow = workflow_options_for(opts, target, base)?;
+    workflow.preview_max_edge = preview_max_edge;
+    imgconvert_core::convert_image_workflow_with_control(
+        image,
+        target,
+        &workflow,
+        convert_wall_clock_timeout()?,
+        cancelled,
+    )
+    .map_err(|error| error.to_string())
 }
 
 fn parse_avif_subsample(value: &str) -> AvifSubsample {
@@ -1618,7 +2197,7 @@ fn push_unique_candidate(candidates: &mut Vec<EncodeOptions>, candidate: EncodeO
     }
 }
 
-fn read_source_for_core(input: &Path) -> Result<SourceForCore, String> {
+pub(crate) fn read_source_for_core(input: &Path) -> Result<SourceForCore, String> {
     if external_codecs::is_heic_path(input) {
         let decoded = external_codecs::decode_heic(input)?;
         return Ok(SourceForCore {
@@ -1698,7 +2277,11 @@ pub fn path_conversion_smoke_options(
         output_suffix: None,
         allow_source_overwrite: false,
         preserve_metadata: Some(false),
+        metadata_policy: None,
+        resize: None,
+        target_size_bytes: None,
         color_management_policy: None,
+        pdf: None,
     }
 }
 
@@ -1836,57 +2419,74 @@ fn prepare_batch_work(
         }
     };
 
-    for (index, options) in options.into_iter().enumerate() {
-        let _output_dir_scope =
-            access::output_directory(options.out_dir.as_deref()).map(|grant| grant.scoped_access());
-        match output_path(&options) {
-            Ok(output) => {
-                let _output_scope = output.parent().map(access::scoped_path_access);
-                let output_identity = match existing_file_identity(&output) {
-                    Ok(identity) => identity,
-                    Err(error) => {
+    'jobs: for (index, options) in options.into_iter().enumerate() {
+        let output_dir_grant = match access::output_directory(options.out_dir.as_deref()) {
+            Ok(grant) => grant,
+            Err(error) => {
+                preflight_events.push(BatchProgressEvent::FileError {
+                    index,
+                    input: options.input.clone(),
+                    error: command_error_for_conversion(&options, error),
+                });
+                continue;
+            }
+        };
+        let _output_dir_scope = output_dir_grant.as_ref().map(|grant| grant.scoped_access());
+        match planned_output_paths(&options) {
+            Ok(outputs) => {
+                let mut job_keys = HashSet::new();
+                for output in &outputs {
+                    let _output_scope = output.parent().map(access::scoped_path_access);
+                    let output_identity = match existing_file_identity(output) {
+                        Ok(identity) => identity,
+                        Err(error) => {
+                            preflight_events.push(BatchProgressEvent::FileError {
+                                index,
+                                input: options.input,
+                                error: CommandError::output_safety_check_failed(
+                                    output.to_string_lossy().to_string(),
+                                    error,
+                                ),
+                            });
+                            continue 'jobs;
+                        }
+                    };
+                    if output_identity.is_some_and(|identity| {
+                        input_identities
+                            .get(&identity)
+                            .is_some_and(|input_indexes| {
+                                input_indexes
+                                    .iter()
+                                    .any(|input_index| *input_index != index)
+                            })
+                    }) {
                         preflight_events.push(BatchProgressEvent::FileError {
                             index,
                             input: options.input,
-                            error: CommandError::output_safety_check_failed(
+                            error: CommandError::output_conflicts_with_input(
                                 output.to_string_lossy().to_string(),
-                                error,
+                                format!(
+                                    "{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} {}",
+                                    output.display()
+                                ),
                             ),
                         });
-                        continue;
+                        continue 'jobs;
                     }
-                };
-                if output_identity.is_some_and(|identity| {
-                    input_identities
-                        .get(&identity)
-                        .is_some_and(|input_indexes| {
-                            input_indexes
-                                .iter()
-                                .any(|input_index| *input_index != index)
-                        })
-                }) {
-                    preflight_events.push(BatchProgressEvent::FileError {
-                        index,
-                        input: options.input,
-                        error: CommandError::output_conflicts_with_input(
-                            output.to_string_lossy().to_string(),
-                            format!("{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} {}", output.display()),
-                        ),
-                    });
-                    continue;
+                    let key = output_conflict_key(output);
+                    if output_paths.contains(&key) || !job_keys.insert(key) {
+                        preflight_events.push(BatchProgressEvent::FileError {
+                            index,
+                            input: options.input,
+                            error: CommandError::batch_failed(format!(
+                                "输出路径在本批次内重复: {}",
+                                output.display()
+                            )),
+                        });
+                        continue 'jobs;
+                    }
                 }
-                let key = output_conflict_key(&output);
-                if !output_paths.insert(key) {
-                    preflight_events.push(BatchProgressEvent::FileError {
-                        index,
-                        input: options.input,
-                        error: CommandError::batch_failed(format!(
-                            "输出路径在本批次内重复: {}",
-                            output.display()
-                        )),
-                    });
-                    continue;
-                }
+                output_paths.extend(job_keys);
             }
             Err(_) => {
                 // Let convert() report the exact validation error through the normal file path.
@@ -1899,17 +2499,47 @@ fn prepare_batch_work(
     (jobs, preflight_events)
 }
 
-fn output_conflict_key(output: &Path) -> PathBuf {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum OutputConflictKey {
+    Exact(PathBuf),
+    CaseFolded(String),
+}
+
+fn output_conflict_key(output: &Path) -> OutputConflictKey {
+    output_conflict_key_for(
+        output,
+        cfg!(any(target_os = "windows", target_os = "macos")),
+    )
+}
+
+fn output_conflict_key_for(output: &Path, case_insensitive: bool) -> OutputConflictKey {
     let Some(parent) = output.parent() else {
-        return output.to_path_buf();
+        return path_conflict_key(output.to_path_buf(), case_insensitive);
     };
     let Some(file_name) = output.file_name() else {
-        return output.to_path_buf();
+        return path_conflict_key(output.to_path_buf(), case_insensitive);
     };
-    match fs::canonicalize(parent) {
-        Ok(parent) => parent.join(file_name),
-        Err(_) => output.to_path_buf(),
+    let parent = fs::canonicalize(parent)
+        .or_else(|_| std::path::absolute(parent))
+        .unwrap_or_else(|_| parent.to_path_buf());
+    path_conflict_key(parent.join(file_name), case_insensitive)
+}
+
+fn path_conflict_key(path: PathBuf, case_insensitive: bool) -> OutputConflictKey {
+    if !case_insensitive {
+        return OutputConflictKey::Exact(path);
     }
+
+    // Windows and default macOS volumes compare names case-insensitively; macOS
+    // also treats canonically equivalent Unicode spellings as the same name.
+    // NFKC + lowercase is deliberately conservative: a rare false collision is
+    // safer than allowing parallel writers to race for one filesystem entry.
+    let folded = path
+        .to_string_lossy()
+        .nfkc()
+        .flat_map(char::to_lowercase)
+        .collect();
+    OutputConflictKey::CaseFolded(folded)
 }
 
 fn input_identity_index(
@@ -2077,9 +2707,28 @@ fn batch_worker_loop(
             break;
         }
 
-        let event = match convert(&opts) {
+        let report_pdf_progress = |completed: usize, total: usize| {
+            let fraction = if total == 0 {
+                1.0
+            } else {
+                completed as f64 / total as f64
+            };
+            let _ = send_worker_event(
+                &tx,
+                BatchProgressEvent::FileProgress {
+                    index,
+                    percent: 5.0 + fraction * 90.0,
+                    stage: BatchProgressStage::ReadingAndConverting,
+                },
+                &cancel,
+            );
+        };
+        let event = match convert_with_control(&opts, Some(&cancel), Some(&report_pdf_progress)) {
             Ok(result) => BatchProgressEvent::FileFinished { index, result },
             Err(detail) => {
+                if cancel.is_cancelled() {
+                    break;
+                }
                 let skipped = should_count_as_skipped(&opts, &detail);
                 let error = command_error_for_conversion(&opts, detail);
                 if skipped {
@@ -2198,6 +2847,12 @@ fn apply_memory_budget<'a>(
 }
 
 fn estimated_job_memory_bytes(options: &ConvertOptions) -> u64 {
+    if pdf::is_pdf_path(Path::new(&options.input)) {
+        // PDF rendering owns a document parser/cache plus one full RGBA page and the downstream
+        // image workflow. Run each PDF beside no other batch worker until measurements justify a
+        // tighter cross-document estimate.
+        return BATCH_MEMORY_BUDGET_BYTES;
+    }
     // `read_source_for_core` retains the complete source byte buffer while
     // core decodes and encodes it. Pixel dimensions alone therefore
     // underestimate batches of small-canvas files with unusually large
@@ -2205,9 +2860,31 @@ fn estimated_job_memory_bytes(options: &ConvertOptions) -> u64 {
     // available, and reserve the read ceiling if it is not, so an unreadable
     // or changing input cannot make the scheduler overcommit memory.
     let source_bytes = source_bytes_for_memory_budget(Path::new(&options.input));
-    let image_working_set = estimate_from_dimensions(options.source_width, options.source_height)
-        .unwrap_or(UNKNOWN_JOB_MEMORY_BYTES);
+    let image_working_set = estimated_image_working_set(options);
     image_working_set.saturating_add(source_bytes)
+}
+
+fn estimated_image_working_set(options: &ConvertOptions) -> u64 {
+    let Some(source_estimate) =
+        estimate_from_dimensions(options.source_width, options.source_height)
+    else {
+        return UNKNOWN_JOB_MEMORY_BYTES;
+    };
+    let (Some(source_width), Some(source_height)) = (options.source_width, options.source_height)
+    else {
+        return UNKNOWN_JOB_MEMORY_BYTES;
+    };
+    let resize = match resize_rule_for(options) {
+        Ok(resize) => resize,
+        Err(_) => return BATCH_MEMORY_BUDGET_BYTES,
+    };
+    let (output_width, output_height) = match resize.dimensions(source_width, source_height) {
+        Ok(dimensions) => dimensions,
+        Err(_) => return BATCH_MEMORY_BUDGET_BYTES,
+    };
+    let output_estimate = estimate_from_dimensions(Some(output_width), Some(output_height))
+        .unwrap_or(BATCH_MEMORY_BUDGET_BYTES);
+    source_estimate.max(output_estimate)
 }
 
 fn source_bytes_for_memory_budget(input: &Path) -> u64 {
@@ -2295,6 +2972,7 @@ struct CandidatePolicyCheck<'a> {
     target: Format,
     encode_options: &'a EncodeOptions,
     dimensions: Option<(u32, u32)>,
+    dimensions_changed: bool,
     source_size: u64,
     candidate_size: u64,
 }
@@ -2306,23 +2984,26 @@ fn candidate_policy_error(
     // SVG is a vector source, whereas every supported target is raster. Comparing the
     // compact SVG markup with raster bytes makes "skip if larger" reject legitimate
     // conversions almost every time, so size-based compression policy is not applicable.
-    if check.source_format != Some(Format::Svg)
+    if !check.dimensions_changed
+        && check.source_format != Some(Format::Svg)
         && should_skip_larger_candidate(opts, check.source_size, check.candidate_size)
     {
         return Some(skip_larger_message(check.source_size, check.candidate_size));
     }
-    if should_skip_generation_loss(
-        opts,
-        GenerationLossCheck {
-            source: check.source,
-            source_format: check.source_format,
-            target: check.target,
-            encode_options: check.encode_options,
-            dimensions: check.dimensions,
-            source_size: check.source_size,
-            candidate_size: check.candidate_size,
-        },
-    ) {
+    if !check.dimensions_changed
+        && should_skip_generation_loss(
+            opts,
+            GenerationLossCheck {
+                source: check.source,
+                source_format: check.source_format,
+                target: check.target,
+                encode_options: check.encode_options,
+                dimensions: check.dimensions,
+                source_size: check.source_size,
+                candidate_size: check.candidate_size,
+            },
+        )
+    {
         return Some(generation_loss_message(
             check.source_size,
             check.candidate_size,
@@ -2454,7 +3135,7 @@ fn result_cache_key(
 ) -> String {
     let source_hash = blake3::hash(source);
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"imgconvert-result-cache-v4\0");
+    hasher.update(b"imgconvert-result-cache-v5\0");
     hasher.update(source_hash.as_bytes());
     hasher.update(target.id().as_bytes());
     hasher.update(color_management_policy_id(color_policy));
@@ -2474,16 +3155,74 @@ fn result_cache_key(
     hasher.update(&[u8::from(encode_options.webp_sharp_yuv)]);
     hasher.update(&[u8::from(encode_options.jpeg_trellis)]);
     hasher.update(&[u8::from(encode_options.preserve_metadata)]);
+    let metadata_policy = metadata_policy_for(opts).unwrap_or(MetadataPolicy::StripAll);
+    hasher.update(match metadata_policy {
+        MetadataPolicy::StripAll => b"metadata:stripAll",
+        MetadataPolicy::ColorOnly => b"metadata:colorOnly",
+        MetadataPolicy::PreserveAll => b"metadata:preserveAll",
+    });
+    let resize = resize_rule_for(opts).unwrap_or_default();
+    hasher.update(match resize.mode {
+        ResizeMode::None => b"resize:none",
+        ResizeMode::Fit => b"resize:fit",
+        ResizeMode::Width => b"resize:width",
+        ResizeMode::Height => b"resize:height",
+        ResizeMode::LongestEdge => b"resize:longestEdge",
+        ResizeMode::Percentage => b"resize:percentage",
+    });
+    hash_optional_u32(&mut hasher, resize.width);
+    hash_optional_u32(&mut hasher, resize.height);
+    hash_optional_u32(&mut hasher, resize.value);
+    hasher.update(&[u8::from(resize.allow_upscale)]);
+    if let Ok(probe) = imgconvert_core::probe(source) {
+        if let Ok((width, height)) = resize.dimensions(probe.width, probe.height) {
+            hasher.update(&width.to_le_bytes());
+            hasher.update(&height.to_le_bytes());
+        }
+    }
+    match opts.target_size_bytes {
+        Some(max_bytes) => {
+            hasher.update(b"target-size:some");
+            hasher.update(&max_bytes.to_le_bytes());
+            hasher.update(&[auto_quality_min(opts.quality_floor, encode_options.quality)]);
+        }
+        None => {
+            hasher.update(b"target-size:none");
+        }
+    }
     hasher.update(&[u8::from(opts.multi_candidate)]);
     hasher.update(&[u8::from(opts.auto_quality)]);
     hasher.update(&opts.auto_quality_score.to_le_bytes());
     if should_use_auto_quality(opts, target, encode_options) {
         hasher.update(&[auto_quality_min(opts.quality_floor, encode_options.quality)]);
     }
-    if encode_options.preserve_metadata || color_policy == ColorManagementPolicy::ConvertToSrgb {
+    if metadata_policy != MetadataPolicy::StripAll
+        || color_policy == ColorManagementPolicy::ConvertToSrgb
+    {
         hash_metadata_override(&mut hasher, metadata_override);
+    } else {
+        // stripAll converts profiled pixels to sRGB before removing the ICC, including when resize
+        // is disabled or becomes a no-op. Hash the helper override profile so different color
+        // interpretations can never reuse the same cached pixels.
+        hash_optional_metadata_blob(
+            &mut hasher,
+            b"strip-all-icc",
+            metadata_override.and_then(|metadata| metadata.icc.as_deref()),
+        );
     }
     hasher.finalize().to_hex().to_string()
+}
+
+fn hash_optional_u32(hasher: &mut blake3::Hasher, value: Option<u32>) {
+    match value {
+        Some(value) => {
+            hasher.update(b"1");
+            hasher.update(&value.to_le_bytes());
+        }
+        None => {
+            hasher.update(b"0");
+        }
+    }
 }
 
 fn hash_metadata_override(hasher: &mut blake3::Hasher, metadata: Option<&RawMetadata>) {
@@ -2509,120 +3248,6 @@ fn hash_optional_metadata_blob(hasher: &mut blake3::Hasher, label: &[u8], bytes:
         hasher.update(b"0");
     }
     hasher.update(b"\0");
-}
-
-fn result_cache_hit(out: &Path, key: &str) -> Option<u64> {
-    let record = read_result_cache_record(key)?;
-    let (output_size, output_hash) = blake3_hash_file(out)?;
-    if output_size == record.output_size && output_hash.to_hex().as_str() == record.output_hash {
-        Some(output_size)
-    } else {
-        None
-    }
-}
-
-fn blake3_hash_file(path: &Path) -> Option<(u64, blake3::Hash)> {
-    let mut file = File::open(path).ok()?;
-    let output_size = file.metadata().ok()?.len();
-    let mut hasher = blake3::Hasher::new();
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer).ok()?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Some((output_size, hasher.finalize()))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ResultCacheRecord {
-    output_hash: String,
-    output_size: u64,
-}
-
-fn read_result_cache_record(key: &str) -> Option<ResultCacheRecord> {
-    let path = result_cache_record_path(key)?;
-    let data = fs::read_to_string(path).ok()?;
-    parse_result_cache_record(&data)
-}
-
-fn write_result_cache_record(key: &str, output: &[u8], output_size: u64) {
-    let Some(path) = result_cache_record_path(key) else {
-        return;
-    };
-    let Some(parent) = path.parent() else {
-        return;
-    };
-    if fs::create_dir_all(parent).is_err() {
-        return;
-    }
-    let record = format!("v1\n{}\n{}\n", blake3::hash(output).to_hex(), output_size);
-    let _ = fs::write(path, record);
-}
-
-fn parse_result_cache_record(data: &str) -> Option<ResultCacheRecord> {
-    let mut lines = data.lines();
-    if lines.next()? != "v1" {
-        return None;
-    }
-    let output_hash = lines.next()?.trim().to_string();
-    let output_size = lines.next()?.trim().parse().ok()?;
-    if output_hash.len() != 64 || !output_hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return None;
-    }
-    Some(ResultCacheRecord {
-        output_hash,
-        output_size,
-    })
-}
-
-fn result_cache_record_path(key: &str) -> Option<PathBuf> {
-    if key.len() != 64 || !key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return None;
-    }
-    Some(result_cache_dir()?.join(format!("{key}.txt")))
-}
-
-fn result_cache_dir() -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("IMGCONVERT_RESULT_CACHE_DIR") {
-        return Some(PathBuf::from(dir));
-    }
-
-    platform_result_cache_dir()
-}
-
-#[cfg(target_os = "windows")]
-fn platform_result_cache_dir() -> Option<PathBuf> {
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .map(|base| base.join("ImgConvert").join("Cache").join("results"))
-}
-
-#[cfg(target_os = "macos")]
-fn platform_result_cache_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).map(|home| {
-        home.join("Library")
-            .join("Caches")
-            .join("ImgConvert")
-            .join("results")
-    })
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn platform_result_cache_dir() -> Option<PathBuf> {
-    if let Some(cache_home) = std::env::var_os("XDG_CACHE_HOME") {
-        return Some(PathBuf::from(cache_home).join("imgconvert").join("results"));
-    }
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".cache").join("imgconvert").join("results"))
-}
-
-#[cfg(not(any(unix, target_os = "windows")))]
-fn platform_result_cache_dir() -> Option<PathBuf> {
-    None
 }
 
 fn should_count_as_skipped(opts: &ConvertOptions, message: &str) -> bool {
@@ -2785,7 +3410,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         }
     }
 
@@ -2843,6 +3472,30 @@ mod tests {
             output_denied.params,
             Some(serde_json::json!({ "path": "/images" }))
         );
+
+        options.input = "/documents/protected.pdf".to_string();
+        let protected = command_error_for_conversion(
+            &options,
+            format!("{} encrypted", pdf::PDF_PASSWORD_PROTECTED_PREFIX),
+        );
+        assert_eq!(
+            protected.code,
+            crate::command_error::ErrorCode::PdfPasswordProtected
+        );
+        assert_eq!(
+            protected.params,
+            Some(serde_json::json!({ "path": "/documents/protected.pdf" }))
+        );
+
+        let limited = command_error_for_conversion(
+            &options,
+            format!("{} too many pixels", pdf::PDF_RESOURCE_LIMIT_PREFIX),
+        );
+        assert_eq!(
+            limited.code,
+            crate::command_error::ErrorCode::PdfResourceLimit
+        );
+        options.input = "/images/source.png".to_string();
 
         let output_exists = command_error_for_conversion(
             &options,
@@ -2907,6 +3560,41 @@ mod tests {
             fallback.params,
             Some(serde_json::json!({ "path": "/images/source.png" }))
         );
+    }
+
+    #[test]
+    fn pdf_page_context_preserves_typed_error_prefixes() {
+        let cases = [
+            (
+                pdf::PDF_PASSWORD_PROTECTED_PREFIX,
+                crate::command_error::ErrorCode::PdfPasswordProtected,
+            ),
+            (
+                pdf::PDF_SETTINGS_INVALID_PREFIX,
+                crate::command_error::ErrorCode::PdfSettingsInvalid,
+            ),
+            (
+                pdf::PDF_RESOURCE_LIMIT_PREFIX,
+                crate::command_error::ErrorCode::PdfResourceLimit,
+            ),
+            (
+                pdf::PDF_INVALID_PREFIX,
+                crate::command_error::ErrorCode::PdfInvalid,
+            ),
+        ];
+
+        for (prefix, expected_code) in cases {
+            let wrapped = pdf_partial_error(2, 1, &format!("{prefix} renderer detail"));
+            assert!(wrapped.starts_with(prefix));
+            assert!(wrapped.contains("PDF 第 3 页转换失败"));
+            assert!(wrapped.contains("此前已完成 1 页"));
+            assert_eq!(
+                command_error_for_pdf("/documents/input.pdf", &wrapped)
+                    .expect("typed PDF error should still map")
+                    .code,
+                expected_code
+            );
+        }
     }
 
     #[test]
@@ -3551,6 +4239,93 @@ mod tests {
     }
 
     #[test]
+    fn result_cache_key_includes_override_icc_when_resize_transforms_pixels() {
+        let mut options = test_convert_options("/tmp/input.png".to_string());
+        options.result_cache = true;
+        options.metadata_policy = Some("stripAll".to_string());
+        options.preserve_metadata = Some(false);
+        options.resize = Some(ResizeOptions {
+            mode: Some("width".to_string()),
+            width: Some(800),
+            height: None,
+            value: None,
+            allow_upscale: false,
+        });
+        let encode = encode_options_for(&options, Format::Png);
+        let metadata_a = RawMetadata {
+            icc: Some(b"ICC-A".to_vec()),
+            exif: None,
+            xmp: None,
+            iptc: None,
+        };
+        let metadata_b = RawMetadata {
+            icc: Some(b"ICC-B".to_vec()),
+            exif: None,
+            xmp: None,
+            iptc: None,
+        };
+
+        let key_a = result_cache_key(
+            &options,
+            Format::Png,
+            &encode,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            Some(&metadata_a),
+        );
+        let key_b = result_cache_key(
+            &options,
+            Format::Png,
+            &encode,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            Some(&metadata_b),
+        );
+
+        assert_ne!(key_a, key_b);
+    }
+
+    #[test]
+    fn result_cache_key_includes_override_icc_when_strip_all_converts_pixels() {
+        let mut options = test_convert_options("/tmp/input.png".to_string());
+        options.metadata_policy = Some("stripAll".to_string());
+        options.preserve_metadata = Some(false);
+        options.resize = None;
+        let encode = encode_options_for(&options, Format::Png);
+        let metadata_a = RawMetadata {
+            icc: Some(b"ICC-A".to_vec()),
+            exif: None,
+            xmp: None,
+            iptc: None,
+        };
+        let metadata_b = RawMetadata {
+            icc: Some(b"ICC-B".to_vec()),
+            exif: None,
+            xmp: None,
+            iptc: None,
+        };
+
+        let key_a = result_cache_key(
+            &options,
+            Format::Png,
+            &encode,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            Some(&metadata_a),
+        );
+        let key_b = result_cache_key(
+            &options,
+            Format::Png,
+            &encode,
+            ColorManagementPolicy::PreserveEmbeddedProfile,
+            b"source-a",
+            Some(&metadata_b),
+        );
+
+        assert_ne!(key_a, key_b);
+    }
+
+    #[test]
     fn candidate_policy_error_applies_skip_if_larger_to_cached_size() {
         let mut options = test_convert_options("/tmp/input.png".to_string());
         options.skip_if_larger = true;
@@ -3564,6 +4339,7 @@ mod tests {
                 target: Format::Jpeg,
                 encode_options: &encode,
                 dimensions: Some((1, 1)),
+                dimensions_changed: false,
                 source_size: 42,
                 candidate_size: 42,
             },
@@ -3587,45 +4363,13 @@ mod tests {
                 target: Format::Jpeg,
                 encode_options: &encode,
                 dimensions: Some((1, 1)),
+                dimensions_changed: false,
                 source_size: 96,
                 candidate_size: 512,
             },
         );
 
         assert!(message.is_none());
-    }
-
-    #[test]
-    fn blake3_hash_file_reports_size_and_hash() {
-        let dir = unique_test_dir("hash-file");
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("out.bin");
-        let data = b"cached-output";
-        fs::write(&path, data).unwrap();
-
-        let (size, hash) = blake3_hash_file(&path).unwrap();
-
-        assert_eq!(size, data.len() as u64);
-        assert_eq!(hash, blake3::hash(data));
-
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn result_cache_record_parser_rejects_malformed_data() {
-        let valid_hash = "a".repeat(64);
-        let valid = format!("v1\n{valid_hash}\n42\n");
-
-        assert_eq!(
-            parse_result_cache_record(&valid),
-            Some(ResultCacheRecord {
-                output_hash: valid_hash,
-                output_size: 42,
-            })
-        );
-        assert!(parse_result_cache_record("v0\nabc\n42\n").is_none());
-        assert!(parse_result_cache_record("v1\nnot-hex\n42\n").is_none());
-        assert!(parse_result_cache_record("v1\nabc\nsize\n").is_none());
     }
 
     #[test]
@@ -3822,6 +4566,70 @@ mod tests {
 
         assert_eq!(serialized["code"], "previousOutputBackupRetained");
         assert_eq!(serialized["path"], "/tmp/imgconvert-backup");
+
+        let warning = ConvertWarning::ModifiedTimeNotPreserved {
+            path: "/tmp/converted.png".to_string(),
+        };
+        let serialized = serde_json::to_value(warning).unwrap();
+        assert_eq!(serialized["code"], "modifiedTimeNotPreserved");
+        assert_eq!(serialized["path"], "/tmp/converted.png");
+
+        let warning = ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
+            backup_path: "/tmp/imgconvert-backup".to_string(),
+            output_path: "/tmp/converted.png".to_string(),
+        };
+        let serialized = serde_json::to_value(warning).unwrap();
+        assert_eq!(
+            serialized["code"],
+            "outputBackupRetainedAndModifiedTimeNotPreserved"
+        );
+        assert_eq!(serialized["backupPath"], "/tmp/imgconvert-backup");
+        assert_eq!(serialized["outputPath"], "/tmp/converted.png");
+
+        let serialized =
+            serde_json::to_value(ConvertWarning::InvalidColorProfileDiscarded).unwrap();
+        assert_eq!(serialized["code"], "invalidColorProfileDiscarded");
+
+        let serialized =
+            serde_json::to_value(ConvertWarning::PdfRenderWarnings { page: 3, count: 2 }).unwrap();
+        assert_eq!(serialized["code"], "pdfRenderWarnings");
+        assert_eq!(serialized["page"], 3);
+        assert_eq!(serialized["count"], 2);
+    }
+
+    #[test]
+    fn cached_workflow_reconstructs_all_persistent_warnings() {
+        let mut options = path_conversion_smoke_options(
+            "/tmp/source.png".to_string(),
+            Some("/tmp".to_string()),
+            "jpeg".to_string(),
+        );
+        options.target_size_bytes = Some(16 * 1024);
+        let warnings = cached_workflow_warnings(
+            &options,
+            result_cache::CacheHit {
+                output_size: 20 * 1024,
+                workflow: result_cache::CachedWorkflowStatus {
+                    width: 320,
+                    height: 200,
+                    selected_quality: Some(30),
+                    target_size_met: Some(false),
+                    color_profile_converted_for_resize: false,
+                    invalid_color_profile_discarded: true,
+                },
+            },
+        );
+
+        assert_eq!(
+            warnings,
+            vec![
+                ConvertWarning::InvalidColorProfileDiscarded,
+                ConvertWarning::TargetSizeNotMet {
+                    target_bytes: 16 * 1024,
+                    actual_bytes: 20 * 1024,
+                },
+            ]
+        );
     }
 
     #[test]
@@ -3927,7 +4735,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
         let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
         let summary =
@@ -4056,7 +4868,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
 
         let plan = conversion_plan(&[options]);
@@ -4170,6 +4986,15 @@ mod tests {
     }
 
     #[test]
+    fn output_path_rejects_invalid_output_directory_instead_of_using_source_parent() {
+        let mut options = test_convert_options("/images/source.png".to_string());
+        options.out_dir = Some("https://example.com/output".to_string());
+
+        let error = output_path(&options).unwrap_err();
+        assert!(error.contains("不支持的路径 URL scheme"));
+    }
+
+    #[test]
     fn batch_preflight_rejects_output_that_would_replace_another_queued_input() {
         let dir = unique_test_dir("batch-input-collision");
         fs::create_dir_all(&dir).unwrap();
@@ -4277,7 +5102,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
 
         let output = output_path(&options).unwrap();
@@ -4366,7 +5195,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
 
         let err = output_path(&options).unwrap_err();
@@ -4418,7 +5251,11 @@ mod tests {
                 output_suffix: None,
                 allow_source_overwrite: false,
                 preserve_metadata: Some(false),
+                metadata_policy: None,
+                resize: None,
+                target_size_bytes: None,
                 color_management_policy: None,
+                pdf: None,
             })
             .collect();
         let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
@@ -4481,7 +5318,11 @@ mod tests {
                 output_suffix: None,
                 allow_source_overwrite: false,
                 preserve_metadata: Some(false),
+                metadata_policy: None,
+                resize: None,
+                target_size_bytes: None,
                 color_management_policy: None,
+                pdf: None,
             })
             .collect();
         let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
@@ -4495,6 +5336,22 @@ mod tests {
         assert!(out_dir.join("sample.jpg").exists());
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn output_conflict_keys_model_case_insensitive_filesystems() {
+        let parent = unique_test_dir("case-insensitive-output-key");
+        let upper = parent.join("Photo.É.JPG");
+        let lower_decomposed = parent.join("photo.e\u{301}.jpg");
+
+        assert_eq!(
+            output_conflict_key_for(&upper, true),
+            output_conflict_key_for(&lower_decomposed, true)
+        );
+        assert_ne!(
+            output_conflict_key_for(&upper, false),
+            output_conflict_key_for(&lower_decomposed, false)
+        );
     }
 
     #[test]
@@ -4539,7 +5396,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
 
         let result = convert(&options).unwrap();
@@ -4552,6 +5413,29 @@ mod tests {
         assert!(delta < std::time::Duration::from_secs(2));
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn modified_time_failure_preserves_an_existing_backup_warning() {
+        let dir = unique_test_dir("mtime-warning");
+        let missing = dir.join("missing.jpg");
+        let warning = preserve_source_modified_time(
+            &missing,
+            Some(UNIX_EPOCH),
+            Some(ConvertWarning::PreviousOutputBackupRetained {
+                path: "backup.jpg".to_string(),
+            }),
+        );
+
+        assert_eq!(
+            warning,
+            Some(
+                ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
+                    backup_path: "backup.jpg".to_string(),
+                    output_path: missing.to_string_lossy().to_string(),
+                }
+            )
+        );
     }
 
     #[test]
@@ -4654,6 +5538,32 @@ mod tests {
     }
 
     #[test]
+    fn memory_budget_accounts_for_resize_upscaling() {
+        let dir = unique_test_dir("memory-budget-upscale");
+        fs::create_dir_all(&dir).unwrap();
+        let jobs = (0..4)
+            .map(|index| {
+                let input = dir.join(format!("upscale-{index}.png"));
+                File::create(&input).unwrap();
+                let mut options = test_convert_options(input.to_string_lossy().into_owned());
+                options.source_width = Some(1000);
+                options.source_height = Some(1000);
+                options.resize = Some(ResizeOptions {
+                    mode: Some("width".to_string()),
+                    width: Some(8000),
+                    height: None,
+                    value: None,
+                    allow_upscale: true,
+                });
+                IndexedConvertOptions { index, options }
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(apply_memory_budget(4, jobs.iter()), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn memory_budget_accounts_for_retained_source_bytes() {
         let dir = unique_test_dir("memory-budget-source-bytes");
         fs::create_dir_all(&dir).unwrap();
@@ -4731,7 +5641,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
         let token = CancellationToken::new();
         token.cancel();
@@ -4790,7 +5704,11 @@ mod tests {
             output_suffix: None,
             allow_source_overwrite: false,
             preserve_metadata: Some(false),
+            metadata_policy: None,
+            resize: None,
+            target_size_bytes: None,
             color_management_policy: None,
+            pdf: None,
         };
         let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
         let summary =
@@ -4802,6 +5720,86 @@ mod tests {
         assert_eq!(summary.failed, 0);
         assert!(!summary.cancelled);
         assert_eq!(fs::read(output).unwrap(), b"old");
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn pdf_conversion_plans_and_writes_only_selected_pages() {
+        let dir = unique_test_dir("pdf-selected-pages");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("document.pdf");
+        fs::write(&input, crate::pdf::tests::minimal_pdf(3)).unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(out_dir.to_string_lossy().to_string());
+        options.format = "png".to_string();
+        options.lossless = true;
+        options.output_suffix = Some("_done".to_string());
+        options.pdf = Some(PdfConvertOptions {
+            dpi: 72,
+            page_range: Some("1, 3".to_string()),
+        });
+
+        let plan = conversion_plan(&[options.clone()]);
+        assert_eq!(plan[0].output_count, 2);
+        assert_eq!(plan[0].existing_output_count, 0);
+        assert_eq!(
+            plan[0].output.as_deref(),
+            Some(
+                out_dir
+                    .join("document_done-page-001.png")
+                    .to_string_lossy()
+                    .as_ref()
+            )
+        );
+
+        let result = convert(&options).unwrap();
+        assert_eq!(result.output_count, 2);
+        assert_eq!(result.skipped_output_count, 0);
+        assert!(out_dir.join("document_done-page-001.png").exists());
+        assert!(!out_dir.join("document_done-page-002.png").exists());
+        let third = out_dir.join("document_done-page-003.png");
+        assert!(third.exists());
+        let probe = imgconvert_core::probe(&fs::read(third).unwrap()).unwrap();
+        assert_eq!((probe.width, probe.height), (72, 72));
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn pdf_skip_policy_keeps_existing_pages_and_writes_the_rest() {
+        let dir = unique_test_dir("pdf-partial-skip");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&out_dir).unwrap();
+        let input = dir.join("document.pdf");
+        fs::write(&input, crate::pdf::tests::minimal_pdf(2)).unwrap();
+        let first = out_dir.join("document-page-001.png");
+        fs::write(&first, b"existing page").unwrap();
+
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(out_dir.to_string_lossy().to_string());
+        options.format = "png".to_string();
+        options.lossless = true;
+        options.pdf = Some(PdfConvertOptions {
+            dpi: 72,
+            page_range: None,
+        });
+
+        let plan = conversion_plan(&[options.clone()]);
+        assert_eq!(plan[0].output_count, 2);
+        assert_eq!(plan[0].existing_output_count, 1);
+        assert!(plan[0].exists);
+
+        let result = convert(&options).unwrap();
+        assert_eq!(result.output_count, 1);
+        assert_eq!(result.skipped_output_count, 1);
+        assert_eq!(fs::read(&first).unwrap(), b"existing page");
+        assert!(out_dir.join("document-page-002.png").is_file());
+        assert!(result
+            .warnings
+            .contains(&ConvertWarning::PdfPagesSkippedExisting { count: 1 }));
 
         fs::remove_dir_all(dir).unwrap();
     }

@@ -22,12 +22,17 @@ pub enum ErrorCode {
     OutputConflictsWithInput,
     OutputSafetyCheckFailed,
     OutputNotSmaller,
+    PdfPasswordProtected,
+    PdfSettingsInvalid,
+    PdfResourceLimit,
+    PdfInvalid,
     ConversionFailed,
     BatchFailed,
     ImportFailed,
     ClipboardImportFailed,
     NativeDialogFailed,
     ThumbnailFailed,
+    PreviewFailed,
     CodecConfigurationFailed,
     TaskFailed,
 }
@@ -100,6 +105,22 @@ impl CommandError {
         Self::with_path(ErrorCode::OutputNotSmaller, path, detail)
     }
 
+    pub fn pdf_password_protected(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::PdfPasswordProtected, path, detail)
+    }
+
+    pub fn pdf_settings_invalid(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::PdfSettingsInvalid, path, detail)
+    }
+
+    pub fn pdf_resource_limit(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::PdfResourceLimit, path, detail)
+    }
+
+    pub fn pdf_invalid(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::PdfInvalid, path, detail)
+    }
+
     pub fn conversion_failed(path: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::with_path(ErrorCode::ConversionFailed, path, detail)
     }
@@ -123,6 +144,10 @@ impl CommandError {
 
     pub fn thumbnail_failed(path: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::with_path(ErrorCode::ThumbnailFailed, path, detail)
+    }
+
+    pub fn preview_failed(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::PreviewFailed, path, detail)
     }
 
     pub fn codec_configuration_failed(path: Option<&str>, detail: impl Into<String>) -> Self {

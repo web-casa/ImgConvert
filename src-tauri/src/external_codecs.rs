@@ -10,8 +10,10 @@ use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Read;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Mutex};
 use std::thread;
@@ -1118,20 +1120,22 @@ fn system_helper_diagnostics() -> Vec<SystemHelperDiagnostic> {
 
     HEIC_HELPERS
         .iter()
-        .map(|command| match find_executable_in_path(command, &paths) {
-            Some(path) => SystemHelperDiagnostic {
-                command: (*command).to_string(),
-                available: true,
-                path: Some(path.to_string_lossy().to_string()),
-                message: None,
+        .map(
+            |command| match find_trusted_executable_in_path(command, &paths) {
+                Some(path) => SystemHelperDiagnostic {
+                    command: (*command).to_string(),
+                    available: true,
+                    path: Some(path.to_string_lossy().to_string()),
+                    message: None,
+                },
+                None => SystemHelperDiagnostic {
+                    command: (*command).to_string(),
+                    available: false,
+                    path: None,
+                    message: Some(DiagnosticMessage::new("helperNotFoundInTrustedPath")),
+                },
             },
-            None => SystemHelperDiagnostic {
-                command: (*command).to_string(),
-                available: false,
-                path: None,
-                message: Some(DiagnosticMessage::new("helperNotFoundInTrustedPath")),
-            },
-        })
+        )
         .collect()
 }
 
@@ -1159,17 +1163,32 @@ fn load_manifest_helper(manifest_path: &Path) -> Result<Helper, String> {
     })?;
 
     let bytes = read_manifest_bytes(&manifest_path, &manifest_metadata)?;
-    let manifest: CodecManifest = serde_json::from_slice(&bytes).map_err(|error| {
-        format!(
-            "HEIC_PLUGIN_MANIFEST_PARSE_FAILED: {}: {error}",
-            manifest_path.display()
-        )
-    })?;
-
-    validate_manifest(&manifest)?;
+    let manifest = parse_and_validate_manifest(&bytes, &manifest_path.display().to_string())?;
     let helper_path = resolve_manifest_helper_path(manifest_dir, &manifest.decode.command)?;
     let args = validate_manifest_args(&manifest.decode.args)?;
     Ok(Helper::manifest(manifest, helper_path, args))
+}
+
+fn parse_and_validate_manifest(bytes: &[u8], source: &str) -> Result<CodecManifest, String> {
+    let manifest: CodecManifest = serde_json::from_slice(bytes)
+        .map_err(|error| format!("HEIC_PLUGIN_MANIFEST_PARSE_FAILED: {source}: {error}"))?;
+    validate_manifest(&manifest)?;
+    Ok(manifest)
+}
+
+#[cfg(feature = "fuzzing")]
+pub(crate) fn fuzz_manifest_bytes(bytes: &[u8]) {
+    if bytes.len() > MAX_PLUGIN_MANIFEST_BYTES {
+        return;
+    }
+    let Ok(manifest) = parse_and_validate_manifest(bytes, "<fuzz>") else {
+        return;
+    };
+    let _ = validate_manifest_args(&manifest.decode.args);
+    let command = Path::new(&manifest.decode.command);
+    if !command.is_absolute() {
+        let _ = validate_relative_helper_path(command);
+    }
 }
 
 fn read_manifest_bytes(manifest_path: &Path, metadata: &fs::Metadata) -> Result<Vec<u8>, String> {
@@ -1431,14 +1450,14 @@ fn validate_manifest_args(args: &[String]) -> Result<Vec<String>, String> {
 
 fn find_heic_helper_in_path(paths: &OsStr) -> Option<Helper> {
     for command in HEIC_HELPERS {
-        if let Some(path) = find_executable_in_path(command, paths) {
+        if let Some(path) = find_trusted_executable_in_path(command, paths) {
             return Some(Helper::system(command, path));
         }
     }
     None
 }
 
-fn find_executable_in_path(command: &'static str, paths: &OsStr) -> Option<PathBuf> {
+pub(crate) fn find_trusted_executable_in_path(command: &str, paths: &OsStr) -> Option<PathBuf> {
     for dir in env::split_paths(paths) {
         if !is_trusted_path_dir(&dir) {
             continue;
@@ -1749,6 +1768,8 @@ fn run_decode_helper(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+    #[cfg(unix)]
+    command.process_group(0);
     let mut attempts = 0;
     let mut child = loop {
         match command.spawn() {
@@ -1782,8 +1803,7 @@ fn run_decode_helper(
             break status;
         }
         if started.elapsed() >= HEIC_DECODE_TIMEOUT {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_helper_process_tree(&mut child);
             let stderr = join_capped_reader(stderr_reader);
             return Err(format!(
                 "HEIC helper {} 解码超时({}s){}",
@@ -1795,6 +1815,8 @@ fn run_decode_helper(
         thread::sleep(Duration::from_millis(50));
     };
 
+    #[cfg(unix)]
+    terminate_remaining_helper_process_group(child.id());
     let stderr = join_capped_reader(stderr_reader);
     if status.success() {
         Ok(stderr)
@@ -1810,6 +1832,39 @@ fn run_decode_helper(
             }
         ))
     }
+}
+
+fn terminate_helper_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        // The helper starts as its own process-group leader above. Killing the
+        // group also terminates shell-wrapper grandchildren that may still own
+        // stderr and would otherwise keep the drain thread alive indefinitely.
+        let killed_group = kill_helper_process_group(child.id());
+        if !killed_group {
+            let _ = child.kill();
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = child.kill();
+    }
+    let _ = child.wait();
+}
+
+#[cfg(unix)]
+fn terminate_remaining_helper_process_group(pid: u32) {
+    // A shell wrapper can report success while a background grandchild still
+    // owns stderr. Once the declared helper has exited, no descendant is part
+    // of the conversion contract, so close the entire remaining group.
+    let _ = kill_helper_process_group(pid);
+}
+
+#[cfg(unix)]
+fn kill_helper_process_group(pid: u32) -> bool {
+    i32::try_from(pid)
+        .ok()
+        .is_some_and(|pid| unsafe { libc::kill(-pid, libc::SIGKILL) == 0 })
 }
 
 fn read_decoded_png(workdir: &Path, output: &Path) -> Result<Vec<u8>, String> {
@@ -1998,6 +2053,65 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     static SELECTED_HELPER_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    #[cfg(unix)]
+    #[test]
+    fn terminating_helper_group_closes_grandchild_stderr_pipe() {
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg("sleep 30 & wait")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        command.process_group(0);
+        let mut child = command.spawn().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        thread::sleep(Duration::from_millis(50));
+
+        terminate_helper_process_tree(&mut child);
+
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = stderr.read_to_end(&mut bytes);
+            let _ = sender.send(result);
+        });
+        assert!(receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("process-group kill should close inherited stderr")
+            .is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn completed_shell_helper_does_not_leave_background_stderr_owner() {
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg("sleep 30 & exit 0")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        command.process_group(0);
+        let mut child = command.spawn().unwrap();
+        let pid = child.id();
+        let mut stderr = child.stderr.take().unwrap();
+        assert!(child.wait().unwrap().success());
+
+        terminate_remaining_helper_process_group(pid);
+
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = stderr.read_to_end(&mut bytes);
+            let _ = sender.send(result);
+        });
+        assert!(receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("remaining process-group kill should close inherited stderr")
+            .is_ok());
+    }
 
     fn unique_test_dir(name: &str) -> PathBuf {
         let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -2392,7 +2506,8 @@ mod tests {
         let helper = dir.join("imgconvert-heic-helper.exe");
         fs::write(&helper, b"helper").unwrap();
 
-        let found = find_executable_in_path("imgconvert-heic-helper", dir.as_os_str()).unwrap();
+        let found =
+            find_trusted_executable_in_path("imgconvert-heic-helper", dir.as_os_str()).unwrap();
 
         assert_eq!(found, fs::canonicalize(&helper).unwrap());
 
@@ -2406,7 +2521,9 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("imgconvert-heic-helper"), b"helper").unwrap();
 
-        assert!(find_executable_in_path("imgconvert-heic-helper", dir.as_os_str()).is_none());
+        assert!(
+            find_trusted_executable_in_path("imgconvert-heic-helper", dir.as_os_str()).is_none()
+        );
 
         fs::remove_dir_all(dir).unwrap();
     }

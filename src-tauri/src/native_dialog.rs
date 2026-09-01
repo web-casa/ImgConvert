@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
+use std::env;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -10,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
-use crate::access;
+use crate::{access, external_codecs};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,24 +74,28 @@ pub fn pick_paths(options: &NativePickOptions) -> Result<Vec<String>, String> {
 
 fn pick_paths_linux(options: &NativePickOptions) -> Result<Vec<String>, String> {
     let mut errors = Vec::new();
+    let fixed_dirs = [Path::new("/usr/bin"), Path::new("/usr/local/bin")];
+    let search_path = env::var_os("PATH")
+        .and_then(|paths| {
+            env::join_paths(
+                env::split_paths(&paths).chain(fixed_dirs.iter().map(|dir| dir.to_path_buf())),
+            )
+            .ok()
+        })
+        .or_else(|| env::join_paths(fixed_dirs).ok());
 
-    for command in ["/usr/bin/zenity", "/usr/local/bin/zenity"] {
-        if !Path::new(command).is_file() {
-            continue;
+    if let Some(paths) = search_path.as_deref() {
+        if let Some(command) = external_codecs::find_trusted_executable_in_path("zenity", paths) {
+            match run_zenity(&command, options) {
+                Ok(paths) => return Ok(paths),
+                Err(error) => errors.push(error),
+            }
         }
-        match run_zenity(command, options) {
-            Ok(paths) => return Ok(paths),
-            Err(error) => errors.push(error),
-        }
-    }
-
-    for command in ["/usr/bin/kdialog", "/usr/local/bin/kdialog"] {
-        if !Path::new(command).is_file() {
-            continue;
-        }
-        match run_kdialog(command, options) {
-            Ok(paths) => return Ok(paths),
-            Err(error) => errors.push(error),
+        if let Some(command) = external_codecs::find_trusted_executable_in_path("kdialog", paths) {
+            match run_kdialog(&command, options) {
+                Ok(paths) => return Ok(paths),
+                Err(error) => errors.push(error),
+            }
         }
     }
 
@@ -104,7 +109,7 @@ fn pick_paths_linux(options: &NativePickOptions) -> Result<Vec<String>, String> 
     }
 }
 
-fn run_zenity(command: &str, options: &NativePickOptions) -> Result<Vec<String>, String> {
+fn run_zenity(command: &Path, options: &NativePickOptions) -> Result<Vec<String>, String> {
     let separator = "\n";
     let mut cmd = host_dialog_command(command);
     cmd.arg("--file-selection");
@@ -130,11 +135,11 @@ fn run_zenity(command: &str, options: &NativePickOptions) -> Result<Vec<String>,
     run_dialog_command(cmd, "zenity")
 }
 
-fn run_kdialog(command: &str, options: &NativePickOptions) -> Result<Vec<String>, String> {
+fn run_kdialog(command: &Path, options: &NativePickOptions) -> Result<Vec<String>, String> {
     run_dialog_command(kdialog_command(command, options), "kdialog")
 }
 
-fn kdialog_command(command: &str, options: &NativePickOptions) -> Command {
+fn kdialog_command(command: &Path, options: &NativePickOptions) -> Command {
     let mut cmd = host_dialog_command(command);
     if let Some(title) = options.title.as_deref().filter(|title| !title.is_empty()) {
         cmd.arg("--title").arg(title);
@@ -350,7 +355,7 @@ fn push_pattern(patterns: &mut Vec<String>, pattern: String) {
     }
 }
 
-fn host_dialog_command(path: &str) -> Command {
+fn host_dialog_command(path: &Path) -> Command {
     let mut cmd = Command::new(path);
     for key in HOST_DIALOG_ENV_REMOVE {
         cmd.env_remove(key);
@@ -413,7 +418,7 @@ mod tests {
 
     #[test]
     fn host_dialog_environment_removes_appimage_and_toolkit_overrides() {
-        let cmd = host_dialog_command("/usr/bin/zenity");
+        let cmd = host_dialog_command(Path::new("/usr/bin/zenity"));
         let removed: Vec<_> = cmd
             .get_envs()
             .filter(|(_, value)| value.is_none())
@@ -448,7 +453,7 @@ mod tests {
             filter_name: None,
             all_files_name: None,
         };
-        let command = kdialog_command("/usr/bin/kdialog", &options);
+        let command = kdialog_command(Path::new("/usr/bin/kdialog"), &options);
         let arguments: Vec<_> = command
             .get_args()
             .map(|argument| argument.to_string_lossy().to_string())

@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "imgconvert-tauri-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Keep this nested fuzz package independent from the core-only repository
+# workspace while still allowing a path dependency on the parent Tauri crate.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+tauri-app-lib = { package = "imgconvert", path = "..", default-features = false, features = ["fuzzing"] }
+
+[[bin]]
+name = "external_codec_manifest"
+path = "fuzz_targets/external_codec_manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "import_scanner"
+path = "fuzz_targets/import_scanner.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pdf_document"
+path = "fuzz_targets/pdf_document.rs"
+test = false
+doc = false
+bench = false

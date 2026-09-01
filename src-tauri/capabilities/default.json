@@ -6,10 +6,16 @@
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
-    "os:default",
-    "opener:default",
-    "dialog:default",
-    "store:default",
+    "os:allow-locale",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/web-casa/ImgConvert/issues" }]
+    },
+    "dialog:allow-open",
+    "dialog:allow-message",
+    "store:allow-load",
+    "store:allow-get",
+    "store:allow-set",
     "fs:scope",
     "process:allow-restart"
   ]

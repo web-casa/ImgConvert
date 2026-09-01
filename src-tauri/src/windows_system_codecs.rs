@@ -129,13 +129,14 @@ mod platform {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use windows::core::{IUnknown, Interface, PCWSTR};
+    use windows::core::{IUnknown, Interface, PCWSTR, PWSTR};
     use windows::Win32::Foundation::{GENERIC_READ, RPC_E_CHANGED_MODE, S_FALSE, S_OK};
     use windows::Win32::Graphics::Imaging::{
         CLSID_WICImagingFactory, GUID_ContainerFormatHeif, GUID_ContainerFormatPng,
-        GUID_WICPixelFormat32bppBGRA, IWICBitmapDecoderInfo, IWICImagingFactory,
-        WICBitmapDitherTypeNone, WICBitmapEncoderNoCache, WICBitmapPaletteTypeCustom,
-        WICComponentEnumerateDefault, WICDecodeMetadataCacheOnDemand, WICDecoder,
+        GUID_WICPixelFormat32bppBGRA, IWICBitmapCodecInfo, IWICBitmapDecoderInfo,
+        IWICComponentInfo, IWICImagingFactory, WICBitmapDitherTypeNone, WICBitmapEncoderNoCache,
+        WICBitmapPaletteTypeCustom, WICComponentEnumerateDefault, WICDecodeMetadataCacheOnDemand,
+        WICDecoder,
     };
     use windows::Win32::System::Com::{
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
@@ -147,6 +148,7 @@ mod platform {
     use super::{require_single_heic_frame, DiagnosticMessage, HeicStatus};
 
     static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+    const MAX_WIC_STRING_CODE_UNITS: u32 = 64 * 1024;
 
     struct ComGuard {
         initialized: bool,
@@ -241,12 +243,29 @@ mod platform {
             return Ok(true);
         }
 
-        let mime_types = wic_string(|buffer, actual| info.GetMimeTypes(buffer, actual))
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let extensions = wic_string(|buffer, actual| info.GetFileExtensions(buffer, actual))
-            .unwrap_or_default()
-            .to_ascii_lowercase();
+        let codec_info: &IWICBitmapCodecInfo = info;
+        let mime_types = wic_string(|capacity, buffer, actual| {
+            (Interface::vtable(codec_info).GetMimeTypes)(
+                Interface::as_raw(codec_info),
+                capacity,
+                buffer,
+                actual,
+            )
+            .ok()
+        })
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+        let extensions = wic_string(|capacity, buffer, actual| {
+            (Interface::vtable(codec_info).GetFileExtensions)(
+                Interface::as_raw(codec_info),
+                capacity,
+                buffer,
+                actual,
+            )
+            .ok()
+        })
+        .unwrap_or_default()
+        .to_ascii_lowercase();
         Ok(mime_types.contains("image/heic")
             || mime_types.contains("image/heif")
             || extensions
@@ -256,8 +275,17 @@ mod platform {
     }
 
     unsafe fn decoder_label(info: &IWICBitmapDecoderInfo) -> String {
-        let friendly_name =
-            wic_string(|buffer, actual| info.GetFriendlyName(buffer, actual)).unwrap_or_default();
+        let component_info: &IWICComponentInfo = info;
+        let friendly_name = wic_string(|capacity, buffer, actual| {
+            (Interface::vtable(component_info).GetFriendlyName)(
+                Interface::as_raw(component_info),
+                capacity,
+                buffer,
+                actual,
+            )
+            .ok()
+        })
+        .unwrap_or_default();
         if friendly_name.trim().is_empty() {
             "WIC HEIF decoder".to_string()
         } else {
@@ -383,18 +411,32 @@ mod platform {
 
     unsafe fn wic_string<F>(mut read: F) -> Result<String, String>
     where
-        F: FnMut(&mut [u16], *mut u32) -> windows::core::Result<()>,
+        F: FnMut(u32, PWSTR, *mut u32) -> windows::core::Result<()>,
     {
         let mut actual = 0u32;
-        let mut buffer = vec![0u16; 512];
-        read(&mut buffer, &mut actual).map_err(|error| format!("读取 WIC 字符串失败: {error}"))?;
-        if actual as usize > buffer.len() {
-            buffer.resize(actual as usize, 0);
-            read(&mut buffer, &mut actual)
-                .map_err(|error| format!("读取 WIC 字符串失败: {error}"))?;
+        read(0, PWSTR::null(), &mut actual)
+            .map_err(|error| format!("读取 WIC 字符串长度失败: {error}"))?;
+        if actual == 0 {
+            return Ok(String::new());
         }
-        let actual = actual as usize;
-        let len = actual.min(buffer.len());
+        if actual > MAX_WIC_STRING_CODE_UNITS {
+            return Err(format!(
+                "WIC 字符串长度 {actual} 超过上限 {MAX_WIC_STRING_CODE_UNITS}"
+            ));
+        }
+
+        let capacity = actual;
+        let mut buffer = vec![0u16; capacity as usize];
+        let mut written = 0u32;
+        read(capacity, PWSTR::from_raw(buffer.as_mut_ptr()), &mut written)
+            .map_err(|error| format!("读取 WIC 字符串失败: {error}"))?;
+        if written > capacity {
+            return Err(format!(
+                "WIC 字符串长度在读取期间从 {capacity} 增长到 {written}"
+            ));
+        }
+
+        let len = written as usize;
         let trimmed = if len > 0 && buffer[len - 1] == 0 {
             &buffer[..len - 1]
         } else {

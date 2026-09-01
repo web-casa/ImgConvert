@@ -15,11 +15,17 @@ edition = "2021"
 name = "tauri_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[example]]
+name = "replay_fuzz_corpus"
+required-features = ["fuzzing"]
+
 [features]
 # Direct builds retain the in-app updater. Mac App Store builds explicitly turn
 # this feature off, since Store updates are delivered by the App Store itself.
 default = ["updater"]
 updater = ["dep:tauri-plugin-updater"]
+desktop-e2e = []
+fuzzing = ["dep:tempfile"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -37,8 +43,17 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio-util = "0.7"
 blake3 = "1.8"
+unicode-normalization = "0.1"
+tempfile = { version = "3", optional = true }
+# Pure-Rust, CPU-only PDF rasterization. Keeping this at the Tauri boundary
+# avoids making PDF a fake image format in imgconvert-core and adds no runtime
+# system library/download requirement to packaged desktop builds.
+hayro = "0.7.1"
 tauri-plugin-process = "2"
 tauri-plugin-os = "2.3.2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61.3", features = [

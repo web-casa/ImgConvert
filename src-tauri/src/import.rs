@@ -7,12 +7,12 @@
 //! 可能的 macOS security-scoped bookmark 都应接在这一层之下，而不是散落到前端。
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
+use std::fs::{self, File, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use imgconvert_core::{probe, Format, READABLE_FORMATS};
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,7 @@ use tokio_util::sync::CancellationToken;
 use crate::access::{self, AuthorizedPath};
 use crate::command_error::CommandError;
 use crate::external_codecs;
+use crate::pdf;
 
 const DEFAULT_MAX_FILES: usize = 20_000;
 const DEFAULT_MAX_ENTRIES: usize = 100_000;
@@ -29,9 +30,17 @@ const HARD_MAX_FILES: usize = 100_000;
 const HARD_MAX_ENTRIES: usize = 500_000;
 const HARD_MAX_DEPTH: usize = 256;
 const PROBE_MAX_BYTES: u64 = 512 * 1024;
+/// Import metadata is opportunistic. Larger PDFs remain importable and are
+/// parsed later by preview/conversion instead of blocking a directory scan.
+const PDF_IMPORT_PROBE_MAX_BYTES: u64 = 16 * 1024 * 1024;
+const PDF_IMPORT_TOTAL_PROBE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_CLIPBOARD_IMAGE_BYTES: usize = 128 * 1024 * 1024;
 const CLIPBOARD_TEMP_PREFIX: &str = "imgconvert-clipboard-";
 const CLIPBOARD_FILE_PREFIX: &str = "clipboard-";
+const CLIPBOARD_TEMP_MARKER_FILE: &str = ".imgconvert-owner";
+const CLIPBOARD_TEMP_MARKER: &[u8] = b"imgconvert-clipboard-temp-v1\n";
+const CLIPBOARD_SESSION_LOCK_FILE: &str = ".session.lock";
+const CLIPBOARD_TEMP_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
 static CLIPBOARD_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -85,6 +94,8 @@ pub struct ImportImageMetadata {
     pub height: u32,
     pub dpi_x: Option<f64>,
     pub dpi_y: Option<f64>,
+    /// Present for document inputs. Raster images keep this `None`.
+    pub page_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -98,6 +109,7 @@ pub struct ImportScanError {
 pub struct ClipboardImageImport {
     pub file: ImportScanFile,
     pub managed_path: PathBuf,
+    pub session_lock: File,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -118,7 +130,7 @@ pub struct ImportScanState {
 
 #[derive(Default)]
 pub struct ClipboardImportState {
-    managed_files: Mutex<BTreeSet<PathBuf>>,
+    managed_files: Mutex<BTreeMap<PathBuf, File>>,
 }
 
 struct ImportScanHandle {
@@ -165,6 +177,7 @@ struct Scanner {
     truncated: bool,
     cancelled: bool,
     limit_reason: Option<ImportScanLimitReason>,
+    pdf_probe_bytes_remaining: u64,
 }
 
 impl ImportScanState {
@@ -216,12 +229,15 @@ impl ImportScanRegistration {
 }
 
 impl ClipboardImportState {
-    pub(crate) fn register(&self, path: PathBuf) -> Result<(), String> {
+    pub(crate) fn register(&self, path: PathBuf, session_lock: File) -> Result<(), String> {
         let mut managed_files = self
             .managed_files
             .lock()
             .map_err(|_| "剪贴板临时文件状态锁已损坏".to_string())?;
-        managed_files.insert(path);
+        if managed_files.contains_key(&path) {
+            return Err(format!("剪贴板临时文件已注册: {}", path.display()));
+        }
+        managed_files.insert(path, session_lock);
         Ok(())
     }
 
@@ -230,12 +246,12 @@ impl ClipboardImportState {
             .managed_files
             .lock()
             .map_err(|_| "剪贴板临时文件状态锁已损坏".to_string())?;
-        if let Some(path) = managed_files.get(path) {
+        if let Some((path, _)) = managed_files.get_key_value(path) {
             return Ok(Some(path.clone()));
         }
 
         if let Ok(canonical_path) = fs::canonicalize(path) {
-            if let Some(path) = managed_files.get(&canonical_path) {
+            if let Some((path, _)) = managed_files.get_key_value(&canonical_path) {
                 return Ok(Some(path.clone()));
             }
         }
@@ -243,13 +259,32 @@ impl ClipboardImportState {
         Ok(None)
     }
 
-    fn unregister(&self, path: &Path) -> Result<(), String> {
+    fn unregister(&self, path: &Path) -> Result<Option<File>, String> {
         let mut managed_files = self
             .managed_files
             .lock()
             .map_err(|_| "剪贴板临时文件状态锁已损坏".to_string())?;
-        managed_files.remove(path);
-        Ok(())
+        Ok(managed_files.remove(path))
+    }
+}
+
+impl Drop for ClipboardImportState {
+    fn drop(&mut self) {
+        let Ok(managed_files) = self.managed_files.get_mut() else {
+            return;
+        };
+        let paths = managed_files.keys().cloned().collect::<Vec<_>>();
+        for path in &paths {
+            let _ = fs::remove_file(path);
+        }
+        managed_files.clear();
+        for parent in paths
+            .iter()
+            .filter_map(|path| path.parent())
+            .collect::<BTreeSet<_>>()
+        {
+            cleanup_clipboard_temp_dir_best_effort(parent);
+        }
     }
 }
 
@@ -273,9 +308,18 @@ pub fn scan_import_paths(
         truncated: false,
         cancelled: false,
         limit_reason: None,
+        pdf_probe_bytes_remaining: PDF_IMPORT_TOTAL_PROBE_BYTES,
     };
 
-    scanner.scan(access::user_selected_paths(options.paths));
+    let resolved = access::user_selected_paths(options.paths);
+    for rejected in resolved.rejected {
+        scanner.skipped += 1;
+        scanner.error_text(
+            rejected.input,
+            format!("无法解析导入路径: {}", rejected.reason),
+        );
+    }
+    scanner.scan(resolved.authorized);
     scanner.finish()
 }
 
@@ -298,56 +342,60 @@ pub fn import_clipboard_image(
 
     let info = probe(&options.bytes)
         .map_err(|error| format!("剪贴板内容不是支持的图片或文件已损坏: {error}"))?;
-    let temp_dir = create_clipboard_temp_dir()?;
+    let (temp_dir, session_lock) = create_clipboard_temp_dir()?;
     let extension = format_extension(info.format);
     let file_name = clipboard_file_name(options.suggested_name.as_deref(), extension);
     let path = temp_dir.join(file_name);
 
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-        .map_err(|error| format!("无法创建剪贴板临时图片 {}: {error}", path.display()))?;
-    file.write_all(&options.bytes)
-        .and_then(|_| file.sync_all())
-        .map_err(|error| format!("无法写入剪贴板临时图片 {}: {error}", path.display()))?;
+    let imported = (|| -> Result<(ImportScanFile, PathBuf), String> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|error| format!("无法创建剪贴板临时图片 {}: {error}", path.display()))?;
+        file.write_all(&options.bytes)
+            .and_then(|_| file.sync_all())
+            .map_err(|error| format!("无法写入剪贴板临时图片 {}: {error}", path.display()))?;
 
-    let key = match fs::canonicalize(&path) {
-        Ok(path) => path,
-        Err(error) => {
-            cleanup_clipboard_file_best_effort(&path);
-            return Err(format!(
-                "无法解析剪贴板临时图片路径 {}: {error}",
-                path.display()
-            ));
-        }
-    };
-    let grant = access::clipboard_temp_path(path);
-    let path_text = match grant.path().to_str() {
-        Some(path) => path.to_string(),
-        None => {
-            cleanup_clipboard_file_best_effort(grant.path());
-            return Err(format!(
+        let key = fs::canonicalize(&path)
+            .map_err(|error| format!("无法解析剪贴板临时图片路径 {}: {error}", path.display()))?;
+        let grant = access::clipboard_temp_path(path);
+        let path_text = grant.path().to_str().map(str::to_string).ok_or_else(|| {
+            format!(
                 "剪贴板临时图片路径不是有效 UTF-8: {}",
                 grant.path().display()
-            ));
+            )
+        })?;
+        Ok((
+            ImportScanFile {
+                path: path_text,
+                key: key.to_string_lossy().to_string(),
+                relative_dir: None,
+                metadata: Some(ImportImageMetadata {
+                    format: info.format.id().to_string(),
+                    width: info.width,
+                    height: info.height,
+                    dpi_x: info.dpi.map(|dpi| dpi.x),
+                    dpi_y: info.dpi.map(|dpi| dpi.y),
+                    page_count: None,
+                }),
+            },
+            key,
+        ))
+    })();
+
+    match imported {
+        Ok((file, managed_path)) => Ok(ClipboardImageImport {
+            file,
+            managed_path,
+            session_lock,
+        }),
+        Err(error) => {
+            drop(session_lock);
+            cleanup_clipboard_temp_dir_best_effort(&temp_dir);
+            Err(error)
         }
-    };
-    Ok(ClipboardImageImport {
-        file: ImportScanFile {
-            path: path_text,
-            key: key.to_string_lossy().to_string(),
-            relative_dir: None,
-            metadata: Some(ImportImageMetadata {
-                format: info.format.id().to_string(),
-                width: info.width,
-                height: info.height,
-                dpi_x: info.dpi.map(|dpi| dpi.x),
-                dpi_y: info.dpi.map(|dpi| dpi.y),
-            }),
-        },
-        managed_path: key,
-    })
+    }
 }
 
 pub fn cleanup_imported_temp_file(
@@ -363,19 +411,19 @@ pub fn cleanup_imported_temp_file(
     }
 
     let Ok(metadata) = fs::symlink_metadata(&managed_path) else {
-        state.unregister(&managed_path)?;
+        drop(state.unregister(&managed_path)?);
         return Ok(false);
     };
     if !metadata.is_file() {
-        state.unregister(&managed_path)?;
+        drop(state.unregister(&managed_path)?);
         return Ok(false);
     }
 
     fs::remove_file(&managed_path)
         .map_err(|error| format!("无法清理剪贴板临时图片 {}: {error}", managed_path.display()))?;
-    state.unregister(&managed_path)?;
+    drop(state.unregister(&managed_path)?);
     if let Some(parent) = managed_path.parent() {
-        let _ = fs::remove_dir(parent);
+        cleanup_clipboard_temp_dir_best_effort(parent);
     }
     Ok(true)
 }
@@ -417,6 +465,7 @@ fn readable_extensions_with_heic(heic_available: bool) -> BTreeSet<String> {
             extensions.insert((*extension).to_string());
         }
     }
+    extensions.insert("pdf".to_string());
     extensions
 }
 
@@ -613,6 +662,18 @@ impl Scanner {
     }
 
     fn consider_file(&mut self, path: PathBuf, relative_base: Option<&Path>) {
+        self.consider_file_with_probe(path, relative_base, probe_file_metadata);
+    }
+
+    fn consider_file_with_probe(
+        &mut self,
+        path: PathBuf,
+        relative_base: Option<&Path>,
+        probe: impl FnOnce(&Path, &mut u64) -> Option<ImportImageMetadata>,
+    ) {
+        if self.should_stop() {
+            return;
+        }
         if !self.has_allowed_extension(&path) {
             self.skipped += 1;
             return;
@@ -627,7 +688,10 @@ impl Scanner {
             return;
         }
 
-        let metadata = probe_file_metadata(&path);
+        let metadata = probe(&path, &mut self.pdf_probe_bytes_remaining);
+        if self.should_stop() {
+            return;
+        }
         let relative_dir = relative_dir_for(&path, relative_base);
         self.files.insert(
             key,
@@ -698,7 +762,10 @@ impl Scanner {
     }
 
     fn error(&mut self, path: &Path, message: impl Into<String>) {
-        let path = path.to_string_lossy().to_string();
+        self.error_text(path.to_string_lossy().to_string(), message);
+    }
+
+    fn error_text(&mut self, path: String, message: impl Into<String>) {
         self.errors.push(ImportScanError {
             error: CommandError::import_failed(Some(&path), message),
             path,
@@ -722,7 +789,41 @@ fn relative_dir_for(path: &Path, relative_base: Option<&Path>) -> Option<PathBuf
     }
 }
 
-fn probe_file_metadata(path: &Path) -> Option<ImportImageMetadata> {
+fn probe_file_metadata(
+    path: &Path,
+    pdf_probe_bytes_remaining: &mut u64,
+) -> Option<ImportImageMetadata> {
+    if pdf::is_pdf_path(path) {
+        let probe_limit = PDF_IMPORT_PROBE_MAX_BYTES.min(*pdf_probe_bytes_remaining);
+        if probe_limit == 0 {
+            return None;
+        }
+        let source = fs::metadata(path).ok()?;
+        if !source.is_file() || source.len() > probe_limit {
+            return None;
+        }
+
+        // Reserve the full read allowance before opening the file. If the PDF grows after the
+        // metadata check, the bounded reader can consume `probe_limit + 1` bytes before rejecting
+        // it; retaining the reservation prevents repeated growth races from bypassing the scan's
+        // aggregate I/O budget. Successful short reads refund the unused allowance.
+        *pdf_probe_bytes_remaining = pdf_probe_bytes_remaining.saturating_sub(probe_limit);
+        let bytes = pdf::read_pdf_file_with_limit(path, probe_limit)
+            .ok()
+            .flatten()?;
+        *pdf_probe_bytes_remaining = pdf_probe_bytes_remaining
+            .saturating_add(probe_limit.saturating_sub(bytes.len() as u64));
+        let document = pdf::PdfDocument::load(bytes).ok()?;
+        let dimensions = document.first_page_dimensions_at_default_dpi().ok()?;
+        return Some(ImportImageMetadata {
+            format: "pdf".to_string(),
+            width: dimensions.width,
+            height: dimensions.height,
+            dpi_x: Some(f64::from(pdf::DEFAULT_PDF_DPI)),
+            dpi_y: Some(f64::from(pdf::DEFAULT_PDF_DPI)),
+            page_count: Some(document.page_count()),
+        });
+    }
     if external_codecs::is_heic_path(path) {
         return None;
     }
@@ -739,6 +840,7 @@ fn probe_file_metadata(path: &Path) -> Option<ImportImageMetadata> {
         height: info.height,
         dpi_x: info.dpi.map(|dpi| dpi.x),
         dpi_y: info.dpi.map(|dpi| dpi.y),
+        page_count: None,
     })
 }
 
@@ -806,7 +908,11 @@ fn sanitize_file_stem(stem: &str) -> String {
         .collect()
 }
 
-fn create_clipboard_temp_dir() -> Result<PathBuf, String> {
+fn create_clipboard_temp_dir() -> Result<(PathBuf, File), String> {
+    create_clipboard_temp_dir_in(&std::env::temp_dir())
+}
+
+fn create_clipboard_temp_dir_in(temp_root: &Path) -> Result<(PathBuf, File), String> {
     let pid = std::process::id();
     for _ in 0..64 {
         let counter = CLIPBOARD_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -814,10 +920,18 @@ fn create_clipboard_temp_dir() -> Result<PathBuf, String> {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        let path =
-            std::env::temp_dir().join(format!("{CLIPBOARD_TEMP_PREFIX}{pid}-{nanos}-{counter}"));
+        let path = temp_root.join(format!("{CLIPBOARD_TEMP_PREFIX}{pid}-{nanos}-{counter}"));
         match create_private_dir(&path) {
-            Ok(()) => return Ok(path),
+            Ok(()) => match initialize_clipboard_temp_dir(&path) {
+                Ok(session_lock) => return Ok((path, session_lock)),
+                Err(error) => {
+                    let _ = fs::remove_dir_all(&path);
+                    return Err(format!(
+                        "无法初始化剪贴板临时目录 {}: {error}",
+                        path.display()
+                    ));
+                }
+            },
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => {
                 return Err(format!(
@@ -828,6 +942,25 @@ fn create_clipboard_temp_dir() -> Result<PathBuf, String> {
         }
     }
     Err("无法创建唯一剪贴板临时目录".to_string())
+}
+
+fn initialize_clipboard_temp_dir(path: &Path) -> std::io::Result<File> {
+    let marker_path = path.join(CLIPBOARD_TEMP_MARKER_FILE);
+    let mut marker = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(marker_path)?;
+    marker.write_all(CLIPBOARD_TEMP_MARKER)?;
+    marker.sync_all()?;
+    drop(marker);
+
+    let session_lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path.join(CLIPBOARD_SESSION_LOCK_FILE))?;
+    session_lock.lock()?;
+    Ok(session_lock)
 }
 
 #[cfg(unix)]
@@ -844,8 +977,121 @@ fn create_private_dir(path: &Path) -> std::io::Result<()> {
 pub(crate) fn cleanup_clipboard_file_best_effort(path: &Path) {
     let _ = fs::remove_file(path);
     if let Some(parent) = path.parent() {
-        let _ = fs::remove_dir(parent);
+        cleanup_clipboard_temp_dir_best_effort(parent);
     }
+}
+
+fn has_valid_clipboard_temp_marker(path: &Path) -> bool {
+    let marker_path = path.join(CLIPBOARD_TEMP_MARKER_FILE);
+    let Ok(metadata) = fs::symlink_metadata(&marker_path) else {
+        return false;
+    };
+    metadata.file_type().is_file()
+        && fs::read(marker_path).is_ok_and(|contents| contents == CLIPBOARD_TEMP_MARKER)
+}
+
+fn try_clipboard_temp_cleanup_lock(path: &Path) -> Option<File> {
+    if !has_valid_clipboard_temp_marker(path) {
+        return None;
+    }
+    let lock_path = path.join(CLIPBOARD_SESSION_LOCK_FILE);
+    let Ok(metadata) = fs::symlink_metadata(&lock_path) else {
+        return None;
+    };
+    if !metadata.file_type().is_file() {
+        return None;
+    }
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(lock_path)
+        .ok()?;
+    match lock.try_lock() {
+        Ok(()) => Some(lock),
+        Err(TryLockError::WouldBlock) | Err(TryLockError::Error(_)) => None,
+    }
+}
+
+fn cleanup_clipboard_temp_dir_best_effort(path: &Path) {
+    let Some(lock) = try_clipboard_temp_cleanup_lock(path) else {
+        return;
+    };
+    let _ = lock.unlock();
+    drop(lock);
+    let _ = fs::remove_dir_all(path);
+}
+
+pub(crate) fn cleanup_stale_clipboard_temp_dirs_best_effort() {
+    let _ = cleanup_stale_clipboard_temp_dirs_in(
+        &std::env::temp_dir(),
+        SystemTime::now(),
+        CLIPBOARD_TEMP_MAX_AGE,
+    );
+}
+
+fn cleanup_stale_clipboard_temp_dirs_in(
+    temp_root: &Path,
+    now: SystemTime,
+    max_age: Duration,
+) -> Result<usize, String> {
+    let root_metadata = match fs::symlink_metadata(temp_root) {
+        Ok(metadata) if metadata.file_type().is_dir() => metadata,
+        Ok(_) => return Err(format!("临时路径不是普通目录: {}", temp_root.display())),
+        Err(error) => return Err(format!("无法检查临时目录 {}: {error}", temp_root.display())),
+    };
+    let _ = root_metadata;
+
+    let entries = fs::read_dir(temp_root)
+        .map_err(|error| format!("无法读取临时目录 {}: {error}", temp_root.display()))?;
+    let mut removed = 0usize;
+    for entry in entries {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !name.starts_with(CLIPBOARD_TEMP_PREFIX) {
+            continue;
+        }
+        let Some(created_at) = clipboard_temp_created_at(name) else {
+            continue;
+        };
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !metadata.file_type().is_dir() {
+            continue;
+        }
+        let stale = now
+            .duration_since(created_at)
+            .map(|age| age > max_age)
+            .unwrap_or(false);
+        if stale {
+            let Some(lock) = try_clipboard_temp_cleanup_lock(&path) else {
+                continue;
+            };
+            let _ = lock.unlock();
+            drop(lock);
+            if fs::remove_dir_all(&path).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    Ok(removed)
+}
+
+fn clipboard_temp_created_at(name: &str) -> Option<SystemTime> {
+    let suffix = name.strip_prefix(CLIPBOARD_TEMP_PREFIX)?;
+    let mut components = suffix.split('-');
+    components.next()?.parse::<u32>().ok()?;
+    let nanos = components.next()?.parse::<u64>().ok()?;
+    components.next()?.parse::<u64>().ok()?;
+    if components.next().is_some() {
+        return None;
+    }
+    UNIX_EPOCH.checked_add(Duration::from_nanos(nanos))
 }
 
 fn is_managed_clipboard_temp_file(path: &Path) -> bool {
@@ -863,6 +1109,9 @@ fn is_managed_clipboard_temp_file(path: &Path) -> bool {
         return false;
     };
     if !parent_name.starts_with(CLIPBOARD_TEMP_PREFIX) {
+        return false;
+    }
+    if !has_valid_clipboard_temp_marker(parent) {
         return false;
     }
 
@@ -952,10 +1201,101 @@ mod tests {
         assert!(without_heic.contains("svg"));
         assert!(without_heic.contains("gif"));
         assert!(without_heic.contains("bmp"));
+        assert!(without_heic.contains("pdf"));
         assert!(!without_heic.contains("heic"));
         assert!(with_heic.contains("heic"));
         assert!(with_heic.contains("heif"));
         assert!(with_heic.contains("hif"));
+    }
+
+    #[test]
+    fn stale_clipboard_cleanup_only_removes_old_owned_directories() {
+        let root = unique_test_dir("clipboard-stale-cleanup");
+        fs::create_dir_all(&root).unwrap();
+        let stale = root.join(format!("{CLIPBOARD_TEMP_PREFIX}1-2-3"));
+        let fresh_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let fresh = root.join(format!("{CLIPBOARD_TEMP_PREFIX}4-{fresh_nanos}-6"));
+        let unmarked = root.join(format!("{CLIPBOARD_TEMP_PREFIX}7-2-8"));
+        let unrelated = root.join("other-app-temp");
+        fs::create_dir_all(&stale).unwrap();
+        fs::create_dir_all(&fresh).unwrap();
+        fs::create_dir_all(&unmarked).unwrap();
+        fs::create_dir_all(&unrelated).unwrap();
+        let stale_lock = initialize_clipboard_temp_dir(&stale).unwrap();
+        stale_lock.unlock().unwrap();
+        drop(stale_lock);
+        let fresh_lock = initialize_clipboard_temp_dir(&fresh).unwrap();
+        fresh_lock.unlock().unwrap();
+        drop(fresh_lock);
+        fs::write(stale.join("clipboard-old.png"), b"old").unwrap();
+        fs::write(unmarked.join("clipboard-unowned.png"), b"unowned").unwrap();
+
+        let removed = cleanup_stale_clipboard_temp_dirs_in(
+            &root,
+            SystemTime::now(),
+            Duration::from_secs(24 * 60 * 60),
+        )
+        .unwrap();
+
+        assert_eq!(removed, 1);
+        assert!(!stale.exists());
+        assert!(fresh.exists());
+        assert!(unmarked.exists());
+        assert!(unrelated.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn stale_clipboard_cleanup_preserves_a_directory_with_an_active_session_lock() {
+        let root = unique_test_dir("clipboard-active-lock");
+        fs::create_dir_all(&root).unwrap();
+        let active = root.join(format!("{CLIPBOARD_TEMP_PREFIX}1-2-3"));
+        fs::create_dir_all(&active).unwrap();
+        let session_lock = initialize_clipboard_temp_dir(&active).unwrap();
+        fs::write(active.join("clipboard-active.png"), b"active").unwrap();
+
+        let removed = cleanup_stale_clipboard_temp_dirs_in(
+            &root,
+            SystemTime::now(),
+            Duration::from_secs(24 * 60 * 60),
+        )
+        .unwrap();
+
+        assert_eq!(removed, 0);
+        assert!(active.exists());
+
+        session_lock.unlock().unwrap();
+        drop(session_lock);
+        let removed = cleanup_stale_clipboard_temp_dirs_in(
+            &root,
+            SystemTime::now(),
+            Duration::from_secs(24 * 60 * 60),
+        )
+        .unwrap();
+        assert_eq!(removed, 1);
+        assert!(!active.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn clipboard_state_drop_cleans_registered_files() {
+        let root = unique_test_dir("clipboard-state-drop");
+        fs::create_dir_all(&root).unwrap();
+        let (dir, session_lock) = create_clipboard_temp_dir_in(&root).unwrap();
+        let path = dir.join("clipboard-test.png");
+        fs::write(&path, b"temporary").unwrap();
+        let path = fs::canonicalize(path).unwrap();
+
+        let state = ClipboardImportState::default();
+        state.register(path.clone(), session_lock).unwrap();
+        drop(state);
+
+        assert!(!path.exists());
+        assert!(!dir.exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1044,16 +1384,109 @@ mod tests {
     }
 
     #[test]
+    fn scan_reports_pdf_page_count_and_default_render_dimensions() {
+        let dir = unique_test_dir("pdf-metadata");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("sample.pdf");
+        fs::write(&file, crate::pdf::tests::minimal_pdf(2)).unwrap();
+
+        let result = scan(options(vec![file]));
+
+        assert_eq!(result.files.len(), 1);
+        let metadata = result.files[0].metadata.as_ref().unwrap();
+        assert_eq!(metadata.format, "pdf");
+        assert_eq!(metadata.page_count, Some(2));
+        assert_eq!((metadata.width, metadata.height), (150, 150));
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn scan_defers_metadata_for_pdf_over_import_probe_budget() {
+        let dir = unique_test_dir("large-pdf-metadata");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("large.pdf");
+        File::create(&file)
+            .unwrap()
+            .set_len(PDF_IMPORT_PROBE_MAX_BYTES + 1)
+            .unwrap();
+
+        let result = scan(options(vec![file]));
+
+        assert_eq!(result.files.len(), 1);
+        assert!(result.files[0].metadata.is_none());
+        assert!(!result.cancelled);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn pdf_metadata_probe_respects_the_aggregate_scan_budget() {
+        let dir = unique_test_dir("pdf-total-probe-budget");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("sample.pdf");
+        let bytes = crate::pdf::tests::minimal_pdf(1);
+        fs::write(&file, &bytes).unwrap();
+
+        let mut insufficient = bytes.len().saturating_sub(1) as u64;
+        assert!(probe_file_metadata(&file, &mut insufficient).is_none());
+        assert_eq!(insufficient, bytes.len().saturating_sub(1) as u64);
+
+        let mut exact = bytes.len() as u64;
+        assert!(probe_file_metadata(&file, &mut exact).is_some());
+        assert_eq!(exact, 0);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn cancellation_during_metadata_probe_does_not_insert_the_file() {
+        let dir = unique_test_dir("cancel-during-probe");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("sample.png");
+        fs::write(&file, png_with_dimensions(4, 3)).unwrap();
+        let token = CancellationToken::new();
+        let mut scanner = Scanner {
+            allowed_extensions: readable_extensions_with_heic(false),
+            recursive: true,
+            limits: ScanLimits {
+                max_files: 10,
+                max_entries: 10,
+                max_depth: 10,
+            },
+            cancel: token.clone(),
+            files: BTreeMap::new(),
+            entries_seen: 0,
+            skipped: 0,
+            errors: Vec::new(),
+            truncated: false,
+            cancelled: false,
+            limit_reason: None,
+            pdf_probe_bytes_remaining: PDF_IMPORT_TOTAL_PROBE_BYTES,
+        };
+
+        scanner.consider_file_with_probe(file, None, |_, _| {
+            token.cancel();
+            None
+        });
+
+        assert!(scanner.files.is_empty());
+        assert!(scanner.cancelled);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn clipboard_import_writes_temp_file_and_returns_metadata() {
         let state = ClipboardImportState::default();
-        let clipboard_import = import_clipboard_image(ClipboardImageImportOptions {
+        let ClipboardImageImport {
+            file,
+            managed_path,
+            session_lock,
+        } = import_clipboard_image(ClipboardImageImportOptions {
             bytes: png_with_dimensions(32, 18),
             mime_type: Some("image/png".to_string()),
             suggested_name: Some("screen shot.png".to_string()),
         })
         .unwrap();
-        state.register(clipboard_import.managed_path).unwrap();
-        let file = clipboard_import.file;
+        state.register(managed_path, session_lock).unwrap();
 
         assert!(file.path.contains(CLIPBOARD_TEMP_PREFIX));
         assert!(file.path.ends_with(".png"));
@@ -1135,15 +1568,17 @@ mod tests {
     #[test]
     fn cleanup_imported_temp_file_accepts_alias_without_losing_registration() {
         let state = ClipboardImportState::default();
-        let clipboard_import = import_clipboard_image(ClipboardImageImportOptions {
+        let ClipboardImageImport {
+            file,
+            managed_path,
+            session_lock,
+        } = import_clipboard_image(ClipboardImageImportOptions {
             bytes: png_with_dimensions(8, 8),
             mime_type: Some("image/png".to_string()),
             suggested_name: Some("alias.png".to_string()),
         })
         .unwrap();
-        let managed_path = clipboard_import.managed_path.clone();
-        let file = clipboard_import.file;
-        state.register(managed_path.clone()).unwrap();
+        state.register(managed_path.clone(), session_lock).unwrap();
 
         let alias_dir = unique_test_dir("clipboard-alias");
         fs::create_dir_all(&alias_dir).unwrap();
@@ -1168,6 +1603,23 @@ mod tests {
         assert_eq!(result.skipped, 0);
         assert_eq!(result.errors.len(), 1);
         assert_eq!(result.errors[0].path, missing.to_string_lossy().to_string());
+    }
+
+    #[test]
+    fn invalid_selected_paths_are_reported_instead_of_disappearing() {
+        let input = "https://example.com/photo.png".to_string();
+        let result = scan(ScanImportOptions {
+            paths: vec![input.clone()],
+            recursive: true,
+            max_files: None,
+            max_entries: None,
+            max_depth: None,
+        });
+
+        assert!(result.files.is_empty());
+        assert_eq!(result.skipped, 1);
+        assert_eq!(result.errors.len(), 1);
+        assert_eq!(result.errors[0].path, input);
     }
 
     #[cfg(unix)]

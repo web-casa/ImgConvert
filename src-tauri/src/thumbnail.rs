@@ -11,7 +11,9 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::access;
 use crate::external_codecs;
+use crate::pdf;
 
 const DEFAULT_THUMBNAIL_EDGE: u32 = 180;
 const MIN_THUMBNAIL_EDGE: u32 = 32;
@@ -33,16 +35,39 @@ pub struct ThumbnailResult {
     pub width: u32,
     pub height: u32,
     pub bytes: Vec<u8>,
+    /// Non-fatal PDF interpreter warnings. Raster thumbnails keep this at zero.
+    pub warning_count: usize,
 }
 
 pub fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailResult>, String> {
-    let input = Path::new(&options.input);
+    let grant = access::user_selected_path(&options.input)
+        .map_err(|error| format!("无法解析缩略图输入路径: {error}"))?;
+    let _input_scope = grant.scoped_access();
+    let input = grant.path();
     let metadata = fs::metadata(input).map_err(|e| format!("无法读取输入文件信息: {e}"))?;
     if !metadata.is_file() {
         return Err(format!("输入路径不是文件: {}", options.input));
     }
     if metadata.len() > MAX_THUMBNAIL_SOURCE_BYTES {
         return Ok(None);
+    }
+
+    let max_edge = options
+        .max_edge
+        .unwrap_or(DEFAULT_THUMBNAIL_EDGE)
+        .clamp(MIN_THUMBNAIL_EDGE, MAX_THUMBNAIL_EDGE);
+    if pdf::is_pdf_path(input) {
+        let document = pdf::PdfDocument::load(pdf::read_pdf_file(input)?)?;
+        let rendered = document.render_first_page_thumbnail(max_edge)?;
+        let info = imgconvert_core::probe(&rendered.png).map_err(|error| error.to_string())?;
+        return Ok(Some(ThumbnailResult {
+            input: options.input,
+            mime: "image/png",
+            width: info.width,
+            height: info.height,
+            bytes: rendered.png,
+            warning_count: rendered.warning_count,
+        }));
     }
 
     let source = if external_codecs::is_heic_path(input) {
@@ -53,10 +78,6 @@ pub fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailR
         };
         bytes
     };
-    let max_edge = options
-        .max_edge
-        .unwrap_or(DEFAULT_THUMBNAIL_EDGE)
-        .clamp(MIN_THUMBNAIL_EDGE, MAX_THUMBNAIL_EDGE);
     let Some(thumbnail) =
         imgconvert_core::thumbnail(&source, max_edge).map_err(|e| e.to_string())?
     else {
@@ -69,6 +90,7 @@ pub fn generate_thumbnail(options: ThumbnailOptions) -> Result<Option<ThumbnailR
         width: thumbnail.width,
         height: thumbnail.height,
         bytes: thumbnail.png,
+        warning_count: 0,
     }))
 }
 
@@ -173,6 +195,7 @@ mod tests {
 
         assert_eq!(result.mime, "image/png");
         assert_eq!((result.width, result.height), (1, 1));
+        assert_eq!(result.warning_count, 0);
         assert!(result.bytes.starts_with(&[0x89, b'P', b'N', b'G']));
 
         fs::remove_dir_all(dir).unwrap();
@@ -215,6 +238,26 @@ mod tests {
         assert!(result.is_none());
         assert!(read_limited_thumbnail_source(&input).unwrap().is_none());
 
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn thumbnail_command_renders_the_first_pdf_page() {
+        let dir = unique_test_dir("pdf");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.pdf");
+        fs::write(&input, crate::pdf::tests::minimal_pdf(2)).unwrap();
+
+        let result = generate_thumbnail(ThumbnailOptions {
+            input: input.to_string_lossy().to_string(),
+            max_edge: Some(64),
+        })
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(result.mime, "image/png");
+        assert_eq!((result.width, result.height), (64, 64));
+        assert_eq!(result.warning_count, 0);
         fs::remove_dir_all(dir).unwrap();
     }
 }

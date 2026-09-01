@@ -5,11 +5,16 @@ mod access;
 mod command_error;
 mod convert;
 mod external_codecs;
+#[cfg(feature = "fuzzing")]
+mod fuzzing;
 mod import;
 mod macos_security;
 #[cfg(target_os = "macos")]
 mod macos_system_codecs;
 mod native_dialog;
+mod pdf;
+mod preview;
+mod result_cache;
 mod thumbnail;
 #[cfg(target_os = "windows")]
 mod windows_system_codecs;
@@ -19,9 +24,10 @@ use convert::{
     ConvertOptions, RuntimeDiagnostics,
 };
 use import::{
-    ClipboardImageImportOptions, ClipboardImportState, ImportScanFile, ImportScanResult,
-    ImportScanState, ScanImportOptions,
+    ClipboardImageImport, ClipboardImageImportOptions, ClipboardImportState, ImportScanFile,
+    ImportScanResult, ImportScanState, ScanImportOptions,
 };
+use preview::{PreviewOptions, PreviewState, WorkflowExecutionGate};
 use tauri::ipc::Channel;
 use tauri::State;
 use thumbnail::{ThumbnailOptions, ThumbnailResult};
@@ -31,6 +37,18 @@ use crate::native_dialog::NativePickOptions;
 use command_error::CommandError;
 
 pub use convert::ConvertResult;
+
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub use fuzzing::{fuzz_external_codec_manifest, fuzz_import_scan_bytes, fuzz_pdf_document};
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopE2ESeed {
+    input: String,
+    pdf_input: String,
+    out_dir: String,
+}
 
 pub fn run_path_conversion_smoke(
     input: String,
@@ -76,17 +94,6 @@ fn set_selected_heic_helper(
     })
 }
 
-/// 转换单张图片。前端按文件循环调用以便逐项汇报进度。
-#[tauri::command]
-async fn convert_image(options: ConvertOptions) -> Result<ConvertResult, CommandError> {
-    // 图像编解码和文件 IO 都是阻塞工作,放到阻塞线程池避免卡住异步运行时。
-    let error_options = options.clone();
-    tauri::async_runtime::spawn_blocking(move || convert::convert(&options))
-        .await
-        .map_err(|error| CommandError::task_failed(format!("任务调度失败: {error}")))?
-        .map_err(|detail| convert::command_error_for_conversion(&error_options, detail))
-}
-
 /// 批量转换图片。进度通过 Tauri Channel 返回,取消在文件边界生效。
 #[tauri::command]
 async fn convert_batch(
@@ -94,12 +101,20 @@ async fn convert_batch(
     progress: Channel<BatchProgressEvent>,
     concurrency: Option<usize>,
     state: State<'_, BatchState>,
+    preview_state: State<'_, PreviewState>,
+    execution_gate: State<'_, WorkflowExecutionGate>,
 ) -> Result<BatchSummary, CommandError> {
     let batch = state.begin().map_err(CommandError::batch_failed)?;
+    // Register the batch before cancelling preview. A preview that raced past its first active
+    // check will either already be current and get cancelled here, or observe the active batch in
+    // its post-registration check below.
+    preview_state.cancel_current();
     let batch_id = batch.id();
     let cancel = batch.token();
+    let execution = execution_gate.handle();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = preview::lock_workflow_execution_gate(&execution);
         convert::convert_batch(options, progress, cancel, concurrency)
     })
     .await
@@ -164,11 +179,16 @@ async fn import_clipboard_image(
             .await
             .map_err(|error| CommandError::task_failed(format!("剪贴板导入任务调度失败: {error}")))?
             .map_err(CommandError::clipboard_import_failed)?;
-    if let Err(error) = state.register(clipboard_import.managed_path.clone()) {
-        import::cleanup_clipboard_file_best_effort(&clipboard_import.managed_path);
+    let ClipboardImageImport {
+        file,
+        managed_path,
+        session_lock,
+    } = clipboard_import;
+    if let Err(error) = state.register(managed_path.clone(), session_lock) {
+        import::cleanup_clipboard_file_best_effort(&managed_path);
         return Err(CommandError::clipboard_import_failed(error));
     }
-    Ok(clipboard_import.file)
+    Ok(file)
 }
 
 /// 清理由剪贴板导入创建的临时文件。非本应用管理的路径会被忽略。
@@ -199,13 +219,107 @@ async fn generate_thumbnail(
     tauri::async_runtime::spawn_blocking(move || thumbnail::generate_thumbnail(options))
         .await
         .map_err(|error| CommandError::task_failed(format!("缩略图任务调度失败: {error}")))?
-        .map_err(|detail| CommandError::thumbnail_failed(input, detail))
+        .map_err(|detail| {
+            convert::command_error_for_pdf(&input, &detail)
+                .unwrap_or_else(|| CommandError::thumbnail_failed(input, detail))
+        })
+}
+
+/// 运行与最终转换相同的内存工作流，仅返回有界 PNG 前后预览与标量统计。
+#[tauri::command]
+async fn generate_comparison_preview(
+    options: PreviewOptions,
+    state: State<'_, PreviewState>,
+    batch_state: State<'_, BatchState>,
+    execution_gate: State<'_, WorkflowExecutionGate>,
+) -> Result<tauri::ipc::Response, CommandError> {
+    let input = options.conversion.input.clone();
+    if batch_state.is_active() {
+        return Err(CommandError::preview_failed(
+            input,
+            "批量转换运行时不能生成预览",
+        ));
+    }
+    let preview = state
+        .begin()
+        .map_err(|detail| CommandError::preview_failed(input.clone(), detail))?;
+    let generation = preview.id();
+    let cancel = preview.token();
+    if batch_state.is_active() {
+        cancel.cancel();
+        state.finish(generation);
+        return Err(CommandError::preview_failed(
+            input,
+            "批量转换运行时不能生成预览",
+        ));
+    }
+    let execution = execution_gate.handle();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _guard = preview::lock_workflow_execution_gate(&execution);
+        if cancel.is_cancelled() {
+            return Err("预览已取消".to_string());
+        }
+        preview::generate_preview(options, cancel)
+    })
+    .await
+    .map_err(|error| CommandError::task_failed(format!("预览任务调度失败: {error}")))
+    .and_then(|inner| {
+        inner.map_err(|detail| {
+            convert::command_error_for_pdf(&input, &detail)
+                .unwrap_or_else(|| CommandError::preview_failed(input.clone(), detail))
+        })
+    });
+    state.finish(generation);
+    result.and_then(|preview| {
+        preview::into_ipc_response(preview)
+            .map_err(|detail| CommandError::preview_failed(input, detail))
+    })
+}
+
+/// 请求取消当前比较预览。原生编码调用会在下一个可安全检查的边界停止。
+#[tauri::command]
+fn cancel_comparison_preview(state: State<'_, PreviewState>) -> bool {
+    state.cancel_current()
+}
+
+/// 删除本应用创建的 metadata-only 转换结果缓存记录。
+#[tauri::command]
+fn clear_result_cache() -> Result<usize, CommandError> {
+    result_cache::clear().map_err(CommandError::task_failed)
+}
+
+/// Test-only queue seed. Release builds compile this command as an inert null
+/// response; debug E2E builds must also opt in at compile and runtime.
+#[tauri::command]
+fn desktop_e2e_seed() -> Option<DesktopE2ESeed> {
+    if !cfg!(feature = "desktop-e2e")
+        || std::env::var("IMGCONVERT_ENABLE_DESKTOP_E2E").as_deref() != Ok("1")
+    {
+        return None;
+    }
+    let input = std::env::var_os("IMGCONVERT_DESKTOP_E2E_INPUT").map(std::path::PathBuf::from)?;
+    let pdf_input =
+        std::env::var_os("IMGCONVERT_DESKTOP_E2E_PDF_INPUT").map(std::path::PathBuf::from)?;
+    let out_dir =
+        std::env::var_os("IMGCONVERT_DESKTOP_E2E_OUT_DIR").map(std::path::PathBuf::from)?;
+    if !input.is_file() || !pdf_input.is_file() || !out_dir.is_dir() {
+        return None;
+    }
+    Some(DesktopE2ESeed {
+        input: input.to_string_lossy().to_string(),
+        pdf_input: pdf_input.to_string_lossy().to_string(),
+        out_dir: out_dir.to_string_lossy().to_string(),
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    result_cache::cleanup_best_effort();
+    import::cleanup_stale_clipboard_temp_dirs_best_effort();
     let builder = tauri::Builder::default()
         .manage(BatchState::default())
+        .manage(PreviewState::default())
+        .manage(WorkflowExecutionGate::default())
         .manage(ImportScanState::default())
         .manage(ClipboardImportState::default())
         .plugin(tauri_plugin_opener::init())
@@ -230,7 +344,6 @@ pub fn run() {
             runtime_diagnostics,
             codec_diagnostics,
             set_selected_heic_helper,
-            convert_image,
             convert_batch,
             plan_conversions,
             cancel_batch,
@@ -239,7 +352,11 @@ pub fn run() {
             import_clipboard_image,
             cleanup_imported_temp_file,
             pick_paths,
-            generate_thumbnail
+            generate_thumbnail,
+            generate_comparison_preview,
+            cancel_comparison_preview,
+            clear_result_cache,
+            desktop_e2e_seed
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

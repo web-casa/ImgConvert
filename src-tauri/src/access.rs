@@ -19,6 +19,18 @@ pub struct AuthorizedPath {
     path: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RejectedSelectedPath {
+    pub input: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Default)]
+pub struct ResolvedSelectedPaths {
+    pub authorized: Vec<AuthorizedPath>,
+    pub rejected: Vec<RejectedSelectedPath>,
+}
+
 impl AuthorizedPath {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self { path: path.into() }
@@ -128,21 +140,25 @@ impl ScopedPathAccess {
     }
 }
 
-pub fn user_selected_paths(paths: Vec<String>) -> Vec<AuthorizedPath> {
-    paths
-        .into_iter()
-        .filter_map(|path| {
-            selected_path_to_path_buf(&path)
-                .or_else(|_| selected_path_to_path_buf(path.trim()))
-                .ok()
-                .map(AuthorizedPath::new)
-        })
-        .collect()
+pub fn user_selected_paths(paths: Vec<String>) -> ResolvedSelectedPaths {
+    let mut resolved = ResolvedSelectedPaths::default();
+    for input in paths {
+        match selected_path_to_path_buf(&input) {
+            Ok(path) => resolved.authorized.push(AuthorizedPath::new(path)),
+            Err(reason) => resolved
+                .rejected
+                .push(RejectedSelectedPath { input, reason }),
+        }
+    }
+    resolved
 }
 
-pub fn output_directory(path: Option<&str>) -> Option<AuthorizedPath> {
-    path.and_then(|path| selected_path_to_path_buf(path).ok())
-        .map(AuthorizedPath::new)
+pub fn user_selected_path(path: &str) -> Result<AuthorizedPath, String> {
+    selected_path_to_path_buf(path).map(AuthorizedPath::new)
+}
+
+pub fn output_directory(path: Option<&str>) -> Result<Option<AuthorizedPath>, String> {
+    path.map(user_selected_path).transpose()
 }
 
 pub fn clipboard_temp_path(path: impl Into<PathBuf>) -> AuthorizedPath {
@@ -153,20 +169,24 @@ pub fn scoped_path_access(path: &Path) -> ScopedPathAccess {
     ScopedPathAccess::start(path)
 }
 
-fn selected_path_to_path_buf(path: &str) -> Result<PathBuf, ()> {
+fn selected_path_to_path_buf(path: &str) -> Result<PathBuf, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
-        return Err(());
+        return Err("路径为空".to_string());
     }
     if let Ok(url) = tauri::Url::parse(trimmed) {
         if url.scheme() == "file" {
-            return url.to_file_path().map_err(|_| ());
+            return url
+                .to_file_path()
+                .map_err(|_| format!("无法解析 file URL: {trimmed}"));
         }
         if url.scheme().len() != 1 {
-            return Err(());
+            return Err(format!("不支持的路径 URL scheme: {}", url.scheme()));
         }
     }
-    Ok(PathBuf::from(trimmed))
+    // Whitespace is legal in native filenames. Use the trimmed view only for empty/URL
+    // validation; a plain path must preserve exactly what the picker returned.
+    Ok(PathBuf::from(path))
 }
 
 #[cfg(test)]
@@ -175,24 +195,26 @@ mod tests {
 
     #[test]
     fn user_selected_paths_preserve_noncanonical_portal_paths() {
-        let paths = user_selected_paths(vec![
+        let resolved = user_selected_paths(vec![
             "  ".to_string(),
             "/run/user/1000/doc/by-app/imgconvert/photo.png".to_string(),
         ]);
 
-        assert_eq!(paths.len(), 1);
+        assert_eq!(resolved.authorized.len(), 1);
+        assert_eq!(resolved.rejected.len(), 1);
         assert_eq!(
-            paths[0].path(),
+            resolved.authorized[0].path(),
             Path::new("/run/user/1000/doc/by-app/imgconvert/photo.png")
         );
+        assert_eq!(resolved.rejected[0].input, "  ");
     }
 
     #[test]
-    fn output_directory_treats_empty_values_as_same_directory() {
-        assert!(output_directory(None).is_none());
-        assert!(output_directory(Some(" ")).is_none());
+    fn output_directory_rejects_invalid_values_instead_of_falling_back() {
+        assert!(output_directory(None).unwrap().is_none());
+        assert!(output_directory(Some(" ")).is_err());
         assert_eq!(
-            output_directory(Some("/tmp/out")).unwrap().path(),
+            output_directory(Some("/tmp/out")).unwrap().unwrap().path(),
             Path::new("/tmp/out")
         );
     }
@@ -209,13 +231,24 @@ mod tests {
 
         let paths = user_selected_paths(vec![input.to_string()]);
 
-        assert_eq!(paths.len(), 1);
-        assert_eq!(paths[0].path(), expected);
+        assert_eq!(paths.authorized.len(), 1);
+        assert!(paths.rejected.is_empty());
+        assert_eq!(paths.authorized[0].path(), expected);
     }
 
     #[test]
     fn selected_paths_reject_non_file_urls() {
-        assert!(user_selected_paths(vec!["https://example.com/photo.png".to_string()]).is_empty());
+        let paths = user_selected_paths(vec!["https://example.com/photo.png".to_string()]);
+        assert!(paths.authorized.is_empty());
+        assert_eq!(paths.rejected.len(), 1);
+    }
+
+    #[test]
+    fn selected_plain_path_preserves_filename_whitespace() {
+        let input = "/tmp/photo .png ";
+        let selected = user_selected_path(input).unwrap();
+
+        assert_eq!(selected.path(), Path::new(input));
     }
 
     #[cfg(not(target_os = "macos"))]
