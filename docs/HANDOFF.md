@@ -21,8 +21,8 @@
 ## 2. 当前候选状态（2026-09-01）
 
 此前尚未提交的大型功能与安全加固工作已按 core、桌面后端、前端/UI、质量门禁、文档和
-许可证拆为独立提交，并在版本准备前通过对应测试。当前应用版本为 `0.2.24`，公开版本记录
-仍保持 `v0.2.22`；`docs/RELEASE_V0.2.24.md` 是本轮正式跨平台候选说明。
+许可证拆为独立提交，并在版本准备前通过对应测试。当前应用版本为 `0.3.1`，公开版本记录
+仍保持 `v0.2.22`；`docs/RELEASE_V0.3.1.md` 是本轮正式跨平台候选说明。
 
 候选构建范围包括 Linux amd64/arm64、macOS x64/arm64、Windows x64/arm64、MAS universal
 以及 Microsoft Store x64/arm64。MAS 必须保持 `upload_build=false`，Microsoft Store 工作流
@@ -99,5 +99,5 @@ node scripts/check-platform-release-guardrails.mjs --platform=all --channel=all
 
 - Partner Center 的 IARC/CSV、listing 资料和 Store submission 需要账户负责人执行。
 - macOS 直发仍以本轮 Developer ID/notarization 凭据和双架构 runner 的实际结果为准。
-- 已授权准备 `v0.2.24` 不可变标签、GitHub Release 草稿及正式跨平台候选构建；未授权公开
+- 已授权准备 `v0.3.1` 不可变标签、GitHub Release 草稿及正式跨平台候选构建；未授权公开
   GitHub Release、上传商店构建或提交审核。全部平台资产与 smoke 集齐前 Release 必须保持 draft。

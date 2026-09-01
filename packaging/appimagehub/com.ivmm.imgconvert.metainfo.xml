@@ -25,11 +25,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.24/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.3.1/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.3.1" date="2026-09-01">
+      <description>
+        <p>Adds fixed official website and source repository entry points while keeping Store builds free of external installers and in-app updates.</p>
+      </description>
+    </release>
     <release version="0.2.24" date="2026-09-01">
       <description>
         <p>Makes HEIC and PDF support discoverable from the import area while keeping the compact engine status readable at narrow window sizes.</p>

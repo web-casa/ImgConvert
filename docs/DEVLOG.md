@@ -5,12 +5,13 @@
 
 ---
 
-## 2026-09-01 — 下一版本官网入口与 Store 外链边界
+## 2026-09-01 — v0.3.1 官网入口与全渠道候选边界
 
 - **统一官网入口**：空队列、设置菜单和“关于与开源许可”页均提供 `https://imgconvert.web.casa/`；直发版更新弹窗同时明确列出官网与 GitHub 仓库。所有入口只在用户点击后交给系统默认浏览器，不在 WebView 内加载远程页面。
 - **最小外链权限**：官网、仓库和 issue tracker 集中为三个固定 HTTPS 常量，Tauri opener capability 与这些地址做集合完全相等的测试，禁止通配符或任意 URL。
 - **商店边界**：MAS/MSIX 继续在构建时移除应用内 updater；官网入口不下载、安装或执行代码，也不承担商店外购买。Apple/Microsoft 官方政策复核和跨平台 Store guardrail 均通过。
 - **复审修正**：Web 预览先打开同源空白页、同步切断 `opener` 后再跳转，避免 `noopener` 导致成功打开却返回 `null` 的误报；更新弹窗改为窄窗口自然高度并补齐三个弹窗的焦点约束与返回。
+- **候选纪律**：`v0.3.1` 从同一不可变标签构建 GitHub Linux/macOS/Windows 双架构直发包、Updater、Snap、Flatpak 源包、MAS universal PKG 与 Microsoft Store x64/arm64 submission MSIX。GitHub Release 保持 draft，MAS/MS Store 只构建不上传，Snap 只构建不发布。
 
 ---
 
