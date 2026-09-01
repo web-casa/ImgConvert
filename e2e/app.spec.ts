@@ -7,7 +7,7 @@ test("loads the web preview shell", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "ImgConvert" })).toBeVisible();
   await expect(
     page.locator(
-      "header span[title*='网页预览'], header span[title*='Core 就绪'], header span[title*='Web preview'], header span[title*='Core ready']",
+      "header span[title*='网页预览'], header span[title*='本地处理就绪'], header span[title*='Web preview'], header span[title*='Local processing ready']",
     ),
   ).toBeVisible();
   await expect(
@@ -16,6 +16,35 @@ test("loads the web preview shell", async ({ page }) => {
   await expect(
     page.getByText(/网页预览不支持本机输出位置|The web preview has no local output location/),
   ).toBeVisible();
+});
+
+test("discloses import and export formats without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto("/");
+
+  const disclosure = page.locator("details").filter({
+    hasText: /支持常见图片、HEIC 与 PDF|Supports common images, HEIC, and PDF/,
+  });
+  const trigger = disclosure.locator("summary");
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(disclosure).toHaveAttribute("open", "");
+  await expect(trigger).toBeFocused();
+  await expect(disclosure.getByText("HEIC / HEIF", { exact: false })).toBeVisible();
+  await expect(disclosure.getByText("PDF", { exact: true })).toBeVisible();
+  await expect(disclosure.getByText(/^(导出|Export)$/)).toBeVisible();
+  await expect(disclosure.getByText("AVIF", { exact: true })).toHaveCount(2);
+  await expect(disclosure.getByText(/可选解码组件|optional decoder/)).toBeVisible();
+
+  const triggerHeight = await trigger.evaluate((element) => element.getBoundingClientRect().height);
+  expect(triggerHeight).toBeGreaterThanOrEqual(44);
+
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
 });
 
 test("keeps the primary conversion action visible in a short viewport", async ({ page }) => {
@@ -108,7 +137,7 @@ test("exposes names for conversion sliders and progress", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("slider", { name: /质量|Quality/ })).toBeVisible();
-  await page.getByText(/格式参数|Format parameters/, { exact: true }).click();
+  await page.getByText(/^(格式参数|Format parameters)$/).click();
   await expect(page.getByRole("slider", { name: /速度|Speed/ })).toBeVisible();
   await expect(page.getByRole("slider", { name: /最低质量|Minimum quality/ })).toBeVisible();
   await expect(

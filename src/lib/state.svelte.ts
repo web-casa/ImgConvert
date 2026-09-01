@@ -2539,9 +2539,7 @@ export async function checkEngine() {
     capabilities.lossless = [...CORE_CAPABILITIES.lossless];
     capabilities.heic = CORE_CAPABILITIES.heic;
     capabilities.codecProviders = [...CORE_CAPABILITIES.codecProviders];
-    engine.text = translate("state.webPreviewEngine", {
-      formats: capabilities.writable.map(formatLabel).join(" / "),
-    });
+    engine.text = translate("state.webPreviewEngine");
     engine.ok = true;
     return;
   }
@@ -2560,28 +2558,7 @@ export async function checkEngine() {
       await persistSettings();
     }
 
-    const heicProvider = capabilities.codecProviders.find((provider) =>
-      provider.readable.includes("heic"),
-    );
-    const heicProviderText =
-      heicProvider?.kind === "manifest"
-        ? translate("state.plugin")
-        : heicProvider?.kind === "system-helper"
-          ? translate("state.systemHelper")
-          : heicProvider?.kind === "system-imageio"
-            ? translate("state.systemImageIO")
-            : heicProvider?.kind === "system-wic"
-              ? "Windows WIC"
-              : heicProvider?.kind === "selected-helper"
-                ? translate("state.manualHelper")
-                : translate("state.optionalHelper");
-    const heicText = capabilities.heic
-      ? ` · ${translate("state.heicOptionalImport", { provider: heicProviderText })}`
-      : "";
-    engine.text = translate("state.coreReady", {
-      formats: capabilities.writable.map(formatLabel).join(" / "),
-      heic: heicText,
-    });
+    engine.text = translate("state.coreReady");
     engine.ok = capabilities.writable.length > 0;
   } catch (e) {
     engine.text = translate("state.coreFailed", { error: formatCommandError(e) });

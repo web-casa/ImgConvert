@@ -20,6 +20,8 @@
     setImportCommandError,
     setImportMessage,
     ui,
+    capabilities,
+    formatLabel,
     readableExtensions,
   } from "$lib/state.svelte";
 
@@ -29,6 +31,17 @@
   const hiddenImportErrors = $derived(
     Math.max(0, ui.importErrors.length - importErrorPreview.length),
   );
+  const readableFormatOrder = ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp", "heic", "pdf"];
+  const readableFormats = $derived.by(() => {
+    const available = new Set(capabilities.readable);
+    const ordered = readableFormatOrder.filter(
+      (format) => available.has(format) || format === "heic",
+    );
+    const remaining = capabilities.readable.filter((format) => !ordered.includes(format));
+    return [...ordered, ...remaining];
+  });
+  const writableFormats = $derived([...capabilities.writable]);
+  let formatsExpanded = $state(false);
 
   async function pickFiles() {
     if (busy) return;
@@ -72,6 +85,68 @@
     }
   }
 </script>
+
+{#snippet formatDisclosure(compact: boolean)}
+  <details bind:open={formatsExpanded} class="group mt-1 text-xs">
+    <summary
+      class="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1 rounded px-1 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden {compact
+        ? 'justify-start'
+        : 'mx-auto justify-center'}"
+    >
+      <span>{$t("dropzone.supportedFormats.summary")}</span>
+      <span aria-hidden="true">·</span>
+      <span class="font-medium text-primary group-open:hidden">
+        {$t("dropzone.supportedFormats.viewAll")}
+      </span>
+      <span class="hidden font-medium text-primary group-open:inline">
+        {$t("dropzone.supportedFormats.collapse")}
+      </span>
+    </summary>
+    <div
+      class="mt-1.5 grid max-w-lg gap-2 rounded-md border bg-background/85 p-3 text-left shadow-sm {compact
+        ? ''
+        : 'mx-auto'}"
+    >
+      <div class="grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-2">
+        <span class="pt-1 font-medium text-foreground">
+          {$t("dropzone.supportedFormats.importLabel")}
+        </span>
+        <div class="flex flex-wrap gap-1.5">
+          {#each readableFormats as format (format)}
+            <span
+              class="inline-flex items-center gap-1 rounded border px-2 py-1 text-foreground {format ===
+              'heic'
+                ? capabilities.heic
+                  ? 'border-success/35 bg-success/10'
+                  : 'border-border bg-muted text-muted-foreground'
+                : 'border-border bg-card'}"
+            >
+              {format === "heic" ? "HEIC / HEIF" : formatLabel(format)}
+              {#if format === "heic" && !capabilities.heic}
+                <span>{$t("dropzone.supportedFormats.optional")}</span>
+              {/if}
+            </span>
+          {/each}
+        </div>
+      </div>
+      <div class="grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-2">
+        <span class="pt-1 font-medium text-foreground">
+          {$t("dropzone.supportedFormats.exportLabel")}
+        </span>
+        <div class="flex flex-wrap gap-1.5">
+          {#each writableFormats as format (format)}
+            <span class="rounded border border-border bg-card px-2 py-1 text-foreground">
+              {formatLabel(format)}
+            </span>
+          {/each}
+        </div>
+      </div>
+      <p class="text-xs leading-relaxed text-muted-foreground">
+        {$t("dropzone.supportedFormats.note")}
+      </p>
+    </div>
+  </details>
+{/snippet}
 
 {#snippet importActions(compact: boolean)}
   <div class="flex flex-wrap gap-2 {compact ? 'justify-end' : 'justify-center'}">
@@ -129,7 +204,11 @@
          {hasItems ? 'px-4 py-3' : 'px-6 py-8'}"
 >
   {#if hasItems}
-    <div class="flex min-h-[104px] flex-wrap items-center gap-x-4 gap-y-3">
+    <div
+      class="flex min-h-[104px] flex-wrap gap-x-4 gap-y-3 {formatsExpanded
+        ? 'items-start'
+        : 'items-center'}"
+    >
       <img
         src={dropzoneIllustrationUrl}
         alt=""
@@ -143,6 +222,7 @@
         <p class="text-sm font-medium">
           {ui.importing ? $t("dropzone.importing") : $t("dropzone.dropHint")}
         </p>
+        {@render formatDisclosure(true)}
         <p class="text-xs text-muted-foreground">{$t("dropzone.features")}</p>
         {#if ui.importMessage}
           <p class="mt-1 text-xs text-muted-foreground">{ui.importMessage}</p>
@@ -166,6 +246,7 @@
       <p class="mt-3 text-sm font-medium">
         {ui.importing ? $t("dropzone.importing") : $t("dropzone.dropHint")}
       </p>
+      {@render formatDisclosure(false)}
       <p class="mb-3 text-xs text-muted-foreground">{$t("dropzone.features")}</p>
       {@render importActions(false)}
       {#if ui.importMessage}
