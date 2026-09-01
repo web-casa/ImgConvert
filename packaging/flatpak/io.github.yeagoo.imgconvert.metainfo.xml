@@ -24,11 +24,16 @@
   <content_rating type="oars-1.1" />
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.23/packaging/flatpak/screenshots/main.png</image>
+      <image>https://raw.githubusercontent.com/web-casa/ImgConvert/v0.2.24/packaging/flatpak/screenshots/main.png</image>
       <caption>Batch image conversion queue and output settings</caption>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.24" date="2026-09-01">
+      <description>
+        <p>Makes HEIC and PDF support discoverable from the import area while keeping the compact engine status readable at narrow window sizes.</p>
+      </description>
+    </release>
     <release version="0.2.23" date="2026-09-01">
       <description>
         <p>Adds workflow presets, batch resize rules, target-size encoding, metadata privacy controls, comparison preview, PDF input, and the refreshed desktop UI.</p>
