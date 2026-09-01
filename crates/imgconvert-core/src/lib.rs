@@ -11,6 +11,13 @@
 //! 色彩管线:v2 支持 RGBA8/RGBA16/RGBAF32 中间表示、LittleCMS ICC→sRGB 转换、
 //! 线性空间 resize 和 PNG16 保真。JPEG/WebP/AVIF 落盘仍是 RGBA8 SDR。
 
+mod workflow;
+pub use workflow::{
+    MetadataPolicy, ResizeMode, ResizeRule, TargetSizeOptions, WorkflowOptions, WorkflowResult,
+    WorkflowWarning, MAX_RESIZE_PERCENT, MAX_TARGET_SIZE_BYTES, MAX_WORKFLOW_PREVIEW_EDGE,
+    MIN_TARGET_SIZE_BYTES, MIN_WORKFLOW_PREVIEW_EDGE,
+};
+
 use std::borrow::Cow;
 use std::fmt;
 use std::io::{Cursor, Read, Write};
@@ -33,6 +40,11 @@ use ssimulacra2::{compute_frame_ssimulacra2, ColorPrimaries, Rgb, TransferCharac
 /// estimate within the 768 MiB batch budget instead of accepting a 100 MP image
 /// that can exhaust memory before the batch scheduler has a chance to help.
 pub const MAX_PIXELS: usize = 64_000_000;
+
+/// Formats without decoder-level scaling may use at most this many pixels for
+/// a UI thumbnail. Larger inputs remain fully convertible, but the UI uses its
+/// format placeholder instead of allocating a full-resolution preview frame.
+const MAX_THUMBNAIL_FULL_DECODE_PIXELS: u64 = 32_000_000;
 
 /// SVG 是文本格式；单独限制源码大小，避免向 XML/CSS 解析器交付异常大的文档。
 pub const MAX_SVG_SOURCE_BYTES: usize = 16 * 1024 * 1024;
@@ -313,8 +325,17 @@ fn transform_rgba8_to_srgb(samples: &[u8], source: &Profile, srgb: &Profile) -> 
         Flags::COPY_ALPHA,
     )
     .map_err(|e| Error::Unsupported(format!("ICC RGBA8→sRGB transform 初始化失败: {e}")))?;
+    if !samples.len().is_multiple_of(4) {
+        return Err(Error::Invalid("RGBA8 缓冲长度不是 4 的倍数".into()));
+    }
     let mut out = vec![0u8; samples.len()];
-    transform.transform_pixels(samples, &mut out);
+    let chunk_samples = ICC_TRANSFORM_CHUNK_PIXELS * 4;
+    for (src_chunk, dst_chunk) in samples
+        .chunks(chunk_samples)
+        .zip(out.chunks_mut(chunk_samples))
+    {
+        transform.transform_pixels(src_chunk, dst_chunk);
+    }
     Ok(out)
 }
 
@@ -883,6 +904,7 @@ pub enum Error {
     Decode(String),
     Encode(String),
     Timeout(String),
+    Cancelled(String),
     /// 输入不变量错误(尺寸/长度/溢出)。
     Invalid(String),
     Unsupported(String),
@@ -894,6 +916,7 @@ impl fmt::Display for Error {
             Error::Decode(m) => write!(f, "解码失败: {m}"),
             Error::Encode(m) => write!(f, "编码失败: {m}"),
             Error::Timeout(m) => write!(f, "转换超时: {m}"),
+            Error::Cancelled(m) => write!(f, "转换已取消: {m}"),
             Error::Invalid(m) => write!(f, "非法输入: {m}"),
             Error::Unsupported(m) => write!(f, "不支持: {m}"),
         }
@@ -937,6 +960,17 @@ fn check_deadline(deadline: Option<&EncodeDeadline>, stage: &str) -> Result<()> 
         deadline.check(stage)?;
     }
     Ok(())
+}
+
+fn check_pipeline_control(
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+    stage: &str,
+) -> Result<()> {
+    if cancelled.is_some_and(|cancelled| cancelled()) {
+        return Err(Error::Cancelled(stage.to_string()));
+    }
+    check_deadline(deadline, stage)
 }
 
 /// 编解码器接口。
@@ -1048,6 +1082,26 @@ fn convert_best_of_with_color_policy_deadline(
     color_policy: ColorManagementPolicy,
     deadline: Option<&EncodeDeadline>,
 ) -> Result<Vec<u8>> {
+    catch_pipeline_unwind(|| {
+        convert_best_of_with_color_policy_deadline_inner(
+            input,
+            target,
+            options,
+            metadata_override,
+            color_policy,
+            deadline,
+        )
+    })
+}
+
+fn convert_best_of_with_color_policy_deadline_inner(
+    input: &[u8],
+    target: Format,
+    options: &[EncodeOptions],
+    metadata_override: Option<&RawMetadata>,
+    color_policy: ColorManagementPolicy,
+    deadline: Option<&EncodeDeadline>,
+) -> Result<Vec<u8>> {
     let img = decode_for_pipeline(input, metadata_override, color_policy)?;
     check_deadline(deadline, "解码完成")?;
     encode_best_of_with_deadline(&img, target, options, deadline)
@@ -1129,12 +1183,489 @@ fn convert_auto_quality_with_color_policy_deadline(
     color_policy: ColorManagementPolicy,
     deadline: Option<&EncodeDeadline>,
 ) -> Result<AutoQualityResult> {
+    catch_pipeline_unwind(|| {
+        convert_auto_quality_with_color_policy_deadline_inner(
+            input,
+            target,
+            options,
+            auto,
+            metadata_override,
+            color_policy,
+            deadline,
+        )
+    })
+}
+
+fn convert_auto_quality_with_color_policy_deadline_inner(
+    input: &[u8],
+    target: Format,
+    options: &[EncodeOptions],
+    auto: &AutoQualityOptions,
+    metadata_override: Option<&RawMetadata>,
+    color_policy: ColorManagementPolicy,
+    deadline: Option<&EncodeDeadline>,
+) -> Result<AutoQualityResult> {
     if !matches!(target, Format::Jpeg | Format::WebP) {
         return Err(Error::Unsupported("自动质量仅支持 JPEG/WebP".into()));
     }
     let img = decode_for_pipeline(input, metadata_override, color_policy)?;
     check_deadline(deadline, "自动质量解码完成")?;
     encode_auto_quality_with_deadline(&img, target, options, auto, deadline)
+}
+
+/// Unified batch/preview workflow. Resize, metadata filtering and encoder selection share this
+/// boundary so callers cannot accidentally build a semantically different preview pipeline.
+pub fn convert_workflow(
+    input: &[u8],
+    target: Format,
+    options: &WorkflowOptions,
+    metadata_override: Option<&RawMetadata>,
+) -> Result<WorkflowResult> {
+    convert_workflow_with_control(input, target, options, metadata_override, None, None)
+}
+
+pub fn convert_workflow_with_timeout(
+    input: &[u8],
+    target: Format,
+    options: &WorkflowOptions,
+    metadata_override: Option<&RawMetadata>,
+    timeout: Duration,
+) -> Result<WorkflowResult> {
+    convert_workflow_with_control(
+        input,
+        target,
+        options,
+        metadata_override,
+        Some(timeout),
+        None,
+    )
+}
+
+pub fn convert_workflow_with_control(
+    input: &[u8],
+    target: Format,
+    options: &WorkflowOptions,
+    metadata_override: Option<&RawMetadata>,
+    timeout: Option<Duration>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult> {
+    let deadline = timeout.map(EncodeDeadline::from_timeout);
+    catch_pipeline_unwind(|| {
+        convert_workflow_inner(
+            input,
+            target,
+            options,
+            metadata_override,
+            deadline.as_ref(),
+            cancelled,
+        )
+    })
+}
+
+/// Runs the shared resize/metadata/encoder workflow for pixels decoded by a trusted caller.
+///
+/// This is intentionally separate from [`convert_workflow_with_control`]: document renderers such
+/// as the desktop PDF adapter already produce bounded RGBA pixels and should not need an
+/// encode-to-PNG/decode round trip merely to reuse the exact image workflow. The same panic,
+/// timeout and cancellation boundary still applies.
+pub fn convert_image_workflow_with_control(
+    image: ImageData,
+    target: Format,
+    options: &WorkflowOptions,
+    timeout: Option<Duration>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult> {
+    let deadline = timeout.map(EncodeDeadline::from_timeout);
+    catch_pipeline_unwind(|| {
+        validate_workflow_options(target, options)?;
+        image.validate()?;
+        check_pipeline_control(deadline.as_ref(), cancelled, "工作流像素处理开始前")?;
+        convert_decoded_workflow_inner(image, target, options, deadline.as_ref(), cancelled)
+    })
+}
+
+fn convert_workflow_inner(
+    input: &[u8],
+    target: Format,
+    options: &WorkflowOptions,
+    metadata_override: Option<&RawMetadata>,
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult> {
+    validate_workflow_options(target, options)?;
+
+    check_pipeline_control(deadline, cancelled, "工作流解码开始前")?;
+    let source_format =
+        Format::from_magic(input).ok_or_else(|| Error::Unsupported("无法识别输入格式".into()))?;
+    let mut image = codec_for(source_format).decode(input)?;
+    if let Some(metadata) = metadata_override.filter(|metadata| !metadata.is_empty()) {
+        image.apply_metadata_override(metadata);
+    }
+    check_pipeline_control(deadline, cancelled, "工作流解码完成")?;
+    convert_decoded_workflow_inner(image, target, options, deadline, cancelled)
+}
+
+fn validate_workflow_options(target: Format, options: &WorkflowOptions) -> Result<()> {
+    if options.encoders.is_empty() {
+        return Err(Error::Invalid("至少需要一个编码候选".into()));
+    }
+    if options.auto_quality.is_some() && options.target_size.is_some() {
+        return Err(Error::Invalid("自动质量与目标文件体积不能同时启用".into()));
+    }
+    if options.auto_quality.is_some() && !matches!(target, Format::Jpeg | Format::WebP) {
+        return Err(Error::Unsupported("自动质量仅支持 JPEG/WebP".into()));
+    }
+    if let Some(target_size) = options.target_size {
+        validate_target_size(target, &options.encoders, target_size)?;
+    }
+    if let Some(max_edge) = options.preview_max_edge {
+        validate_workflow_preview_edge(max_edge)?;
+    }
+
+    Ok(())
+}
+
+fn convert_decoded_workflow_inner(
+    mut image: ImageData,
+    target: Format,
+    options: &WorkflowOptions,
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<WorkflowResult> {
+    // A malformed profile that is being preserved must not make preview fail
+    // when the same conversion without a display render succeeds. Render the
+    // already-decoded samples and report the display-only degradation.
+    let tolerate_invalid_preview_profile =
+        options.color_policy == ColorManagementPolicy::PreserveEmbeddedProfile;
+    let mut invalid_profile_ignored_for_preview = false;
+    let source_preview_png = options
+        .preview_max_edge
+        .map(|max_edge| {
+            render_workflow_preview_png(
+                &mut image,
+                max_edge,
+                tolerate_invalid_preview_profile,
+                &mut invalid_profile_ignored_for_preview,
+            )
+        })
+        .transpose()?;
+    check_pipeline_control(deadline, cancelled, "源图预览生成完成")?;
+
+    let (output_width, output_height) = options.resize.dimensions(image.width, image.height)?;
+    let resized = (output_width, output_height) != (image.width, image.height);
+    let had_embedded_profile = image.icc.as_ref().is_some_and(|icc| !icc.is_empty());
+    let forced_profile_conversion = resized
+        && had_embedded_profile
+        && options.color_policy == ColorManagementPolicy::PreserveEmbeddedProfile;
+    let strip_profile_after_conversion =
+        had_embedded_profile && options.metadata_policy == MetadataPolicy::StripAll;
+    let mut invalid_profile_discarded = false;
+    if options.color_policy == ColorManagementPolicy::ConvertToSrgb
+        || (resized && had_embedded_profile)
+        || strip_profile_after_conversion
+    {
+        match convert_image_to_srgb(&image) {
+            Ok(converted) => image = converted,
+            Err(Error::Unsupported(_))
+                if strip_profile_after_conversion
+                    && options.color_policy == ColorManagementPolicy::PreserveEmbeddedProfile =>
+            {
+                // A privacy policy must not let attacker-controlled, malformed ICC metadata block
+                // removal. Preserve the decoded samples as-is, discard the unusable profile, and
+                // surface the colour uncertainty instead of silently degrading.
+                image.icc = None;
+                invalid_profile_discarded = true;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    check_pipeline_control(deadline, cancelled, "工作流色彩准备完成")?;
+
+    if resized {
+        image = resize_linear(&image, output_width, output_height)?;
+    }
+    apply_metadata_policy(&mut image, options.metadata_policy);
+    check_pipeline_control(deadline, cancelled, "工作流缩放与元数据处理完成")?;
+
+    let preserve_metadata = options.metadata_policy != MetadataPolicy::StripAll;
+    let mut encoders = options.encoders.clone();
+    for encoder in &mut encoders {
+        encoder.preserve_metadata = preserve_metadata;
+    }
+
+    let (bytes, selected_quality, target_size_met) = if let Some(target_size) = options.target_size
+    {
+        let (bytes, quality, met) = encode_target_size_with_control(
+            &image,
+            target,
+            &encoders,
+            target_size,
+            deadline,
+            cancelled,
+        )?;
+        (bytes, Some(quality), Some(met))
+    } else if let Some(auto_quality) = options.auto_quality {
+        if !matches!(target, Format::Jpeg | Format::WebP) {
+            return Err(Error::Unsupported("自动质量仅支持 JPEG/WebP".into()));
+        }
+        let result = encode_auto_quality_with_control(
+            &image,
+            target,
+            &encoders,
+            &auto_quality,
+            deadline,
+            cancelled,
+        )?;
+        (result.bytes, Some(result.quality), None)
+    } else {
+        let selected =
+            encode_best_candidate_with_control(&image, target, &encoders, deadline, cancelled)?;
+        let selected_is_lossless = selected.options.lossless && target.supports_lossless();
+        let selected_quality = (!selected_is_lossless
+            && matches!(target, Format::Jpeg | Format::WebP | Format::Avif))
+        .then_some(selected.options.quality);
+        (selected.bytes, selected_quality, None)
+    };
+
+    let mut warnings = Vec::new();
+    if forced_profile_conversion && !invalid_profile_discarded {
+        warnings.push(WorkflowWarning::ColorProfileConvertedForResize);
+    }
+    if invalid_profile_discarded {
+        warnings.push(WorkflowWarning::InvalidColorProfileDiscarded);
+    }
+    if target_size_met == Some(false) {
+        warnings.push(WorkflowWarning::TargetSizeNotMet {
+            target_bytes: options.target_size.map_or(0, |target| target.max_bytes),
+            actual_bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+        });
+    }
+
+    let width = image.width;
+    let height = image.height;
+    drop(image);
+    let output_preview_png = options
+        .preview_max_edge
+        .map(|max_edge| {
+            check_pipeline_control(deadline, cancelled, "输出预览解码前")?;
+            let mut decoded = codec_for(target).decode(&bytes)?;
+            let preview = render_workflow_preview_png(
+                &mut decoded,
+                max_edge,
+                tolerate_invalid_preview_profile,
+                &mut invalid_profile_ignored_for_preview,
+            )?;
+            check_pipeline_control(deadline, cancelled, "输出预览生成完成")?;
+            Ok(preview)
+        })
+        .transpose()?;
+    if invalid_profile_ignored_for_preview && !invalid_profile_discarded {
+        warnings.push(WorkflowWarning::InvalidColorProfileIgnoredForPreview);
+    }
+
+    Ok(WorkflowResult {
+        bytes,
+        width,
+        height,
+        selected_quality,
+        target_size_met,
+        warnings,
+        source_preview_png,
+        output_preview_png,
+    })
+}
+
+fn render_workflow_preview_png(
+    image: &mut ImageData,
+    max_edge: u32,
+    tolerate_invalid_profile: bool,
+    invalid_profile_ignored: &mut bool,
+) -> Result<Vec<u8>> {
+    validate_workflow_preview_edge(max_edge)?;
+    let converted;
+    let color_ready = if image.icc.as_ref().is_some_and(|icc| !icc.is_empty()) {
+        match convert_image_to_srgb(image) {
+            Ok(value) => {
+                converted = value;
+                &converted
+            }
+            Err(Error::Unsupported(_)) if tolerate_invalid_profile => {
+                // The final workflow may preserve or strip this malformed metadata. Temporarily
+                // remove it only from the bounded display render; the caller emits an explicit
+                // warning and the full-resolution conversion keeps its configured semantics.
+                *invalid_profile_ignored = true;
+                let invalid_profile = image.icc.take();
+                let result = render_workflow_preview_png_unprofiled(image, max_edge);
+                image.icc = invalid_profile;
+                return result;
+            }
+            Err(error) => return Err(error),
+        }
+    } else {
+        image
+    };
+    render_workflow_preview_png_unprofiled(color_ready, max_edge)
+}
+
+fn render_workflow_preview_png_unprofiled(image: &ImageData, max_edge: u32) -> Result<Vec<u8>> {
+    let (preview_width, preview_height) = thumbnail_dimensions(image.width, image.height, max_edge);
+    let resized;
+    let preview = if (preview_width, preview_height) != (image.width, image.height) {
+        resized = resize_linear(image, preview_width, preview_height)?;
+        &resized
+    } else {
+        image
+    };
+    PngCodec.encode(
+        preview,
+        &EncodeOptions {
+            preserve_metadata: false,
+            ..EncodeOptions::default()
+        },
+    )
+}
+
+fn validate_workflow_preview_edge(max_edge: u32) -> Result<()> {
+    if !(MIN_WORKFLOW_PREVIEW_EDGE..=MAX_WORKFLOW_PREVIEW_EDGE).contains(&max_edge) {
+        return Err(Error::Invalid(format!(
+            "预览边长必须在 {MIN_WORKFLOW_PREVIEW_EDGE}..={MAX_WORKFLOW_PREVIEW_EDGE} 之间"
+        )));
+    }
+    Ok(())
+}
+
+fn apply_metadata_policy(image: &mut ImageData, policy: MetadataPolicy) {
+    match policy {
+        MetadataPolicy::StripAll => {
+            image.icc = None;
+            image.exif = None;
+            image.xmp = None;
+            image.iptc = None;
+        }
+        MetadataPolicy::ColorOnly => {
+            image.exif = None;
+            image.xmp = None;
+            image.iptc = None;
+        }
+        MetadataPolicy::PreserveAll => {}
+    }
+}
+
+fn validate_target_size(
+    target: Format,
+    encoders: &[EncodeOptions],
+    target_size: TargetSizeOptions,
+) -> Result<()> {
+    if !matches!(target, Format::Jpeg | Format::WebP) {
+        return Err(Error::Unsupported(
+            "目标文件体积仅支持有损 JPEG/WebP".into(),
+        ));
+    }
+    if encoders.iter().any(|encoder| encoder.lossless) {
+        return Err(Error::Invalid("目标文件体积不能与无损编码同时启用".into()));
+    }
+    if !(MIN_TARGET_SIZE_BYTES..=MAX_TARGET_SIZE_BYTES).contains(&target_size.max_bytes) {
+        return Err(Error::Invalid(format!(
+            "目标文件体积必须在 {MIN_TARGET_SIZE_BYTES}..={MAX_TARGET_SIZE_BYTES} 字节之间"
+        )));
+    }
+    if !(1..=100).contains(&target_size.min_quality) {
+        return Err(Error::Invalid(
+            "目标文件体积最低质量必须在 1..=100 之间".into(),
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+struct TargetSizeCandidate {
+    bytes: Vec<u8>,
+    quality: u8,
+}
+
+fn encode_target_size_with_control(
+    image: &ImageData,
+    target: Format,
+    encoders: &[EncodeOptions],
+    target_size: TargetSizeOptions,
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<(Vec<u8>, u8, bool)> {
+    let max_quality = highest_candidate_quality(encoders).clamp(1, 100);
+    let min_quality = target_size.min_quality.clamp(1, 100).min(max_quality);
+    let mut smallest: Option<TargetSizeCandidate> = None;
+    let mut previous_failed_quality = None;
+
+    for quality in workflow::target_quality_levels(min_quality, max_quality) {
+        let candidate =
+            encode_target_quality_candidate(image, target, encoders, quality, deadline, cancelled)?;
+        if candidate.bytes.len() as u64 <= target_size.max_bytes {
+            for refined_quality in
+                workflow::target_refinement_levels(quality, previous_failed_quality, max_quality)
+            {
+                let refined = encode_target_quality_candidate(
+                    image,
+                    target,
+                    encoders,
+                    refined_quality,
+                    deadline,
+                    cancelled,
+                )?;
+                if refined.bytes.len() as u64 <= target_size.max_bytes {
+                    return Ok((refined.bytes, refined.quality, true));
+                }
+            }
+            return Ok((candidate.bytes, candidate.quality, true));
+        }
+        previous_failed_quality = Some(quality);
+        if smallest
+            .as_ref()
+            .is_none_or(|current| candidate.bytes.len() < current.bytes.len())
+        {
+            smallest = Some(candidate);
+        }
+    }
+
+    let smallest = smallest.ok_or_else(|| Error::Invalid("目标体积没有可用编码候选".into()))?;
+    Ok((smallest.bytes, smallest.quality, false))
+}
+
+fn encode_target_quality_candidate(
+    image: &ImageData,
+    target: Format,
+    encoders: &[EncodeOptions],
+    quality: u8,
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<TargetSizeCandidate> {
+    let candidates = encoders
+        .iter()
+        .map(|encoder| {
+            let mut candidate = *encoder;
+            candidate.quality = quality;
+            candidate.lossless = false;
+            candidate
+        })
+        .collect::<Vec<_>>();
+    let bytes = encode_best_of_with_control(image, target, &candidates, deadline, cancelled)?;
+    Ok(TargetSizeCandidate { bytes, quality })
+}
+
+/// Keep Rust panics from codec and parser implementations from unwinding across
+/// the desktop IPC/fuzz boundary. Native aborts and memory faults remain outside
+/// Rust's unwind model and are constrained separately by the input budgets.
+fn catch_pipeline_unwind<T>(operation: impl FnOnce() -> Result<T>) -> Result<T> {
+    match catch_unwind(AssertUnwindSafe(operation)) {
+        Ok(result) => result,
+        Err(payload) => {
+            let message = payload
+                .downcast_ref::<&str>()
+                .map(|message| (*message).to_string())
+                .or_else(|| payload.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "未知 panic".to_string());
+            Err(Error::Encode(format!("转换过程 panic: {message}")))
+        }
+    }
 }
 
 fn decode_for_pipeline(
@@ -1148,7 +1679,12 @@ fn decode_for_pipeline(
     if let Some(metadata) = metadata_override.filter(|metadata| !metadata.is_empty()) {
         img.apply_metadata_override(metadata);
     }
-    apply_color_management_policy(&img, color_policy)
+    match color_policy {
+        // `img` is freshly decoded and owned by this pipeline. Moving it avoids
+        // an otherwise unconditional full-frame clone on the default path.
+        ColorManagementPolicy::PreserveEmbeddedProfile => Ok(img),
+        ColorManagementPolicy::ConvertToSrgb => convert_image_to_srgb(&img),
+    }
 }
 
 fn encode_best_of_with_deadline(
@@ -1157,21 +1693,51 @@ fn encode_best_of_with_deadline(
     options: &[EncodeOptions],
     deadline: Option<&EncodeDeadline>,
 ) -> Result<Vec<u8>> {
+    encode_best_of_with_control(img, target, options, deadline, None)
+}
+
+fn encode_best_of_with_control(
+    img: &ImageData,
+    target: Format,
+    options: &[EncodeOptions],
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<Vec<u8>> {
+    encode_best_candidate_with_control(img, target, options, deadline, cancelled)
+        .map(|candidate| candidate.bytes)
+}
+
+#[derive(Debug)]
+struct BestEncodedCandidate {
+    bytes: Vec<u8>,
+    options: EncodeOptions,
+}
+
+fn encode_best_candidate_with_control(
+    img: &ImageData,
+    target: Format,
+    options: &[EncodeOptions],
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<BestEncodedCandidate> {
     if options.is_empty() {
         return Err(Error::Invalid("至少需要一个编码候选".into()));
     }
 
     let codec = codec_for(target);
-    let mut best: Option<Vec<u8>> = None;
+    let mut best: Option<BestEncodedCandidate> = None;
     for opts in options {
-        check_deadline(deadline, "编码候选开始前")?;
-        let candidate = codec.encode(img, opts)?;
-        check_deadline(deadline, "编码候选完成后")?;
+        check_pipeline_control(deadline, cancelled, "编码候选开始前")?;
+        let bytes = codec.encode(img, opts)?;
+        check_pipeline_control(deadline, cancelled, "编码候选完成后")?;
         if best
             .as_ref()
-            .is_none_or(|current| candidate.len() < current.len())
+            .is_none_or(|current| bytes.len() < current.bytes.len())
         {
-            best = Some(candidate);
+            best = Some(BestEncodedCandidate {
+                bytes,
+                options: *opts,
+            });
         }
     }
     best.ok_or_else(|| Error::Invalid("没有可用编码候选".into()))
@@ -1184,17 +1750,29 @@ fn encode_auto_quality_with_deadline(
     auto: &AutoQualityOptions,
     deadline: Option<&EncodeDeadline>,
 ) -> Result<AutoQualityResult> {
+    encode_auto_quality_with_control(img, target, options, auto, deadline, None)
+}
+
+fn encode_auto_quality_with_control(
+    img: &ImageData,
+    target: Format,
+    options: &[EncodeOptions],
+    auto: &AutoQualityOptions,
+    deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
+) -> Result<AutoQualityResult> {
     if options.is_empty() {
         return Err(Error::Invalid("至少需要一个编码候选".into()));
     }
 
     if img.width < 8 || img.height < 8 {
-        let bytes = encode_best_of_with_deadline(img, target, options, deadline)?;
+        let selected =
+            encode_best_candidate_with_control(img, target, options, deadline, cancelled)?;
         return Ok(AutoQualityResult {
-            bytes,
-            quality: highest_candidate_quality(options),
+            bytes: selected.bytes,
+            quality: selected.options.quality,
             score: None,
-            used_lossless: options.iter().any(|opts| opts.lossless),
+            used_lossless: target.supports_lossless() && selected.options.lossless,
         });
     }
 
@@ -1207,12 +1785,13 @@ fn encode_auto_quality_with_deadline(
     let mut max_candidate: Option<ScoredCandidate> = None;
 
     while low < high {
-        check_deadline(deadline, "自动质量候选开始前")?;
+        check_pipeline_control(deadline, cancelled, "自动质量候选开始前")?;
         let mid = low + (high - low) / 2;
         let quality = levels[mid];
-        let candidate =
-            encode_scored_quality_candidate_with_deadline(img, target, options, quality, deadline)?;
-        check_deadline(deadline, "自动质量候选评分后")?;
+        let candidate = encode_scored_quality_candidate_with_control(
+            img, target, options, quality, deadline, cancelled,
+        )?;
+        check_pipeline_control(deadline, cancelled, "自动质量候选评分后")?;
         if candidate.score >= auto.target_score {
             best = Some(candidate);
             high = mid;
@@ -1229,13 +1808,21 @@ fn encode_auto_quality_with_deadline(
     } else if let Some(max_candidate) = max_candidate {
         max_candidate
     } else {
-        encode_scored_quality_candidate_with_deadline(img, target, options, max_quality, deadline)?
+        encode_scored_quality_candidate_with_control(
+            img,
+            target,
+            options,
+            max_quality,
+            deadline,
+            cancelled,
+        )?
     };
 
     if target == Format::WebP && !options.iter().any(|opts| opts.lossless) {
-        check_deadline(deadline, "WebP 无损候选开始前")?;
-        let lossless = encode_lossless_webp_candidate_with_deadline(img, options, deadline)?;
-        check_deadline(deadline, "WebP 无损候选评分后")?;
+        check_pipeline_control(deadline, cancelled, "WebP 无损候选开始前")?;
+        let lossless =
+            encode_lossless_webp_candidate_with_control(img, options, deadline, cancelled)?;
+        check_pipeline_control(deadline, cancelled, "WebP 无损候选评分后")?;
         if lossless.bytes.len() < selected.bytes.len() {
             selected = lossless;
         }
@@ -1304,12 +1891,13 @@ pub fn auto_quality_scoring_evaluation_limit(
     }
 }
 
-fn encode_scored_quality_candidate_with_deadline(
+fn encode_scored_quality_candidate_with_control(
     img: &ImageData,
     target: Format,
     options: &[EncodeOptions],
     quality: u8,
     deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<ScoredCandidate> {
     let quality_options = options
         .iter()
@@ -1320,10 +1908,10 @@ fn encode_scored_quality_candidate_with_deadline(
             candidate
         })
         .collect::<Vec<_>>();
-    let bytes = encode_best_of_with_deadline(img, target, &quality_options, deadline)?;
-    check_deadline(deadline, "自动质量候选解码前")?;
+    let bytes = encode_best_of_with_control(img, target, &quality_options, deadline, cancelled)?;
+    check_pipeline_control(deadline, cancelled, "自动质量候选解码前")?;
     let decoded = codec_for(target).decode(&bytes)?;
-    check_deadline(deadline, "自动质量候选评分前")?;
+    check_pipeline_control(deadline, cancelled, "自动质量候选评分前")?;
     let score = ssimulacra2_score(img, &decoded)?;
     Ok(ScoredCandidate {
         bytes,
@@ -1333,10 +1921,11 @@ fn encode_scored_quality_candidate_with_deadline(
     })
 }
 
-fn encode_lossless_webp_candidate_with_deadline(
+fn encode_lossless_webp_candidate_with_control(
     img: &ImageData,
     options: &[EncodeOptions],
     deadline: Option<&EncodeDeadline>,
+    cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<ScoredCandidate> {
     let lossless_options = options
         .iter()
@@ -1348,10 +1937,11 @@ fn encode_lossless_webp_candidate_with_deadline(
             candidate
         })
         .collect::<Vec<_>>();
-    let bytes = encode_best_of_with_deadline(img, Format::WebP, &lossless_options, deadline)?;
-    check_deadline(deadline, "WebP 无损候选解码前")?;
+    let bytes =
+        encode_best_of_with_control(img, Format::WebP, &lossless_options, deadline, cancelled)?;
+    check_pipeline_control(deadline, cancelled, "WebP 无损候选解码前")?;
     let decoded = WebpCodec.decode(&bytes)?;
-    check_deadline(deadline, "WebP 无损候选评分前")?;
+    check_pipeline_control(deadline, cancelled, "WebP 无损候选评分前")?;
     let score = ssimulacra2_score(img, &decoded)?;
     Ok(ScoredCandidate {
         bytes,
@@ -1727,21 +2317,118 @@ pub fn probe(input: &[u8]) -> Result<ImageProbe> {
 pub fn thumbnail(input: &[u8], max_edge: u32) -> Result<Option<Thumbnail>> {
     let src =
         Format::from_magic(input).ok_or_else(|| Error::Unsupported("无法识别输入格式".into()))?;
-    let img = codec_for(src).decode(input)?;
+    let max_edge = max_edge.clamp(32, 512);
+    let img = if src == Format::Jpeg {
+        decode_jpeg_thumbnail(input, max_edge)?
+    } else {
+        let info = probe(input)?;
+        if thumbnail_full_decode_exceeds_budget(&info) {
+            return Ok(None);
+        }
+        codec_for(src).decode(input)?
+    };
     let source = img.rgba8_cow();
     if source.chunks_exact(4).all(|pixel| pixel[3] == 0) {
         return Ok(None);
     }
 
-    let max_edge = max_edge.clamp(32, 512);
     let (width, height) = thumbnail_dimensions(img.width, img.height, max_edge);
     let resized = if width == img.width && height == img.height {
         source.into_owned()
     } else {
-        resize_rgba8_linear(&source, img.width, img.height, width, height)?
+        resize_rgba8_thumbnail(&source, img.width, img.height, width, height)?
     };
     let png = encode_png_rgba(width, height, &resized)?;
     Ok(Some(Thumbnail { width, height, png }))
+}
+
+fn thumbnail_full_decode_exceeds_budget(info: &ImageProbe) -> bool {
+    u64::from(info.width).saturating_mul(u64::from(info.height)) > MAX_THUMBNAIL_FULL_DECODE_PIXELS
+}
+
+fn decode_jpeg_thumbnail(input: &[u8], max_edge: u32) -> Result<ImageData> {
+    let info = probe(input)?;
+    let source_max_edge = info.width.max(info.height);
+    if source_max_edge <= max_edge.saturating_mul(2) {
+        return JpegCodec.decode(input);
+    }
+
+    match catch_unwind(AssertUnwindSafe(|| {
+        decode_jpeg_thumbnail_scaled(input, max_edge)
+    })) {
+        Ok(Ok(image)) => Ok(image),
+        // libjpeg-turbo cannot convert CMYK/YCCK directly to EXT_RGBA. The
+        // regular image decoder supports that conversion, so retain thumbnail
+        // correctness when the scaled fast path rejects the source.
+        Ok(Err(scaled_error)) => JpegCodec.decode(input).map_err(|fallback_error| {
+            Error::Decode(format!(
+                "JPEG 缩放缩略图解码失败: {scaled_error};完整解码回退失败: {fallback_error}"
+            ))
+        }),
+        Err(payload) => {
+            let message = payload
+                .downcast_ref::<&str>()
+                .map(|message| (*message).to_string())
+                .or_else(|| payload.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "未知 panic".to_string());
+            JpegCodec.decode(input).map_err(|fallback_error| {
+                Error::Decode(format!(
+                    "mozjpeg 缩略图解码 panic: {message};完整解码回退失败: {fallback_error}"
+                ))
+            })
+        }
+    }
+}
+
+fn decode_jpeg_thumbnail_scaled(input: &[u8], max_edge: u32) -> Result<ImageData> {
+    let mut decoder = mozjpeg::Decompress::new_mem(input)
+        .map_err(|error| Error::Decode(format!("mozjpeg 缩略图头解析失败: {error}")))?;
+    let (source_width, source_height) = decoder.size();
+    let source_width =
+        u32::try_from(source_width).map_err(|_| Error::Decode("JPEG 宽度超过 u32 上限".into()))?;
+    let source_height =
+        u32::try_from(source_height).map_err(|_| Error::Decode("JPEG 高度超过 u32 上限".into()))?;
+    rgba_byte_len(source_width, source_height)?;
+
+    let source_max = u64::from(source_width.max(source_height));
+    let numerator = u8::try_from(
+        (u64::from(max_edge)
+            .saturating_mul(8)
+            .saturating_add(source_max - 1)
+            / source_max)
+            .clamp(1, 8),
+    )
+    .map_err(|_| Error::Decode("JPEG 缩放比例无效".into()))?;
+    decoder.scale(numerator);
+
+    let mut started = decoder
+        .rgba()
+        .map_err(|error| Error::Decode(format!("mozjpeg 缩略图解码启动失败: {error}")))?;
+    let width = u32::try_from(started.width())
+        .map_err(|_| Error::Decode("JPEG 缩略图宽度超过 u32 上限".into()))?;
+    let height = u32::try_from(started.height())
+        .map_err(|_| Error::Decode("JPEG 缩略图高度超过 u32 上限".into()))?;
+    let expected = rgba_byte_len(width, height)?;
+    let rgba = started
+        .read_scanlines::<u8>()
+        .map_err(|error| Error::Decode(format!("mozjpeg 缩略图像素解码失败: {error}")))?;
+    started
+        .finish()
+        .map_err(|error| Error::Decode(format!("mozjpeg 缩略图解码收尾失败: {error}")))?;
+    if rgba.len() != expected {
+        return Err(Error::Decode("mozjpeg 缩略图 RGBA 长度不匹配".into()));
+    }
+
+    let orientation = extract_jpeg_metadata(input, false)
+        .exif
+        .as_deref()
+        .and_then(inspect_exif_semantics)
+        .and_then(|probe| probe.orientation)
+        .and_then(|value| u8::try_from(value).ok())
+        .and_then(image::metadata::Orientation::from_exif)
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let (width, height, rgba) = apply_rgba8_orientation(width, height, rgba, orientation)?;
+    ImageData::new(width, height, rgba)
 }
 
 /// 主图线性空间 resize。输出保留输入的像素缓冲编码和 metadata。
@@ -1837,6 +2524,82 @@ fn resize_rgba8_linear(
             );
             let offset = (dst_y * dst_width as usize + dst_x) * 4;
             out[offset..offset + 4].copy_from_slice(&px);
+        }
+    }
+    Ok(out)
+}
+
+fn resize_rgba8_thumbnail(
+    rgba: &[u8],
+    src_width: u32,
+    src_height: u32,
+    dst_width: u32,
+    dst_height: u32,
+) -> Result<Vec<u8>> {
+    let large_reduction = u64::from(src_width) >= u64::from(dst_width).saturating_mul(2)
+        || u64::from(src_height) >= u64::from(dst_height).saturating_mul(2);
+    if large_reduction {
+        resize_rgba8_area_linear(rgba, src_width, src_height, dst_width, dst_height)
+    } else {
+        resize_rgba8_linear(rgba, src_width, src_height, dst_width, dst_height)
+    }
+}
+
+fn resize_rgba8_area_linear(
+    rgba: &[u8],
+    src_width: u32,
+    src_height: u32,
+    dst_width: u32,
+    dst_height: u32,
+) -> Result<Vec<u8>> {
+    let expected = rgba_byte_len(src_width, src_height)?;
+    if rgba.len() != expected {
+        return Err(Error::Invalid("缩略图 area 输入 RGBA 长度不匹配".into()));
+    }
+    let dst_len = rgba_byte_len(dst_width, dst_height)?;
+    let mut out = vec![0u8; dst_len];
+    let x_scale = f64::from(src_width) / f64::from(dst_width);
+    let y_scale = f64::from(src_height) / f64::from(dst_height);
+
+    for dst_y in 0..dst_height {
+        let src_y0 = f64::from(dst_y) * y_scale;
+        let src_y1 = f64::from(dst_y + 1) * y_scale;
+        let y_start = src_y0.floor() as u32;
+        let y_end = (src_y1.ceil() as u32).min(src_height);
+        for dst_x in 0..dst_width {
+            let src_x0 = f64::from(dst_x) * x_scale;
+            let src_x1 = f64::from(dst_x + 1) * x_scale;
+            let x_start = src_x0.floor() as u32;
+            let x_end = (src_x1.ceil() as u32).min(src_width);
+            let mut alpha_sum = 0.0f64;
+            let mut rgb_sum = [0.0f64; 3];
+
+            for src_y in y_start..y_end {
+                let y_weight =
+                    (src_y1.min(f64::from(src_y + 1)) - src_y0.max(f64::from(src_y))).max(0.0);
+                for src_x in x_start..x_end {
+                    let x_weight =
+                        (src_x1.min(f64::from(src_x + 1)) - src_x0.max(f64::from(src_x))).max(0.0);
+                    let weight = x_weight * y_weight;
+                    let offset = (src_y as usize * src_width as usize + src_x as usize) * 4;
+                    let alpha = f64::from(rgba[offset + 3]) / 255.0;
+                    alpha_sum += alpha * weight;
+                    for channel in 0..3 {
+                        rgb_sum[channel] +=
+                            f64::from(srgb8_to_linear(rgba[offset + channel])) * alpha * weight;
+                    }
+                }
+            }
+
+            let area = (src_x1 - src_x0) * (src_y1 - src_y0);
+            let output_offset = (dst_y as usize * dst_width as usize + dst_x as usize) * 4;
+            if alpha_sum > f64::EPSILON {
+                for channel in 0..3 {
+                    out[output_offset + channel] =
+                        linear_to_srgb8((rgb_sum[channel] / alpha_sum) as f32);
+                }
+            }
+            out[output_offset + 3] = ((alpha_sum / area).clamp(0.0, 1.0) * 255.0).round() as u8;
         }
     }
     Ok(out)
@@ -2122,6 +2885,7 @@ fn probe_png(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
     let height = be_u32(&bytes[20..24]).ok_or_else(|| Error::Decode("PNG 高度缺失".into()))?;
 
     let mut dpi = None;
+    let mut orientation = image::metadata::Orientation::NoTransforms;
     let mut offset = 8usize;
     while offset + 8 <= bytes.len() {
         let length = be_u32(&bytes[offset..offset + 4])
@@ -2151,6 +2915,13 @@ fn probe_png(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
                     });
                 }
             }
+        } else if chunk == b"eXIf" {
+            let metadata = Metadata {
+                exif: metadata_blob(&bytes[data_start..data_end]),
+                ..Metadata::default()
+            };
+            orientation = metadata_exif_orientation(&metadata)
+                .unwrap_or(image::metadata::Orientation::NoTransforms);
         }
         if chunk == b"IDAT" || chunk == b"IEND" {
             break;
@@ -2158,6 +2929,7 @@ fn probe_png(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
         offset = next_offset;
     }
 
+    let (width, height) = oriented_dimensions(width, height, orientation);
     Ok((width, height, dpi))
 }
 
@@ -2306,15 +3078,12 @@ fn probe_webp(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
     if feat.has_animation() {
         return Err(Error::Unsupported("动画 WebP 暂不支持".into()));
     }
-    Ok((feat.width(), feat.height(), probe_webp_exif_dpi(bytes)))
-}
-
-fn probe_webp_exif_dpi(bytes: &[u8]) -> Option<Dpi> {
-    parse_webp_chunks(bytes)
-        .ok()?
-        .into_iter()
-        .find(|chunk| chunk.fourcc == *b"EXIF" && !chunk.data.is_empty())
-        .and_then(|chunk| parse_exif_dpi(chunk.data))
+    let metadata = extract_webp_metadata(bytes);
+    let orientation =
+        metadata_exif_orientation(&metadata).unwrap_or(image::metadata::Orientation::NoTransforms);
+    let (width, height) = oriented_dimensions(feat.width(), feat.height(), orientation);
+    let dpi = metadata.exif.as_deref().and_then(parse_exif_dpi);
+    Ok((width, height, dpi))
 }
 
 fn probe_avif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
@@ -2335,7 +3104,10 @@ fn probe_avif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
         if image.is_null() {
             return Err(Error::Decode("decoder.image 为 null".into()));
         }
-        Ok(((*image).width, (*image).height, probe_avif_exif_dpi(image)))
+        let metadata = avif_metadata_from_image(image);
+        let orientation = avif_effective_orientation(image, &metadata);
+        let (width, height) = oriented_dimensions((*image).width, (*image).height, orientation);
+        Ok((width, height, probe_avif_exif_dpi(image)))
     }
 }
 
@@ -2647,6 +3419,16 @@ fn normalize_xmp_orientation(xmp: Vec<u8>) -> Vec<u8> {
         Err(err) => return err.into_bytes(),
     };
     normalize_xmp_semantics(&text).into_bytes()
+}
+
+fn metadata_exif_orientation(metadata: &Metadata) -> Option<image::metadata::Orientation> {
+    metadata
+        .exif
+        .as_deref()
+        .and_then(inspect_exif_semantics)
+        .and_then(|probe| probe.orientation)
+        .and_then(|value| u8::try_from(value).ok())
+        .and_then(image::metadata::Orientation::from_exif)
 }
 
 fn normalize_xmp_semantics(input: &str) -> String {
@@ -3036,6 +3818,14 @@ fn remove_xml_attribute(input: &str, name: &str) -> String {
     let mut cursor = 0usize;
     while let Some(relative) = input[cursor..].find(name) {
         let name_start = cursor + relative;
+        // Attribute names must start after XML whitespace. Without this left
+        // boundary, removing `tiff:Orientation` also corrupts aliases such as
+        // `xtiff:Orientation`.
+        if name_start == 0 || !input.as_bytes()[name_start - 1].is_ascii_whitespace() {
+            out.push_str(&input[cursor..name_start + name.len()]);
+            cursor = name_start + name.len();
+            continue;
+        }
         let Some(eq_relative) = input[name_start + name.len()..].find('=') else {
             break;
         };
@@ -3276,6 +4066,12 @@ fn extract_jpeg_metadata(bytes: &[u8], normalize_exif: bool) -> Metadata {
 
     if let Some(xmp) = reassemble_jpeg_extended_xmp(&extended_xmp_segments) {
         metadata.xmp = Some(xmp);
+    }
+
+    if normalize_exif {
+        if let Some(xmp) = metadata.xmp.take() {
+            metadata.xmp = Some(normalize_xmp_orientation(xmp));
+        }
     }
 
     metadata
@@ -3561,6 +4357,11 @@ fn extract_png_metadata(bytes: &[u8], normalize_exif: bool) -> Metadata {
         offset = next_offset;
     }
 
+    if normalize_exif {
+        if let Some(xmp) = metadata.xmp.take() {
+            metadata.xmp = Some(normalize_xmp_orientation(xmp));
+        }
+    }
     metadata
 }
 
@@ -4040,8 +4841,13 @@ impl Codec for WebpCodec {
             .decode()
             .ok_or_else(|| Error::Decode("libwebp 解码失败".into()))?;
         let rgba = decoded.to_image().to_rgba8();
-        let mut img = ImageData::new(rgba.width(), rgba.height(), rgba.into_raw())?;
         let metadata = metadata_from_image_format(bytes, Format::WebP);
+        let orientation = metadata_exif_orientation(&metadata)
+            .unwrap_or(image::metadata::Orientation::NoTransforms);
+        let metadata = metadata.normalized_orientation();
+        let (width, height, rgba) =
+            apply_rgba8_orientation(rgba.width(), rgba.height(), rgba.into_raw(), orientation)?;
+        let mut img = ImageData::new(width, height, rgba)?;
         img.icc = metadata.icc;
         img.exif = metadata.exif;
         img.xmp = metadata.xmp;
@@ -4247,8 +5053,13 @@ impl Codec for AvifCodec {
                 buf.ok_or_else(|| Error::Decode("avifImageYUVToRGB 失败".into()))?
             };
 
-            // ICC/EXIF 提取。EXIF 存为 TIFF payload,与 JPEG/PNG/WebP 路径保持一致。
+            // libavif intentionally leaves container transforms to callers.
+            // Apply irot first and imir second (MIAF order), then clear all
+            // orientation metadata so preserving metadata cannot rotate twice.
             let metadata = avif_metadata_from_image(image);
+            let orientation = avif_effective_orientation(image, &metadata);
+            let metadata = metadata.normalized_orientation();
+            let (width, height, rgba) = apply_rgba8_orientation(width, height, rgba, orientation)?;
             let mut id = ImageData::new(width, height, rgba)?;
             id.icc = metadata.icc;
             id.exif = metadata.exif;
@@ -4350,6 +5161,71 @@ impl Codec for AvifCodec {
             }
         }
     }
+}
+
+unsafe fn avif_effective_orientation(
+    image: *const avif::avifImage,
+    metadata: &Metadata,
+) -> image::metadata::Orientation {
+    unsafe { avif_orientation_from_image(image) }
+        .or_else(|| metadata_exif_orientation(metadata))
+        .unwrap_or(image::metadata::Orientation::NoTransforms)
+}
+
+unsafe fn avif_orientation_from_image(
+    image: *const avif::avifImage,
+) -> Option<image::metadata::Orientation> {
+    if image.is_null() {
+        return None;
+    }
+    let image = unsafe { &*image };
+    let has_irot = image.transformFlags & avif::AVIF_TRANSFORM_IROT != 0;
+    let has_imir = image.transformFlags & avif::AVIF_TRANSFORM_IMIR != 0;
+    if !has_irot && !has_imir {
+        return None;
+    }
+    let angle = if has_irot { image.irot.angle & 3 } else { 0 };
+    let axis = if has_imir {
+        Some(image.imir.axis & 1)
+    } else {
+        None
+    };
+
+    // irot is counter-clockwise in the AVIF coordinate system; imir is applied
+    // after rotation. Express that composition as image's EXIF-compatible enum.
+    let exif_orientation = match (angle, axis) {
+        (1, Some(1)) => 7,
+        (1, Some(0)) => 5,
+        (1, None) => 8,
+        (2, Some(1)) => 4,
+        (2, Some(0)) => 2,
+        (2, None) => 3,
+        (3, Some(1)) => 5,
+        (3, Some(0)) => 7,
+        (3, None) => 6,
+        (0, Some(1)) => 2,
+        (0, Some(0)) => 4,
+        (0, None) => 1,
+        _ => 1,
+    };
+    image::metadata::Orientation::from_exif(exif_orientation)
+}
+
+fn apply_rgba8_orientation(
+    width: u32,
+    height: u32,
+    rgba: Vec<u8>,
+    orientation: image::metadata::Orientation,
+) -> Result<(u32, u32, Vec<u8>)> {
+    if orientation == image::metadata::Orientation::NoTransforms {
+        return Ok((width, height, rgba));
+    }
+    let buffer = image::RgbaImage::from_raw(width, height, rgba)
+        .ok_or_else(|| Error::Decode("RGBA 缓冲长度不匹配".into()))?;
+    let mut image = image::DynamicImage::ImageRgba8(buffer);
+    image.apply_orientation(orientation);
+    let rgba = image.into_rgba8();
+    Ok((rgba.width(), rgba.height(), rgba.into_raw()))
 }
 
 fn avif_metadata_blob(data: *const u8, size: usize) -> Option<Vec<u8>> {
@@ -5507,6 +6383,41 @@ mod tests {
     }
 
     #[test]
+    fn xmp_cleanup_does_not_corrupt_longer_attribute_aliases() {
+        let cleaned = normalize_xmp_semantics(
+            r#"<rdf:Description xtiff:Orientation="keep" tiff:Orientation="6"><xtiff:Orientation>keep</xtiff:Orientation><tiff:Orientation>6</tiff:Orientation></rdf:Description>"#,
+        );
+
+        assert!(cleaned.contains(r#"xtiff:Orientation="keep""#));
+        assert!(cleaned.contains("<xtiff:Orientation>keep</xtiff:Orientation>"));
+        assert!(!cleaned.contains(r#" tiff:Orientation="6""#));
+        assert!(!cleaned.contains("<tiff:Orientation>6</tiff:Orientation>"));
+    }
+
+    #[test]
+    fn decoded_oriented_containers_clear_xmp_orientation() {
+        let xmp =
+            br#"<rdf:Description tiff:Orientation="6"><dc:title>ok</dc:title></rdf:Description>"#
+                .to_vec();
+        for format in [Format::Jpeg, Format::Png, Format::WebP] {
+            let mut image = quadrant_image(16, 24);
+            image.exif = Some(exif_with_orientation(6));
+            image.xmp = Some(xmp.clone());
+            let encoded = codec_for(format)
+                .encode(&image, &preserve_metadata_options())
+                .unwrap();
+
+            let probed = probe(&encoded).unwrap();
+            assert_eq!((probed.width, probed.height), (24, 16));
+            let decoded = codec_for(format).decode(&encoded).unwrap();
+            assert_eq!((decoded.width, decoded.height), (24, 16));
+            let decoded_xmp = String::from_utf8(decoded.xmp.unwrap()).unwrap();
+            assert!(!decoded_xmp.contains("tiff:Orientation"));
+            assert!(decoded_xmp.contains("<dc:title>ok</dc:title>"));
+        }
+    }
+
+    #[test]
     fn xmp_semantic_cleanup_handles_self_closing_orientation() {
         let cleaned = normalize_xmp_semantics(
             r#"<rdf:Description><tiff:Orientation/><dc:title>ok</dc:title></rdf:Description>"#,
@@ -5574,6 +6485,12 @@ mod tests {
     }
 
     #[test]
+    fn conversion_boundary_turns_rust_panics_into_errors() {
+        let error = catch_pipeline_unwind::<()>(|| panic!("codec exploded")).unwrap_err();
+        assert!(matches!(error, Error::Encode(message) if message.contains("codec exploded")));
+    }
+
+    #[test]
     fn convert_with_metadata_override_preserves_helper_sidecar_metadata() {
         let img = synth(16, 16);
         let source = PngCodec.encode(&img, &EncodeOptions::default()).unwrap();
@@ -5617,6 +6534,94 @@ mod tests {
         assert_eq!(Format::from_magic(&thumb.png), Some(Format::Png));
         let decoded = PngCodec.decode(&thumb.png).unwrap();
         assert_eq!((decoded.width, decoded.height), (96, 48));
+    }
+
+    #[test]
+    fn thumbnail_area_filter_averages_high_frequency_checkerboard() {
+        let mut rgba = Vec::with_capacity(64 * 64 * 4);
+        for y in 0..64 {
+            for x in 0..64 {
+                let value = if (x + y) % 2 == 0 { 0 } else { 255 };
+                rgba.extend_from_slice(&[value, value, value, 255]);
+            }
+        }
+
+        let reduced = resize_rgba8_area_linear(&rgba, 64, 64, 1, 1).unwrap();
+
+        assert_eq!(reduced[3], 255);
+        assert_eq!(reduced[0], reduced[1]);
+        assert_eq!(reduced[1], reduced[2]);
+        assert!((184..=192).contains(&reduced[0]), "pixel={reduced:?}");
+    }
+
+    #[test]
+    fn non_jpeg_thumbnail_full_decode_budget_is_bounded() {
+        let at_budget = ImageProbe {
+            format: Format::Png,
+            width: 8_000,
+            height: 4_000,
+            dpi: None,
+        };
+        let over_budget = ImageProbe {
+            width: 8_001,
+            ..at_budget
+        };
+
+        assert!(!thumbnail_full_decode_exceeds_budget(&at_budget));
+        assert!(thumbnail_full_decode_exceeds_budget(&over_budget));
+    }
+
+    #[test]
+    fn jpeg_thumbnail_scales_during_decode_and_keeps_exif_orientation() {
+        let source = quadrant_image(80, 120);
+        let jpeg = JpegCodec
+            .encode(
+                &source,
+                &EncodeOptions {
+                    quality: 100,
+                    ..EncodeOptions::default()
+                },
+            )
+            .unwrap();
+        let oriented = jpeg_with_exif_orientation(&jpeg, 6);
+
+        let scaled = decode_jpeg_thumbnail(&oriented, 32).unwrap();
+        assert_eq!((scaled.width, scaled.height), (45, 30));
+        assert!(scaled.width < 120 && scaled.height < 80);
+        assert_eq!(dominant_rgb_channel(pixel_at(&scaled, 3, 3)), 2);
+        assert_eq!(dominant_rgb_channel(pixel_at(&scaled, 41, 3)), 0);
+
+        let thumb = thumbnail(&oriented, 32).unwrap().unwrap();
+        assert_eq!((thumb.width, thumb.height), (32, 21));
+    }
+
+    #[test]
+    fn jpeg_thumbnail_falls_back_for_large_cmyk_sources() {
+        let width = 96usize;
+        let height = 72usize;
+        let mut cmyk = Vec::with_capacity(width * height * 4);
+        for y in 0..height {
+            for x in 0..width {
+                cmyk.extend_from_slice(&[
+                    u8::try_from(x * 255 / (width - 1)).unwrap(),
+                    u8::try_from(y * 255 / (height - 1)).unwrap(),
+                    96,
+                    220,
+                ]);
+            }
+        }
+        let mut compressor = mozjpeg::Compress::new(mozjpeg::ColorSpace::JCS_CMYK);
+        compressor.set_size(width, height);
+        compressor.set_quality(90.0);
+        let mut started = compressor.start_compress(Vec::new()).unwrap();
+        started.write_scanlines(&cmyk).unwrap();
+        let jpeg = started.finish().unwrap();
+
+        let scaled = catch_unwind(AssertUnwindSafe(|| decode_jpeg_thumbnail_scaled(&jpeg, 32)));
+        assert!(matches!(scaled, Ok(Err(_)) | Err(_)));
+        let thumbnail = thumbnail(&jpeg, 32).unwrap().unwrap();
+        assert_eq!((thumbnail.width, thumbnail.height), (32, 24));
+        assert_eq!(Format::from_magic(&thumbnail.png), Some(Format::Png));
     }
 
     #[test]
@@ -6192,6 +7197,76 @@ mod tests {
     }
 
     #[test]
+    fn avif_decode_applies_irot_imir_and_normalizes_orientation_metadata() {
+        for exif_value in 2u16..=8 {
+            let orientation = image::metadata::Orientation::from_exif(exif_value as u8).unwrap();
+            let mut source = quadrant_image(16, 24);
+            source.exif = Some(exif_with_orientation(exif_value));
+            source.xmp = Some(
+                format!(
+                    r#"<rdf:Description tiff:Orientation="{exif_value}"><dc:title>ok</dc:title></rdf:Description>"#
+                )
+                .into_bytes(),
+            );
+            let encoded = AvifCodec
+                .encode(
+                    &source,
+                    &EncodeOptions {
+                        lossless: true,
+                        avif_speed: 10,
+                        ..preserve_metadata_options()
+                    },
+                )
+                .unwrap();
+
+            let expected = apply_rgba8_orientation(
+                source.width,
+                source.height,
+                source.rgba8().unwrap().to_vec(),
+                orientation,
+            )
+            .unwrap();
+            let decoded = AvifCodec.decode(&encoded).unwrap();
+            let probed = probe(&encoded).unwrap();
+            assert_eq!(
+                (decoded.width, decoded.height),
+                (expected.0, expected.1),
+                "EXIF orientation {exif_value}"
+            );
+            assert_eq!((probed.width, probed.height), (expected.0, expected.1));
+            assert_eq!(
+                decoded.rgba8().unwrap(),
+                expected.2.as_slice(),
+                "EXIF orientation {exif_value}"
+            );
+            assert_eq!(
+                decoded.exif.as_deref().and_then(exif_orientation),
+                Some(image::metadata::Orientation::NoTransforms)
+            );
+            let xmp = String::from_utf8(decoded.xmp.unwrap()).unwrap();
+            assert!(!xmp.contains("tiff:Orientation"));
+            assert!(xmp.contains("<dc:title>ok</dc:title>"));
+        }
+    }
+
+    #[test]
+    fn avif_orientation_uses_exif_only_when_container_transform_is_absent() {
+        let metadata = Metadata {
+            exif: Some(exif_with_orientation(6)),
+            ..Metadata::default()
+        };
+        let mut image = avif::avifImage::default();
+
+        let fallback = unsafe { avif_effective_orientation(&image, &metadata) };
+        assert_eq!(fallback, image::metadata::Orientation::Rotate90);
+
+        image.transformFlags = avif::AVIF_TRANSFORM_IMIR;
+        image.imir.axis = 1;
+        let container = unsafe { avif_effective_orientation(&image, &metadata) };
+        assert_eq!(container, image::metadata::Orientation::FlipHorizontal);
+    }
+
+    #[test]
     fn avif_preserves_icc() {
         // 尖刺核心验证:libavif 容器逐字节保留 ICC(这正是弃用裸 ravif 的主因)。
         let mut img = synth(32, 32);
@@ -6253,5 +7328,367 @@ mod tests {
         assert_eq!(Format::from_magic(&av), Some(Format::Avif));
         let back = convert(&av, Format::Png, &EncodeOptions::default()).unwrap();
         assert_eq!(PngCodec.decode(&back).unwrap().width, 64);
+    }
+
+    fn workflow_options(
+        encoder: EncodeOptions,
+        metadata_policy: MetadataPolicy,
+    ) -> WorkflowOptions {
+        WorkflowOptions {
+            encoders: vec![encoder],
+            auto_quality: None,
+            resize: ResizeRule::default(),
+            metadata_policy,
+            target_size: None,
+            color_policy: ColorManagementPolicy::PreserveEmbeddedProfile,
+            preview_max_edge: None,
+        }
+    }
+
+    #[test]
+    fn workflow_resizes_before_encoding() {
+        let source = PngCodec
+            .encode(&synth(400, 200), &EncodeOptions::default())
+            .unwrap();
+        let mut options = workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll);
+        options.resize = ResizeRule {
+            mode: ResizeMode::Fit,
+            width: Some(100),
+            height: Some(100),
+            value: None,
+            allow_upscale: false,
+        };
+
+        let result = convert_workflow(&source, Format::Png, &options, None).unwrap();
+        assert_eq!((result.width, result.height), (100, 50));
+        let decoded = PngCodec.decode(&result.bytes).unwrap();
+        assert_eq!((decoded.width, decoded.height), (100, 50));
+    }
+
+    #[test]
+    fn workflow_metadata_profiles_filter_complete_blobs() {
+        let mut image = synth(320, 160);
+        image.icc = Some(b"workflow-icc".to_vec());
+        image.exif = Some(exif_with_orientation(1));
+        image.xmp = Some(xmp_packet("workflow"));
+        image.iptc = Some(iptc_fixture());
+        let source = JpegCodec
+            .encode(&image, &preserve_metadata_options())
+            .unwrap();
+
+        let mut strip_options =
+            workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll);
+        strip_options.preview_max_edge = Some(MIN_WORKFLOW_PREVIEW_EDGE);
+        strip_options.resize = ResizeRule {
+            mode: ResizeMode::Width,
+            width: Some(160),
+            height: None,
+            value: None,
+            allow_upscale: false,
+        };
+        let strip = convert_workflow(&source, Format::Jpeg, &strip_options, None).unwrap();
+        let strip_metadata = extract_jpeg_metadata(&strip.bytes, true);
+        assert!(strip_metadata.is_empty());
+        assert_eq!((strip.width, strip.height), (160, 80));
+        assert_eq!(
+            strip.warnings,
+            vec![WorkflowWarning::InvalidColorProfileDiscarded]
+        );
+        assert!(strip
+            .source_preview_png
+            .as_deref()
+            .is_some_and(|preview| preview.starts_with(b"\x89PNG\r\n\x1a\n")));
+
+        let color = convert_workflow(
+            &source,
+            Format::Jpeg,
+            &workflow_options(EncodeOptions::default(), MetadataPolicy::ColorOnly),
+            None,
+        )
+        .unwrap();
+        let color_metadata = extract_jpeg_metadata(&color.bytes, true);
+        assert_eq!(color_metadata.icc, image.icc);
+        assert!(color_metadata.exif.is_none());
+        assert!(color_metadata.xmp.is_none());
+        assert!(color_metadata.iptc.is_none());
+
+        let preserve = convert_workflow(
+            &source,
+            Format::Jpeg,
+            &workflow_options(EncodeOptions::default(), MetadataPolicy::PreserveAll),
+            None,
+        )
+        .unwrap();
+        let preserve_metadata = extract_jpeg_metadata(&preserve.bytes, true);
+        assert_eq!(preserve_metadata.icc, image.icc);
+        assert!(preserve_metadata.exif.is_some());
+        assert_eq!(preserve_metadata.xmp, image.xmp);
+        assert_eq!(preserve_metadata.iptc, image.iptc);
+
+        let mut preserve_preview_options =
+            workflow_options(EncodeOptions::default(), MetadataPolicy::PreserveAll);
+        preserve_preview_options.preview_max_edge = Some(MIN_WORKFLOW_PREVIEW_EDGE);
+        let preserve_preview =
+            convert_workflow(&source, Format::Jpeg, &preserve_preview_options, None).unwrap();
+        assert!(preserve_preview.source_preview_png.is_some());
+        assert!(preserve_preview.output_preview_png.is_some());
+        assert_eq!(
+            preserve_preview.warnings,
+            vec![WorkflowWarning::InvalidColorProfileIgnoredForPreview]
+        );
+    }
+
+    #[test]
+    fn workflow_privacy_profiles_apply_to_every_writable_format() {
+        let mut image = synth(24, 18);
+        let icc = Profile::new_srgb().icc().unwrap();
+        image.icc = Some(icc.clone());
+        image.exif = Some(exif_with_orientation(1));
+        image.xmp = Some(xmp_packet("workflow-formats"));
+        let source = JpegCodec
+            .encode(&image, &preserve_metadata_options())
+            .unwrap();
+
+        for target in WRITABLE_FORMATS {
+            let mut encoder = EncodeOptions {
+                quality: 90,
+                avif_speed: 10,
+                ..EncodeOptions::default()
+            };
+            if *target == Format::WebP {
+                encoder.lossless = true;
+                encoder.webp_method = 0;
+            }
+
+            let stripped = convert_workflow(
+                &source,
+                *target,
+                &workflow_options(encoder, MetadataPolicy::StripAll),
+                None,
+            )
+            .unwrap();
+            let stripped = codec_for(*target).decode(&stripped.bytes).unwrap();
+            assert!(stripped.icc.is_none(), "{target:?} retained ICC");
+            assert!(stripped.exif.is_none(), "{target:?} retained EXIF");
+            assert!(stripped.xmp.is_none(), "{target:?} retained XMP");
+
+            let color_only = convert_workflow(
+                &source,
+                *target,
+                &workflow_options(encoder, MetadataPolicy::ColorOnly),
+                None,
+            )
+            .unwrap();
+            let color_only = codec_for(*target).decode(&color_only.bytes).unwrap();
+            assert_eq!(color_only.icc, Some(icc.clone()), "{target:?} lost ICC");
+            assert!(color_only.exif.is_none(), "{target:?} retained EXIF");
+            assert!(color_only.xmp.is_none(), "{target:?} retained XMP");
+        }
+    }
+
+    #[test]
+    fn workflow_strip_all_converts_profiled_pixels_to_srgb_before_removal() {
+        let mut image = ImageData::new(2, 1, vec![220, 96, 32, 255, 40, 220, 150, 128]).unwrap();
+        image.icc = Some(display_p3_icc_profile());
+        let source = PngCodec
+            .encode(&image, &preserve_metadata_options())
+            .unwrap();
+        let expected = convert_image_to_srgb(&PngCodec.decode(&source).unwrap()).unwrap();
+
+        let result = convert_workflow(
+            &source,
+            Format::Png,
+            &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+            None,
+        )
+        .unwrap();
+        let decoded = PngCodec.decode(&result.bytes).unwrap();
+
+        assert!(decoded.icc.is_none());
+        assert_eq!(decoded.pixels, expected.pixels);
+        assert_ne!(decoded.pixels, image.pixels);
+    }
+
+    #[test]
+    fn workflow_resize_uses_orientation_normalized_dimensions() {
+        let mut image = synth(32, 24);
+        image.exif = Some(exif_with_orientation(6));
+        let source = JpegCodec
+            .encode(&image, &preserve_metadata_options())
+            .unwrap();
+        assert_eq!(
+            probe(&source)
+                .map(|info| (info.width, info.height))
+                .unwrap(),
+            (24, 32)
+        );
+
+        let mut options = workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll);
+        options.resize = ResizeRule {
+            mode: ResizeMode::Width,
+            width: Some(12),
+            height: None,
+            value: None,
+            allow_upscale: false,
+        };
+        let result = convert_workflow(&source, Format::Png, &options, None).unwrap();
+        assert_eq!((result.width, result.height), (12, 16));
+    }
+
+    #[test]
+    fn workflow_resize_converts_embedded_profile_without_reattaching_it() {
+        let mut image = synth(64, 32);
+        image.icc = Some(Profile::new_srgb().icc().unwrap());
+        let source = PngCodec
+            .encode(&image, &preserve_metadata_options())
+            .unwrap();
+        let mut options = workflow_options(EncodeOptions::default(), MetadataPolicy::PreserveAll);
+        options.resize = ResizeRule {
+            mode: ResizeMode::Width,
+            width: Some(32),
+            height: None,
+            value: None,
+            allow_upscale: false,
+        };
+
+        let result = convert_workflow(&source, Format::Png, &options, None).unwrap();
+        assert_eq!((result.width, result.height), (32, 16));
+        assert_eq!(
+            result.warnings,
+            vec![WorkflowWarning::ColorProfileConvertedForResize]
+        );
+        assert!(PngCodec.decode(&result.bytes).unwrap().icc.is_none());
+    }
+
+    #[test]
+    fn workflow_target_size_meets_limit_or_reports_best_effort() {
+        let source = PngCodec
+            .encode(&synth(512, 512), &EncodeOptions::default())
+            .unwrap();
+        let mut fitting = workflow_options(
+            EncodeOptions {
+                quality: 95,
+                ..EncodeOptions::default()
+            },
+            MetadataPolicy::StripAll,
+        );
+        fitting.target_size = Some(TargetSizeOptions {
+            max_bytes: MIN_TARGET_SIZE_BYTES,
+            min_quality: 30,
+        });
+        let fit_result = convert_workflow(&source, Format::Jpeg, &fitting, None).unwrap();
+        assert_eq!(fit_result.target_size_met, Some(true));
+        assert!(fit_result.bytes.len() as u64 <= MIN_TARGET_SIZE_BYTES);
+        assert!(fit_result.selected_quality.is_some());
+
+        let mut metadata_heavy = synth(128, 128);
+        metadata_heavy.xmp = Some(vec![b'x'; MIN_TARGET_SIZE_BYTES as usize + 1024]);
+        let metadata_source = JpegCodec
+            .encode(&metadata_heavy, &preserve_metadata_options())
+            .unwrap();
+        let mut impossible = workflow_options(
+            EncodeOptions {
+                quality: 60,
+                ..EncodeOptions::default()
+            },
+            MetadataPolicy::PreserveAll,
+        );
+        impossible.target_size = Some(TargetSizeOptions {
+            max_bytes: MIN_TARGET_SIZE_BYTES,
+            min_quality: 30,
+        });
+        let impossible_result =
+            convert_workflow(&metadata_source, Format::Jpeg, &impossible, None).unwrap();
+        assert_eq!(impossible_result.target_size_met, Some(false));
+        assert!(impossible_result.bytes.len() as u64 > MIN_TARGET_SIZE_BYTES);
+        assert!(matches!(
+            impossible_result.warnings.as_slice(),
+            [WorkflowWarning::TargetSizeNotMet {
+                target_bytes: MIN_TARGET_SIZE_BYTES,
+                actual_bytes
+            }] if *actual_bytes > MIN_TARGET_SIZE_BYTES
+        ));
+    }
+
+    #[test]
+    fn workflow_reports_the_quality_of_the_selected_best_candidate() {
+        let image = synth(48, 32);
+        let source = PngCodec.encode(&image, &EncodeOptions::default()).unwrap();
+        let high_quality = EncodeOptions {
+            quality: 92,
+            ..EncodeOptions::default()
+        };
+        let low_quality = EncodeOptions {
+            quality: 28,
+            ..EncodeOptions::default()
+        };
+        let high_bytes = JpegCodec.encode(&image, &high_quality).unwrap();
+        let low_bytes = JpegCodec.encode(&image, &low_quality).unwrap();
+        let (expected_bytes, expected_quality) = if high_bytes.len() <= low_bytes.len() {
+            (high_bytes, high_quality.quality)
+        } else {
+            (low_bytes, low_quality.quality)
+        };
+        let mut options = workflow_options(high_quality, MetadataPolicy::StripAll);
+        options.encoders.push(low_quality);
+
+        let result = convert_workflow(&source, Format::Jpeg, &options, None).unwrap();
+
+        assert_eq!(result.bytes, expected_bytes);
+        assert_eq!(result.selected_quality, Some(expected_quality));
+    }
+
+    #[test]
+    fn workflow_rejects_invalid_target_combinations_and_cancellation() {
+        let source = PngCodec
+            .encode(&synth(32, 32), &EncodeOptions::default())
+            .unwrap();
+        let mut options = workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll);
+        options.target_size = Some(TargetSizeOptions {
+            max_bytes: MIN_TARGET_SIZE_BYTES,
+            min_quality: 30,
+        });
+        assert!(matches!(
+            convert_workflow(&source, Format::Png, &options, None),
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(
+            convert_workflow(b"not an image", Format::Png, &options, None),
+            Err(Error::Unsupported(message)) if message.contains("目标文件体积")
+        ));
+
+        options.target_size = Some(TargetSizeOptions {
+            max_bytes: MIN_TARGET_SIZE_BYTES,
+            min_quality: 0,
+        });
+        assert!(matches!(
+            convert_workflow(b"not an image", Format::Jpeg, &options, None),
+            Err(Error::Invalid(message)) if message.contains("最低质量")
+        ));
+
+        options.target_size = None;
+        options.preview_max_edge = Some(MIN_WORKFLOW_PREVIEW_EDGE - 1);
+        assert!(matches!(
+            convert_workflow(b"not an image", Format::Jpeg, &options, None),
+            Err(Error::Invalid(message)) if message.contains("预览边长")
+        ));
+        options.preview_max_edge = None;
+        options.target_size = Some(TargetSizeOptions {
+            max_bytes: MIN_TARGET_SIZE_BYTES,
+            min_quality: 30,
+        });
+
+        let cancelled = || true;
+        assert!(matches!(
+            convert_workflow_with_control(
+                &source,
+                Format::Jpeg,
+                &options,
+                None,
+                None,
+                Some(&cancelled)
+            ),
+            Err(Error::Cancelled(_))
+        ));
     }
 }
