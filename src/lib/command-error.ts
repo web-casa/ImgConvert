@@ -11,12 +11,17 @@ const ERROR_MESSAGE_KEYS = {
   outputConflictsWithInput: "errors.outputConflictsWithInput",
   outputSafetyCheckFailed: "errors.outputSafetyCheckFailed",
   outputNotSmaller: "errors.outputNotSmaller",
+  pdfPasswordProtected: "errors.pdfPasswordProtected",
+  pdfSettingsInvalid: "errors.pdfSettingsInvalid",
+  pdfResourceLimit: "errors.pdfResourceLimit",
+  pdfInvalid: "errors.pdfInvalid",
   conversionFailed: "errors.conversionFailed",
   batchFailed: "errors.batchFailed",
   importFailed: "errors.importFailed",
   clipboardImportFailed: "errors.clipboardImportFailed",
   nativeDialogFailed: "errors.nativeDialogFailed",
   thumbnailFailed: "errors.thumbnailFailed",
+  previewFailed: "errors.previewFailed",
   codecConfigurationFailed: "errors.codecConfigurationFailed",
   taskFailed: "errors.taskFailed",
 } as const;
@@ -33,8 +38,13 @@ const REQUIRED_MESSAGE_PARAMS: Partial<Record<CommandErrorCode, readonly string[
   outputConflictsWithInput: ["path"],
   outputSafetyCheckFailed: ["path"],
   outputNotSmaller: ["path"],
+  pdfPasswordProtected: ["path"],
+  pdfSettingsInvalid: ["path"],
+  pdfResourceLimit: ["path"],
+  pdfInvalid: ["path"],
   conversionFailed: ["path"],
   thumbnailFailed: ["path"],
+  previewFailed: ["path"],
 };
 
 export interface CommandError {

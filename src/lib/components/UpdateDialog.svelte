@@ -1,6 +1,11 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
-  import { ArrowClockwise, CheckCircle, DownloadSimple, WarningCircle, X } from "phosphor-svelte";
+  import {
+    CloseIcon,
+    DownloadMinimalisticIcon,
+    RefreshIcon,
+  } from "@solar-icons/svelte/bold-duotone";
+  import { CheckCircleIcon, DangerCircleIcon } from "@solar-icons/svelte/bold-duotone";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import {
@@ -56,7 +61,7 @@
       tabindex="-1"
     >
       <header class="flex items-start gap-3 border-b px-4 py-3">
-        <DownloadSimple size={22} weight="duotone" class="mt-0.5 text-primary" />
+        <DownloadMinimalisticIcon size={22} class="mt-0.5 text-primary" />
         <div class="min-w-0 flex-1">
           <h2 id="update-title" class="text-sm font-semibold">{$t("topbar.appUpdate")}</h2>
           <p class="mt-1 text-xs text-muted-foreground">
@@ -64,7 +69,7 @@
           </p>
         </div>
         <Button variant="ghost" size="icon" title={$t("legal.close")} onclick={close}>
-          <X />
+          <CloseIcon size={20} />
         </Button>
       </header>
 
@@ -73,13 +78,13 @@
           <div
             class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           >
-            <WarningCircle size={17} weight="fill" class="mt-0.5 shrink-0" />
+            <DangerCircleIcon size={17} class="mt-0.5 shrink-0" />
             <span>{appUpdate.error}</span>
           </div>
         {:else if appUpdate.available}
           <div class="rounded-md border bg-card px-3 py-3">
             <div class="flex items-start gap-2">
-              <DownloadSimple size={18} weight="duotone" class="mt-0.5 text-primary" />
+              <DownloadMinimalisticIcon size={18} class="mt-0.5 text-primary" />
               <div class="min-w-0">
                 <p class="text-sm font-medium">
                   {appUpdate.currentVersion ?? $t("update.currentVersion")} → {appUpdate.version}
@@ -99,7 +104,7 @@
           <div
             class="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300"
           >
-            <CheckCircle size={17} weight="fill" class="mt-0.5 shrink-0" />
+            <CheckCircleIcon size={17} class="mt-0.5 shrink-0" />
             <span>{appUpdate.message || $t("update.latest")}</span>
           </div>
         {:else}
@@ -126,7 +131,7 @@
 
       <footer class="flex items-center justify-end gap-2 border-t px-4 py-3">
         <Button variant="ghost" size="sm" onclick={checkForAppUpdate} disabled={busy}>
-          <ArrowClockwise class={appUpdate.checking ? "animate-spin" : ""} />
+          <RefreshIcon size={20} class={appUpdate.checking ? "animate-spin" : ""} />
           {$t("update.check")}
         </Button>
         <Button
@@ -135,7 +140,7 @@
           onclick={installAppUpdate}
           disabled={!appUpdate.available || busy}
         >
-          <DownloadSimple />
+          <DownloadMinimalisticIcon size={20} />
           {$t("update.installAndRestart")}
         </Button>
       </footer>

@@ -8,17 +8,24 @@
     "scripts/*.mjs",
     "tests/**/*.test.ts",
     "e2e/**/*.spec.ts",
+    "e2e-desktop/wdio.conf.mjs",
+    "e2e-desktop/specs/**/*.e2e.mjs",
     "src/lib/components/{LegalDialog,PluginDiagnosticsDialog,PrivacySupportDialog,UpdateDialog}.svelte"
   ],
   "project": [
     "src/**/*.{ts,svelte}",
     "tests/**/*.ts",
     "e2e/**/*.ts",
+    "e2e-desktop/**/*.mjs",
     "*.config.ts",
     "scripts/*.mjs"
   ],
   "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts", "docs-site/source.config.ts"],
   "ignoreDependencies": [
+    "@wdio/cli",
+    "@wdio/local-runner",
+    "@wdio/mocha-framework",
+    "@wdio/spec-reporter",
     "@internationalized/date",
     "@testing-library/svelte",
     "@tauri-apps/plugin-opener",

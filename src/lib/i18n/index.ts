@@ -43,21 +43,12 @@ export async function systemLocale(): Promise<AppLocale> {
   }
 }
 
-export async function initI18n(initialLocale?: AppLocale): Promise<void> {
-  const requested = initialLocale ?? (await systemLocale());
-  if (get(locale) !== requested) {
-    await locale.set(requested);
-  }
-  await syncAppWindowTitle();
-}
-
-export function setAppLocale(nextLocale: AppLocale): void {
+export function setAppLocale(nextLocale: AppLocale): Promise<void> {
   const localeChange = locale.set(nextLocale);
   if (localeChange) {
-    void localeChange.then(syncAppWindowTitle);
-  } else {
-    void syncAppWindowTitle();
+    return localeChange.then(syncAppWindowTitle);
   }
+  return syncAppWindowTitle();
 }
 
 export function translate(key: string, params?: Record<string, string | number>): string {

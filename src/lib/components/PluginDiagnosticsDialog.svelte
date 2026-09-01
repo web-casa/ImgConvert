@@ -1,15 +1,14 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import {
-    ArrowClockwise,
-    CheckCircle,
-    FolderOpen,
-    PlugsConnected,
-    PuzzlePiece,
-    Trash,
-    WarningCircle,
-    X,
-  } from "phosphor-svelte";
+    CloseIcon,
+    FolderOpenIcon,
+    PlugCircleIcon,
+    RefreshIcon,
+    TrashBinMinimalisticIcon,
+    WidgetIcon,
+  } from "@solar-icons/svelte/bold-duotone";
+  import { CheckCircleIcon, DangerCircleIcon } from "@solar-icons/svelte/bold-duotone";
   import { get } from "svelte/store";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
@@ -259,7 +258,7 @@
       tabindex="-1"
     >
       <header class="flex items-start gap-3 border-b px-4 py-3">
-        <PuzzlePiece size={22} weight="duotone" class="mt-0.5 text-primary" />
+        <WidgetIcon size={22} class="mt-0.5 text-primary" />
         <div class="min-w-0 flex-1">
           <h2 id="plugin-diagnostics-title" class="text-sm font-semibold">
             {$t("diagnostics.title")}
@@ -273,10 +272,10 @@
           onclick={refresh}
           disabled={loading}
         >
-          <ArrowClockwise class={loading ? "animate-spin" : ""} />
+          <RefreshIcon size={20} class={loading ? "animate-spin" : ""} />
         </Button>
         <Button variant="ghost" size="icon" title={$t("diagnostics.close")} onclick={close}>
-          <X />
+          <CloseIcon size={20} />
         </Button>
       </header>
 
@@ -289,7 +288,7 @@
           </p>
         {:else if loading && !diagnostics}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
-            <ArrowClockwise size={16} class="animate-spin" />
+            <RefreshIcon size={16} class="animate-spin" />
             {$t("diagnostics.loading")}
           </div>
         {:else if heic}
@@ -299,10 +298,10 @@
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
                     {#if heic.enabled}
-                      <CheckCircle size={18} weight="fill" class="text-emerald-600" />
+                      <CheckCircleIcon size={18} class="text-success" />
                       <h3 class="text-sm font-semibold">{$t("diagnostics.heicEnabled")}</h3>
                     {:else}
-                      <WarningCircle size={18} weight="fill" class="text-muted-foreground" />
+                      <DangerCircleIcon size={18} class="text-muted-foreground" />
                       <h3 class="text-sm font-semibold">{$t("diagnostics.heicDisabled")}</h3>
                     {/if}
                   </div>
@@ -329,7 +328,7 @@
               {#if heic.activeProvider}
                 <div class="mt-3 rounded-md border bg-background p-3">
                   <div class="flex items-center gap-2 text-sm font-medium">
-                    <PlugsConnected size={16} weight="duotone" class="text-primary" />
+                    <PlugCircleIcon size={16} class="text-primary" />
                     {heic.activeProvider.id}
                   </div>
                   <dl class="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
@@ -426,7 +425,7 @@
                   onclick={chooseSelectedHelper}
                   disabled={helperBusy || !heic.externalCodecsEnabled}
                 >
-                  <FolderOpen />
+                  <FolderOpenIcon size={20} />
                   {$t("diagnostics.choose")}
                 </Button>
                 <Button
@@ -435,7 +434,7 @@
                   onclick={clearSelectedHelper}
                   disabled={helperBusy || !heic.selectedHelper.configured}
                 >
-                  <Trash />
+                  <TrashBinMinimalisticIcon size={20} />
                   {$t("diagnostics.clear")}
                 </Button>
               </div>

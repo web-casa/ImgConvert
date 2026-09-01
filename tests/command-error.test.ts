@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatCommandError, logCommandError, parseCommandError } from "../src/lib/command-error";
-import { initI18n } from "../src/lib/i18n";
+import { setAppLocale } from "../src/lib/i18n";
 
 afterEach(async () => {
-  await initI18n("en-US");
+  await setAppLocale("en-US");
   vi.restoreAllMocks();
 });
 
 describe("structured command errors", () => {
   it("formats a Tauri error payload with ICU parameters", async () => {
-    await initI18n("en-US");
+    await setAppLocale("en-US");
 
     expect(
       formatCommandError({
@@ -22,7 +22,7 @@ describe("structured command errors", () => {
   });
 
   it("formats the same error in zh-CN without rendering its detail", async () => {
-    await initI18n("zh-CN");
+    await setAppLocale("zh-CN");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const message = formatCommandError({
@@ -36,7 +36,7 @@ describe("structured command errors", () => {
   });
 
   it("explains how to restore output-directory access", async () => {
-    await initI18n("en-US");
+    await setAppLocale("en-US");
 
     expect(
       formatCommandError({
@@ -47,6 +47,20 @@ describe("structured command errors", () => {
     ).toBe(
       "Cannot write to the output directory: /Users/example/Documents/ImgConvert Output. Choose an output directory and try again.",
     );
+  });
+
+  it("keeps actionable PDF failures visible while hiding backend details", async () => {
+    await setAppLocale("en-US");
+
+    const message = formatCommandError({
+      code: "pdfResourceLimit",
+      params: { path: "/documents/poster.pdf" },
+      detail: "PDF_RESOURCE_LIMIT: 90000000 pixels",
+    });
+
+    expect(message).toContain("Select fewer pages or lower the DPI");
+    expect(message).toContain("/documents/poster.pdf");
+    expect(message).not.toContain("90000000");
   });
 
   it("accepts a JSON-encoded Error message from an IPC bridge", () => {

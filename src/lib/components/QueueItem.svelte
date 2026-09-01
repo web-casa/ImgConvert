@@ -2,7 +2,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { t } from "svelte-i18n";
-  import { ArrowsClockwise, CheckCircle, Image, WarningCircle, X } from "phosphor-svelte";
+  import {
+    ArrowRightIcon,
+    GalleryIcon,
+    RefreshIcon,
+    TransferHorizontalIcon,
+    CloseIcon,
+    DocumentTextIcon,
+  } from "@solar-icons/svelte/bold-duotone";
+  import { CheckCircleIcon, DangerCircleIcon } from "@solar-icons/svelte/bold-duotone";
   import FormatSelect from "$lib/components/FormatSelect.svelte";
   import {
     extOf,
@@ -13,6 +21,7 @@
     ensureThumbnail,
     itemProgress,
     itemTargetFormat,
+    openComparisonPreview,
     removeItem,
     setItemTargetFormat,
     settings,
@@ -58,110 +67,135 @@
 
 <li
   bind:this={root}
-  class="group grid min-h-40 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-lg border bg-background p-3 transition-colors ease-[var(--motion-ease-img)] hover:border-primary/35"
+  data-testid="queue-item"
+  data-status={item.status}
+  class="group flex min-h-28 flex-wrap items-center gap-3 rounded-lg border bg-background p-3 transition-colors ease-[var(--motion-ease-img)] hover:border-primary/35 min-[900px]:min-h-24"
 >
   <div
-    class="flex h-full min-h-32 flex-col justify-between rounded-md border p-2 {sourceAccent.border} {sourceAccent.background}"
+    class="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md border sm:size-[72px] {sourceAccent.border} {sourceAccent.background}"
   >
-    <div
-      class="relative flex h-20 items-center justify-center overflow-hidden rounded bg-background/65"
-    >
-      {#if item.thumbnailStatus === "ready" && item.thumbnail}
-        <img src={item.thumbnail.url} alt="" class="h-full w-full object-cover" draggable="false" />
-      {:else if item.thumbnailStatus === "loading"}
-        <ArrowsClockwise size={22} class="animate-spin {sourceAccent.text}" />
-      {:else}
-        <Image size={24} weight="duotone" class={sourceAccent.text} />
-      {/if}
-    </div>
-    <div class="space-y-1">
-      <div class="text-[11px] font-medium uppercase tracking-wide {sourceAccent.text}">
-        {sourceFormat ? formatLabel(sourceFormat) : "IMG"}
-      </div>
-      <div class="h-1.5 overflow-hidden rounded-full bg-background/70">
-        <div
-          class="h-full rounded-full bg-primary transition-all duration-300 ease-[var(--motion-ease-img)]"
-          style={`width: ${progress}%`}
-        ></div>
-      </div>
-    </div>
+    {#if item.thumbnailStatus === "ready" && item.thumbnail}
+      <img src={item.thumbnail.url} alt="" class="h-full w-full object-cover" draggable="false" />
+    {:else if item.thumbnailStatus === "loading"}
+      <RefreshIcon size={22} class="animate-spin {sourceAccent.text}" />
+    {:else if sourceFormat === "pdf"}
+      <DocumentTextIcon size={24} class={sourceAccent.text} />
+    {:else}
+      <GalleryIcon size={24} class={sourceAccent.text} />
+    {/if}
+    {#if item.thumbnail?.warningCount}
+      <span
+        class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-amber-500/90 text-white"
+        title={$t("queueItem.pdfThumbnailWarnings", {
+          values: { count: item.thumbnail.warningCount },
+        })}
+        aria-label={$t("queueItem.pdfThumbnailWarnings", {
+          values: { count: item.thumbnail.warningCount },
+        })}
+      >
+        <DangerCircleIcon size={14} aria-hidden="true" />
+      </span>
+    {/if}
   </div>
 
-  <div class="flex min-w-0 flex-col gap-3">
-    <div class="flex min-w-0 items-start gap-2">
-      <div class="min-w-0 flex-1">
-        <div class="truncate text-sm font-medium" title={item.path}>{item.name}</div>
-        <div class="truncate text-xs text-muted-foreground" title={item.path}>
-          {item.path}
-        </div>
-        {#if metadataText}
-          <div class="mt-0.5 text-xs text-muted-foreground">{metadataText}</div>
-        {/if}
-      </div>
-
-      <button
-        class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
-        onclick={() => removeItem(item.path)}
-        disabled={busy}
-        aria-label={$t("queueItem.remove")}
-      >
-        <X size={16} />
-      </button>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-2">
-      <span
-        class="inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs {targetAccent.border} {targetAccent.background} {targetAccent.text}"
-      >
-        {#if item.status === "running"}
-          <ArrowsClockwise size={13} class="animate-spin" />
-        {:else if item.status === "done"}
-          <CheckCircle size={13} weight="fill" />
-        {:else if item.status === "skipped"}
-          <WarningCircle size={13} weight="fill" />
-        {:else if item.status === "error"}
-          <WarningCircle size={13} weight="fill" />
-        {/if}
-        {item.status === "running"
-          ? $t("queueItem.running")
-          : item.status === "done"
-            ? $t("queueItem.done")
-            : item.status === "skipped"
-              ? $t("queueItem.skipped")
-              : item.status === "error"
-                ? $t("queueItem.error")
-                : $t("queueItem.pending")}
+  <div class="min-w-0 flex-1">
+    <div class="truncate text-sm font-medium" title={item.path}>{item.name}</div>
+    <div class="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span class="shrink-0 font-medium uppercase {sourceAccent.text}">
+        {sourceFormat ? formatLabel(sourceFormat) : "IMG"}
       </span>
-
-      <FormatSelect
-        value={item.targetFormat ?? "__global"}
-        includeGlobal
-        globalLabel={$t("queueItem.followGlobal", {
-          values: { format: formatLabel(settings.format) },
-        })}
-        triggerClass="w-36"
-        triggerSize="sm"
-        disabled={busy}
-        {sourceFormats}
-        onChange={updateFormat}
-      />
+      <ArrowRightIcon size={12} class="shrink-0" aria-hidden="true" />
+      <span class="shrink-0 font-medium uppercase {targetAccent.text}">
+        {formatLabel(targetFormat)}
+      </span>
+      {#if metadataText}
+        <span class="min-w-0 truncate tabular-nums">· {metadataText}</span>
+      {/if}
     </div>
-
-    <div class="min-h-8">
+    <div class="mt-1 min-h-4">
       {#if item.detail}
         <div
           title={item.detail}
-          class="line-clamp-2 text-xs {item.status === 'error'
+          class="truncate text-xs {item.status === 'error'
             ? 'text-destructive'
             : 'text-muted-foreground'}"
         >
           {item.detail}
         </div>
-      {:else}
-        <div class="text-xs text-muted-foreground">
-          {$t("queueItem.outputsTo", { values: { format: formatLabel(targetFormat) } })}
-        </div>
       {/if}
     </div>
+    <div
+      class="mt-1.5 h-1 overflow-hidden rounded-full bg-muted"
+      role="progressbar"
+      aria-label={$t("queueItem.progress", { values: { name: item.name } })}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={progress}
+    >
+      <div
+        class="h-full rounded-full bg-primary transition-all duration-300 ease-[var(--motion-ease-img)]"
+        style={`width: ${progress}%`}
+      ></div>
+    </div>
+  </div>
+
+  <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+    <span
+      class="inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs {targetAccent.border} {targetAccent.background} {targetAccent.text}"
+    >
+      {#if item.status === "running"}
+        <RefreshIcon size={13} class="animate-spin" />
+      {:else if item.status === "done"}
+        <CheckCircleIcon size={13} />
+      {:else if item.status === "skipped"}
+        <DangerCircleIcon size={13} />
+      {:else if item.status === "error"}
+        <DangerCircleIcon size={13} />
+      {/if}
+      {item.status === "running"
+        ? $t("queueItem.running")
+        : item.status === "done"
+          ? $t("queueItem.done")
+          : item.status === "skipped"
+            ? $t("queueItem.skipped")
+            : item.status === "error"
+              ? $t("queueItem.error")
+              : $t("queueItem.pending")}
+    </span>
+
+    <FormatSelect
+      value={item.targetFormat ?? "__global"}
+      includeGlobal
+      globalLabel={$t("queueItem.followGlobal", {
+        values: { format: formatLabel(settings.format) },
+      })}
+      triggerClass="w-32 xl:w-36"
+      triggerSize="sm"
+      ariaLabel={$t("queueItem.targetFormat", { values: { name: item.name } })}
+      disabled={busy}
+      {sourceFormats}
+      onChange={updateFormat}
+    />
+
+    <button
+      data-testid="comparison-preview-open"
+      class="inline-flex h-11 items-center gap-1 rounded-md border bg-background px-2 text-xs text-muted-foreground outline-none transition-colors hover:border-primary/35 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40 sm:h-10"
+      onclick={() => openComparisonPreview(item)}
+      disabled={busy}
+      aria-label={$t("queueItem.compare")}
+      title={$t("queueItem.compare")}
+    >
+      <TransferHorizontalIcon size={14} />
+      <span class="max-[1199px]:hidden">{$t("workflow.preview.open")}</span>
+    </button>
+
+    <button
+      class="size-11 rounded-md p-1 text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-30 sm:size-10"
+      onclick={() => removeItem(item.path)}
+      disabled={busy}
+      aria-label={$t("queueItem.remove")}
+    >
+      <CloseIcon size={16} />
+    </button>
   </div>
 </li>

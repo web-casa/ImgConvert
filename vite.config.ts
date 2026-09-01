@@ -23,7 +23,7 @@ export default defineConfig(async () => ({
               // Keep this sizeable, stable dependency independently cacheable.
               // Low-frequency dialogs are loaded dynamically from App.svelte.
               name: "icons",
-              test: /node_modules[\\/]phosphor-svelte[\\/]/,
+              test: /node_modules[\\/]@solar-icons[\\/]svelte[\\/]/,
             },
           ],
         },

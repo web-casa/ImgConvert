@@ -12,6 +12,8 @@ import {
   formatFromExt,
   formatImportSummary,
   formatLabel,
+  hasInvalidPdfConfiguration,
+  hasInvalidTargetSizeConfiguration,
   hasTemporaryQueuedInput,
   needsOutputDirectoryForBatch,
   needsOutputDirectoryGrant,
@@ -26,8 +28,9 @@ import {
   setImportMessage,
   settings,
   ui,
+  validatePdfPageRange,
 } from "../src/lib/state.svelte";
-import { initI18n, setAppLocale } from "../src/lib/i18n";
+import { setAppLocale } from "../src/lib/i18n";
 
 describe("state helpers", () => {
   beforeEach(() => {
@@ -39,12 +42,16 @@ describe("state helpers", () => {
     capabilities.codecProviders = [];
     settings.quality = 80;
     settings.lossless = false;
+    settings.autoQuality = false;
     settings.jpegQualityFloor = 30;
     settings.webpQualityFloor = 30;
     settings.avifQualityFloor = 30;
     settings.outputSuffixEnabled = true;
     settings.outputSuffix = "_done";
     settings.fileNameTemplate = "%name%";
+    settings.pdfDpi = 150;
+    settings.pdfPageRange = "";
+    settings.targetSizeEnabled = false;
   });
 
   it("maps extensions and labels through the capability model", () => {
@@ -54,6 +61,15 @@ describe("state helpers", () => {
     expect(formatFromExt("BMP")).toBe("bmp");
     expect(formatFromExt("unknown")).toBeNull();
     expect(formatLabel("webp")).toBe("WebP");
+  });
+
+  it("validates PDF page ranges without expanding unbounded input", () => {
+    expect(validatePdfPageRange("", 12)).toBeNull();
+    expect(validatePdfPageRange("1-3, 5, 8-10", 10)).toBeNull();
+    expect(validatePdfPageRange("3-1", 10)).not.toBeNull();
+    expect(validatePdfPageRange("1-11", 10)).not.toBeNull();
+    expect(validatePdfPageRange("1-999999999", null)).not.toBeNull();
+    expect(validatePdfPageRange("", 501)).not.toBeNull();
   });
 
   it("requires a fresh output-folder grant for each macOS app session", () => {
@@ -76,6 +92,31 @@ describe("state helpers", () => {
     expect(hasTemporaryQueuedInput([{ temporary: true, status: "pending" }])).toBe(true);
     expect(hasTemporaryQueuedInput([{ temporary: true, status: "done" }])).toBe(false);
     expect(hasTemporaryQueuedInput([{ temporary: false, status: "pending" }])).toBe(false);
+  });
+
+  it("validates workflow settings only against items that will be converted", () => {
+    capabilities.readable.push("pdf");
+    addPaths(["/tmp/completed.pdf", "/tmp/pending.jpg"]);
+    const completedPdf = queue[0];
+    const pendingImage = queue[1];
+    expect(completedPdf).toBeDefined();
+    expect(pendingImage).toBeDefined();
+    if (!completedPdf || !pendingImage) return;
+
+    completedPdf.status = "done";
+    settings.pdfPageRange = "3-1";
+    expect(hasInvalidPdfConfiguration()).toBe(false);
+    completedPdf.status = "pending";
+    expect(hasInvalidPdfConfiguration()).toBe(true);
+
+    completedPdf.status = "done";
+    completedPdf.targetFormat = "png";
+    settings.pdfPageRange = "";
+    settings.targetSizeEnabled = true;
+    settings.format = "jpeg";
+    expect(hasInvalidTargetSizeConfiguration()).toBe(false);
+    completedPdf.status = "pending";
+    expect(hasInvalidTargetSizeConfiguration()).toBe(true);
   });
 
   it("normalizes custom suffixes before they reach the conversion command", () => {
@@ -149,6 +190,7 @@ describe("state helpers", () => {
   it("formats byte sizes for queue summaries", () => {
     expect(fmtSize(0)).toBe("0 B");
     expect(fmtSize(1536)).toBe("1.5 KB");
+    expect(fmtSize(2 * 1024 ** 4)).toBe("2.0 TB");
   });
 
   it("applies per-format quality floors only to lossy targets", () => {
@@ -168,7 +210,7 @@ describe("state helpers", () => {
   });
 
   it("re-localizes an active batch progress stage when the locale changes", async () => {
-    await initI18n("zh-CN");
+    await setAppLocale("zh-CN");
     addPaths(["/tmp/a.png"]);
     const item = queue[0];
     expect(item).toBeDefined();
@@ -177,22 +219,22 @@ describe("state helpers", () => {
     item.progressStage = "readingAndConverting";
     item.detail = "读取并转换";
 
-    setAppLocale("en-US");
+    await setAppLocale("en-US");
     expect(item.detail).toBe("Reading and converting");
 
-    setAppLocale("zh-CN");
+    await setAppLocale("zh-CN");
     expect(item.detail).toBe("读取并转换");
   });
 
   it("re-localizes persisted queue detail messages when the locale changes", async () => {
-    await initI18n("zh-CN");
+    await setAppLocale("zh-CN");
     addDemoItems();
     expect(queue[0]?.detail).toBe("网页预览示例");
 
-    setAppLocale("en-US");
+    await setAppLocale("en-US");
     expect(queue[0]?.detail).toBe("Web preview sample");
 
-    setAppLocale("zh-CN");
+    await setAppLocale("zh-CN");
     expect(queue[0]?.detail).toBe("网页预览示例");
   });
 
@@ -206,23 +248,23 @@ describe("state helpers", () => {
       limitReason: "entryCount" as const,
     };
 
-    await initI18n("en-US");
+    await setAppLocale("en-US");
     expect(formatImportSummary({ added: 0, duplicates: 0, skipped: 0 }, scan)).toBe(
       "Scan entry limit reached",
     );
 
-    setAppLocale("zh-CN");
+    await setAppLocale("zh-CN");
     expect(formatImportSummary({ added: 0, duplicates: 0, skipped: 0 }, scan)).toBe(
       "扫描条目达到上限",
     );
   });
 
   it("re-localizes persistent import and wrapped error messages", async () => {
-    await initI18n("zh-CN");
+    await setAppLocale("zh-CN");
     setImportMessage("state.importCancelled");
     expect(ui.importMessage).toBe("已取消导入扫描");
 
-    setAppLocale("en-US");
+    await setAppLocale("en-US");
     expect(ui.importMessage).toBe("Import scan canceled");
 
     setImportCommandError(
@@ -235,16 +277,16 @@ describe("state helpers", () => {
     );
     expect(ui.importMessage).toContain("Unsupported format: tiff");
 
-    setAppLocale("zh-CN");
+    await setAppLocale("zh-CN");
     expect(ui.importMessage).toContain("不支持的格式：tiff");
   });
 
   it("re-localizes a persistent updater result", async () => {
-    await initI18n("zh-CN");
+    await setAppLocale("zh-CN");
     await checkForAppUpdate();
     expect(appUpdate.message).toBe("网页预览不连接桌面更新通道");
 
-    setAppLocale("en-US");
+    await setAppLocale("en-US");
     expect(appUpdate.message).toBe(
       "The web preview is not connected to the desktop update channel",
     );

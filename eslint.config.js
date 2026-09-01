@@ -14,8 +14,10 @@ export default [
       "node_modules/**",
       "fuzz/target/**",
       "fuzz/artifacts/**",
+      "src-tauri/fuzz/target/**",
       "src-tauri/target/**",
       "target/**",
+      "tmp/**",
       "docs-site/**",
       "THIRD_PARTY_LICENSES.md",
     ],
@@ -72,10 +74,24 @@ export default [
       "scripts/**/*.mjs",
       "tests/**/*.ts",
       "e2e/**/*.ts",
+      "e2e-desktop/wdio.conf.mjs",
     ],
     languageOptions: {
       globals: {
         ...globals.node,
+      },
+    },
+  },
+  {
+    files: ["e2e-desktop/specs/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.mocha,
+        $: "readonly",
+        $$: "readonly",
+        browser: "readonly",
+        expect: "readonly",
       },
     },
   },

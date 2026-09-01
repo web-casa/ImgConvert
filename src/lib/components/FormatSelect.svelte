@@ -2,7 +2,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { t } from "svelte-i18n";
-  import { MagnifyingGlass } from "phosphor-svelte";
+  import { MagnifierIcon } from "@solar-icons/svelte/bold-duotone";
   import * as Select from "$lib/components/ui/select";
   import { FORMAT_CATEGORIES, writableFormats } from "$lib/state.svelte";
 
@@ -16,6 +16,7 @@
     disabled = false,
     triggerClass = "w-48",
     triggerSize = "default",
+    ariaLabel,
     sourceFormats = [],
     onChange,
   }: {
@@ -26,6 +27,7 @@
     disabled?: boolean;
     triggerClass?: string;
     triggerSize?: TriggerSize;
+    ariaLabel?: string;
     sourceFormats?: string[];
     onChange?: (value: string) => void;
   } = $props();
@@ -92,14 +94,14 @@
 </script>
 
 <Select.Root type="single" bind:open bind:value {disabled} onValueChange={choose}>
-  <Select.Trigger size={triggerSize} class={triggerClass}>
+  <Select.Trigger size={triggerSize} class={triggerClass} aria-label={ariaLabel}>
     <span data-slot="select-value" class="truncate">{triggerLabel}</span>
   </Select.Trigger>
   <Select.Content
     class="w-[min(520px,calc(100vw-2rem))] max-h-[min(70vh,28rem)] p-1 max-sm:!fixed max-sm:!inset-x-2 max-sm:!bottom-2 max-sm:!top-auto max-sm:!w-auto max-sm:!translate-x-0 max-sm:!translate-y-0"
   >
     <div class="mb-1 flex items-center gap-2 rounded-md border bg-background px-2 py-1.5">
-      <MagnifyingGlass size={15} weight="duotone" class="text-muted-foreground" />
+      <MagnifierIcon size={15} class="text-muted-foreground" />
       <input
         bind:this={searchInput}
         bind:value={search}

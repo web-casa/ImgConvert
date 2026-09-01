@@ -31,6 +31,22 @@ import {
   type DownloadEvent,
   type Update,
 } from "@tauri-apps/plugin-updater";
+import { CoalescingWriter } from "$lib/coalescing-writer";
+import {
+  buildConvertRequest,
+  conversionContentSignature,
+  type ConvertRequest,
+} from "$lib/conversion-options";
+import {
+  MAX_TARGET_SIZE_KIB,
+  MIN_TARGET_SIZE_KIB,
+  WORKFLOW_SETTINGS_VERSION,
+  normalizeCustomWorkflowPresets,
+  type CustomWorkflowPreset,
+  type MetadataPolicy,
+  type ResizeMode,
+} from "$lib/workflow-presets";
+import { decodePreviewPayload } from "$lib/preview-wire";
 
 // ---- 类型 ----
 export type ItemStatus = "pending" | "running" | "done" | "skipped" | "error";
@@ -57,6 +73,19 @@ export interface QueueItem {
   localizedDetail?: LocalizedItemDetail | null;
   detailError?: CommandError | null;
   preview?: boolean;
+}
+export interface ComparisonPreviewResult {
+  input: string;
+  mime: string;
+  sourcePage: number | null;
+  sourceWidth: number;
+  sourceHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  outputSize: number;
+  selectedQuality: number | null;
+  targetSizeMet: boolean | null;
+  warnings: ConvertWarning[];
 }
 export interface Capabilities {
   readable: string[];
@@ -145,11 +174,47 @@ export interface ConvertResult {
   inSize: number;
   outSize: number;
   warning?: ConvertWarning | null;
+  warnings?: ConvertWarning[];
+  outputCount?: number;
+  skippedOutputCount?: number;
 }
-export type ConvertWarning = {
-  code: "previousOutputBackupRetained";
-  path: string;
-};
+export type ConvertWarning =
+  | {
+      code: "previousOutputBackupRetained";
+      path: string;
+    }
+  | {
+      code: "modifiedTimeNotPreserved";
+      path: string;
+    }
+  | {
+      code: "outputBackupRetainedAndModifiedTimeNotPreserved";
+      backupPath: string;
+      outputPath: string;
+    }
+  | {
+      code: "colorProfileConvertedForResize";
+    }
+  | {
+      code: "invalidColorProfileDiscarded";
+    }
+  | {
+      code: "invalidColorProfileIgnoredForPreview";
+    }
+  | {
+      code: "targetSizeNotMet";
+      targetBytes: number;
+      actualBytes: number;
+    }
+  | {
+      code: "pdfPagesSkippedExisting";
+      count: number;
+    }
+  | {
+      code: "pdfRenderWarnings";
+      page: number;
+      count: number;
+    };
 export interface ImportScanError {
   path: string;
   error: CommandError;
@@ -172,6 +237,7 @@ export interface ImageMetadata {
   height: number;
   dpiX: number | null;
   dpiY: number | null;
+  pageCount: number | null;
 }
 export interface ImportScanResult {
   files: ImportScanFile[];
@@ -194,6 +260,7 @@ export interface ThumbnailPreview {
   width: number;
   height: number;
   mime: string;
+  warningCount: number;
 }
 export interface ThumbnailResult {
   input: string;
@@ -201,6 +268,7 @@ export interface ThumbnailResult {
   width: number;
   height: number;
   bytes: number[] | Uint8Array;
+  warningCount: number;
 }
 export interface PickPathOptions {
   directory?: boolean;
@@ -210,6 +278,11 @@ export interface PickPathOptions {
   defaultPath?: string;
   recursive?: boolean;
 }
+interface DesktopE2ESeed {
+  input: string;
+  pdfInput: string;
+  outDir: string;
+}
 export interface ConversionPlanEntry {
   index: number;
   input: string;
@@ -217,6 +290,8 @@ export interface ConversionPlanEntry {
   exists: boolean;
   sameAsSource: boolean;
   conflictsWithQueuedInput: boolean;
+  outputCount: number;
+  existingOutputCount: number;
   error: CommandError | null;
 }
 export interface AppUpdateState {
@@ -234,40 +309,7 @@ export interface AppUpdateState {
   downloadedBytes: number;
   contentLength: number | null;
 }
-type ConvertRequest = {
-  input: string;
-  format: string;
-  quality: number;
-  qualityFloor: number;
-  lossless: boolean;
-  jpegProgressive: boolean;
-  pngOxipngLevel: number;
-  pngLossyQuantize: boolean;
-  pngQuantColors: number;
-  webpMethod: number;
-  avifSpeed: number;
-  avifSubsample: string;
-  webpNearLossless: number;
-  webpSharpYuv: boolean;
-  jpegTrellis: boolean;
-  autoQuality: boolean;
-  autoQualityScore: number;
-  generationLossProtection: boolean;
-  resultCache: boolean;
-  skipIfLarger: boolean;
-  multiCandidate: boolean;
-  overwrite: boolean;
-  overwriteMode: OverwriteMode;
-  outDir: string | null;
-  relativeDir: string | null;
-  sourceWidth: number | null;
-  sourceHeight: number | null;
-  fileNameTemplate: string;
-  outputSuffix: string | null;
-  allowSourceOverwrite: boolean;
-  preserveMetadata: boolean;
-  colorManagementPolicy: ColorManagementPolicy;
-};
+export type { ConvertRequest } from "$lib/conversion-options";
 type BatchConvertRequest = {
   options: ConvertRequest[];
   concurrency: number | null;
@@ -331,7 +373,19 @@ export interface Settings {
   outputSuffixEnabled: boolean;
   outputSuffix: string;
   preserveMetadata: boolean;
+  metadataPolicy: MetadataPolicy;
+  resizeMode: ResizeMode;
+  resizeWidth: number;
+  resizeHeight: number;
+  resizeValue: number;
+  resizeAllowUpscale: boolean;
+  targetSizeEnabled: boolean;
+  targetSizeKib: number;
+  workflowSettingsVersion: number;
+  customWorkflowPresets: CustomWorkflowPreset[];
   colorManagementPolicy: ColorManagementPolicy;
+  pdfDpi: number;
+  pdfPageRange: string;
   concurrency: number;
   theme: Theme;
   reduceMotion: boolean;
@@ -340,7 +394,7 @@ export interface Settings {
 
 // ---- 常量 ----
 const CORE_CAPABILITIES: Capabilities = {
-  readable: ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp"],
+  readable: ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp", "pdf"],
   writable: ["jpeg", "png", "webp", "avif"],
   lossless: ["png", "webp", "avif"],
   colorPipeline: {
@@ -363,6 +417,7 @@ const FORMAT_EXTENSIONS: Record<string, string[]> = {
   gif: ["gif"],
   bmp: ["bmp"],
   heic: ["heic", "heif", "hif"],
+  pdf: ["pdf"],
 };
 const THUMBNAIL_MAX_EDGE = 180;
 const THUMBNAIL_CONCURRENCY = 2;
@@ -381,6 +436,11 @@ export const OUTPUT_SUFFIX_MAX_CHARS = 48;
 const OUTPUT_SUFFIX_MAX_BYTES = 128;
 export const DEFAULT_OUTPUT_SUFFIX = "_done";
 export const CONVERSION_POLICY_VERSION = 2;
+export const MIN_PDF_DPI = 72;
+export const MAX_PDF_DPI = 600;
+export const DEFAULT_PDF_DPI = 150;
+export const MAX_PDF_PAGES_PER_JOB = 500;
+export const MAX_PDF_PAGE_RANGE_CHARS = 2048;
 export interface RuntimeFileAccess {
   useHostLinuxPicker: boolean;
   requiresOutputDirectory: boolean;
@@ -486,7 +546,19 @@ export const settings = $state<Settings>({
   outputSuffixEnabled: true,
   outputSuffix: DEFAULT_OUTPUT_SUFFIX,
   preserveMetadata: false,
+  metadataPolicy: "stripAll",
+  resizeMode: "none",
+  resizeWidth: 1920,
+  resizeHeight: 1080,
+  resizeValue: 2048,
+  resizeAllowUpscale: false,
+  targetSizeEnabled: false,
+  targetSizeKib: 1024,
+  workflowSettingsVersion: WORKFLOW_SETTINGS_VERSION,
+  customWorkflowPresets: [],
   colorManagementPolicy: "preserve",
+  pdfDpi: 150,
+  pdfPageRange: "",
   concurrency: 0,
   theme: "system",
   reduceMotion: false,
@@ -517,6 +589,70 @@ export function effectiveQualityFor(format: string, quality = settings.quality):
 }
 
 export const queue = $state<QueueItem[]>([]);
+
+export const comparisonPreview = $state<{
+  open: boolean;
+  loading: boolean;
+  stale: boolean;
+  itemPath: string | null;
+  itemName: string;
+  beforeUrl: string | null;
+  afterUrl: string | null;
+  reveal: number;
+  result: ComparisonPreviewResult | null;
+  error: string;
+}>({
+  open: false,
+  loading: false,
+  stale: false,
+  itemPath: null,
+  itemName: "",
+  beforeUrl: null,
+  afterUrl: null,
+  reveal: 50,
+  result: null,
+  error: "",
+});
+
+let comparisonPreviewRequestId = 0;
+
+/**
+ * Settings that change the bytes of the converted output. When any of them
+ * changes while the comparison preview is open, the displayed "after" image no
+ * longer matches the current configuration and the preview is marked stale.
+ * The previewed item's per-format override is part of the same signature.
+ */
+function comparisonPreviewSettingsSignature(): string {
+  const item = comparisonPreview.itemPath
+    ? queue.find((candidate) => candidate.path === comparisonPreview.itemPath)
+    : null;
+  if (!item) return "null";
+  const format = itemTargetFormat(item);
+  return conversionContentSignature(conversionRequestFor(item, format));
+}
+
+let comparisonPreviewSettingsBaseline: string | null = null;
+
+// Components mutate `settings` directly (including `bind:value`), so a single
+// effect tracking the output-affecting fields is the only reliable
+// invalidation point. Marking stale never triggers I/O; the user refreshes
+// through the existing guarded path.
+$effect.root(() => {
+  $effect(() => {
+    if (!comparisonPreview.open) {
+      comparisonPreviewSettingsBaseline = null;
+      return;
+    }
+    const signature = comparisonPreviewSettingsSignature();
+    if (comparisonPreviewSettingsBaseline === null) {
+      comparisonPreviewSettingsBaseline = signature;
+      return;
+    }
+    if (signature === comparisonPreviewSettingsBaseline) return;
+    comparisonPreviewSettingsBaseline = signature;
+    comparisonPreview.stale = true;
+  });
+});
 
 interface UiState {
   converting: boolean;
@@ -690,7 +826,12 @@ export async function installAppUpdate(): Promise<void> {
     appUpdate.available = false;
     setAppUpdateMessage(translationMessage("update.installed"));
     pendingAppUpdate = null;
-    await relaunch();
+    try {
+      await relaunch();
+    } catch (error) {
+      setAppUpdateMessage(translationMessage("update.installedRelaunchFailed"));
+      setAppUpdateError(translationMessage("update.relaunchFailed", { message: String(error) }));
+    }
   } catch (error) {
     setAppUpdateError(updaterErrorMessage(error));
   } finally {
@@ -1035,6 +1176,12 @@ export function formatAccent(format: string | null): {
         border: "border-fuchsia-500/35",
         background: "bg-fuchsia-500/10",
       };
+    case "pdf":
+      return {
+        text: "text-rose-700 dark:text-rose-300",
+        border: "border-rose-500/35",
+        background: "bg-rose-500/10",
+      };
     default:
       return {
         text: "text-primary",
@@ -1048,18 +1195,64 @@ export function formatAccent(format: string | null): {
 export const extOf = (p: string) => p.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
 export const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 export function fmtSize(b: number): string {
-  if (b <= 0) return "0 B";
-  const u = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(b) / Math.log(1024));
+  if (!Number.isFinite(b) || b <= 0) return "0 B";
+  const u = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
   return `${(b / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
 }
 
 export function formatImageMetadata(metadata: ImageMetadata | null): string {
   if (!metadata) return "";
   const parts = [`${metadata.width}×${metadata.height}`];
+  if (metadata.pageCount) {
+    parts.unshift(translate("state.pdfPageCount", { count: metadata.pageCount }));
+  }
   const dpi = formatDpi(metadata);
   if (dpi) parts.push(dpi);
   return parts.join(" · ");
+}
+
+export function isPdfItem(item: Pick<QueueItem, "path" | "metadata">): boolean {
+  return item.metadata?.format === "pdf" || extOf(item.path) === "pdf";
+}
+
+export function validatePdfPageRange(
+  value: string,
+  pageCount: number | null = null,
+): string | null {
+  const range = value.trim();
+  if (!range) {
+    return pageCount !== null && pageCount > MAX_PDF_PAGES_PER_JOB
+      ? translate("workflow.pdfRangeRequired", { count: MAX_PDF_PAGES_PER_JOB })
+      : null;
+  }
+  if (range.length > MAX_PDF_PAGE_RANGE_CHARS) return translate("workflow.pdfRangeTooLong");
+  const seen = new Set<number>();
+  for (const rawToken of range.split(",")) {
+    const token = rawToken.trim();
+    if (!token) return translate("workflow.pdfRangeInvalid");
+    const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(token);
+    if (!match) return translate("workflow.pdfRangeInvalid");
+    const start = Number(match[1]);
+    const end = Number(match[2] ?? match[1]);
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || start > end) {
+      return translate("workflow.pdfRangeInvalid");
+    }
+    if (pageCount !== null && end > pageCount) {
+      return translate("workflow.pdfRangeOutOfBounds", { count: pageCount });
+    }
+    // Avoid expanding an attacker-controlled gigantic range merely to validate it.
+    if (end - start + 1 > MAX_PDF_PAGES_PER_JOB) {
+      return translate("workflow.pdfTooManyPages", { count: MAX_PDF_PAGES_PER_JOB });
+    }
+    for (let page = start; page <= end; page += 1) {
+      seen.add(page);
+      if (seen.size > MAX_PDF_PAGES_PER_JOB) {
+        return translate("workflow.pdfTooManyPages", { count: MAX_PDF_PAGES_PER_JOB });
+      }
+    }
+  }
+  return null;
 }
 
 function formatDpi(metadata: ImageMetadata): string {
@@ -1195,7 +1388,7 @@ async function importPathList(paths: string[], messageKey: string) {
     const added = addPaths(scan.files);
     setUiImportMessage(importSummaryMessage(added, scan));
   } catch (e) {
-    setImportCommandError(e);
+    setImportCommandError(e, "state.importFailed");
     ui.importErrors = [];
   } finally {
     ui.importing = false;
@@ -1390,7 +1583,7 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
     }
     setUiImportMessage(importSummaryMessage({ ...added, skipped: added.skipped + skipped }, null));
   } catch (error) {
-    setImportCommandError(error);
+    setImportCommandError(error, "state.clipboardImportFailed");
   } finally {
     ui.importing = false;
     ui.importMode = null;
@@ -1497,7 +1690,7 @@ export async function cancelImportScan() {
   try {
     await invoke<boolean>("cancel_import_scan");
   } catch (e) {
-    setImportCommandError(e);
+    setImportCommandError(e, "state.cancelImportScanFailed");
   }
 }
 
@@ -1613,6 +1806,7 @@ export function removeItem(path: string) {
   if (ui.converting || ui.importing) return;
   const i = queue.findIndex((it) => it.path === path);
   if (i >= 0) {
+    if (comparisonPreview.itemPath === queue[i].path) closeComparisonPreview();
     disposeThumbnail(queue[i]);
     removeQueuedThumbnail(queue[i]);
     cleanupTemporaryImport(queue[i]);
@@ -1626,6 +1820,7 @@ export function clearQueue() {
     cleanupTemporaryImport(item);
   }
   resetThumbnailQueue();
+  closeComparisonPreview();
   queue.splice(0, queue.length);
 }
 
@@ -1694,6 +1889,7 @@ async function loadThumbnail(item: QueueItem) {
       width: result.width,
       height: result.height,
       mime: result.mime,
+      warningCount: result.warningCount,
     };
     item.thumbnailStatus = "ready";
   } catch (e) {
@@ -1726,11 +1922,118 @@ function resetThumbnailQueue() {
   thumbnailQueuedKeys.clear();
 }
 
+// ---- 前后对比预览 ----
+export function openComparisonPreview(item: QueueItem) {
+  if (ui.converting || ui.importing) return;
+  // Opening is a new item-level preview session. Never leave another file's
+  // image or statistics visible while the replacement request is in flight.
+  disposeComparisonPreviewUrls();
+  comparisonPreview.result = null;
+  comparisonPreview.loading = false;
+  comparisonPreview.open = true;
+  comparisonPreview.itemPath = item.path;
+  comparisonPreview.itemName = item.name;
+  comparisonPreview.reveal = 50;
+  comparisonPreview.stale = false;
+  comparisonPreviewSettingsBaseline = comparisonPreviewSettingsSignature();
+  comparisonPreview.error = "";
+
+  if (!isTauriRuntime()) {
+    comparisonPreview.loading = false;
+    comparisonPreview.error = translate("state.webPreviewNoLocalConvert");
+    return;
+  }
+  void refreshComparisonPreview();
+}
+
+export async function refreshComparisonPreview() {
+  const path = comparisonPreview.itemPath;
+  if (!path || !comparisonPreview.open || !isTauriRuntime() || ui.converting) return;
+  const item = queue.find((candidate) => candidate.path === path);
+  if (!item) {
+    closeComparisonPreview();
+    return;
+  }
+
+  const requestId = ++comparisonPreviewRequestId;
+  comparisonPreview.loading = true;
+  // A refresh starts from the current settings; re-sync the invalidation
+  // baseline so the signature effect does not flag this in-flight, explicitly
+  // requested refresh as stale.
+  comparisonPreview.stale = false;
+  comparisonPreviewSettingsBaseline = comparisonPreviewSettingsSignature();
+  comparisonPreview.error = "";
+  try {
+    const format = itemTargetFormat(item);
+    const payload = await invoke<ArrayBuffer>("generate_comparison_preview", {
+      options: {
+        conversion: conversionRequestFor(item, format),
+        maxEdge: 1200,
+      },
+    });
+    if (requestId !== comparisonPreviewRequestId || !comparisonPreview.open) return;
+
+    const {
+      summary: result,
+      beforeBytes,
+      afterBytes,
+    } = decodePreviewPayload<ComparisonPreviewResult>(payload);
+
+    const beforeUrl = URL.createObjectURL(new Blob([beforeBytes], { type: result.mime }));
+    const afterUrl = URL.createObjectURL(new Blob([afterBytes], { type: result.mime }));
+    if (requestId !== comparisonPreviewRequestId || !comparisonPreview.open) {
+      URL.revokeObjectURL(beforeUrl);
+      URL.revokeObjectURL(afterUrl);
+      return;
+    }
+    disposeComparisonPreviewUrls();
+    comparisonPreview.beforeUrl = beforeUrl;
+    comparisonPreview.afterUrl = afterUrl;
+    comparisonPreview.result = result;
+  } catch (error) {
+    if (requestId !== comparisonPreviewRequestId || !comparisonPreview.open) return;
+    comparisonPreview.error = formatCommandError(error);
+  } finally {
+    if (requestId === comparisonPreviewRequestId) comparisonPreview.loading = false;
+  }
+}
+
+export function closeComparisonPreview() {
+  comparisonPreviewRequestId += 1;
+  if (isTauriRuntime() && comparisonPreview.open) {
+    void invoke<boolean>("cancel_comparison_preview").catch((error) => {
+      logCommandError("Failed to cancel comparison preview", error);
+    });
+  }
+  disposeComparisonPreviewUrls();
+  comparisonPreview.open = false;
+  comparisonPreview.loading = false;
+  comparisonPreview.stale = false;
+  comparisonPreview.itemPath = null;
+  comparisonPreview.itemName = "";
+  comparisonPreview.result = null;
+  comparisonPreview.error = "";
+}
+
+export function setComparisonReveal(value: number) {
+  comparisonPreview.reveal = Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function disposeComparisonPreviewUrls() {
+  for (const url of [comparisonPreview.beforeUrl, comparisonPreview.afterUrl]) {
+    if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+  }
+  comparisonPreview.beforeUrl = null;
+  comparisonPreview.afterUrl = null;
+}
+
 // ---- 转换 ----
 export async function convertAll() {
   if (ui.converting || ui.importing || queue.length === 0) {
     return;
   }
+
+  if (comparisonPreview.open) closeComparisonPreview();
 
   if (!isTauriRuntime()) {
     for (const item of queue) {
@@ -1752,7 +2055,7 @@ export async function convertAll() {
     await convertAllWithBatch();
   } catch (error) {
     for (const item of queue) {
-      if (item.status !== "done") {
+      if (item.status === "pending" || item.status === "running") {
         item.status = "error";
         setItemCommandError(item, error);
         item.progress = 100;
@@ -1963,11 +2266,15 @@ async function applyAskOverwriteDecisions(jobs: BatchJob[], plan: ConversionPlan
 function prepareBatchJobs(): BatchJob[] {
   const jobs: BatchJob[] = [];
   for (const item of queue) {
-    if (item.status === "done") continue;
+    if (!isPendingConversionItem(item)) continue;
     const options = prepareSingleJob(item);
     if (options) jobs.push({ item, options });
   }
   return jobs;
+}
+
+export function isPendingConversionItem(item: Pick<QueueItem, "status">): boolean {
+  return item.status !== "done";
 }
 
 function prepareSingleJob(item: QueueItem): ConvertRequest | null {
@@ -1979,44 +2286,64 @@ function prepareSingleJob(item: QueueItem): ConvertRequest | null {
     item.progressStage = null;
     return null;
   }
-  return buildConvertRequest(item, format);
+  if (settings.targetSizeEnabled && !targetSizeSupported(format)) {
+    item.status = "error";
+    setLocalizedItemDetail(item, "state.targetSizeUnsupported");
+    item.progress = 100;
+    item.progressStage = null;
+    return null;
+  }
+  if (isPdfItem(item)) {
+    const pageRangeError = validatePdfPageRange(
+      settings.pdfPageRange,
+      item.metadata?.pageCount ?? null,
+    );
+    if (pageRangeError) {
+      item.status = "error";
+      setLocalizedItemDetail(item, "state.pdfSettingsInvalid");
+      item.progress = 100;
+      item.progressStage = null;
+      return null;
+    }
+  }
+  return conversionRequestFor(item, format);
 }
 
-function buildConvertRequest(item: QueueItem, format: string): ConvertRequest {
-  return {
-    input: item.path,
+export function targetSizeSupported(format: string): boolean {
+  return ["jpeg", "webp"].includes(format) && !settings.lossless;
+}
+
+export function hasInvalidWorkflowConfiguration(): boolean {
+  if (hasInvalidPdfConfiguration()) return true;
+  return hasInvalidTargetSizeConfiguration();
+}
+
+export function hasInvalidPdfConfiguration(): boolean {
+  return queue.some(
+    (item) =>
+      isPendingConversionItem(item) &&
+      isPdfItem(item) &&
+      validatePdfPageRange(settings.pdfPageRange, item.metadata?.pageCount ?? null) !== null,
+  );
+}
+
+export function hasInvalidTargetSizeConfiguration(): boolean {
+  if (!settings.targetSizeEnabled) return false;
+  if (settings.autoQuality || settings.lossless) return true;
+  return queue.some(
+    (item) => isPendingConversionItem(item) && !targetSizeSupported(itemTargetFormat(item)),
+  );
+}
+
+function conversionRequestFor(item: QueueItem, format: string): ConvertRequest {
+  return buildConvertRequest({
+    settings,
+    item,
     format,
-    quality: settings.quality,
     qualityFloor: qualityFloorFor(format),
-    lossless: settings.lossless && supportsLossless(format),
-    jpegProgressive: settings.jpegProgressive,
-    pngOxipngLevel: settings.pngOxipngLevel,
-    pngLossyQuantize: settings.pngLossyQuantize,
-    pngQuantColors: settings.pngQuantColors,
-    webpMethod: settings.webpMethod,
-    avifSpeed: settings.avifSpeed,
-    avifSubsample: settings.avifSubsample,
-    webpNearLossless: format === "webp" && settings.lossless ? settings.webpNearLossless : 100,
-    webpSharpYuv: settings.webpSharpYuv,
-    jpegTrellis: settings.jpegTrellis,
-    autoQuality: settings.autoQuality,
-    autoQualityScore: settings.autoQualityScore,
-    generationLossProtection: settings.generationLossProtection,
-    resultCache: settings.resultCache,
-    skipIfLarger: settings.skipIfLarger,
-    multiCandidate: settings.multiCandidate,
-    overwrite: settings.overwrite === "overwrite",
-    overwriteMode: settings.overwrite,
-    outDir: settings.outDir,
-    relativeDir: settings.outDir ? item.relativeDir : null,
-    sourceWidth: item.metadata?.width ?? null,
-    sourceHeight: item.metadata?.height ?? null,
-    fileNameTemplate: settings.fileNameTemplate,
+    losslessSupported: supportsLossless(format),
     outputSuffix: outputSuffixForRequest(settings.outputSuffixEnabled, settings.outputSuffix),
-    allowSourceOverwrite: false,
-    preserveMetadata: settings.preserveMetadata,
-    colorManagementPolicy: settings.colorManagementPolicy,
-  };
+  });
 }
 
 function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
@@ -2132,16 +2459,74 @@ function finalizeCancelledJobs(jobs: BatchJob[]) {
 
 function formatResultDetail(res: ConvertResult): string {
   const ratio = res.inSize > 0 ? Math.round((1 - res.outSize / res.inSize) * 100) : 0;
-  const detail = `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
-  if (res.warning?.code === "previousOutputBackupRetained") {
-    return `${detail} · ${translate("state.outputBackupRetained", { path: res.warning.path })}`;
+  const pdfOutput = extOf(res.input) === "pdf";
+  const pageDetail =
+    pdfOutput || (res.outputCount ?? 1) > 1 || (res.skippedOutputCount ?? 0) > 0
+      ? `${translate("state.pdfOutputsCreated", { count: res.outputCount ?? 0 })} · `
+      : "";
+  const sizeDetail = pdfOutput
+    ? `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)}`
+    : `${fmtSize(res.inSize)} → ${fmtSize(res.outSize)} (${ratio >= 0 ? "-" : "+"}${Math.abs(ratio)}%)`;
+  const detail = `${pageDetail}${sizeDetail}`;
+  const warningMessages = conversionWarnings(res).flatMap(formatConvertWarning);
+  return warningMessages.length ? `${detail} · ${warningMessages.join(" · ")}` : detail;
+}
+
+export function conversionWarnings(
+  res: Pick<ConvertResult, "warning" | "warnings">,
+): ConvertWarning[] {
+  const warnings = [...(res.warnings ?? []), ...(res.warning ? [res.warning] : [])];
+  const seen = new Set<string>();
+  return warnings.filter((warning) => {
+    const key = JSON.stringify(warning);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function formatConvertWarning(warning: ConvertWarning): string[] {
+  switch (warning.code) {
+    case "previousOutputBackupRetained":
+      return [translate("state.outputBackupRetained", { path: warning.path })];
+    case "modifiedTimeNotPreserved":
+      return [translate("state.modifiedTimeNotPreserved", { path: warning.path })];
+    case "outputBackupRetainedAndModifiedTimeNotPreserved":
+      return [
+        translate("state.outputBackupRetained", { path: warning.backupPath }),
+        translate("state.modifiedTimeNotPreserved", { path: warning.outputPath }),
+      ];
+    case "colorProfileConvertedForResize":
+      return [translate("state.colorProfileConvertedForResize")];
+    case "invalidColorProfileDiscarded":
+      return [translate("state.invalidColorProfileDiscarded")];
+    case "invalidColorProfileIgnoredForPreview":
+      return [translate("state.invalidColorProfileIgnoredForPreview")];
+    case "targetSizeNotMet":
+      return [
+        translate("state.targetSizeNotMet", {
+          target: fmtSize(warning.targetBytes),
+          actual: fmtSize(warning.actualBytes),
+        }),
+      ];
+    case "pdfPagesSkippedExisting":
+      return [translate("state.pdfPagesSkippedExisting", { count: warning.count })];
+    case "pdfRenderWarnings":
+      return [
+        translate("state.pdfRenderWarnings", {
+          page: warning.page,
+          count: warning.count,
+        }),
+      ];
   }
-  return detail;
 }
 
 function formatAskOverwriteMessage(entry: ConversionPlanEntry): string {
   if (entry.sameAsSource) {
     return translate("state.sourceOverwriteSingleMessage", { path: entry.output ?? entry.input });
+  }
+  if (entry.existingOutputCount > 1) {
+    return translate("state.pdfOutputsExist", { count: entry.existingOutputCount });
   }
   return translate("state.outputExists", { path: entry.output ?? entry.input });
 }
@@ -2274,45 +2659,106 @@ export function applyTheme() {
 
 // ---- 持久化(Tauri Store)----
 export const persistenceReady = $state({ ready: false });
+export const persistenceStatus = $state({ error: null as string | null });
 let store: Store | null = null;
+let settingsWriter: CoalescingWriter<Settings> | null = null;
 export async function initPersistence() {
   let detectedLocale = navigatorLocale();
+  persistenceStatus.error = null;
   try {
     detectedLocale = await systemLocale();
     if (!isTauriRuntime()) {
       settings.locale = detectedLocale;
-      setAppLocale(detectedLocale);
+      await setAppLocale(detectedLocale);
       applyTheme();
       return;
     }
 
     store = await load("settings.json", { defaults: {}, autoSave: 300 });
+    settingsWriter = new CoalescingWriter(async (snapshot) => {
+      if (!store) throw new Error("settings store is unavailable");
+      await store.set("settings", snapshot);
+    });
     const saved = await store.get<Partial<Settings>>("settings");
     if (saved) {
       Object.assign(settings, saved);
-      const migratedConversionPolicy = normalizeSettings(detectedLocale, saved);
-      if (migratedConversionPolicy) {
+      const normalized = normalizeSettings(detectedLocale, saved);
+      if (normalized) {
         await persistSettings();
       }
     } else {
       settings.locale = detectedLocale;
     }
-    setAppLocale(settings.locale);
+    await setAppLocale(settings.locale);
   } catch (e) {
     console.warn("Failed to load settings, using defaults:", e);
+    persistenceStatus.error = String(e);
+    store = null;
+    settingsWriter = null;
     settings.locale = detectedLocale;
-    setAppLocale(detectedLocale);
+    await setAppLocale(detectedLocale);
   } finally {
     applyTheme();
     persistenceReady.ready = true;
   }
 }
 export async function persistSettings() {
-  if (!store) return;
-  await store.set("settings", { ...settings });
+  const writer = settingsWriter;
+  if (!writer) return;
+  try {
+    await writer.enqueue(settingsSnapshot());
+    persistenceStatus.error = null;
+  } catch (error) {
+    persistenceStatus.error = String(error);
+    console.warn("Failed to persist settings:", error);
+  }
+}
+
+function settingsSnapshot(): Settings {
+  return {
+    ...settings,
+    customWorkflowPresets: settings.customWorkflowPresets.map((preset) => ({
+      ...preset,
+      snapshot: { ...preset.snapshot },
+    })),
+  };
+}
+
+export async function clearResultCache(): Promise<number> {
+  if (!isTauriRuntime()) return 0;
+  return invoke<number>("clear_result_cache");
+}
+
+export async function seedDesktopE2E(): Promise<boolean> {
+  if (import.meta.env.VITE_IMGCONVERT_DESKTOP_E2E !== "1" || !isTauriRuntime()) return false;
+  const seed = await invoke<DesktopE2ESeed | null>("desktop_e2e_seed");
+  if (!seed) return false;
+
+  clearQueue();
+  const added = addPaths([seed.input, seed.pdfInput]);
+  if (added.added !== 2) throw new Error("desktop E2E fixtures could not be queued");
+  settings.format = "jpeg";
+  settings.outDir = seed.outDir;
+  settings.outputSuffixEnabled = true;
+  settings.outputSuffix = "_done";
+  settings.overwrite = "skip";
+  settings.resizeMode = "percentage";
+  settings.resizeValue = 50;
+  settings.resizeAllowUpscale = false;
+  settings.targetSizeEnabled = true;
+  settings.targetSizeKib = 16;
+  settings.autoQuality = false;
+  settings.lossless = false;
+  settings.metadataPolicy = "stripAll";
+  settings.pdfDpi = 72;
+  settings.pdfPageRange = "1-2";
+  settings.preserveMetadata = false;
+  outputDirectoryGrant.sessionGranted = true;
+  return true;
 }
 
 function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settings>): boolean {
+  const before = JSON.stringify({ ...settings });
   const overwrite = settings.overwrite as unknown;
   if (overwrite !== "ask" && overwrite !== "skip" && overwrite !== "overwrite") {
     settings.overwrite = overwrite === true ? "overwrite" : "skip";
@@ -2346,8 +2792,55 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   if (typeof settings.preserveMetadata !== "boolean") {
     settings.preserveMetadata = false;
   }
+  const persistedMetadataPolicy = persisted?.metadataPolicy;
+  if (
+    persistedMetadataPolicy !== "stripAll" &&
+    persistedMetadataPolicy !== "colorOnly" &&
+    persistedMetadataPolicy !== "preserveAll"
+  ) {
+    settings.metadataPolicy = settings.preserveMetadata ? "preserveAll" : "stripAll";
+  }
+  settings.preserveMetadata = settings.metadataPolicy === "preserveAll";
+  if (
+    !["none", "fit", "width", "height", "longestEdge", "percentage"].includes(settings.resizeMode)
+  ) {
+    settings.resizeMode = "none";
+  }
+  settings.resizeWidth = normalizeWorkflowInteger(settings.resizeWidth, 1, 65_535, 1920);
+  settings.resizeHeight = normalizeWorkflowInteger(settings.resizeHeight, 1, 65_535, 1080);
+  settings.resizeValue = normalizeWorkflowInteger(
+    settings.resizeValue,
+    1,
+    settings.resizeMode === "percentage" ? 400 : 65_535,
+    settings.resizeMode === "percentage" ? 100 : 2048,
+  );
+  if (typeof settings.resizeAllowUpscale !== "boolean") {
+    settings.resizeAllowUpscale = false;
+  }
+  if (typeof settings.targetSizeEnabled !== "boolean") {
+    settings.targetSizeEnabled = false;
+  }
+  settings.targetSizeKib = normalizeWorkflowInteger(
+    settings.targetSizeKib,
+    MIN_TARGET_SIZE_KIB,
+    MAX_TARGET_SIZE_KIB,
+    1024,
+  );
+  settings.workflowSettingsVersion = WORKFLOW_SETTINGS_VERSION;
+  settings.customWorkflowPresets = normalizeCustomWorkflowPresets(settings.customWorkflowPresets);
   if (!["preserve", "convertToSrgb"].includes(settings.colorManagementPolicy)) {
     settings.colorManagementPolicy = "preserve";
+  }
+  settings.pdfDpi = normalizeWorkflowInteger(
+    settings.pdfDpi,
+    MIN_PDF_DPI,
+    MAX_PDF_DPI,
+    DEFAULT_PDF_DPI,
+  );
+  if (typeof settings.pdfPageRange !== "string") {
+    settings.pdfPageRange = "";
+  } else {
+    settings.pdfPageRange = settings.pdfPageRange.slice(0, MAX_PDF_PAGE_RANGE_CHARS);
   }
   if (typeof settings.concurrency !== "number" || !Number.isFinite(settings.concurrency)) {
     settings.concurrency = 0;
@@ -2403,6 +2896,12 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   if (typeof settings.autoQuality !== "boolean") {
     settings.autoQuality = false;
   }
+  if (settings.targetSizeEnabled && settings.autoQuality) {
+    settings.autoQuality = false;
+  }
+  if (settings.targetSizeEnabled && settings.lossless) {
+    settings.lossless = false;
+  }
   if (
     typeof settings.autoQualityScore !== "number" ||
     !Number.isFinite(settings.autoQualityScore)
@@ -2432,7 +2931,7 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   settings.jpegQualityFloor = normalizeQualityFloor(settings.jpegQualityFloor, 30);
   settings.webpQualityFloor = normalizeQualityFloor(settings.webpQualityFloor, 30);
   settings.avifQualityFloor = normalizeQualityFloor(settings.avifQualityFloor, 30);
-  return conversionPolicySettings.migrated;
+  return conversionPolicySettings.migrated || JSON.stringify({ ...settings }) !== before;
 }
 
 function clampQuality(value: unknown): number {
@@ -2440,6 +2939,16 @@ function clampQuality(value: unknown): number {
     return 80;
   }
   return Math.min(100, Math.max(1, Math.round(value)));
+}
+
+function normalizeWorkflowInteger(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function normalizeQualityFloor(value: unknown, fallback: number): number {

@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
-  import { ArrowSquareOut, ShieldCheck, X } from "phosphor-svelte";
+  import { CloseIcon, ShieldCheckIcon, SquareTopDownIcon } from "@solar-icons/svelte/bold-duotone";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
@@ -65,7 +65,7 @@
         <div
           class="grid size-9 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary"
         >
-          <ShieldCheck size={20} weight="duotone" aria-hidden="true" />
+          <ShieldCheckIcon size={20} aria-hidden="true" />
         </div>
         <div class="min-w-0 flex-1">
           <h2 id="privacy-support-title" class="text-sm font-semibold">
@@ -76,7 +76,7 @@
           </p>
         </div>
         <Button variant="ghost" size="icon" title={$t("privacySupport.close")} onclick={close}>
-          <X />
+          <CloseIcon size={20} />
         </Button>
       </header>
 
@@ -121,7 +121,7 @@
               onclick={() => void openSupport()}
               disabled={openingSupport}
             >
-              <ArrowSquareOut />
+              <SquareTopDownIcon size={20} />
               {openingSupport
                 ? $t("privacySupport.openingSupport")
                 : $t("privacySupport.openSupport")}

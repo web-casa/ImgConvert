@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
-  import { X } from "phosphor-svelte";
+  import { CloseIcon } from "@solar-icons/svelte/bold-duotone";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import {
@@ -78,7 +78,7 @@
           </p>
         </div>
         <Button variant="ghost" size="icon" title={$t("legal.close")} onclick={close}>
-          <X />
+          <CloseIcon size={20} />
         </Button>
       </header>
 

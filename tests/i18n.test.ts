@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { extname, join } from "node:path";
 import { enUS } from "../src/lib/i18n/messages/en-US";
 import { zhCN } from "../src/lib/i18n/messages/zh-CN";
-import { initI18n, normalizeLocale, setAppLocale } from "../src/lib/i18n";
+import { normalizeLocale, setAppLocale } from "../src/lib/i18n";
 
 const tauriMocks = vi.hoisted(() => ({
   active: false,
@@ -20,7 +22,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 afterEach(async () => {
   tauriMocks.active = false;
   tauriMocks.setTitle.mockClear();
-  await initI18n("en-US");
+  await setAppLocale("en-US");
 });
 
 function keyPaths(value: unknown, prefix = ""): string[] {
@@ -48,6 +50,19 @@ function placeholders(message: string): string[] {
   return [...message.matchAll(/\{([A-Za-z][\w]*)/g)].map((match) => match[1]).sort();
 }
 
+function sourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return [".mjs", ".svelte", ".ts"].includes(extname(path)) ? [path] : [];
+  });
+}
+
+function containsExactStringLiteral(corpus: string, value: string): boolean {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp("([\"'`])" + escaped + "\\1").test(corpus);
+}
+
 describe("i18n dictionaries", () => {
   it("keeps zh-CN and en-US key sets identical", () => {
     const zh = keyPaths(zhCN).sort();
@@ -64,6 +79,34 @@ describe("i18n dictionaries", () => {
     }
   });
 
+  it("has no unreferenced translation keys outside audited dynamic namespaces", () => {
+    const files = ["src", "tests", "e2e-desktop"]
+      .flatMap(sourceFiles)
+      .filter(
+        (path) => !path.includes("/i18n/messages/") && path !== join("tests", "i18n.test.ts"),
+      );
+    const corpus = files.map((path) => readFileSync(path, "utf8")).join("\n");
+    const expectedDynamicKeys = [
+      "workflow.metadata.colorOnly",
+      "workflow.metadata.colorOnlyDescription",
+      "workflow.metadata.preserveAll",
+      "workflow.metadata.preserveAllDescription",
+      "workflow.metadata.stripAll",
+      "workflow.metadata.stripAllDescription",
+      "workflow.resizeModes.fit",
+      "workflow.resizeModes.height",
+      "workflow.resizeModes.longestEdge",
+      "workflow.resizeModes.none",
+      "workflow.resizeModes.percentage",
+      "workflow.resizeModes.width",
+    ];
+    const unreferenced = keyPaths(enUS)
+      .filter((key) => !containsExactStringLiteral(corpus, key))
+      .sort();
+
+    expect(unreferenced).toEqual(expectedDynamicKeys);
+  });
+
   it("normalizes Chinese locales to zh-CN", () => {
     expect(normalizeLocale("zh-CN")).toBe("zh-CN");
     expect(normalizeLocale("zh-TW")).toBe("zh-CN");
@@ -72,24 +115,24 @@ describe("i18n dictionaries", () => {
   });
 
   it("keeps the page metadata in sync with the selected locale", async () => {
-    await initI18n("zh-CN");
-    expect(document.title).toBe("ImgConvert · 图片批量转换");
+    await setAppLocale("zh-CN");
+    expect(document.title).toBe("ImgConvert · 图片与 PDF 批量转换");
     expect(document.documentElement.lang).toBe("zh-CN");
 
-    setAppLocale("en-US");
-    expect(document.title).toBe("ImgConvert · Batch Image Converter");
+    await setAppLocale("en-US");
+    expect(document.title).toBe("ImgConvert · Batch Image and PDF Converter");
     expect(document.documentElement.lang).toBe("en-US");
   });
 
   it("updates the native Tauri window title", async () => {
     tauriMocks.active = true;
 
-    await initI18n("zh-CN");
-    expect(tauriMocks.setTitle).toHaveBeenLastCalledWith("ImgConvert · 图片批量转换");
+    await setAppLocale("zh-CN");
+    expect(tauriMocks.setTitle).toHaveBeenLastCalledWith("ImgConvert · 图片与 PDF 批量转换");
 
-    setAppLocale("en-US");
-    await vi.waitFor(() => {
-      expect(tauriMocks.setTitle).toHaveBeenLastCalledWith("ImgConvert · Batch Image Converter");
-    });
+    await setAppLocale("en-US");
+    expect(tauriMocks.setTitle).toHaveBeenLastCalledWith(
+      "ImgConvert · Batch Image and PDF Converter",
+    );
   });
 });

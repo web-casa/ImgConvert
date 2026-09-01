@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { FolderOpen, WarningCircle, X } from "phosphor-svelte";
+  import { CloseIcon, FolderOpenIcon } from "@solar-icons/svelte/bold-duotone";
+  import { DangerCircleIcon } from "@solar-icons/svelte/bold-duotone";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import { formatCommandError } from "$lib/command-error";
@@ -80,9 +81,9 @@
     class={`flex min-w-0 items-center gap-2 rounded-md border bg-card/85 px-2.5 py-2 shadow-sm ${needsAttention ? "border-amber-500/55 bg-amber-500/8" : ""}`}
   >
     {#if needsAttention}
-      <WarningCircle size={17} weight="fill" class="shrink-0 text-amber-600 dark:text-amber-300" />
+      <DangerCircleIcon size={17} class="shrink-0 text-amber-600 dark:text-amber-300" />
     {:else}
-      <FolderOpen size={17} weight="duotone" class="shrink-0 text-primary" />
+      <FolderOpenIcon size={17} class="shrink-0 text-primary" />
     {/if}
     <div class="min-w-0 flex-1">
       <p class="text-[11px] font-medium text-muted-foreground">{$t("app.outputLocation")}</p>
@@ -103,23 +104,23 @@
       <Button
         variant="ghost"
         size="icon"
-        class="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+        class="size-11 shrink-0 text-muted-foreground hover:text-foreground sm:size-10"
         onclick={resetDirectory}
         disabled={busy}
         aria-label={$t("app.clearOutputLocation")}
         title={$t("app.clearOutputLocation")}
       >
-        <X size={16} />
+        <CloseIcon size={16} />
       </Button>
     {/if}
     <Button
       variant={needsAttention ? "default" : "outline"}
       size="sm"
-      class="shrink-0"
+      class="min-h-11 shrink-0 sm:min-h-10"
       onclick={selectDirectory}
       disabled={busy || !isTauriRuntime()}
     >
-      <FolderOpen size={16} />
+      <FolderOpenIcon size={16} />
       {customDirectory ? $t("app.changeOutputLocation") : $t("app.chooseOutputLocation")}
     </Button>
   </div>
