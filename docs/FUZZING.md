@@ -15,10 +15,11 @@ pnpm run fuzz:check
 pnpm run fuzz:replay
 ```
 
-`fuzz:prepare` writes generated seeds to `fuzz/corpus/*` and imports supported
-real images from `corpus/real/`. The corpus directories are ignored on purpose.
-`fuzz:replay` runs the prepared corpus through normal `imgconvert-core` decode,
-convert, and metadata semantics paths without requiring `cargo-fuzz`.
+`fuzz:prepare` writes generated core seeds to `fuzz/corpus/*`, Tauri seeds to
+`src-tauri/fuzz/corpus/*`, and imports supported real images from
+`corpus/real/`. The corpus directories are ignored on purpose. `fuzz:replay`
+runs the prepared corpus through the normal core and Tauri fuzz bridges without
+requiring `cargo-fuzz`.
 
 To require at least one local real image:
 
@@ -41,6 +42,11 @@ On Windows, separate directories with `;` instead of `:`.
 - `convert_pipeline`: bounded real conversion into PNG/JPEG/WebP/AVIF with
   conservative fast options.
 - `metadata_semantics`: EXIF/XMP/IPTC semantic inspection and normalization.
+- `external_codec_manifest`: external helper manifest JSON parsing, license and
+  argv/path validation.
+- `import_scanner`: bounded synthetic directory trees, recursion/limit handling,
+  symlink rejection, and image/PDF metadata probing.
+- `pdf_document`: bounded Hayro document parsing and page-dimension validation.
 
 ## Corpus Replay
 
@@ -52,8 +58,10 @@ pnpm run fuzz:replay
 
 It writes `target/fuzz-corpus/replay-report.json` and returns non-zero if a
 target panics or violates an invariant such as output magic mismatch. By default
-it includes `fuzz/artifacts/<target>/` too, so minimized crash inputs become
-ordinary regression cases after they are placed there.
+it includes both `fuzz/artifacts/<target>/` and
+`src-tauri/fuzz/artifacts/<target>/`, so minimized crash inputs become ordinary
+regression cases after they are placed there. The report has separate `core`
+and `tauri` suite totals and one target record for each of the six targets.
 
 For CI-style local smoke:
 
@@ -71,6 +79,10 @@ pnpm run fuzz:prepare
 cargo fuzz run decode_pipeline
 cargo fuzz run convert_pipeline
 cargo fuzz run metadata_semantics
+cd src-tauri
+cargo fuzz run external_codec_manifest
+cargo fuzz run import_scanner
+cargo fuzz run pdf_document
 ```
 
 ## Corpus Rules
@@ -90,10 +102,11 @@ cargo fuzz run metadata_semantics
 
 ## Triage
 
-`cargo-fuzz` stores crashing inputs under `fuzz/artifacts/<target>/`. Before
-sharing a minimized input, confirm that it does not contain private photo data
-or copyrighted material. If it does, reduce it locally or reproduce the bug with
-a generated fixture.
+`cargo-fuzz` stores core crashes under `fuzz/artifacts/<target>/` and Tauri
+crashes under `src-tauri/fuzz/artifacts/<target>/`. Before sharing a minimized
+input, confirm that it does not contain private photo data or copyrighted
+material. If it does, reduce it locally or reproduce the bug with a generated
+fixture.
 
 To inspect pending crash artifacts without running a long minimization job:
 
@@ -101,9 +114,11 @@ To inspect pending crash artifacts without running a long minimization job:
 pnpm run fuzz:minimize
 ```
 
-That writes `target/fuzz-corpus/minimize-report.json` and records only
-repository-relative paths or basenames. To actually run `cargo fuzz tmin` for
-the artifacts:
+That command currently inventories and minimizes the core fuzz crate; Tauri
+artifacts are still replayed automatically but must be minimized from
+`src-tauri/` with `cargo fuzz tmin`. The core command writes
+`target/fuzz-corpus/minimize-report.json` and records only repository-relative
+paths or basenames. To actually run `cargo fuzz tmin` for core artifacts:
 
 ```bash
 cargo install cargo-fuzz

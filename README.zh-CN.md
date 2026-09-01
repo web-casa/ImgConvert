@@ -6,8 +6,8 @@
     alt="ImgConvert 应用图标"
   >
   <h1>ImgConvert</h1>
-  <p><strong>本地优先的跨平台图片批量转换与压缩工具</strong></p>
-  <p>拖拽即转 · 批量处理 · 元数据保真 · 默认不上传图片</p>
+  <p><strong>本地优先的跨平台图片批量转换、压缩与 PDF 转图片工具</strong></p>
+  <p>拖拽即转 · PDF 逐页导出 · 批量处理 · 默认不上传文件</p>
   <p><a href="README.md">English</a> · <strong>简体中文</strong></p>
   <p>
     <a href="https://github.com/web-casa/ImgConvert/releases/latest">
@@ -62,9 +62,10 @@
 </p>
 
 > [!NOTE]
-> 最新 GitHub Release 为 **v0.2.11**，提供已签名/公证的 macOS DMG、Linux
-> amd64/arm64 直装包，以及已签名的 Linux x86_64 updater 元数据。Snap Store 的
-> stable 渠道也独立提供 Linux amd64 与 arm64 版本。
+> 最新 GitHub Release 为 **v0.2.22**，提供已签名/公证的 macOS DMG、经校验和验证但未
+> 签名的 Windows x64/arm64 MSI 与 NSIS 安装包、Linux amd64/arm64 直装包，以及已签名的
+> Linux x86_64 updater 元数据。Snap Store 的 stable 渠道也独立提供 Linux amd64 与
+> arm64 版本。
 
 ## 下载
 
@@ -115,40 +116,43 @@
 | 能力       | 说明                                                                                           |
 | ---------- | ---------------------------------------------------------------------------------------------- |
 | 格式转换   | 支持 SVG、静态 GIF、BMP、AVIF、WebP、JPEG、PNG 导入；JPEG/PNG/WebP/AVIF 输出，支持 AVIF 真无损 |
-| 批量工作流 | 文件、目录、递归与剪贴板导入；去重、异步缩略图、进度和取消                                     |
+| PDF 转图片 | 单向导入 PDF；支持全部页面或 `1-3,5` 范围、72–600 DPI，并输出 JPEG/PNG/WebP/AVIF               |
+| 批量工作流 | 文件、目录、递归与剪贴板导入；尺寸规则、场景预设、进度和取消                                   |
 | 性能控制   | Rust 端批量转换、并发控制、内存预算降并发与 Channel 进度上报                                   |
-| 压缩策略   | 可选 `skip-if-larger` 与代际跳过策略、多候选取最小和自动质量                                   |
-| 图像保真   | EXIF orientation 真旋正，保留或剥离 ICC / EXIF / XMP / IPTC                                    |
+| 压缩策略   | JPEG/WebP 目标体积、可选 `skip-if-larger` / 代际跳过策略、多候选取最小和自动质量               |
+| 图像保真   | orientation 真旋正，元数据支持全部移除 / 仅色彩 / 全部保留三种隐私策略                         |
+| 对比预览   | 与最终输出共用尺寸、元数据、色彩及编码管线的精确前后对比                                       |
 | 色彩管理   | Display P3 ICC 测试、显式转 sRGB 与色彩管线 v2                                                 |
 | HEIC 导入  | macOS ImageIO、Windows WIC、Linux helper / Flatpak extension；只读导入                         |
-| 本地隐私   | 图片处理默认在本机完成，不需要账号，不上传原始图片                                             |
+| 本地隐私   | 图片与 PDF 处理默认在本机完成，不需要账号，不上传原始文件                                      |
 | 发布工程   | Tauri updater、跨平台安装包、许可 / fuzz / benchmark / CI 护栏                                 |
 
 ## 发布与项目状态
 
-- ✅ **GitHub Release v0.2.11**：提供 Linux amd64/arm64 直装包、已签名的 Linux
+- ✅ **GitHub Release v0.2.22**：提供 Linux amd64/arm64 直装包、已签名的 Linux
   x86_64 updater 元数据，以及已公证的 macOS arm64/x64 DMG。Snap Store stable 独立
   提供 amd64 与 arm64。
-- 🚧 **Windows 直装包**：arm64/x64 原生工作流已配置；公开 EXE/MSI 仍等待
-  Authenticode 签名。
-- ✅ **核心能力**：P0–P3 的 UI、Rust 引擎、批处理、压缩、metadata、色彩、
-  fuzz 与跨平台打包入口已落地。
+- ✅ **Windows 直装包**：arm64/x64 EXE/MSI 按项目策略保持未签名，已纳入安装
+  smoke 与 `SHA256SUMS`；发布说明会明确提示 SmartScreen 风险。受信任签名分发由
+  Microsoft Store 接受后的 MSIX 提供。
+- ✅ **核心能力**：P0–P3 的 UI、Rust 引擎、批处理、尺寸/场景工作流、目标体积、
+  隐私元数据、精确对比预览、fuzz 与跨平台打包入口已落地。
 - 🚧 **真实发布验收**：MAS 已完成构建、沙盒与签名检查，仍需 App Store Connect
   建档、上传和 App Review；Microsoft Store 提交由授权账户负责人完成。
-- 🚧 **外部验收**：Flathub 审核、Windows 直发签名、真实图片 corpus 长跑 fuzz
+- 🚧 **外部验收**：Flathub 审核、Microsoft Store 接受、真实图片 corpus 长跑 fuzz
   与 Windows benchmark 数据继续推进。
 
 完整计划、验收证据和后续事项见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 架构与技术栈
 
-| 层级     | 技术与边界                                                         |
-| -------- | ------------------------------------------------------------------ |
-| 桌面壳   | Tauri 2                                                            |
-| 前端     | Svelte 5 runes、shadcn-svelte、Tailwind CSS v4、Phosphor Icons     |
-| 图像核心 | Rust、`resvg`、`mozjpeg`、`oxipng`、`webp`、`libavif-sys`、`image` |
-| HEIC     | 主程序不内置 HEIC codec；按平台使用系统 provider 或可选 helper     |
-| 工具链   | pnpm、Node LTS、Rust toolchain、CMake、Meson、Ninja、NASM          |
+| 层级     | 技术与边界                                                                           |
+| -------- | ------------------------------------------------------------------------------------ |
+| 桌面壳   | Tauri 2                                                                              |
+| 前端     | Svelte 5 runes、shadcn-svelte、Tailwind CSS v4、Solar Icons（`@solar-icons/svelte`） |
+| 图像核心 | Rust、`resvg`、`mozjpeg`、`oxipng`、`webp`、`libavif-sys`、`image`                   |
+| HEIC     | 主程序不内置 HEIC codec；按平台使用系统 provider 或可选 helper                       |
+| 工具链   | pnpm、Node LTS、Rust toolchain、CMake、Meson、Ninja、NASM                            |
 
 图像引擎采用“进程内宽松许可 Rust 编解码器 + 平台系统 HEIC”的混合架构。
 主程序不分发 x265，也不输出 HEIC。具体设计与许可边界见

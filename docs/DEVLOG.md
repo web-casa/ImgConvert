@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-09-01 — 工作流功能、PDF 输入与复审收口
+
+- **统一工作流边界**：新增 core `workflow` 模块，将批量尺寸规则、metadata 隐私策略、目标文件体积搜索、色彩管理和编码候选统一在 `convert_workflow`；正式转换与前后对比预览复用同一个请求构造器和执行语义。目标体积搜索不假设质量与字节数单调，并修正最低质量边界重复编码上一轮失败候选的问题。
+- **PDF 只读输入**：PDF 明确留在 Tauri 文档适配层，不伪装成 core `Format`。Hayro 解析、页范围、DPI、源文件/像素预算、panic 边界、逐页 warning 与取消检查均位于该层；导入阶段的机会式 metadata 探测限制为每文件 16 MiB、每次扫描累计 64 MiB，超预算文件延迟到预览/转换，避免目录扫描读取并解析大量完整 PDF。
+- **结果缓存原则**：缓存只保存输出路径、hash、size、尺寸、选中质量和可重建 warning 等 metadata，不保存源/结果像素。命中仍复核输出 hash、当前策略与 TTL，预览不写缓存。
+- **方向元数据推导**：AVIF `irot`/`imir` 按 libavif 变换语义映射到 EXIF orientation 1–8；像素归一化后同步清理 EXIF/XMP 方向字段，防止后续阅读器重复旋转。JPEG 缩略图 DCT 缩放对 CMYK 失败继续走原解码回退。
+- **复审加固**：README 发布状态闸门对缺失/损坏 JSON 给出聚合错误；删除无调用方的 `convert_image` IPC；core 与 Tauri 六个 fuzz target 全部接入确定性 corpus replay。本轮 replay 首次发现并修复 import-scanner fuzz harness 的 cursor 越界。CI 为 fuzz 与桌面 E2E job 增加固定 SHA 的 Rust/Cargo 缓存。
+- **UI/诊断维护**：Dropzone 装饰图由 768×512/236 KiB 优化为 400×267/约 73 KiB；PDF 缩略图解释器 warning 不再丢弃，会通过结构化结果在队列缩略图上提示。
+
+---
+
 ## 2026-08-28 — Windows GitHub 直发改为未签名，受信任签名仅走 Store
 
 - **渠道决策**：GitHub Release 继续提供 Windows x64/arm64 的 MSI（en-US/zh-CN）和 NSIS EXE，但明确保持未签名并提示 Microsoft Defender SmartScreen；完整性由合并后的 `SHA256SUMS` 提供。

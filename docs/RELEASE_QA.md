@@ -28,6 +28,23 @@ blocks publication: keep the Release as a draft and report the blocker.
 A partial public Release is allowed only after the user explicitly approves a
 platform exception for that specific release.
 
+## Candidate and commit discipline
+
+- Do not create a stable `v<major>.<minor>.<patch>` tag merely to retry a Store
+  submission or packaging experiment. Keep the intended marketing version and
+  increment the Store/build number, or use a non-`v*` candidate ref such as
+  `candidate/0.2.23-rc.1` so it cannot trigger the stable-tag release workflows.
+- Create the stable tag only after the release policy, privacy declarations,
+  feature set, and platform acceptance checklist are frozen. A failed immutable
+  stable tag requires a deliberate new patch release; tags are never moved.
+- Feature, fix, test, and policy changes must be reviewable before the release
+  preparation commit. The final `release: prepare` commit is limited to version
+  fields, generated release metadata, checksums, and release notes; it must not
+  introduce application behavior or change signing/privacy policy.
+- Store review feedback is first recorded as a standalone fix with a regression
+  check. Only after that fix passes the normal quality gates may a new candidate
+  build be prepared.
+
 ## Native build matrix
 
 | Surface | Architecture | Hosted runner | Required evidence |

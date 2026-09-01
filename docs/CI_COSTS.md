@@ -21,13 +21,23 @@ shape.
 Default behavior:
 
 - `CI` runs automatically on `main` pushes and pull requests. The Ubuntu
-  frontend, Rust core, Tauri backend, security/license, fuzz corpus replay, and
-  web preview E2E jobs run on `ubuntu-24.04`. The Windows HEIC check runs on
+  frontend, Rust core, Tauri backend plus desktop E2E, security/license, fuzz
+  corpus replay, and web preview E2E jobs run on `ubuntu-24.04`. The Windows HEIC check runs on
   `windows-latest` for `main` pushes. The Linux package build/install smoke
   runs on both `ubuntu-22.04` and `ubuntu-22.04-arm` for `main` pushes so the
   compatibility check is performed on the same baseline as release builds.
   Manual dispatch keeps the Windows check, package smoke, fuzz replay, and
   arm64 package smoke optional with `false` defaults.
+
+The fuzz replay job compiles and deterministically replays all six targets: the
+three core decode/convert/metadata targets plus the Tauri external codec
+manifest, import scanner, and PDF document targets. It therefore has a
+30-minute timeout and is not classified as a low-cost core-only check. The fuzz
+and Tauri desktop/E2E jobs use a commit-pinned Rust cache for Cargo registry,
+installed tools, and dependency build artifacts; this also avoids compiling the
+pinned `tauri-driver` from scratch on every warm run. The 40-minute desktop job
+budget remains unchanged until a real cold-cache run demonstrates that it is
+insufficient.
 - `Linux Release` builds `amd64` and `arm64` on Ubuntu 22.04 automatically when
   a `v*` tag is pushed. This keeps AppImageHub artifacts at or below the
   `GLIBC_2.35` compatibility baseline. The tag build also runs the Docker

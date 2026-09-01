@@ -1,6 +1,6 @@
 # 开发路线图
 
-> 📍 **当前进度(2026-07-05)**:P0.5 引擎尖刺已通(`imgconvert-core` 跑通 JPEG/PNG/WebP/AVIF,测试全绿)→ **P0「前端整顿」三项已落地**(组件化架构 + core 能力契约 + shadcn 控件/格式选择器)→ **P0.5 批量进度/取消协议、许可闭环、原生工具链预检、文件访问授权边界与并发诊断已落地** → **P1 文件导入层、并发批量、导入元数据 ping、异步缩略图、ask 覆盖批量协议、文件可靠性与剪贴板导入最小闭环已落地** → **P1.5 Linux/Windows 外部 HEIC 可选导入闭环已落地**(manifest 协议、系统/插件 helper、用户显式 helper 白名单、插件诊断 UI、渠道禁用边界) → **P2 高级压缩与保真功能项已落地**(per-format 参数、skip-if-larger、多候选、质量下限、ICC/EXIF/XMP、自动质量、代际防护、结果缓存、实验性 PNG 限色、高级参数 UI) → **P3 Linux 发布闭环与本机 RC 实测已落地**(release workflow、stale artifact 防护、包元数据校验、AppImage scrub、发行版 Docker smoke matrix、checksums、Flatpak build/install/runtime conversion smoke) → **后续平台发布护栏已落地**(macOS/Windows metadata + store external-helper build-time guardrail + macOS direct/MAS entitlements + Windows direct installer guardrail) → **macOS/Windows 发布闭环 repo 侧已落地**(系统 HEIC read-only provider、scoped/persisted scope、直发/MAS/MSIX 留门、签名/安装 smoke 脚本) → **图像管线后续增强已推进到第八批**(色彩管线、metadata、AVIF lossless、质量测试、Fuzz/corpus + replay/minimize、质量 heuristics 第三批) → **GitHub Actions 公共仓库免费标准 runner 策略与发布剩余项 readiness 已落地**(CI push/PR 自动、`v*` tag 自动 Linux amd64+arm64 release、macOS/Windows/updater 手动触发且无付费确认、`ci:cost:check`、`release:readiness`、README 状态同步检查)。详见 [DEVLOG.md](DEVLOG.md)。
+> 📍 **当前进度(2026-08-31)**:P0.5 引擎尖刺已通(`imgconvert-core` 跑通 JPEG/PNG/WebP/AVIF,测试全绿)→ **P0「前端整顿」三项已落地**(组件化架构 + core 能力契约 + shadcn 控件/格式选择器)→ **P0.5 批量进度/取消协议、许可闭环、原生工具链预检、文件访问授权边界与并发诊断已落地** → **P1 文件导入层、并发批量、导入元数据 ping、异步缩略图、ask 覆盖批量协议、文件可靠性与剪贴板导入最小闭环已落地** → **P1.5 Linux/Windows 外部 HEIC 可选导入闭环已落地**(manifest 协议、系统/插件 helper、用户显式 helper 白名单、插件诊断 UI、渠道禁用边界) → **P2 高级压缩与保真功能项已落地**(per-format 参数、skip-if-larger、多候选、质量下限、ICC/EXIF/XMP、自动质量、代际防护、结果缓存、实验性 PNG 限色、高级参数 UI) → **P3 Linux 发布闭环与本机 RC 实测已落地**(release workflow、stale artifact 防护、包元数据校验、AppImage scrub、发行版 Docker smoke matrix、checksums、Flatpak build/install/runtime conversion smoke) → **后续平台发布护栏已落地**(macOS/Windows metadata + store external-helper build-time guardrail + macOS direct/MAS entitlements + Windows direct installer guardrail) → **macOS/Windows 发布闭环 repo 侧已落地**(系统 HEIC read-only provider、scoped/persisted scope、直发/MAS/MSIX 留门、签名/安装 smoke 脚本) → **图像管线后续增强已推进到第八批**(色彩管线、metadata、AVIF lossless、质量测试、Fuzz/corpus + replay/minimize、质量 heuristics 第三批) → **GitHub Actions 公共仓库免费标准 runner 策略与发布剩余项 readiness 已落地**(CI push/PR 自动、`v*` tag 自动 Linux amd64+arm64 release、macOS/Windows/updater 手动触发且无付费确认、`ci:cost:check`、`release:readiness`、README 状态同步检查)。详见 [DEVLOG.md](DEVLOG.md)。
 
 > 原则:**UI/UX 优先**——先把界面与交互做出来「看得见」,再逐步接真实功能与高级压缩。
 > 参考依据见 [REFERENCES.md](REFERENCES.md),引擎/打包设计见 [ENGINE.md](ENGINE.md)。
@@ -49,7 +49,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 
 目标:不接(或假接)后端也能完整演示界面与交互。
 
-> ✅ **脚手架已就位**:Svelte 5 + pnpm/Node LTS + shadcn-svelte(Tailwind v4)+ phosphor-svelte(duotone),`src/App.svelte` 已是一个能拖拽/选文件/调参数/调 `convert_image` 的可运行界面。P0 在此基础上完善设计与交互。
+> ✅ **脚手架已就位**:Svelte 5 + pnpm/Node LTS + shadcn-svelte(Tailwind v4)+ @solar-icons/svelte(line-duotone),`src/App.svelte` 已是一个能拖拽/选文件/调参数/调 `convert_image` 的可运行界面。P0 在此基础上完善设计与交互。
 
 > ✅ **2026-06-30 审计后的 P0 第一优先级已完成(详见 [DEVLOG.md](./DEVLOG.md))。** 原先「没接完的重构 + 旧 libvips 引擎契约」已收口为以下三项:
 
@@ -63,7 +63,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] 主题手动切换(`.dark` class 切换)+ 持久化
 - [x] 自定义弹性 easing 过渡 + **「关闭动效」开关**(`prefers-reduced-motion`)
 - [x] 按文件类型染色体系(图片蓝为主,预留音视频/文档色)
-- [x] 图标统一 phosphor duotone(`IconContext`)
+- [x] 图标统一 Solar line-duotone(`@solar-icons/svelte`,逐组件显式传 size)
 
 ### 主界面布局
 - [x] 顶栏(标题 + 引擎状态 + 设置入口)
@@ -157,10 +157,12 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - [x] **skip-if-larger / 永不变差第一批**:候选输出不小于源文件时可跳过写入,批量计为 skipped；现为默认关闭的显式压缩策略，以保证格式迁移（例如旧系统所需 PNG）会产生输出。
 - [x] **多候选取最小第一批**(借鉴 ImageOptim + Hando keep_bar):同一目标格式下比较等价多参数候选,只写最小有效输出。当前覆盖 JPEG baseline/progressive、PNG oxipng level、WebP method;不改变 quality/lossless/目标格式,AVIF 暂不做多候选以避免编码时间爆炸。
 - [x] **自动质量(仅 JPEG/WebP)**:`ssimulacra2`(BSD-2-Clause,default-features=false)感知打分 + step≈4 二分搜索压到目标分;WebP lossless 作为候选参与比较。
-- [x] **ICC/EXIF/XMP 透传容器手术**:默认剥离,开启 `preserveMetadata` 后 JPEG APP1 EXIF/XMP + Extended XMP + APP2 ICC(含分块)、PNG `iCCP`/`eXIf`/`iTXt` XMP(读压缩/未压缩,写未压缩)、WebP RIFF/`VP8X`/`ICCP`/`EXIF`/`XMP `、AVIF libavif ICC/EXIF/XMP metadata API 均可保留。JPEG/PNG 解码旋正后把 EXIF orientation 改写为 1。
+- [x] **ICC/EXIF/XMP 透传容器手术**:默认剥离,开启 `preserveMetadata` 后 JPEG APP1 EXIF/XMP + Extended XMP + APP2 ICC(含分块)、PNG `iCCP`/`eXIf`/`iTXt` XMP(读压缩/未压缩,写未压缩)、WebP RIFF/`VP8X`/`ICCP`/`EXIF`/`XMP `、AVIF libavif ICC/EXIF/XMP metadata API 均可保留。JPEG/PNG 解码会真旋正；AVIF 会应用容器 `irot`/`imir`，缺少容器变换时才回退 EXIF orientation。旋正后 EXIF/XMP orientation 均规范化，避免二次旋转。
 - [x] **代际损失防护**:对 JPEG/AVIF/lossy WebP 源再次输出有损格式时可按 source bpp 分级要求最低收益(2%/3%/5%/8%),收益不足计 skipped；现为默认关闭的显式压缩策略，VP8L lossless WebP 与 AVIF lossless 目标不触发。
-- [x] 结果缓存(设置哈希 + 文件 blake3 哈希)跳过已优化:默认开启,命中时复用已有输出;缓存只记录 hash/size,不缓存图片内容。
+- [x] 结果缓存(设置哈希 + 文件 blake3 哈希)跳过已优化:默认开启,命中时复用已有输出;v3 记录保存 hash/size 与可重建 warning 的工作流状态，不缓存图片内容，并有 TTL/数量预算及受限清理。
 - [x] 高级参数面板(AVIF speed/subsample、WebP near_lossless/sharp_yuv、MozJPEG trellis 等):已接 core/Tauri/前端设置持久化。
+- [x] **工作流增强**:批量尺寸规则(保持比例、默认不放大)、四个内置及受限自定义场景预设、JPEG/WebP 目标体积、三态隐私元数据 profile 与精确前后对比预览已共用统一 core workflow；preview/batch 在后端互斥，目标未达与 ICC resize 均显式告警。
+- [x] **PDF 单向转图片**:PDF 作为桌面文档输入留在 Tauri 边界，支持全部页或严格页范围、72–600 DPI、逐页 JPEG/PNG/WebP/AVIF 输出、稳定页码命名、聚合覆盖确认、首屏缩略图和所选首面对比预览；加密 PDF、超页数与超像素页面显式拒绝。
 - [x] ⚠️ **不做**:JPEG XL(评审一致,过早);PNG 有损限色仅标「实验性」,PNG 默认仍是 oxipng 无损。
 - [x] **CI 进阶**:npm license audit、Tauri build smoke test、`cargo-about` 自动生成校验、依赖树 GPL/AGPL/LGPL 拦截、GitHub Actions 干净 Linux 冒烟。
 
@@ -260,7 +262,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 | 包管理/运行时 | **pnpm 10 + Node LTS** ✅ | `package.json#packageManager` + `pnpm-lock.yaml`;Rust 后端不受影响 |
 | 前端框架 | **Svelte 5(runes)** ✅ | `@sveltejs/vite-plugin-svelte` 7.x |
 | UI 组件库 | **shadcn-svelte 1.3 + Tailwind v4** ✅ | `components.json` 已配;`pnpm dlx shadcn-svelte add <c>` 加组件 |
-| 图标 | **phosphor-svelte 3.1(duotone)** ✅ | 全局 `IconContext weight="duotone"` |
+| 图标 | **@solar-icons/svelte 2.1(line-duotone)** ✅ | 逐组件显式传 `size`,默认 20 |
 
 > 已写入 `package.json` / `rust-toolchain.toml`,并经 **`pnpm run check`(0 错)+ `pnpm run build`** 验证通过。
 > ⚠️ **Fallback**:TS 6 / Vite 8 都较新(TS 6 是面向 TS 7 的过渡版,Vite 8 用 Rolldown)。若与 Tauri / Svelte 插件链出现兼容问题,短期回退到 **TS 5.9 / Vite 7**。
@@ -270,7 +272,7 @@ Release。已确认的 `v0.2.0` 交付目标是：
 - **前端框架:Svelte 5(runes)** —— 轻、快、组件化省事。⚠️ **注意**:转宽松许可后,**不能再直接搬 vert(AGPL)源码**;只借鉴其交互/布局思路,自行实现。
 - **包管理:pnpm + Node LTS** —— Tauri 桌面复杂度主要在 Rust/Cargo/WebView/系统依赖/签名打包;前端不依赖 Bun runtime。`beforeDevCommand`/`beforeBuildCommand` 用 `pnpm run`,锁文件只保留 `pnpm-lock.yaml`。
 - **UI 库:shadcn-svelte 1.3 + Tailwind v4** —— 组件即代码(复制进仓库,可改),`components.json` 已配;`src/app.css` 是设计 token 单一出处(改色/圆角只此一处)。已内置 `Button`,其余用 `pnpm dlx shadcn-svelte add <component>`。
-- **图标:phosphor-svelte 3.1,默认 duotone** —— 在 `App.svelte` 用 `<IconContext values={{ weight: "duotone" }}>` 全局设默认。
+- **图标:@solar-icons/svelte 2.1,默认 line-duotone** —— 按风格子路径导入,逐组件显式传 `size`(用户决策从 phosphor-svelte 迁移)。
 
 ### 当前脚手架文件结构
 ```

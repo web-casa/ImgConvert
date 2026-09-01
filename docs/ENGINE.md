@@ -27,7 +27,7 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 
 要点:
 - 统一中间表示 **`ImageData`**;`decode → (可选 color policy / resize) → encode` 串成 pipeline。当前 core 已有 `PixelBuffer::{Rgba8,Rgba16,RgbaF32}` 和 `color_pipeline_capabilities()` 边界;PNG 可保留 16-bit RGBA,但 JPEG/WebP/AVIF 编码入口仍显式落到 **RGBA8 + 8-bit SDR**。F32 目前是 0..1 display-referred 内部缓冲,不等于 HDR 容器信令已完成。
-- 色彩管理语义分两层:默认 `convert()` 保持嵌入 ICC/metadata 保真,不会自动改像素;显式 `convert_with_color_policy(..., ConvertToSrgb)` 会通过 LittleCMS 做像素级 ICC→sRGB 转换并清空源 ICC,避免写回 stale profile。Tauri/前端通过 `colorManagementPolicy` 暴露「转为 sRGB」。`resize_linear()` 和缩略图路径使用 sRGB↔linear、预乘 alpha 的 bilinear resize;`resize_linear()` 对非空 ICC 输入会拒绝,要求先转 sRGB。
+- 色彩管理语义分两层:默认 `convert()` 保持嵌入 ICC/metadata 保真,不会自动改像素;显式 `convert_with_color_policy(..., ConvertToSrgb)` 会通过 LittleCMS 做像素级 ICC→sRGB 转换并清空源 ICC,避免写回 stale profile。Tauri/前端通过 `colorManagementPolicy` 暴露「转为 sRGB」。`resize_linear()` 使用 sRGB↔linear、预乘 alpha 的 bilinear resize;缩略图在大倍率缩小时改用线性光 area 预滤波。JPEG 预览会在解码阶段缩放；其他格式的全量预览解码限制为 3200 万像素，超限仅省略缩略图并显示格式占位。`resize_linear()` 对非空 ICC 输入会拒绝,要求先转 sRGB。
 - **崩溃防护(Codex 修正)**:`std::panic::catch_unwind` **只能截 Rust panic,挡不住 C 侧 segfault/abort/UB**。真正的健壮性靠:libjpeg error handler + **输入尺寸/像素上限** + 对可疑文件走隔离 worker + fuzz/corpus 测试。不要承诺「防住 C 崩溃」。
 - **格式检测**:magic bytes + 扩展名。
 - **输入/输出边界**:SVG、静态 GIF、BMP 为只读输入格式；可写格式仍只有 JPEG、PNG、WebP、AVIF。SVG 不加载任何外部或 data-URI raster `<image>`，携带这类 `<image>` `href` 的文件会明确拒绝，不会因一个被选中的 SVG 读取其他路径或静默丢失内容。
@@ -47,6 +47,7 @@ src-tauri/           # Tauri 后端,仅做胶水:invoke 命令 + Channel 进度 
 | **SVG**(读) | `resvg` | — | `resvg`(Apache-2.0/MIT) | 仅本地栅格化；默认 96 DPI、16 MiB 源码上限、64 MP 画布上限；携带 `href` 的本地路径或 data URI `<image>` 会明确拒绝，避免 SVG 扩大文件访问边界或静默丢失内容 |
 | **GIF**(读) | `image` | — | `image` | 仅静态 GIF；在 LZW 像素解码前检查 image descriptor 数量，动画 GIF 明确拒绝 |
 | **BMP**(读) | `image` | — | `image` | 解码用，走与 PNG/JPEG 相同的尺寸和分配上限 |
+| **PDF**(单向读) | `hayro`(Tauri 边界) | — | `hayro`(Apache-2.0 OR MIT) | PDF 不进入 core `Format`；桌面后端按 72–600 DPI 逐页渲染为有界 RGBA，再复用统一 workflow。支持全部页或 `1-3,5` 范围，一次最多 500 页；加密/密码 PDF 明确拒绝 |
 | ~~**JPEG XL**~~ | — | — | — | **删除**(评审一致:libjxl 重型 C++,过早) |
 | 缩放 | — | — | `fast_image_resize`(MIT/Apache) | — |
 | 质量判定 | — | — | **`ssimulacra2`**(宽松,**勿用 dssim/AGPL**) | 感知打分,用于「自动质量」(§6) |
@@ -170,17 +171,17 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 
 ## 5. ICC / EXIF / XMP / IPTC 保真(脏活,Hando 有带测试的实现可参考重写)
 
-- **当前语义**:默认剥离 ICC/EXIF/XMP/IPTC;用户开启 `preserveMetadata` 时才写回。解码阶段会尽量提取 metadata 到 `ImageData { icc, exif, xmp, iptc }`,编码阶段由 `EncodeOptions.preserve_metadata` 控制是否落容器。
+- **当前语义**:工作流提供 `stripAll`(先按 ICC 转为 sRGB，再移除 ICC/EXIF/XMP/IPTC)、`colorOnly`(仅 ICC)和 `preserveAll`(保留全部支持项)三种 profile。旧 `preserveMetadata` 仅作为一代 IPC/持久化迁移兼容；新 enum 同时存在时优先。解码阶段会尽量提取 metadata 到 `ImageData { icc, exif, xmp, iptc }`,编码前按完整 blob 白名单过滤。
 - **JPEG**:已实现 APP1 EXIF、APP1 XMP、APP2 ICC 1-based 分块与 APP13 Photoshop IPTC-NAA resource(`0x0404`)提取/写回。EXIF 存 TIFF payload,写 JPEG 时补 `Exif\0\0`;XMP 存 raw packet;IPTC 存 raw IIM payload。长 XMP 超过单 APP1 上限时会写标准 marker packet + Extended XMP APP1 分片,读取时按 GUID/总长/offset 重组。
 - **PNG**:已实现 `iCCP` zlib 解压/压缩、`eXIf` 和 `iTXt` XMP(`XML:com.adobe.xmp`)提取;读取端支持未压缩与 zlib 压缩 iTXt,写入端统一输出未压缩 iTXt。写入发生在 **oxipng 优化之后**、`IHDR` 后,避免优化器剥离。
 - **WebP**:已实现 RIFF chunk 手术;必要时插入/更新 `VP8X`,设置 ICC/EXIF/XMP flag,写 `ICCP`、`EXIF` 与 `XMP ` chunk 并更新 RIFF size。
 - **AVIF**:✅ `libavif-sys` 路径已通过 `avifImageSetProfileICC` / `avifImageSetMetadataExif` / `avifImageSetMetadataXMP` 写回 ICC/EXIF/XMP;解码读取 `avifImage.icc/exif/xmp`。裸 `ravif`/`image` 被弃用的核心原因仍是容器元数据/ICC 控制弱。
-- **EXIF orientation**:JPEG/PNG 走 image crate 解码时会把像素**真旋正**,因此保存 metadata 前把 orientation tag 改写为 1,避免后续查看器二次旋转。WebP/AVIF 当前 core 未做几何 transform,所以保留原始 EXIF payload。
+- **EXIF/container orientation**:JPEG/PNG/WebP 解码会把像素**真旋正**；AVIF 解码会按 MIAF 顺序应用容器 `irot` / `imir`，仅在容器没有方向变换时才用 EXIF orientation 兜底。像素旋正后 EXIF orientation 会规范化为 1，XMP orientation 会移除，避免后续查看器二次旋转；各格式 `probe()` 返回同一旋正后尺寸。
 - **语义 metadata 模块**:`inspect_metadata_semantics()` 可报告 EXIF orientation、MakerNote offset/byte_len、IPTC dataset 列表与常见字段名、XMP orientation/history 语义。MakerNote 与厂商私有字段只识别边界并原样保留,不做猜测性解析或改写。
 - **导入 probe DPI**:`probe()` 不解码像素即可返回 PNG `pHYs`、JPEG JFIF density、JPEG/WebP/AVIF EXIF Resolution(`XResolution`/`YResolution`/`ResolutionUnit`)。AVIF 通过 libavif parse 阶段暴露的 EXIF metadata 读取,不调用 `avifDecoderNextImage` 做像素解码。
 - **XMP 边界**:当前以 raw packet 透传为主,但会保守移除 `tiff` / `exif` namespace 下的 `Orientation` attribute/element/self-closing element,避免像素已旋正后留下二次旋转语义;同时移除 `xmpMM` namespace 下的 `History` 编辑历史节点。清理逻辑支持自定义 XML namespace 前缀,不依赖固定 `tiff:` / `exif:` / `xmpMM:` 前缀。
 - **Display P3 / ICC 测试**:core 测试中自生成 Apache-2.0 兼容的 Display P3 ICC fixture。覆盖两类语义:开启 `preserveMetadata` 后 P3 ICC 在 JPEG/PNG/WebP/AVIF 间逐字节保留;显式 `ConvertToSrgb` 后像素确实变化、alpha 保持、源 ICC 被清空。
-- **HEIC sidecar**:外部 helper 若声明 `{metadata}` 可把 HEIC 原始 ICC/EXIF/XMP/IPTC 以 sidecar blob 交回主程序;Tauri 会把该 metadata override 传入 core。结果缓存 key 在 `preserveMetadata=true` 或 `colorManagementPolicy=convertToSrgb` 时纳入 sidecar hash。
+- **HEIC sidecar**:外部 helper 若声明 `{metadata}` 可把 HEIC 原始 ICC/EXIF/XMP/IPTC 以 sidecar blob 交回主程序;Tauri 会把该 metadata override 传入 core。结果缓存 key 在 profile 会保留 metadata、显式转 sRGB、`stripAll` 先转像素，或 resize 可能使用 override ICC 改变像素时纳入相应 sidecar hash。
 - **metadata 资源上限**:容器 metadata blob 统一限制为 16 MiB;JPEG Extended XMP 声明总长、JPEG APP13/IPTC、PNG zlib metadata 解压、WebP/AVIF metadata copy 和写回路径都受该上限保护。
 - **未做**:厂商 MakerNote 私有字段深层语义改写、JPEG/WebP/AVIF 16-bit/HDR 落盘保真、HDR PQ/HLG/nclx 端到端。
 
@@ -193,11 +194,12 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 - 用 **`ssimulacra2`** 感知打分 + **二分搜索**:找「达到目标分 S 的最小质量」(质量阶梯 step≈4,最坏评分次数由 `AUTO_QUALITY_MAX_SCORING_EVALUATIONS=7` 约束)。`ssimulacra2` 关闭默认 rayon feature,避免与文件级并发叠加。
 - **WebP 无损候选 vs 有损候选同时竞争,取小者**。JPEG 只做有损搜索;AVIF 不做自动质量。
 - **代际损失防护默认关**:对已是有损的源(JPEG/AVIF/lossy WebP),可按 **bits-per-pixel** 分级收紧门槛;当前最低收益阈值为 2%/3%/5%/8%。仅在用户显式启用时才跳过收益不足的重编码，保证指定格式迁移。VP8L lossless WebP 与 AVIF lossless 目标不触发。PNG 默认仍按无损源处理,但若 core 的 JPEG 8×8 亮度/色度网格或 WebP-like 4×4 块边界 hint 明显命中,会在用户启用 `generationLossProtection` 时按有损来源处理。
-- **结果缓存**:Tauri 层用源文件 `blake3` + 目标格式 + 编码设置 hash 生成 cache key。缓存只记录已有输出的 hash/size,命中时跳过重新编码;不缓存图片内容。默认开启。v4 key 纳入 color policy;在 `preserveMetadata=true` 或 `colorManagementPolicy=convertToSrgb` 时还会纳入 HEIC helper sidecar metadata hash,避免同像素不同 ICC/EXIF/XMP 或 ICC 变换输入误命中。
+- **结果缓存**:Tauri 层用源文件 `blake3` + 目标格式 + 编码/尺寸/metadata/目标体积设置生成 v5 cache key。v3 记录只保存已有输出的 hash/size 和尺寸、实际质量、目标状态、色彩转换/无效 ICC 丢弃状态，命中时可重建 warning；不缓存图片内容。缓存默认开启，并受 30 天、4096 条预算和受限手动清理约束。
 - **平台 benchmark**:`pnpm run bench:platform` 默认用 release profile 跑隐藏入口,输出 AVIF/WebP JSON lines,并生成 `target/benchmarks/*.json` 汇总报告(样本、median、吞吐、字节数、默认参数建议),用于 Linux/macOS/Windows/arm64 复核 AVIF speed、WebP method、耗时和输出体积。`--profile=debug` 仅用于脚本烟测。旧 `bench:avif:macos` 复用同一报告层,作为 Apple Silicon AVIF 专项入口；手动 `macOS Smoke` 会上传 `imgconvert-macos-arm64-avif-benchmark` JSON artifact 并保留 14 天。
 - **wall-clock 软超时**:Tauri 转换路径默认每文件 180s 预算,可用 `IMGCONVERT_CONVERT_TIMEOUT_SECONDS` 覆盖,`0/off/disabled/none` 关闭。core 的 timed API 在解码后、候选编码/评分边界检查 deadline;单个进程内 C/Rust codec 调用不做强杀,避免不安全地终止线程,但超时结果不会写盘,多候选/自动质量不会继续追加后续候选。
 - **图像质量测试体系**:`pnpm run test:image-quality` 运行 core integration suite,覆盖 deterministic golden fixtures、CMYK JPEG 导入、PNG/WebP/AVIF lossless 像素逐字节一致性、JPEG/WebP/AVIF 高质量有损 PSNR/MAE 下限、动画 WebP 与损坏输入的干净拒绝、10,000 × 10,000 PNG 在分配前的像素上限拒绝、输出字节确定性和 JPEG 8×8 亮度/色度网格、WebP-like 4×4 block artifact hint。该入口只用自生成 fixture,适合 CI;真实相机 corpus/fuzz 仍是独立后续项。跨平台物理安装与商店验收见 [RELEASE_QA.md](RELEASE_QA.md)。
-- **Fuzz/corpus**:`fuzz/` 为独立 cargo-fuzz crate,不进普通 workspace。`decode_pipeline` 覆盖 magic/probe/thumbnail/有界 decode,`convert_pipeline` 覆盖有界真实转换,`metadata_semantics` 覆盖 EXIF/XMP/IPTC 语义检查和规范化。`pnpm run fuzz:prepare` 生成 deterministic seeds,并从本地 `corpus/real` 或 `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF/SVG/GIF/BMP 到 ignored corpus;真实图片和 fuzz artifacts 不入仓库。`pnpm run fuzz:replay` 不依赖 `cargo-fuzz`,会把 prepared corpus 与 `fuzz/artifacts/<target>/` crash inputs 走普通 core 路径并写 `target/fuzz-corpus/replay-report.json`;`fuzz:smoke` 串起 prepare + compile + replay。`pnpm run fuzz:minimize` 默认 dry-run 生成 `target/fuzz-corpus/minimize-report.json`;显式 `fuzz:minimize:run` 才调用 `cargo fuzz tmin` 并复跑 artifacts。
+- **Fuzz/corpus**:`fuzz/` 为独立 cargo-fuzz crate,不进普通 workspace。`decode_pipeline` 覆盖 magic/probe/thumbnail/有界 decode,`convert_pipeline` 覆盖有界真实转换,`metadata_semantics` 覆盖 EXIF/XMP/IPTC 语义检查和规范化；`src-tauri/fuzz/` 另覆盖外部 codec manifest、授权导入扫描器和有界 PDF 文档解析。`pnpm run fuzz:prepare` 为两个 fuzz crate 生成 deterministic seeds,并从本地 `corpus/real` 或 `IMGCONVERT_REAL_CORPUS_DIRS` 导入真实 JPEG/PNG/WebP/AVIF/SVG/GIF/BMP 到 ignored corpus;真实图片和 fuzz artifacts 不入仓库。`pnpm run fuzz:replay` 不依赖 `cargo-fuzz`,会把两个 corpus 及各自 `artifacts/<target>/` crash inputs 走与 libFuzzer 相同的共享 harness,写入带 core/Tauri 分区的 `target/fuzz-corpus/replay-report.json`;`fuzz:smoke` 串起 prepare + compile + 六目标 replay。`pnpm run fuzz:minimize` 默认 dry-run 生成 `target/fuzz-corpus/minimize-report.json`;显式 `fuzz:minimize:run` 才调用 `cargo fuzz tmin` 并复跑 artifacts。
+- **PDF 资源/并发边界**:PDF 正式预览/转换源文件限制 256 MiB，导入扫描的可选 metadata 探测另限每文件 16 MiB、每次扫描累计 64 MiB；超出任一预算的 PDF 仍进入队列，但把页数/尺寸延迟到预览或转换，避免批量导入被完整文档解析阻塞。页范围解析不展开超大范围；每页在调用渲染器前同时检查 `u16` 视口与 core 的 64 MP 像素预算。页面串行渲染并共享单文档缓存，批处理调度把 PDF 任务按完整 768 MiB 预算估算，因此不会与另一转换 worker 并发。取消在导入 metadata 探测前后、正式页边界及统一编码管线边界检查；wall-clock 预算按独立页面重置，避免长文档因累计耗时被误杀。单次 Hayro 页面解释与单次编码仍属于不可强杀调用。
 - 未做:Windows 真实 runner benchmark 报告、真实 corpus 驱动的更多压缩噪声指纹、长期 fuzz 运行和真实 crash 样本积累。
 
 ---

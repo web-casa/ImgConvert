@@ -6,8 +6,8 @@
     alt="ImgConvert app icon"
   >
   <h1>ImgConvert</h1>
-  <p><strong>A local-first, cross-platform batch image converter and compressor</strong></p>
-  <p>Drag and drop · Batch processing · Metadata preservation · No image uploads by default</p>
+  <p><strong>A local-first, cross-platform batch image converter, compressor, and PDF rasterizer</strong></p>
+  <p>Drag and drop · PDF page export · Batch processing · No file uploads by default</p>
   <p><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
   <p>
     <a href="https://github.com/web-casa/ImgConvert/releases/latest">
@@ -62,9 +62,10 @@
 </p>
 
 > [!NOTE]
-> The latest GitHub Release is **v0.2.11**, with signed/notarized macOS DMGs,
-> Linux amd64/arm64 direct packages, and signed Linux x86_64 updater metadata.
-> Snap Store independently provides Linux amd64 and arm64 builds on its stable channel.
+> The latest GitHub Release is **v0.2.22**, with signed/notarized macOS DMGs,
+> checksum-verified unsigned Windows x64/arm64 MSI and NSIS packages, Linux amd64/arm64 direct
+> packages, and signed Linux x86_64 updater metadata. Snap Store independently provides Linux amd64
+> and arm64 builds on its stable channel.
 
 ## Downloads
 
@@ -113,27 +114,30 @@
 
 ## Core capabilities
 
-| Capability          | Details                                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Conversion          | SVG, static GIF, BMP, AVIF, WebP, JPEG, and PNG input; JPEG/PNG/WebP/AVIF output with true lossless AVIF support    |
-| Batch workflow      | Files, folders, recursive and clipboard imports; deduplication, asynchronous thumbnails, progress, and cancellation |
-| Performance         | Rust batch conversion, controlled concurrency, memory-aware throttling, and channel-based progress reporting        |
-| Compression         | Optional `skip-if-larger` and generation-loss policies, smallest-candidate selection, and automatic quality         |
-| Fidelity            | Physical EXIF orientation correction; preserve or strip ICC / EXIF / XMP / IPTC metadata                            |
-| Color               | Display P3 ICC tests, explicit sRGB conversion, and color pipeline v2                                               |
-| HEIC import         | macOS ImageIO, Windows WIC, Linux helper / Flatpak extension; import only                                           |
-| Privacy             | Images stay on the local machine by default; no account or source-image upload required                             |
-| Release engineering | Tauri updater, cross-platform packages, and licensing / fuzz / benchmark / CI guardrails                            |
+| Capability          | Details                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Conversion          | SVG, static GIF, BMP, AVIF, WebP, JPEG, and PNG input; JPEG/PNG/WebP/AVIF output with true lossless AVIF support                 |
+| PDF to images       | One-way PDF input; all pages or ranges such as `1-3,5`, 72–600 DPI, with JPEG/PNG/WebP/AVIF output                               |
+| Batch workflow      | Files, folders, recursive and clipboard imports; resize rules, scenario presets, progress, and cancellation                      |
+| Performance         | Rust batch conversion, controlled concurrency, memory-aware throttling, and channel-based progress reporting                     |
+| Compression         | Target-size JPEG/WebP, optional `skip-if-larger` / generation-loss policies, smallest-candidate selection, and automatic quality |
+| Fidelity            | Physical orientation correction and strip-all / color-only / preserve-all metadata profiles                                      |
+| Preview             | Exact before/after comparison using the same resize, metadata, color, and encoder workflow as final output                       |
+| Color               | Display P3 ICC tests, explicit sRGB conversion, and color pipeline v2                                                            |
+| HEIC import         | macOS ImageIO, Windows WIC, Linux helper / Flatpak extension; import only                                                        |
+| Privacy             | Images and PDFs stay on the local machine by default; no account or source-file upload required                                  |
+| Release engineering | Tauri updater, cross-platform packages, and licensing / fuzz / benchmark / CI guardrails                                         |
 
 ## Release and project status
 
-- ✅ **GitHub Release v0.2.11**: provides Linux amd64/arm64 direct packages, signed
+- ✅ **GitHub Release v0.2.22**: provides Linux amd64/arm64 direct packages, signed
   Linux x86_64 updater metadata, and notarized macOS arm64/x64 DMGs. Snap Store stable
   independently serves amd64 and arm64.
 - ✅ **Windows direct packages**: native arm64/x64 workflows build intentionally
   unsigned EXE/MSI packages, run install smoke, and publish checksum evidence.
-- ✅ **Core product**: the P0–P3 UI, Rust engine, batch processing, compression,
-  metadata, color, fuzzing, and cross-platform packaging entrypoints are implemented.
+- ✅ **Core product**: the P0–P3 UI, Rust engine, batch processing, resize and
+  scenario workflows, target-size encoding, privacy metadata profiles, exact comparison
+  preview, fuzzing, and cross-platform packaging entrypoints are implemented.
 - 🚧 **Real release validation**: the MAS build, sandbox, and signing checks pass;
   App Store Connect setup, upload, and App Review remain. Microsoft Store submission
   is handled by the authorized account owner.
@@ -145,13 +149,13 @@ remaining work.
 
 ## Architecture and stack
 
-| Layer         | Technology and boundary                                                         |
-| ------------- | ------------------------------------------------------------------------------- |
-| Desktop shell | Tauri 2                                                                         |
-| Frontend      | Svelte 5 runes, shadcn-svelte, Tailwind CSS v4, Phosphor Icons                  |
-| Image core    | Rust, `resvg`, `mozjpeg`, `oxipng`, `webp`, `libavif-sys`, `image`              |
-| HEIC          | No bundled HEIC codec; system provider or optional helper depending on platform |
-| Toolchain     | pnpm, Node LTS, Rust toolchain, CMake, Meson, Ninja, NASM                       |
+| Layer         | Technology and boundary                                                             |
+| ------------- | ----------------------------------------------------------------------------------- |
+| Desktop shell | Tauri 2                                                                             |
+| Frontend      | Svelte 5 runes, shadcn-svelte, Tailwind CSS v4, Solar Icons (`@solar-icons/svelte`) |
+| Image core    | Rust, `resvg`, `mozjpeg`, `oxipng`, `webp`, `libavif-sys`, `image`                  |
+| HEIC          | No bundled HEIC codec; system provider or optional helper depending on platform     |
+| Toolchain     | pnpm, Node LTS, Rust toolchain, CMake, Meson, Ninja, NASM                           |
 
 The image engine combines permissively licensed in-process Rust codecs with platform
 HEIC providers. The main application neither distributes x265 nor exports HEIC. See

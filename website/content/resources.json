@@ -308,8 +308,8 @@
         "visual": "live-workspace",
         "takeaways": [
           "文件、文件夹和主动粘贴的剪贴板图片可以进入同一个任务队列。",
-          "全局设置适合大多数项目，单张覆盖适合明确的例外。",
-          "进度、取消和输出结果在本地工作区中可见。"
+          "场景预设、批量尺寸、目标体积和隐私元数据策略可复用于整批图片。",
+          "精确前后对比、进度、取消和输出结果都在本地工作区中可见。"
         ],
         "sections": [
           {
@@ -320,10 +320,10 @@
             ]
           },
           {
-            "heading": "2. 设置全局输出，再处理例外",
+            "heading": "2. 选择可复用的工作流，再处理例外",
             "paragraphs": [
-              "为任务选择目标格式，再根据用途调整质量、无损模式、并发、已存在文件处理方式和文件名模板。不是每项都必须修改；先从一套清晰的默认值开始更容易复查。",
-              "某张图片需要不同交付格式时，可以为它单独覆盖输出格式，不必重新建立整个批次。"
+              "可以从网页分享、邮件附件、高质量归档或隐私分享预设开始，也可以自定义保持比例的尺寸规则、JPEG/WebP 目标体积与元数据保留策略。",
+              "用前后对比预览检查最终尺寸、预计体积和告警；某张图片需要不同交付格式时，仍可单独覆盖，不必重建整个批次。"
             ]
           },
           {
@@ -809,8 +809,8 @@
         "visual": "live-workspace",
         "takeaways": [
           "Files, folders, and intentionally pasted clipboard images can join one task queue.",
-          "Global settings suit most items; individual overrides handle an explicit exception.",
-          "Progress, cancellation, and output remain visible in the local workspace."
+          "Scenario presets, batch resize, target size, and privacy metadata rules can be reused across the batch.",
+          "Exact comparison, progress, cancellation, and output remain visible in the local workspace."
         ],
         "sections": [
           {
@@ -821,10 +821,10 @@
             ]
           },
           {
-            "heading": "2. Set a shared output, then handle exceptions",
+            "heading": "2. Choose a reusable workflow, then handle exceptions",
             "paragraphs": [
-              "Choose a target format for the task, then adjust quality, lossless mode, concurrency, existing-file behavior, and filename template for the use case. Starting from one clear set of defaults is easier to review than changing everything.",
-              "When one image has a different delivery need, override its output format without rebuilding the entire batch."
+              "Start with Web sharing, Email attachment, High-quality archive, or Private sharing, or customize an aspect-preserving resize rule, JPEG/WebP target size, and metadata-retention profile.",
+              "Use the exact before/after comparison to review final dimensions, estimated size, and warnings. An individual image can still override its delivery format without rebuilding the batch."
             ]
           },
           {
