@@ -10,33 +10,24 @@
 - 分支：`main`
 - 当前公开版本：`v0.2.22`
 - Release：`https://github.com/web-casa/ImgConvert/releases/tag/v0.2.22`
-- `docs/public-release.json` 是 README/ROADMAP 状态闸门的必需输入；它必须与双语 README、
-  `package.json`、Tauri config/Cargo manifest 以及对应 `docs/RELEASE_V*.md` 保持一致。
+- `docs/public-release.json` 是 README/ROADMAP 状态闸门的必需输入；它必须与双语 README
+  及对应 `docs/RELEASE_V*.md` 保持一致。应用版本字段可以在候选构建期间领先于公开版本，
+  但 `package.json`、docs-site、Tauri config/Cargo manifest 与 lockfile 必须彼此一致。
 - v0.2.22 已于 2026-08-28 公开，GitHub Release 包含 Linux/macOS/Windows 的
   x64/arm64 正式直发资产及合并后的 `SHA256SUMS`。
 - 公开 Release 必须继续遵守根目录 `AGENTS.md`：三平台双架构资产、macOS 签名/公证/staple、
   Windows 未签名安装 smoke 与 SmartScreen 提示全部完成前保持 draft。
 
-## 2. 当前工作树状态（2026-09-01）
+## 2. 当前候选状态（2026-09-01）
 
-当前存在一组尚未提交的大型功能与安全加固改动。不要使用 `git add -A` 或把它们塞进一个
-release preparation 提交；先按依赖关系拆分，并让每个中间提交通过对应测试。
+此前尚未提交的大型功能与安全加固工作已按 core、桌面后端、前端/UI、质量门禁、文档和
+许可证拆为独立提交，并在版本准备前通过对应测试。当前应用版本为 `0.2.23`，公开版本记录
+仍保持 `v0.2.22`；`docs/RELEASE_V0.2.23.md` 是本轮只构建、不公开的候选说明。
 
-建议提交顺序：
-
-1. 发布状态闸门与架构/许可证 guardrail；
-2. core 解码、metadata、缩略图和 panic 边界加固；
-3. 统一 workflow 基础层；
-4. 结果缓存；
-5. PDF 输入完整纵切；
-6. 前后对比预览；
-7. 批量尺寸、场景预设、目标体积和隐私 metadata UI；
-8. UI 重设计、资源与桌面 E2E；
-9. fuzz/CI/文档；
-10. 由最终依赖图生成的 `THIRD_PARTY_LICENSES.md` 两份副本。
-
-`Cargo.lock`/`pnpm-lock.yaml` 应跟随引入对应依赖的功能提交，不能集中到许可证提交，否则中间
-提交无法使用 `--locked`/`--frozen-lockfile` 独立构建。
+候选构建范围包括 Linux amd64/arm64、macOS x64/arm64、Windows x64/arm64、MAS universal
+以及 Microsoft Store x64/arm64。MAS 必须保持 `upload_build=false`，Microsoft Store 工作流
+只生成并侧载验证 MSIX，不执行 Partner Center submission。只有全部原生 runner 产物和 smoke
+通过后，才能另行决定是否创建或公开 GitHub Release、上传商店构建或提交审核。
 
 ## 3. 当前产品与架构能力
 
@@ -107,5 +98,6 @@ node scripts/check-platform-release-guardrails.mjs --platform=all --channel=all
 ## 8. 当前外部阻塞项
 
 - Partner Center 的 IARC/CSV、listing 资料和 Store submission 需要账户负责人执行。
-- 后续 macOS 直发需要可用的 Developer ID/notarization 凭据与双架构 runner 结果。
-- 新公开版本在全部平台资产与 smoke 集齐前只能保留为 draft；当前没有准备或发布新版本的授权。
+- macOS 直发仍以本轮 Developer ID/notarization 凭据和双架构 runner 的实际结果为准。
+- 已授权生成 v0.2.23 的跨平台候选构建；未授权公开 GitHub Release、上传商店构建或提交审核。
+  新公开版本在全部平台资产与 smoke 集齐前只能保留为 draft。
