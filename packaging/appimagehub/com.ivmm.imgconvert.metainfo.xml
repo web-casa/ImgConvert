@@ -30,6 +30,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.2.23" date="2026-09-01">
+      <description>
+        <p>Adds workflow presets, batch resize rules, target-size encoding, metadata privacy controls, comparison preview, PDF input, and the refreshed desktop UI.</p>
+      </description>
+    </release>
     <release version="0.2.22" date="2026-08-28">
       <description>
         <p>Fixes Windows HEIC CI coverage for the shared decoded-image dimension guardrail and publishes the conversion-first direct packages.</p>
