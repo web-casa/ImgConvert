@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,16 +14,23 @@ const tauriCargo = readText("src-tauri/Cargo.toml");
 const workspaceCargo = readText("Cargo.toml");
 const denyToml = readText("src-tauri/deny.toml");
 const coreLib = readText("crates/imgconvert-core/src/lib.rs");
+const tauriLib = readText("src-tauri/src/lib.rs");
 const tauriConvert = readText("src-tauri/src/convert.rs");
+const tauriImport = readText("src-tauri/src/import.rs");
 const externalCodecs = readText("src-tauri/src/external_codecs.rs");
+const pdfAdapter = readText("src-tauri/src/pdf.rs");
 const tauriBuild = readText("src-tauri/build.rs");
 const macosSystemCodecs = readText("src-tauri/src/macos_system_codecs.rs");
 const windowsSystemCodecs = readText("src-tauri/src/windows_system_codecs.rs");
 const flatpakManifest = readText("packaging/flatpak/io.github.yeagoo.imgconvert.yml");
+const coreDependencies = cargoDependencies("crates/imgconvert-core/Cargo.toml");
+const tauriDependencies = cargoDependencies("src-tauri/Cargo.toml");
 
 checkPackageManager();
 checkLicensingAndDependencies();
 checkCoreFormatBoundary();
+checkPdfBoundary();
+checkTauriCommandSurface();
 checkHeicBoundary();
 checkStoreExternalCodecBoundary();
 checkExplicitFileAccessBoundary();
@@ -69,8 +77,8 @@ function checkLicensingAndDependencies() {
     "workspace must keep Tauri and fuzz crates out of normal core-only workspace checks",
   );
 
-  const coreDeps = dependencyNamesFromCargoToml(coreCargo);
-  const tauriDeps = dependencyNamesFromCargoToml(tauriCargo);
+  const coreDeps = dependencyNames(coreDependencies);
+  const tauriDeps = dependencyNames(tauriDependencies);
   const forbiddenMainCrates = [
     "dssim",
     "dssim-core",
@@ -89,16 +97,16 @@ function checkLicensingAndDependencies() {
     }
   }
 
-  requireDependencyWith(coreCargo, "image", "default-features = false");
-  requireDependencyWith(coreCargo, "resvg", "default-features = false");
-  requireDependencyWith(coreCargo, "libavif-sys", "default-features = false");
-  requireDependencyWith(coreCargo, "libavif-sys", '"codec-rav1e"');
-  requireDependencyWith(coreCargo, "libavif-sys", '"codec-aom"');
-  requireDependencyWith(coreCargo, "libavif-sys", '"codec-dav1d"');
-  requireDependencyWithout(coreCargo, "libavif-sys", "x265");
-  requireDependencyWith(coreCargo, "ssimulacra2", "default-features = false");
-  requireDependencyWith(coreCargo, "lcms2", "default-features = false");
-  requireDependencyWith(coreCargo, "lcms2", '"static"');
+  requireDependencyDefaultFeatures(coreDependencies, "image", false);
+  requireDependencyDefaultFeatures(coreDependencies, "resvg", false);
+  requireDependencyDefaultFeatures(coreDependencies, "libavif-sys", false);
+  requireDependencyFeature(coreDependencies, "libavif-sys", "codec-rav1e");
+  requireDependencyFeature(coreDependencies, "libavif-sys", "codec-aom");
+  requireDependencyFeature(coreDependencies, "libavif-sys", "codec-dav1d");
+  requireDependencyWithoutFeature(coreDependencies, "libavif-sys", "x265");
+  requireDependencyDefaultFeatures(coreDependencies, "ssimulacra2", false);
+  requireDependencyDefaultFeatures(coreDependencies, "lcms2", false);
+  requireDependencyFeature(coreDependencies, "lcms2", "static");
   if (!coreDeps.has("color_quant")) {
     failures.push(
       "core must use color_quant instead of imagequant for experimental PNG quantization",
@@ -155,6 +163,65 @@ function checkCoreFormatBoundary() {
     "LOSSLESS_FORMATS: &[Format] = &[Format::Png, Format::WebP, Format::Avif]",
     "core lossless formats must stay PNG/WebP/AVIF",
   );
+}
+
+function checkPdfBoundary() {
+  const coreDeps = dependencyNames(coreDependencies);
+  const tauriDeps = dependencyNames(tauriDependencies);
+  if (coreDeps.has("hayro")) {
+    failures.push("PDF rendering must stay at the Tauri adapter boundary, outside imgconvert-core");
+  }
+  if (!tauriDeps.has("hayro")) {
+    failures.push("Tauri PDF adapter must retain the pure-Rust hayro renderer dependency");
+  }
+  for (const forbidden of ["pdfium-render", "pdfium-sys", "poppler", "poppler-sys"]) {
+    if (coreDeps.has(forbidden) || tauriDeps.has(forbidden)) {
+      failures.push(`PDF conversion must not add a runtime native PDF dependency: ${forbidden}`);
+    }
+  }
+  requireText(
+    tauriConvert,
+    'readable.push("pdf")',
+    "PDF must remain a read-only input capability at the Tauri boundary",
+  );
+  requireText(
+    tauriConvert,
+    "writable: format_ids(WRITABLE_FORMATS)",
+    "PDF must not enter the writable output capability list",
+  );
+  for (const marker of [
+    "MAX_PDF_SOURCE_BYTES",
+    "MAX_SELECTED_PDF_PAGES",
+    "MAX_PDF_PAGE_RANGE_CHARS",
+    "validate_pixel_budget",
+    "catch_pdf_unwind",
+    "warning_sink",
+  ]) {
+    requireText(pdfAdapter, marker, `PDF adapter must retain safety marker: ${marker}`);
+  }
+  for (const marker of [
+    "PDF_IMPORT_PROBE_MAX_BYTES",
+    "PDF_IMPORT_TOTAL_PROBE_BYTES",
+    "read_pdf_file_with_limit",
+    "if self.should_stop()",
+  ]) {
+    requireText(
+      tauriImport,
+      marker,
+      `PDF import scanning must retain its bounded/cancellable probe marker: ${marker}`,
+    );
+  }
+}
+
+function checkTauriCommandSurface() {
+  requireText(
+    tauriLib,
+    "async fn convert_batch(",
+    "the frontend conversion path must retain the batch command",
+  );
+  if (/\bconvert_image\b/u.test(tauriLib)) {
+    failures.push("unused convert_image must not be exposed as a second conversion IPC command");
+  }
 }
 
 function checkHeicBoundary() {
@@ -268,9 +335,14 @@ function checkExplicitFileAccessBoundary() {
   requireText(access, "pub fn output_directory", "output dirs must go through access grants");
   requireText(access, "pub fn scoped_path_access", "path use must retain scoped access hook");
   requireText(
-    readText("src-tauri/src/import.rs"),
-    "scanner.scan(access::user_selected_paths(options.paths))",
+    tauriImport,
+    "scanner.scan(resolved.authorized);",
     "import scanner must consume user-selected path grants",
+  );
+  requireText(
+    tauriImport,
+    "for rejected in resolved.rejected",
+    "import scanner must report rejected user-selected paths",
   );
   requireText(
     tauriConvert,
@@ -307,61 +379,68 @@ function requireScriptIncludes(scriptName, needle) {
   }
 }
 
-function requireDependencyWith(toml, name, needle) {
-  const value = dependencyValue(toml, name);
-  if (!value) {
-    failures.push(`missing Cargo dependency: ${name}`);
-  } else if (!value.includes(needle)) {
-    failures.push(`Cargo dependency ${name} must include ${needle}`);
+function cargoDependencies(manifest) {
+  const manifestPath = path.join(repoRoot, manifest);
+  try {
+    const output = execFileSync(
+      "cargo",
+      ["metadata", "--format-version", "1", "--no-deps", "--manifest-path", manifestPath],
+      { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const metadata = JSON.parse(output);
+    const packageEntry = metadata.packages?.find(
+      (entry) => path.resolve(entry.manifest_path) === path.resolve(manifestPath),
+    );
+    if (!packageEntry || !Array.isArray(packageEntry.dependencies)) {
+      throw new Error("manifest package was not returned by cargo metadata");
+    }
+    return packageEntry.dependencies;
+  } catch (error) {
+    failures.push(`failed to parse ${manifest} with cargo metadata: ${String(error)}`);
+    return [];
   }
 }
 
-function requireDependencyWithout(toml, name, needle) {
-  const value = dependencyValue(toml, name);
-  if (value?.includes(needle)) {
-    failures.push(`Cargo dependency ${name} must not include ${needle}`);
-  }
-}
-
-function dependencyNamesFromCargoToml(toml) {
+function dependencyNames(dependencies) {
   const names = new Set();
-  for (const [name] of dependencyEntriesFromCargoToml(toml)) {
-    names.add(name);
+  for (const dependency of dependencies) {
+    names.add(dependency.name);
+    if (dependency.rename) names.add(dependency.rename);
   }
   return names;
 }
 
-function dependencyValue(toml, name) {
-  const entry = dependencyEntriesFromCargoToml(toml).find(([entryName]) => entryName === name);
-  return entry?.[1] ?? "";
+function cargoDependency(dependencies, name) {
+  const normalizedName = name.replaceAll("-", "_");
+  return dependencies.find((dependency) => {
+    const declaredName = dependency.rename ?? dependency.name;
+    return declaredName.replaceAll("-", "_") === normalizedName;
+  });
 }
 
-function dependencyEntriesFromCargoToml(toml) {
-  const entries = [];
-  let inDependencySection = false;
-  for (const rawLine of toml.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, "").trim();
-    if (!line) {
-      continue;
-    }
-    const section = line.match(/^\[(.+)]$/);
-    if (section) {
-      inDependencySection =
-        section[1] === "dependencies" ||
-        section[1] === "dev-dependencies" ||
-        section[1] === "build-dependencies" ||
-        /\.dependencies$/.test(section[1]);
-      continue;
-    }
-    if (!inDependencySection) {
-      continue;
-    }
-    const dependency = line.match(/^([A-Za-z0-9_-]+)\s*=\s*(.+)$/);
-    if (dependency) {
-      entries.push([dependency[1], dependency[2]]);
-    }
+function requireDependencyDefaultFeatures(dependencies, name, expected) {
+  const dependency = cargoDependency(dependencies, name);
+  if (!dependency) {
+    failures.push(`missing Cargo dependency: ${name}`);
+  } else if (dependency.uses_default_features !== expected) {
+    failures.push(`Cargo dependency ${name} uses_default_features must be ${expected}`);
   }
-  return entries;
+}
+
+function requireDependencyFeature(dependencies, name, feature) {
+  const dependency = cargoDependency(dependencies, name);
+  if (!dependency) {
+    failures.push(`missing Cargo dependency: ${name}`);
+  } else if (!dependency.features.includes(feature)) {
+    failures.push(`Cargo dependency ${name} must include feature ${feature}`);
+  }
+}
+
+function requireDependencyWithoutFeature(dependencies, name, feature) {
+  const dependency = cargoDependency(dependencies, name);
+  if (dependency?.features.includes(feature)) {
+    failures.push(`Cargo dependency ${name} must not include feature ${feature}`);
+  }
 }
 
 function cargoDenyAllowedLicenses(toml) {

@@ -407,7 +407,7 @@ function checkProbeMetadataGuardrails() {
   for (const expected of [
     "fn parse_exif_dpi",
     "fn tiff_entry_rational_value",
-    "fn probe_webp_exif_dpi",
+    "metadata.exif.as_deref().and_then(parse_exif_dpi)",
     "fn probe_avif_exif_dpi",
     "parse_exif_dpi_accepts_optional_exif_prefix",
     "probe_jpeg_reads_exif_resolution_dpi",

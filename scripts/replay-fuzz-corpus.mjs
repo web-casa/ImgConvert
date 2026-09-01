@@ -49,7 +49,7 @@ if (options.prepare) {
   run(process.execPath, prepareArgs, "prepare fuzz corpus");
 }
 
-const replayArgs = [
+const coreReplayArgs = [
   "+1.96.0",
   "run",
   "--quiet",
@@ -65,28 +65,130 @@ const replayArgs = [
   options.includeArtifacts ? "--include-artifacts" : "--no-artifacts",
 ];
 
-const replay = spawnSync("cargo", replayArgs, {
-  cwd: repoRoot,
-  env: process.env,
-  encoding: "utf8",
-  maxBuffer: 32 * 1024 * 1024,
-});
+const coreReport = runJsonReplay("cargo", coreReplayArgs, "core fuzz corpus replay", [
+  "decode_pipeline",
+  "convert_pipeline",
+  "metadata_semantics",
+]);
+const tauriReplayArgs = [
+  "+1.96.0",
+  "run",
+  "--quiet",
+  "--manifest-path",
+  "src-tauri/Cargo.toml",
+  "--example",
+  "replay_fuzz_corpus",
+  "--no-default-features",
+  "--features",
+  "fuzzing",
+  "--",
+  "--corpus-root",
+  path.join(repoRoot, "src-tauri", "fuzz", "corpus"),
+  "--artifacts-root",
+  path.join(repoRoot, "src-tauri", "fuzz", "artifacts"),
+  options.includeArtifacts ? "--include-artifacts" : "--no-artifacts",
+];
+const tauriReport = runJsonReplay("cargo", tauriReplayArgs, "Tauri fuzz corpus replay", [
+  "external_codec_manifest",
+  "import_scanner",
+  "pdf_document",
+]);
+const report = mergeReports(coreReport, tauriReport);
 
-if (replay.stderr) {
-  process.stderr.write(replay.stderr);
-}
-if (replay.error) {
-  fail(`failed to start fuzz corpus replay: ${replay.error.message}`);
-}
+function runJsonReplay(command, args, label, expectedTargets) {
+  const replay = spawnSync(command, args, {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024,
+  });
 
-let report;
-try {
-  report = JSON.parse(replay.stdout);
-} catch (error) {
-  if (replay.stdout) {
-    process.stdout.write(replay.stdout);
+  if (replay.stderr) {
+    process.stderr.write(replay.stderr);
   }
-  fail(`fuzz corpus replay did not emit valid JSON: ${error.message}`);
+  if (replay.error) {
+    fail(`failed to start ${label}: ${replay.error.message}`);
+  }
+
+  let report;
+  try {
+    report = JSON.parse(replay.stdout);
+  } catch (error) {
+    if (replay.stdout) {
+      process.stdout.write(replay.stdout);
+    }
+    fail(`${label} did not emit valid JSON: ${error.message}`);
+  }
+  validateReportCoverage(report, label, expectedTargets);
+  if ((replay.status ?? 1) !== 0 || report.failed > 0) {
+    process.exit(replay.status ?? 1);
+  }
+  return report;
+}
+
+function validateReportCoverage(report, label, expectedTargets) {
+  if (!report || typeof report !== "object" || !Array.isArray(report.targets)) {
+    fail(`${label} emitted an invalid report shape`);
+  }
+  for (const metric of ["totalFiles", "passed", "skipped", "failed"]) {
+    if (!Number.isInteger(report[metric]) || report[metric] < 0) {
+      fail(`${label} emitted an invalid ${metric} total`);
+    }
+  }
+  const targetCounts = new Map();
+  for (const target of report.targets) {
+    if (!target || typeof target.name !== "string") {
+      fail(`${label} emitted an invalid target report`);
+    }
+    for (const metric of ["totalFiles", "passed", "skipped", "failed"]) {
+      if (!Number.isInteger(target[metric]) || target[metric] < 0) {
+        fail(`${label} target ${target.name} emitted an invalid ${metric} total`);
+      }
+    }
+    if (target.passed + target.skipped + target.failed !== target.totalFiles) {
+      fail(`${label} target ${target.name} emitted inconsistent totals`);
+    }
+    targetCounts.set(target.name, (targetCounts.get(target.name) ?? 0) + 1);
+    if (target.totalFiles <= 0) {
+      fail(`${label} target ${target.name} has no corpus inputs; run fuzz:prepare first`);
+    }
+  }
+  for (const target of expectedTargets) {
+    if (targetCounts.get(target) !== 1) {
+      fail(`${label} must report target ${target} exactly once`);
+    }
+  }
+  if (targetCounts.size !== expectedTargets.length) {
+    fail(`${label} reported an unexpected target set`);
+  }
+  if (report.passed + report.skipped + report.failed !== report.totalFiles) {
+    fail(`${label} emitted inconsistent aggregate totals`);
+  }
+}
+
+function mergeReports(core, tauri) {
+  return {
+    schemaVersion: 2,
+    totalFiles: core.totalFiles + tauri.totalFiles,
+    passed: core.passed + tauri.passed,
+    skipped: core.skipped + tauri.skipped,
+    failed: core.failed + tauri.failed,
+    targets: [...core.targets, ...tauri.targets],
+    suites: {
+      core: {
+        totalFiles: core.totalFiles,
+        passed: core.passed,
+        skipped: core.skipped,
+        failed: core.failed,
+      },
+      tauri: {
+        totalFiles: tauri.totalFiles,
+        passed: tauri.passed,
+        skipped: tauri.skipped,
+        failed: tauri.failed,
+      },
+    },
+  };
 }
 
 const enrichedReport = {
@@ -98,6 +200,8 @@ const enrichedReport = {
   },
   corpusRoot: reportPathLabel(options.corpusRoot),
   artifactsRoot: reportPathLabel(options.artifactsRoot),
+  tauriCorpusRoot: "src-tauri/fuzz/corpus",
+  tauriArtifactsRoot: "src-tauri/fuzz/artifacts",
   includedArtifacts: options.includeArtifacts,
 };
 
@@ -108,10 +212,6 @@ const outputPath = path.relative(repoRoot, options.output);
 console.log(
   `fuzz corpus replay: files=${report.totalFiles}, passed=${report.passed}, skipped=${report.skipped}, failed=${report.failed}, report=${outputPath}`,
 );
-
-if ((replay.status ?? 1) !== 0 || report.failed > 0) {
-  process.exit(replay.status ?? 1);
-}
 
 function run(command, args, label) {
   const result = spawnSync(command, args, {

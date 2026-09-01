@@ -210,6 +210,23 @@ function checkAutomaticLinuxCiWorkflow() {
   if (!ci.includes("pnpm run fuzz:ci")) {
     failures.push("ci.yml fuzz corpus job must run pnpm run fuzz:ci");
   }
+  const rustCacheAction = "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6";
+  const rustCacheCount = ci.split(rustCacheAction).length - 1;
+  if (rustCacheCount !== 2) {
+    failures.push(
+      `ci.yml must cache the fuzz and Tauri desktop jobs with pinned rust-cache (found ${rustCacheCount})`,
+    );
+  }
+  for (const marker of [
+    "shared-key: ubuntu-fuzz-corpus",
+    "shared-key: ubuntu-tauri-backend-e2e",
+    "src-tauri/fuzz -> target",
+    "cache-bin: true",
+  ]) {
+    if (!ci.includes(marker)) {
+      failures.push(`ci.yml Rust cache configuration is missing: ${marker}`);
+    }
+  }
   if (!ci.includes("inputs.package_smoke_arm64")) {
     failures.push("ci.yml package smoke matrix must require package_smoke_arm64 on dispatch");
   }

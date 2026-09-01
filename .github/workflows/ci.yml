@@ -13,7 +13,7 @@ on:
         default: false
         type: boolean
       fuzz_corpus:
-        description: Run low-cost generated fuzz corpus replay on Ubuntu.
+        description: Run the bounded core and Tauri fuzz-target compile plus corpus replay on Ubuntu.
         required: true
         default: false
         type: boolean
@@ -84,7 +84,7 @@ jobs:
     name: Fuzz Corpus Replay
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.fuzz_corpus }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -102,8 +102,21 @@ jobs:
             cmake \
             meson \
             nasm \
-            ninja-build
+            ninja-build \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-bin: true
+          shared-key: ubuntu-fuzz-corpus
+          workspaces: |
+            . -> target
+            src-tauri -> target
+            fuzz -> target
+            src-tauri/fuzz -> target
       - run: pnpm install --frozen-lockfile
       - run: pnpm run fuzz:ci
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -114,7 +127,7 @@ jobs:
           path: target/fuzz-corpus/*.json
 
   tauri-backend:
-    name: Tauri Backend
+    name: Tauri Backend And Desktop E2E
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -130,13 +143,32 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
+            webkit2gtk-driver \
+            xvfb \
             patchelf
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.34.4
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-bin: true
+          shared-key: ubuntu-tauri-backend-e2e
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - run: cargo install tauri-driver --version 2.0.6 --locked
       - run: cargo +1.96.0 fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo +1.96.0 clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
+      - run: pnpm run e2e:desktop
 
   tauri-backend-windows:
     name: Tauri Backend Windows HEIC

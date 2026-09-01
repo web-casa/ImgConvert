@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fuzzCorpusRoot = path.join(repoRoot, "fuzz", "corpus");
+const tauriFuzzCorpusRoot = path.join(repoRoot, "src-tauri", "fuzz", "corpus");
 const targetManifestDir = path.join(repoRoot, "target", "fuzz-corpus");
 
 const options = {
@@ -50,6 +51,69 @@ options.realDirs = unique(options.realDirs);
 
 if (!options.skipGenerated) {
   runCargoSeedGenerator();
+  writeTauriFuzzSeeds();
+}
+
+function writeTauriFuzzSeeds() {
+  const manifestRoot = path.join(tauriFuzzCorpusRoot, "external_codec_manifest");
+  const scannerRoot = path.join(tauriFuzzCorpusRoot, "import_scanner");
+  const pdfRoot = path.join(tauriFuzzCorpusRoot, "pdf_document");
+  for (const directory of [manifestRoot, scannerRoot, pdfRoot]) {
+    mkdirSync(directory, { recursive: true });
+  }
+
+  writeFileSync(
+    path.join(manifestRoot, "valid.json"),
+    `${JSON.stringify({
+      id: "ci-seed",
+      protocol: 1,
+      license: "MIT",
+      readable: ["heic", "heif"],
+      writable: [],
+      mode: "external-process",
+      decode: {
+        kind: "heic-to-png-file",
+        command: "bin/helper",
+        output: "png",
+      },
+    })}\n`,
+  );
+  writeFileSync(path.join(manifestRoot, "malformed.json"), '{"decode":{"args":["{input}"]');
+
+  writeFileSync(
+    path.join(scannerRoot, "nested-and-symlinks.bin"),
+    Uint8Array.from([10, 0x62, 0x03, 0xe7, 0x25, 0x46, 0x07, 0x88, 1, 2, 3, 4, 5, 6]),
+  );
+  writeFileSync(
+    path.join(scannerRoot, "pdf-and-limits.bin"),
+    Uint8Array.from([7, 0x07, 0xff, 0x47, 0x27, 0x67, 0x87, 0xa7, 0xc7, 0xe7]),
+  );
+
+  writeFileSync(path.join(pdfRoot, "minimal.pdf"), minimalPdf());
+  writeFileSync(path.join(pdfRoot, "truncated.pdf"), "%PDF-1.7\n1 0 obj\n<< /Type /Catalog");
+}
+
+function minimalPdf() {
+  const stream = "q 1 0 0 rg 0 0 72 72 re f Q\n";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 72] /Resources << >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}endstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return pdf;
 }
 
 const imported = importRealCorpus();

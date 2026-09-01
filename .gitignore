@@ -21,12 +21,20 @@ fuzz/corpus/*
 !fuzz/corpus/README.md
 fuzz/target
 fuzz/artifacts
+src-tauri/fuzz/corpus/*
+!src-tauri/fuzz/corpus/.gitignore
+!src-tauri/fuzz/corpus/README.md
+src-tauri/fuzz/target
+src-tauri/fuzz/artifacts
 .flatpak-builder
 test-results
 playwright-report
 /artifacts/
 output/imagegen/
-tmp/imagegen/
+/tmp/
+/task_plan.md
+/findings.md
+/progress.md
 *.local
 *.tsbuildinfo
 

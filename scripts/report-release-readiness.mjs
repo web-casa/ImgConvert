@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,18 +76,18 @@ if (options.requirePublishable) {
 function buildReport() {
   const localChecks = githubLocalChecks();
   const artifacts = githubArtifacts();
-  const externalPrerequisites = [updaterPrerequisite(), updaterUpgradeSmokePrerequisite()];
+  const externalPrerequisites = [
+    macosDirectPrerequisite(),
+    windowsDirectPrerequisite(),
+    updaterPrerequisite(),
+    updaterUpgradeSmokePrerequisite(),
+  ];
   const deferredPrerequisites = [];
 
   if (options.scope === "all") {
     localChecks.splice(4, 0, ...storeAndFlatpakLocalChecks());
     artifacts.push(...platformArtifacts());
-    externalPrerequisites.unshift(
-      macosDirectPrerequisite(),
-      macosMasPrerequisite(),
-      windowsDirectPrerequisite(),
-      windowsStorePrerequisite(),
-    );
+    externalPrerequisites.unshift(macosMasPrerequisite(), windowsStorePrerequisite());
     externalPrerequisites.push(
       flathubMainPrerequisite(),
       flathubHeicPrerequisite(),
@@ -99,9 +99,7 @@ function buildReport() {
     deferredPrerequisites.push(
       flathubMainPrerequisite(),
       flathubHeicPrerequisite(),
-      macosDirectPrerequisite(),
       macosMasPrerequisite(),
-      windowsDirectPrerequisite(),
       windowsStorePrerequisite(),
       macosBenchmarkPrerequisite(),
       windowsBenchmarkPrerequisite(),
@@ -158,7 +156,7 @@ function githubLocalChecks() {
     ),
     commandReadiness(
       "fuzz:smoke",
-      "Low-cost fuzz seed preparation, target compile, and corpus replay.",
+      "Bounded core/Tauri fuzz seed preparation, target compile, and corpus replay.",
     ),
   ];
 }
@@ -183,26 +181,29 @@ function storeAndFlatpakLocalChecks() {
 
 function githubArtifacts() {
   return [
-    artifactReadiness(
+    architectureArtifactReadiness(
       "linux-deb",
       "Linux .deb",
       "release:linux",
       [artifactDir("release", "bundle", "deb")],
       hasExtensionAndVersion(".deb"),
+      directArchitectureRequirements(),
     ),
-    artifactReadiness(
+    architectureArtifactReadiness(
       "linux-rpm",
       "Linux .rpm",
       "release:linux",
       [artifactDir("release", "bundle", "rpm")],
       hasExtensionAndVersion(".rpm"),
+      directArchitectureRequirements(),
     ),
-    artifactReadiness(
+    architectureArtifactReadiness(
       "linux-appimage",
       "Linux AppImage",
       "release:linux",
       [artifactDir("release", "bundle", "appimage")],
       hasExtensionAndVersion(".appimage"),
+      directArchitectureRequirements(),
     ),
     linuxChecksumsReadiness(),
     artifactReadiness(
@@ -213,38 +214,47 @@ function githubArtifacts() {
       hasExtensionAndVersion(".appimage.sig"),
     ),
     updaterManifestReadiness(),
+    ...directDesktopArtifacts(),
+  ];
+}
+
+function directDesktopArtifacts() {
+  return [
+    architectureArtifactReadiness(
+      "macos-dmg",
+      "macOS DMG",
+      "release:macos",
+      [artifactDir("release", "bundle", "dmg")],
+      hasExtensionAndVersion(".dmg"),
+      directArchitectureRequirements(),
+    ),
+    architectureArtifactReadiness(
+      "windows-msi",
+      "Windows MSI",
+      "release:windows",
+      [artifactDir("release", "bundle", "msi")],
+      hasExtensionAndVersion(".msi"),
+      directArchitectureRequirements(),
+    ),
+    architectureArtifactReadiness(
+      "windows-nsis",
+      "Windows NSIS .exe",
+      "release:windows",
+      [artifactDir("release", "bundle", "nsis")],
+      hasExtensionAndVersion(".exe"),
+      directArchitectureRequirements(),
+    ),
   ];
 }
 
 function platformArtifacts() {
   return [
     artifactReadiness(
-      "macos-dmg",
-      "macOS DMG",
-      "release:macos",
-      [artifactDir("release", "bundle", "dmg")],
-      hasExtension(".dmg"),
-    ),
-    artifactReadiness(
       "macos-mas-app",
       "macOS MAS .app candidate",
       "release:macos:mas",
       [artifactDir("release", "bundle", "macos")],
-      hasExtension(".app"),
-    ),
-    artifactReadiness(
-      "windows-msi",
-      "Windows MSI",
-      "release:windows",
-      [artifactDir("release", "bundle", "msi")],
-      hasExtension(".msi"),
-    ),
-    artifactReadiness(
-      "windows-nsis",
-      "Windows NSIS .exe",
-      "release:windows",
-      [artifactDir("release", "bundle", "nsis")],
-      hasExtension(".exe"),
+      isCurrentVersionAppBundle,
     ),
   ];
 }
@@ -276,6 +286,42 @@ function artifactReadiness(id, label, buildScript, directories, matcher) {
         ? artifacts.map((file) => path.relative(repoRoot, file)).join(", ")
         : `no artifact found under ${directories.map((dir) => path.relative(repoRoot, dir)).join(", ")}`,
   };
+}
+
+function architectureArtifactReadiness(id, label, buildScript, directories, matcher, requirements) {
+  const artifacts = directories
+    .flatMap((dir) => collectArtifacts(dir, matcher))
+    .filter((artifact) => statSync(artifact).size > 0);
+  const missing = requirements.filter(
+    (requirement) =>
+      !artifacts.some((artifact) => filenameHasArchitecture(artifact, requirement.aliases)),
+  );
+  return {
+    id,
+    label,
+    status: missing.length === 0 ? "ready" : "missing",
+    description: `${label} release artifacts for every required direct-download architecture.`,
+    command: packageScripts[buildScript] ? `pnpm run ${buildScript}` : null,
+    detail:
+      missing.length === 0
+        ? artifacts.map((file) => path.relative(repoRoot, file)).join(", ")
+        : `missing current-version architecture(s): ${missing.map((item) => item.label).join(", ")}`,
+  };
+}
+
+function directArchitectureRequirements() {
+  return [
+    { label: "amd64/x64", aliases: ["amd64", "x64", "x86_64"] },
+    { label: "arm64", aliases: ["arm64", "aarch64"] },
+  ];
+}
+
+function filenameHasArchitecture(file, aliases) {
+  const filename = path.basename(file);
+  return aliases.some((alias) => {
+    const pattern = new RegExp(`(^|[^0-9A-Za-z])${escapeRegExp(alias)}(?=$|[^0-9A-Za-z])`, "i");
+    return pattern.test(filename);
+  });
 }
 
 function linuxChecksumsReadiness() {
@@ -701,12 +747,57 @@ function collectArtifacts(dir, matcher) {
 }
 
 function hasExtension(extension) {
-  return (file) => file.toLowerCase().endsWith(extension);
+  return (file) =>
+    file.toLowerCase().endsWith(extension) &&
+    lstatSync(file).isFile() &&
+    !lstatSync(file).isSymbolicLink();
 }
 
 function hasExtensionAndVersion(extension) {
-  return (file) =>
-    hasExtension(extension)(file) && path.basename(file).includes(packageJson.version);
+  const versionPattern = new RegExp(
+    `(^|[^0-9A-Za-z])${escapeRegExp(packageJson.version)}(?=$|[^0-9A-Za-z])`,
+  );
+  return (file) => hasExtension(extension)(file) && versionPattern.test(path.basename(file));
+}
+
+function isCurrentVersionAppBundle(candidate) {
+  if (
+    !candidate.toLowerCase().endsWith(".app") ||
+    !lstatSync(candidate).isDirectory() ||
+    lstatSync(candidate).isSymbolicLink()
+  ) {
+    return false;
+  }
+  const contents = path.join(candidate, "Contents");
+  const plist = path.join(contents, "Info.plist");
+  const executables = path.join(contents, "MacOS");
+  if (
+    !existsSync(plist) ||
+    !lstatSync(plist).isFile() ||
+    lstatSync(plist).isSymbolicLink() ||
+    statSync(plist).size <= 0
+  ) {
+    return false;
+  }
+  if (!existsSync(executables) || !statSync(executables).isDirectory()) {
+    return false;
+  }
+  const plistText = readFileSync(plist, "utf8");
+  const versionPattern = new RegExp(
+    `<key>CFBundleShortVersionString</key>\\s*<string>\\s*${escapeRegExp(packageJson.version)}\\s*</string>`,
+  );
+  if (!versionPattern.test(plistText)) {
+    return false;
+  }
+  return readdirSync(executables, { withFileTypes: true }).some((entry) => {
+    if (!entry.isFile()) return false;
+    const executable = path.join(executables, entry.name);
+    return statSync(executable).size > 0;
+  });
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function envSet(envNames) {

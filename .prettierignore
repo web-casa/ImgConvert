@@ -2,6 +2,9 @@ dist
 node_modules
 .codex
 src-tauri/target
+src-tauri/fuzz/corpus
+src-tauri/fuzz/target
+src-tauri/fuzz/artifacts
 target
 docs-site/.next
 docs-site/.source

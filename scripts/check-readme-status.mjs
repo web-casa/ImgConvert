@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { readRequiredJson } from "./read-required-json.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -10,7 +12,10 @@ const failures = [];
 const readme = readText("README.md");
 const readmeZhCn = readText("README.zh-CN.md");
 const roadmap = readText("docs/ROADMAP.md");
-const packageJson = JSON.parse(readText("package.json"));
+const publicRelease = readRequiredJson(repoRoot, "docs/public-release.json", failures);
+const packageJson = readRequiredJson(repoRoot, "package.json", failures);
+const tauriConfig = readRequiredJson(repoRoot, "src-tauri/tauri.conf.json", failures);
+const tauriCargo = readText("src-tauri/Cargo.toml");
 
 checkReadmeIsCurrent();
 checkReadmeDocumentsReleaseEntrypoints();
@@ -27,6 +32,34 @@ if (failures.length > 0) {
 console.log("README status check passed.");
 
 function checkReadmeIsCurrent() {
+  const publicVersion =
+    typeof publicRelease.version === "string" ? publicRelease.version.trim() : "";
+  const hasValidPublicVersion = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(publicVersion);
+  if (!hasValidPublicVersion) {
+    failures.push("docs/public-release.json must contain a valid published version");
+  }
+  if (publicRelease.published !== true) {
+    failures.push("docs/public-release.json must explicitly mark the release as published");
+  }
+  if (hasValidPublicVersion) {
+    if (!existsSync(path.join(repoRoot, `docs/RELEASE_V${publicVersion}.md`))) {
+      failures.push(`missing release record for public version v${publicVersion}`);
+    }
+    const expectedRelease = `v${publicVersion}`;
+    checkDeclaredReleaseVersion(
+      "English README",
+      readme,
+      /latest GitHub Release is \*\*(v[^*]+)\*\*/,
+      expectedRelease,
+    );
+    checkDeclaredReleaseVersion(
+      "Chinese README",
+      readmeZhCn,
+      /最新 GitHub Release 为 \*\*(v[^*]+)\*\*/,
+      expectedRelease,
+    );
+  }
+
   for (const staleText of [
     "当前为前端串行",
     "P1 改为 Rust 端并发",
@@ -107,6 +140,17 @@ function checkReadmeDocumentsReleaseEntrypoints() {
 
 function checkPackageWiring() {
   const scripts = packageJson.scripts ?? {};
+  if (tauriConfig.version !== packageJson.version) {
+    failures.push(
+      `Tauri config version ${tauriConfig.version ?? "<missing>"} must match package version ${packageJson.version}`,
+    );
+  }
+  const cargoVersion = /^version\s*=\s*"([^"]+)"/m.exec(tauriCargo)?.[1];
+  if (cargoVersion !== packageJson.version) {
+    failures.push(
+      `Tauri Cargo version ${cargoVersion ?? "<missing>"} must match package version ${packageJson.version}`,
+    );
+  }
   if (!scripts["docs:check"]?.includes("check-readme-status.mjs")) {
     failures.push("package.json must expose docs:check");
   }
@@ -115,6 +159,18 @@ function checkPackageWiring() {
   }
   if (!scripts["release:readiness:check"]?.includes("docs:check")) {
     failures.push("package.json must expose release:readiness:check with README guardrails");
+  }
+}
+
+function checkDeclaredReleaseVersion(label, content, pattern, expected) {
+  const declared = pattern.exec(content)?.[1];
+  if (declared !== expected) {
+    failures.push(
+      `${label} latest public release ${declared ?? "<missing>"} must match current release ${expected}`,
+    );
+  }
+  if (!content.includes(`GitHub Release ${expected}`)) {
+    failures.push(`${label} release status section must describe GitHub Release ${expected}`);
   }
 }
 
