@@ -5,6 +5,7 @@
   import { t } from "svelte-i18n";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import {
+    GlobalIcon,
     PlayCircleIcon,
     RefreshIcon,
     StopCircleIcon,
@@ -12,6 +13,7 @@
   } from "@solar-icons/svelte/bold-duotone";
   import { CheckCircleIcon, DangerCircleIcon } from "@solar-icons/svelte/bold-duotone";
   import { Button } from "$lib/components/ui/button";
+  import { EXTERNAL_LINKS, openExternalUrl } from "$lib/external-links";
   import Dropzone from "$lib/components/Dropzone.svelte";
   import ComparisonPreview from "$lib/components/ComparisonPreview.svelte";
   import ConversionPanel from "$lib/components/ConversionPanel.svelte";
@@ -51,6 +53,8 @@
   let privacySupportOpen = $state(false);
   let pluginDiagnosticsOpen = $state(false);
   let updateOpen = $state(false);
+  let openingWebsite = $state(false);
+  let websiteOpenFailed = $state(false);
   let desktopSettingsPanel = $state<HTMLElement | null>(null);
   onMount(() => {
     const runningInTauri = isTauriRuntime();
@@ -89,6 +93,20 @@
 
   function handlePaste(event: ClipboardEvent) {
     void importPastedClipboard(event);
+  }
+
+  async function openWebsite() {
+    if (openingWebsite) return;
+
+    openingWebsite = true;
+    websiteOpenFailed = false;
+    try {
+      await openExternalUrl(EXTERNAL_LINKS.website);
+    } catch {
+      websiteOpenFailed = true;
+    } finally {
+      openingWebsite = false;
+    }
   }
 </script>
 
@@ -130,9 +148,25 @@
                 <QueueItem {item} />
               {:else}
                 <li
-                  class="flex min-h-32 items-center justify-center rounded-lg border border-dashed p-8 text-sm text-muted-foreground"
+                  class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-sm text-muted-foreground"
                 >
-                  {$t("app.emptyQueue")}
+                  <span>{$t("app.emptyQueue")}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="h-auto max-w-full gap-1.5 px-2 py-1 text-xs font-normal text-muted-foreground hover:text-foreground"
+                    onclick={() => void openWebsite()}
+                    disabled={openingWebsite}
+                    aria-label={$t("externalLinks.openWebsite")}
+                  >
+                    <GlobalIcon size={16} class="shrink-0" />
+                    <span class="truncate">{EXTERNAL_LINKS.website}</span>
+                  </Button>
+                  {#if websiteOpenFailed}
+                    <span class="text-center text-xs text-destructive" aria-live="polite">
+                      {$t("externalLinks.openFailed")}
+                    </span>
+                  {/if}
                 </li>
               {/each}
             </ul>

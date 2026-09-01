@@ -41,9 +41,16 @@ export const enUS = {
     pluginDiagnostics: "Plugin diagnostics",
     appUpdate: "App update",
     privacySupport: "Privacy and support",
-    licenses: "Licenses",
+    licenses: "About and licenses",
     language: "Language",
     utilityMenu: "Display settings",
+    returnToWebsite: "Visit website",
+  },
+  externalLinks: {
+    website: "Official website",
+    githubRepository: "GitHub repository",
+    openWebsite: "Visit official website",
+    openFailed: "Unable to open the page. Copy the displayed address into your browser.",
   },
   dropzone: {
     webFilePickerUnavailable:
@@ -282,8 +289,9 @@ export const enUS = {
   },
   legal: {
     loadError: "Unable to load licenses: {error}",
-    title: "Licenses",
-    description: "Apache-2.0 project notice and third-party dependency license attribution.",
+    title: "About and licenses",
+    description:
+      "ImgConvert project information, Apache-2.0 notice, and third-party license attribution.",
     close: "Close",
     loading: "Loading…",
   },
@@ -322,6 +330,7 @@ export const enUS = {
     check: "Check for updates",
     installAndRestart: "Install and restart",
     checking: "Update check not started yet.",
+    officialLinks: "Official links",
   },
   errors: {
     fileNotFound: "File not found: {path}",

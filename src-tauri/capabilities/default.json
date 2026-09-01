@@ -9,7 +9,11 @@
     "os:allow-locale",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://github.com/web-casa/ImgConvert/issues" }]
+      "allow": [
+        { "url": "https://imgconvert.web.casa/" },
+        { "url": "https://github.com/web-casa/ImgConvert" },
+        { "url": "https://github.com/web-casa/ImgConvert/issues" }
+      ]
     },
     "dialog:allow-open",
     "dialog:allow-message",

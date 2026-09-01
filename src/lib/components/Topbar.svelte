@@ -2,6 +2,7 @@
 <script lang="ts">
   import {
     DownloadMinimalisticIcon,
+    GlobalIcon,
     InfoCircleIcon,
     MonitorIcon,
     MoonIcon,
@@ -15,6 +16,7 @@
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
   import appIconUrl from "$lib/assets/app-icon.png";
+  import { EXTERNAL_LINKS, openExternalUrl } from "$lib/external-links";
   import { setAppLocale } from "$lib/i18n";
   import { settings, engine, applyTheme, persistSettings, updaterEnabled } from "$lib/state.svelte";
 
@@ -65,6 +67,8 @@
   let utilityMenuTrigger = $state<HTMLButtonElement | null>(null);
   let utilityMenuContainer = $state<HTMLDivElement | null>(null);
   let utilityMenuPanel = $state<HTMLDivElement | null>(null);
+  let openingWebsite = $state(false);
+  let websiteOpenFailed = $state(false);
 
   function toggleUtilityMenu() {
     utilityMenuOpen = !utilityMenuOpen;
@@ -89,6 +93,21 @@
     const next = event.relatedTarget;
     if (next instanceof Node && utilityMenuContainer?.contains(next)) return;
     utilityMenuOpen = false;
+  }
+
+  async function openWebsite() {
+    if (openingWebsite) return;
+
+    openingWebsite = true;
+    websiteOpenFailed = false;
+    try {
+      await openExternalUrl(EXTERNAL_LINKS.website);
+      closeUtilityMenu();
+    } catch {
+      websiteOpenFailed = true;
+    } finally {
+      openingWebsite = false;
+    }
   }
 
   $effect(() => {
@@ -225,6 +244,20 @@
               {settings.reduceMotion ? $t("topbar.reduceMotionOn") : $t("topbar.reduceMotionOff")}
             </span>
           </button>
+          <button
+            type="button"
+            class="flex min-h-10 w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+            onclick={() => void openWebsite()}
+            aria-busy={openingWebsite}
+          >
+            <GlobalIcon size={20} class="size-5 shrink-0" />
+            <span class="min-w-0 flex-1">{$t("topbar.returnToWebsite")}</span>
+          </button>
+          {#if websiteOpenFailed}
+            <p class="px-2 py-1.5 text-xs text-destructive" aria-live="polite">
+              {$t("externalLinks.openFailed")}
+            </p>
+          {/if}
         </div>
       {/if}
     </div>

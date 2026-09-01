@@ -15,6 +15,7 @@ const chinesePolicy = readRequired("PRIVACY.md");
 const englishPolicy = readRequired("PRIVACY.en.md");
 const websiteLegal = readRequired("website/src/lib/legal.ts");
 const privacySupportDialog = readRequired("src/lib/components/PrivacySupportDialog.svelte");
+const externalLinks = readRequired("src/lib/external-links.ts");
 const topbar = readRequired("src/lib/components/Topbar.svelte");
 const workflow = readRequired(".github/workflows/pages.yml");
 const chinesePolicyDate = requiredMatch(
@@ -80,8 +81,9 @@ for (const [label, text, required] of [
   ["website privacy copy", websiteLegal, "Mac App Store 和 Microsoft Store 版本"],
   ["in-app privacy", privacySupportDialog, "../../../PRIVACY.en.md?raw"],
   ["in-app privacy", privacySupportDialog, "../../../PRIVACY.md?raw"],
-  ["in-app privacy", privacySupportDialog, "https://github.com/web-casa/ImgConvert/issues"],
-  ["in-app privacy", privacySupportDialog, "openUrl(SUPPORT_URL)"],
+  ["external links", externalLinks, 'support: "https://github.com/web-casa/ImgConvert/issues"'],
+  ["in-app privacy", privacySupportDialog, "EXTERNAL_LINKS.support"],
+  ["in-app privacy", privacySupportDialog, "openExternalUrl(EXTERNAL_LINKS.support)"],
   ["top bar", topbar, "onOpenPrivacySupport"],
   ["Pages workflow", workflow, "workflow_dispatch:"],
   ["Pages workflow", workflow, "runs-on: ubuntu-24.04"],

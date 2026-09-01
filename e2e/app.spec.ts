@@ -18,6 +18,50 @@ test("loads the web preview shell", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("exposes fixed official links in the empty state, settings, about, and updater", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.goto("/");
+  await page.getByRole("button", { name: /清空|Clear/ }).click();
+
+  await expect(page.getByText("https://imgconvert.web.casa/", { exact: true })).toBeVisible();
+
+  const utilityTrigger = page.getByRole("button", { name: /显示设置|Display settings/ });
+  await utilityTrigger.click();
+  await expect(page.getByRole("button", { name: /返回官网|Visit website/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(utilityTrigger).toBeFocused();
+
+  const aboutTrigger = page.getByRole("button", { name: /关于与开源许可|About and licenses/ });
+  await aboutTrigger.click();
+  const aboutDialog = page.getByRole("dialog", {
+    name: /关于与开源许可|About and licenses/,
+  });
+  await expect(
+    aboutDialog.getByText("https://imgconvert.web.casa/", { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(aboutTrigger).toBeFocused();
+
+  const updateTrigger = page.getByRole("button", { name: /应用更新|App update/ });
+  await updateTrigger.click();
+  const updateDialog = page.getByRole("dialog", { name: /应用更新|App update/ });
+  await expect(
+    updateDialog.getByText("https://imgconvert.web.casa/", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    updateDialog.getByText("https://github.com/web-casa/ImgConvert", { exact: true }),
+  ).toBeVisible();
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+  }));
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+  await page.keyboard.press("Escape");
+  await expect(updateTrigger).toBeFocused();
+});
+
 test("discloses import and export formats without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 700 });
   await page.goto("/");

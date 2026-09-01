@@ -1,19 +1,29 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
   import { CloseIcon, ShieldCheckIcon, SquareTopDownIcon } from "@solar-icons/svelte/bold-duotone";
-  import { openUrl } from "@tauri-apps/plugin-opener";
   import { t } from "svelte-i18n";
   import { Button } from "$lib/components/ui/button";
-  import { isTauriRuntime, settings } from "$lib/state.svelte";
+  import { EXTERNAL_LINKS, openExternalUrl } from "$lib/external-links";
+  import { trapTabWithin } from "$lib/focus-trap";
+  import { settings } from "$lib/state.svelte";
   import privacyEnglish from "../../../PRIVACY.en.md?raw";
   import privacyChinese from "../../../PRIVACY.md?raw";
-
-  const SUPPORT_URL = "https://github.com/web-casa/ImgConvert/issues";
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
   let openingSupport = $state(false);
   let supportOpenFailed = $state(false);
+  let dialog = $state<HTMLDivElement | null>(null);
+  let closeButton = $state<HTMLButtonElement | null>(null);
+  let previousFocus: HTMLElement | null = null;
   const policyText = $derived(settings.locale === "zh-CN" ? privacyChinese : privacyEnglish);
+
+  onMount(() => {
+    previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButton?.focus();
+  });
+
+  onDestroy(() => previousFocus?.focus());
 
   function close() {
     open = false;
@@ -25,11 +35,7 @@
     openingSupport = true;
     supportOpenFailed = false;
     try {
-      if (isTauriRuntime()) {
-        await openUrl(SUPPORT_URL);
-      } else if (!window.open(SUPPORT_URL, "_blank", "noopener,noreferrer")) {
-        throw new Error("support window blocked");
-      }
+      await openExternalUrl(EXTERNAL_LINKS.support);
     } catch {
       supportOpenFailed = true;
     } finally {
@@ -38,7 +44,14 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (open && event.key === "Escape") close();
+    if (!open) return;
+    if (event.key === "Escape") {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (dialog) trapTabWithin(event, dialog);
   }
 
   function handleBackdropClick(event: MouseEvent) {
@@ -55,6 +68,7 @@
     onclick={handleBackdropClick}
   >
     <div
+      bind:this={dialog}
       class="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border bg-card shadow-xl sm:h-[min(82vh,820px)] sm:max-w-4xl"
       role="dialog"
       aria-modal="true"
@@ -75,7 +89,13 @@
             {$t("privacySupport.description")}
           </p>
         </div>
-        <Button variant="ghost" size="icon" title={$t("privacySupport.close")} onclick={close}>
+        <Button
+          bind:ref={closeButton}
+          variant="ghost"
+          size="icon"
+          title={$t("privacySupport.close")}
+          onclick={close}
+        >
           <CloseIcon size={20} />
         </Button>
       </header>

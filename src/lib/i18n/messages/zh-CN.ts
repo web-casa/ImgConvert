@@ -40,9 +40,16 @@ export const zhCN = {
     pluginDiagnostics: "插件诊断",
     appUpdate: "应用更新",
     privacySupport: "隐私与支持",
-    licenses: "开源许可",
+    licenses: "关于与开源许可",
     language: "语言",
     utilityMenu: "显示设置",
+    returnToWebsite: "返回官网",
+  },
+  externalLinks: {
+    website: "官方网站",
+    githubRepository: "GitHub 仓库",
+    openWebsite: "访问官方网站",
+    openFailed: "无法打开网页，请复制显示的地址到浏览器中。",
   },
   dropzone: {
     webFilePickerUnavailable: "网页预览无法读取本机文件路径，请在 Tauri 桌面端选择文件",
@@ -265,8 +272,8 @@ export const zhCN = {
   },
   legal: {
     loadError: "无法加载开源许可：{error}",
-    title: "开源许可",
-    description: "Apache-2.0 项目声明与第三方依赖许可归属。",
+    title: "关于与开源许可",
+    description: "ImgConvert 官方项目信息、Apache-2.0 声明与第三方依赖许可归属。",
     close: "关闭",
     loading: "正在加载…",
   },
@@ -301,6 +308,7 @@ export const zhCN = {
     check: "检查更新",
     installAndRestart: "安装并重启",
     checking: "尚未检查更新。",
+    officialLinks: "官方链接",
   },
   errors: {
     fileNotFound: "找不到文件：{path}",
