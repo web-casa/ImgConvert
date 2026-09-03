@@ -1,26 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/main.ts",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "playwright.config.ts",
-    "scripts/*.mjs",
-    "tests/**/*.test.ts",
-    "e2e/**/*.spec.ts",
-    "e2e-desktop/wdio.conf.mjs",
-    "e2e-desktop/specs/**/*.e2e.mjs",
-    "src/lib/components/{LegalDialog,PluginDiagnosticsDialog,PrivacySupportDialog,UpdateDialog}.svelte"
-  ],
-  "project": [
-    "src/**/*.{ts,svelte}",
-    "tests/**/*.ts",
-    "e2e/**/*.ts",
-    "e2e-desktop/**/*.mjs",
-    "*.config.ts",
-    "scripts/*.mjs"
-  ],
-  "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts", "docs-site/source.config.ts"],
   "ignoreDependencies": [
     "@wdio/cli",
     "@wdio/local-runner",
@@ -31,5 +10,41 @@
     "@tauri-apps/plugin-opener",
     "@tauri-apps/cli",
     "tw-animate-css"
-  ]
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/main.ts",
+        "vite.config.ts",
+        "vitest.config.ts",
+        "playwright.config.ts",
+        "scripts/*.mjs",
+        "tests/**/*.test.ts",
+        "e2e/**/*.spec.ts",
+        "e2e-desktop/wdio.conf.mjs",
+        "e2e-desktop/specs/**/*.e2e.mjs",
+        "src/lib/components/{LegalDialog,PluginDiagnosticsDialog,PrivacySupportDialog,UpdateDialog}.svelte"
+      ],
+      "project": [
+        "src/**/*.{ts,svelte}",
+        "tests/**/*.ts",
+        "e2e/**/*.ts",
+        "e2e-desktop/**/*.mjs",
+        "*.config.ts",
+        "scripts/*.mjs"
+      ],
+      "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts", "docs-site/source.config.ts"]
+    },
+    "web-app": {
+      "entry": [
+        "pwa/service-worker.js",
+        "scripts/generate-pwa.mjs",
+        "src/lib/archive.worker.ts",
+        "src/lib/pdf-codec.worker.ts",
+        "src/lib/raster-codec.worker.ts",
+        "src/lib/svg-codec.worker.ts"
+      ],
+      "ignore": ["pwa.config.d.mts"]
+    }
+  }
 }

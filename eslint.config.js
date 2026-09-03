@@ -83,6 +83,15 @@ export default [
     },
   },
   {
+    files: ["spikes/**/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ["e2e-desktop/specs/**/*.mjs"],
     languageOptions: {
       globals: {

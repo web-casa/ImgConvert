@@ -1,0 +1,62 @@
+diff --git a/saxes.d.ts b/saxes.d.ts
+index 6ae89bcbd56c655edd0830c4f4aba780e1728de7..a01c54839a3966b08befe4e09fd7fd6b125752ca 100644
+--- a/saxes.d.ts
++++ b/saxes.d.ts
+@@ -43,7 +43,7 @@ export declare type CommentHandler = (comment: string) => void;
+  *
+  * @param tag The tag.
+  */
+-export declare type OpenTagStartHandler<O> = (tag: StartTagForOptions<O>) => void;
++export declare type OpenTagStartHandler<O extends SaxesOptions> = (tag: StartTagForOptions<O>) => void;
+ export declare type AttributeEventForOptions<O extends SaxesOptions> = O extends {
+     xmlns: true;
+ } ? SaxesAttributeNSIncomplete : O extends {
+@@ -52,21 +52,21 @@ export declare type AttributeEventForOptions<O extends SaxesOptions> = O extends
+ /**
+  * Event handler for attributes.
+  */
+-export declare type AttributeHandler<O> = (attribute: AttributeEventForOptions<O>) => void;
++export declare type AttributeHandler<O extends SaxesOptions> = (attribute: AttributeEventForOptions<O>) => void;
+ /**
+  * Event handler for an open tag. This is called when the open tag is
+  * complete. (We've encountered the ">" that ends the open tag.)
+  *
+  * @param tag The tag.
+  */
+-export declare type OpenTagHandler<O> = (tag: TagForOptions<O>) => void;
++export declare type OpenTagHandler<O extends SaxesOptions> = (tag: TagForOptions<O>) => void;
+ /**
+  * Event handler for a close tag. Note that for self-closing tags, this is
+  * called right after ``opentag``.
+  *
+  * @param tag The tag.
+  */
+-export declare type CloseTagHandler<O> = (tag: TagForOptions<O>) => void;
++export declare type CloseTagHandler<O extends SaxesOptions> = (tag: TagForOptions<O>) => void;
+ /**
+  * Event handler for a CDATA section. This is called when ending the
+  * CDATA section.
+@@ -91,7 +91,7 @@ export declare type ReadyHandler = () => void;
+  */
+ export declare type ErrorHandler = (err: Error) => void;
+ export declare type EventName = (typeof EVENTS)[number];
+-export declare type EventNameToHandler<O, N extends EventName> = {
++export declare type EventNameToHandler<O extends SaxesOptions, N extends EventName> = {
+     "xmldecl": XMLDeclHandler;
+     "text": TextHandler;
+     "processinginstruction": PIHandler;
+@@ -255,12 +255,12 @@ export interface NSOptions {
+      * parsing the XML file. It is not legal to pass bindings for the namespaces
+      * ``"xml"`` or ``"xmlns"``.
+      */
+-    additionalNamespaces?: Record<string, string>;
++    additionalNamespaces?: Record<string, string> | undefined;
+     /**
+      * A function that will be used if the parser cannot resolve a namespace
+      * prefix on its own.
+      */
+-    resolvePrefix?: ResolvePrefix;
++    resolvePrefix?: ResolvePrefix | undefined;
+ }
+ export interface NSOptionsWithoutNamespaces extends NSOptions {
+     xmlns?: false;

@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/jamsinclair/jSquash",
+  "sourceRevision": "da47a2be3b302beb5a5ae164a2ab7aa21a041d90",
+  "components": [
+    {
+      "name": "libavif",
+      "version": "1.0.1",
+      "license": "BSD-2-Clause",
+      "source": "https://github.com/AOMediaCodec/libavif/tree/v1.0.1"
+    },
+    {
+      "name": "libaom",
+      "version": "3.7.0",
+      "license": "BSD-2-Clause",
+      "source": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.7.0"
+    },
+    {
+      "name": "libsharpyuv",
+      "version": "e2c85878f6a33f29948b43d3492d9cdaf801aa54",
+      "license": "BSD-3-Clause",
+      "source": "https://chromium.googlesource.com/webm/libwebp/+/e2c85878f6a33f29948b43d3492d9cdaf801aa54"
+    },
+    {
+      "name": "mozjpeg",
+      "version": "3.3.1",
+      "license": "LicenseRef-IJG AND BSD-3-Clause AND Zlib",
+      "source": "https://github.com/mozilla/mozjpeg/tree/v3.3.1"
+    },
+    {
+      "name": "libwebp",
+      "version": "d2e245ea9e959a5a79e1db0ed2085206947e98f2",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/webmproject/libwebp/tree/d2e245ea9e959a5a79e1db0ed2085206947e98f2"
+    },
+    {
+      "name": "adler",
+      "version": "1.0.2",
+      "license": "0BSD OR MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/adler/1.0.2"
+    },
+    {
+      "name": "bitflags",
+      "version": "1.3.2",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/bitflags/1.3.2"
+    },
+    {
+      "name": "bumpalo",
+      "version": "3.14.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/bumpalo/3.14.0"
+    },
+    {
+      "name": "bytemuck",
+      "version": "1.14.0",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "source": "https://crates.io/crates/bytemuck/1.14.0"
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/cfg-if/1.0.0"
+    },
+    {
+      "name": "crc32fast",
+      "version": "1.3.2",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/crc32fast/1.3.2"
+    },
+    {
+      "name": "fdeflate",
+      "version": "0.3.3",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/fdeflate/0.3.3"
+    },
+    {
+      "name": "flate2",
+      "version": "1.0.28",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/flate2/1.0.28"
+    },
+    {
+      "name": "js-sys",
+      "version": "0.3.66",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/js-sys/0.3.66"
+    },
+    {
+      "name": "log",
+      "version": "0.4.20",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/log/0.4.20"
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.7.1",
+      "license": "MIT OR Zlib OR Apache-2.0",
+      "source": "https://crates.io/crates/miniz_oxide/0.7.1"
+    },
+    {
+      "name": "once_cell",
+      "version": "1.19.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/once_cell/1.19.0"
+    },
+    {
+      "name": "png",
+      "version": "0.17.10",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/png/0.17.10"
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.76",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/proc-macro2/1.0.76"
+    },
+    {
+      "name": "quote",
+      "version": "1.0.35",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/quote/1.0.35"
+    },
+    {
+      "name": "rgb",
+      "version": "0.8.37",
+      "license": "MIT",
+      "source": "https://crates.io/crates/rgb/0.8.37"
+    },
+    {
+      "name": "simd-adler32",
+      "version": "0.3.7",
+      "license": "MIT",
+      "source": "https://crates.io/crates/simd-adler32/0.3.7"
+    },
+    {
+      "name": "syn",
+      "version": "2.0.48",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/syn/2.0.48"
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.12",
+      "license": "(MIT OR Apache-2.0) AND Unicode-DFS-2016",
+      "source": "https://crates.io/crates/unicode-ident/1.0.12"
+    },
+    {
+      "name": "wasm-bindgen",
+      "version": "0.2.89",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/wasm-bindgen/0.2.89"
+    },
+    {
+      "name": "wasm-bindgen-backend",
+      "version": "0.2.89",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/wasm-bindgen-backend/0.2.89"
+    },
+    {
+      "name": "wasm-bindgen-macro",
+      "version": "0.2.89",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/wasm-bindgen-macro/0.2.89"
+    },
+    {
+      "name": "wasm-bindgen-macro-support",
+      "version": "0.2.89",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/wasm-bindgen-macro-support/0.2.89"
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "version": "0.2.89",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/wasm-bindgen-shared/0.2.89"
+    },
+    {
+      "name": "web-sys",
+      "version": "0.3.66",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/web-sys/0.3.66"
+    }
+  ],
+  "artifacts": [
+    {
+      "packageName": "@jsquash/avif",
+      "path": "codec/dec/avif_dec.wasm",
+      "sha256": "5c35dde23dfd862088a49a6b8a9fe81f9f9a1a46aaa27de7efd7baa7611c4b47"
+    },
+    {
+      "packageName": "@jsquash/avif",
+      "path": "codec/enc/avif_enc.wasm",
+      "sha256": "d9f2a95164362af48558d176e619becfd49dd97b50b86c679b47100860522b3d"
+    },
+    {
+      "packageName": "@jsquash/avif",
+      "path": "codec/enc/avif_enc_mt.wasm",
+      "sha256": "202d7ec9fb7d658df7cbf17fd85d83da724ac9551818c2d5161c858353a683a4"
+    },
+    {
+      "packageName": "@jsquash/jpeg",
+      "path": "codec/dec/mozjpeg_dec.wasm",
+      "sha256": "a7c4b12169817e779ff4af137981393ae924944e167ad1bd95747c9199162d3e"
+    },
+    {
+      "packageName": "@jsquash/jpeg",
+      "path": "codec/enc/mozjpeg_enc.wasm",
+      "sha256": "24d4177f1c4963e2058b107189249651c61fdef125570e79b1dfb63c8bb49326"
+    },
+    {
+      "packageName": "@jsquash/png",
+      "path": "codec/pkg/squoosh_png_bg.wasm",
+      "sha256": "263d6e658808a74b72a1a99c5cc1d619237e70c150db6e41d5d84d3d117ab9be"
+    },
+    {
+      "packageName": "@jsquash/webp",
+      "path": "codec/dec/webp_dec.wasm",
+      "sha256": "30fb52fa2a80166d25ba7debf902218904ba1f05ccce9f959f722beff9e2f344"
+    },
+    {
+      "packageName": "@jsquash/webp",
+      "path": "codec/enc/webp_enc.wasm",
+      "sha256": "b6085bb6702f144e9dc6016d58d230b34a84976bf0d080b7390b4b4b137d6ab7"
+    },
+    {
+      "packageName": "@jsquash/webp",
+      "path": "codec/enc/webp_enc_simd.wasm",
+      "sha256": "39c279269ec1163b987b6d69749458e3d5b03b9585f58b6ca5455b76b504a305"
+    }
+  ]
+}

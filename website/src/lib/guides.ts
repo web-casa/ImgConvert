@@ -52,6 +52,7 @@ type GuideLocaleContent = {
     docs: string;
     blog: string;
     privacy: string;
+    webApp: string;
     language: string;
     navigation: string;
     skip: string;
@@ -109,6 +110,7 @@ export const guideContent: Record<Locale, GuideLocaleContent> = {
       docs: "文档",
       blog: "Blog",
       privacy: "隐私政策",
+      webApp: "网页版",
       language: "语言",
       navigation: "指南导航",
       skip: "跳至主要内容",
@@ -126,7 +128,7 @@ export const guideContent: Record<Locale, GuideLocaleContent> = {
       related: "继续阅读",
       allGuides: "查看全部实用指南",
       download: "获取 ImgConvert",
-      localNote: "图片留在你的设备上处理，不上传到网页服务。",
+      localNote: "图片在你的设备或浏览器内处理，不上传到转换服务器。",
       homeEyebrow: "PLATFORM & FORMAT GUIDES",
       homeTitle: "从一个具体的问题，\n开始处理图片。",
       homeBody:
@@ -494,6 +496,7 @@ export const guideContent: Record<Locale, GuideLocaleContent> = {
       docs: "Docs",
       blog: "Blog",
       privacy: "Privacy",
+      webApp: "Web app",
       language: "Language",
       navigation: "Guide navigation",
       skip: "Skip to main content",
@@ -511,7 +514,8 @@ export const guideContent: Record<Locale, GuideLocaleContent> = {
       related: "Keep reading",
       allGuides: "Browse all guides",
       download: "Get ImgConvert",
-      localNote: "Your images stay on your device instead of going to a web service.",
+      localNote:
+        "Images are processed on your device or in your browser, not uploaded to a conversion server.",
       homeEyebrow: "PLATFORM & FORMAT GUIDES",
       homeTitle: "Start with one specific\nimage task.",
       homeBody:

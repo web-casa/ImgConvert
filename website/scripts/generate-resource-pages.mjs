@@ -226,7 +226,7 @@ function renderArticleFallback(locale, page) {
     )
     .join("");
 
-  return `<main class="seo-fallback"><p>${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.lede)}</p>${visualMarkup}<h2>${escapeHtml(common.takeaways)}</h2><ul>${page.takeaways.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>${sections}<aside><h2>${escapeHtml(page.callout.title)}</h2><p>${escapeHtml(page.callout.body)}</p></aside><h2>${escapeHtml(common.faq)}</h2>${questions}<h2>${escapeHtml(common.related)}</h2><ul>${related}</ul><p><a href="${hubPath(locale, page.kind)}">${escapeHtml(page.kind === "blog" ? common.blog : common.docs)}</a> · <a href="${locale === "zh" ? "/#download" : "/en/#download"}">${escapeHtml(common.download)}</a></p></main>`;
+  return `<main class="seo-fallback"><p>${escapeHtml(page.eyebrow)}</p><h1>${escapeHtml(page.title)}</h1><p>${escapeHtml(page.lede)}</p>${visualMarkup}<h2>${escapeHtml(common.takeaways)}</h2><ul>${page.takeaways.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>${sections}<aside><h2>${escapeHtml(page.callout.title)}</h2><p>${escapeHtml(page.callout.body)}</p></aside><h2>${escapeHtml(common.faq)}</h2>${questions}<h2>${escapeHtml(common.related)}</h2><ul>${related}</ul><p><a href="${hubPath(locale, page.kind)}">${escapeHtml(page.kind === "blog" ? common.blog : common.docs)}</a> · <a href="/convert/">${escapeHtml(common.webApp)}</a> · <a href="${locale === "zh" ? "/#download" : "/en/#download"}">${escapeHtml(common.download)}</a></p></main>`;
 }
 
 function renderHubFallback(locale, kind) {
@@ -240,7 +240,7 @@ function renderHubFallback(locale, kind) {
     )
     .join("");
 
-  return `<main class="seo-fallback"><p>${escapeHtml(hub.eyebrow)}</p><h1>${escapeHtml(hub.title)}</h1><p>${escapeHtml(hub.lede)}</p><h2>${escapeHtml(hub.indexTitle)}</h2>${items}<p><a href="${kind === "blog" ? hubPath(locale, "docs") : hubPath(locale, "blog")}">${escapeHtml(kind === "blog" ? common.docs : common.blog)}</a> · <a href="${locale === "zh" ? "/" : "/en/"}">${escapeHtml(common.home)}</a></p></main>`;
+  return `<main class="seo-fallback"><p>${escapeHtml(hub.eyebrow)}</p><h1>${escapeHtml(hub.title)}</h1><p>${escapeHtml(hub.lede)}</p><h2>${escapeHtml(hub.indexTitle)}</h2>${items}<p><a href="${kind === "blog" ? hubPath(locale, "docs") : hubPath(locale, "blog")}">${escapeHtml(kind === "blog" ? common.docs : common.blog)}</a> · <a href="/convert/">${escapeHtml(common.webApp)}</a> · <a href="${locale === "zh" ? "/" : "/en/"}">${escapeHtml(common.home)}</a></p></main>`;
 }
 
 function createTemplate({ locale, pageKind, resourceId, meta, fallback }) {

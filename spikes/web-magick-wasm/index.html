@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>ImgConvert magick-wasm spike</title>
+  </head>
+  <body>
+    <main>
+      <h1>ImgConvert magick-wasm spike</h1>
+      <p>This isolated page validates the local raster conversion engine.</p>
+      <button id="run" type="button">Run matrix</button>
+      <pre id="status" aria-live="polite">Idle</pre>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

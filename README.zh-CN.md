@@ -39,6 +39,8 @@
     </a>
   </p>
   <p>
+    <a href="https://imgconvert.web.casa/convert/"><strong>打开网页版</strong></a>
+    ·
     <a href="https://github.com/web-casa/ImgConvert/releases/latest">
       <strong>下载最新版本</strong>
     </a>
@@ -72,8 +74,9 @@
 | 平台                | 安装包                                                                          | 状态                                        |
 | ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
 | macOS arm64 / x64   | [DMG][latest-release]                                                           | 已签名、公证并发布                          |
-| Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                                                         | 双架构 CI 验证中                            |
+| Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                                                         | 未签名直装包；已完成校验和验证              |
 | Linux amd64 / arm64 | [GitHub 安装包][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`、RPM 和 AppImage 已发布；Snap stable |
+| Web                 | [浏览器中打开](https://imgconvert.web.casa/convert/)                            | 浏览器 Worker 本地处理；不上传原图          |
 | Microsoft Store     | MSIX                                                                            | x64 已进 Partner Center，arm64 待提交       |
 | Mac App Store       | MAS 包                                                                          | 等待验证与审核                              |
 
@@ -124,7 +127,7 @@
 | 对比预览   | 与最终输出共用尺寸、元数据、色彩及编码管线的精确前后对比                                       |
 | 色彩管理   | Display P3 ICC 测试、显式转 sRGB 与色彩管线 v2                                                 |
 | HEIC 导入  | macOS ImageIO、Windows WIC、Linux helper / Flatpak extension；只读导入                         |
-| 本地隐私   | 图片与 PDF 处理默认在本机完成，不需要账号，不上传原始文件                                      |
+| 本地隐私   | 桌面版与 Web 版默认都在设备上处理文件，不需要账号，不上传原始文件                              |
 | 发布工程   | Tauri updater、跨平台安装包、许可 / fuzz / benchmark / CI 护栏                                 |
 
 ## 发布与项目状态
@@ -150,6 +153,7 @@
 | -------- | ------------------------------------------------------------------------------------ |
 | 桌面壳   | Tauri 2                                                                              |
 | 前端     | Svelte 5 runes、shadcn-svelte、Tailwind CSS v4、Solar Icons（`@solar-icons/svelte`） |
+| Web 应用 | Svelte 5、Vite、隔离 Worker、按需 WASM codec 与限定在 `/convert/` 的 PWA             |
 | 图像核心 | Rust、`resvg`、`mozjpeg`、`oxipng`、`webp`、`libavif-sys`、`image`                   |
 | HEIC     | 主程序不内置 HEIC codec；按平台使用系统 provider 或可选 helper                       |
 | 工具链   | pnpm、Node LTS、Rust toolchain、CMake、Meson、Ninja、NASM                            |
@@ -177,6 +181,7 @@ pnpm run check
 pnpm run build
 pnpm run tauri build
 pnpm run docs:web:dev
+pnpm run web:release:build
 
 pnpm run release:readiness
 pnpm run release:readiness:github:ready

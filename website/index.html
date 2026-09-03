@@ -5,14 +5,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#17563d" />
+    <meta name="theme-color" content="#fcf9f3" />
     <meta
       name="description"
-      content="ImgConvert 是一款本地优先的跨平台图片转换工具，用于批量转换、压缩 JPEG、PNG、WebP、AVIF 等图片；原图不上传，处理在你的设备上完成。"
+      content="ImgConvert 提供跨平台桌面应用和浏览器内本地处理的 Web 版，支持图片、PDF 与 SVG 转换；原图不上传。"
     />
     <meta
       name="keywords"
-      content="本地图片转换, 图片批量转换, 图片压缩, 图片格式转换, AVIF 转换, WebP 转换, JPEG 转换, PNG 转换, HEIC 导入"
+      content="本地图片转换, 图片批量转换, 图片压缩, PDF 转图片, SVG 输入, AVIF 转换, WebP 转换, JPEG 转换, PNG 转换, HEIC 导入"
     />
     <meta
       name="robots"
@@ -29,29 +29,29 @@
     <meta property="og:title" content="ImgConvert — 本地图片转换、批量压缩与格式转换" />
     <meta
       property="og:description"
-      content="本地批量转换、压缩 JPEG、PNG、WebP 与 AVIF 图片；原图不上传，处理在你的设备上完成。"
+      content="支持 PDF、SVG、HEIC 等输入，本地批量转换为 JPEG、PNG、WebP 与 AVIF；原图不上传。"
     />
     <meta property="og:url" content="https://imgconvert.web.casa/" />
     <meta
       property="og:image"
-      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+      content="https://imgconvert.web.casa/images/product/screenshots/100-zh.png"
     />
     <meta property="og:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="ImgConvert — 本地图片转换、批量压缩与格式转换" />
     <meta
       name="twitter:description"
-      content="本地批量转换、压缩 JPEG、PNG、WebP 与 AVIF 图片；原图不上传。"
+      content="支持 PDF、SVG、HEIC 等输入，本地批量转换为 JPEG、PNG、WebP 与 AVIF；原图不上传。"
     />
     <meta
       name="twitter:image"
-      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+      content="https://imgconvert.web.casa/images/product/screenshots/100-zh.png"
     />
     <meta name="twitter:image:alt" content="ImgConvert 本地批量图片转换工作区界面" />
     <link
       rel="preload"
       as="image"
-      href="/images/product/main-workspace.avif"
+      href="/images/product/screenshots/100-zh.avif"
       type="image/avif"
       fetchpriority="high"
     />
@@ -72,16 +72,26 @@
             "name": "ImgConvert",
             "url": "https://imgconvert.web.casa/",
             "downloadUrl": [
+              "https://apps.apple.com/cn/app/imgconvert/id6803600249",
               "https://snapcraft.io/imgconvert",
               "https://github.com/web-casa/ImgConvert/releases/latest",
-              "https://apps.microsoft.com/store/detail/9P1BWD965DBX"
+              "https://apps.microsoft.com/store/detail/9P1BWD965DBX?cid=DevShareMCLPCS"
             ],
             "applicationCategory": "MultimediaApplication",
             "operatingSystem": "macOS, Windows, Linux",
             "inLanguage": "zh-CN",
-            "description": "本地优先的跨平台图片批量转换与压缩工具。图片不上传，处理在设备上完成。",
-            "image": "https://imgconvert.web.casa/images/product/main-workspace.png",
+            "description": "本地优先的跨平台图片批量转换与压缩工具，支持 PDF、SVG、HEIC 等输入。图片不上传，处理在设备上完成。",
+            "image": "https://imgconvert.web.casa/images/product/screenshots/100-zh.png",
             "sameAs": "https://github.com/web-casa/ImgConvert"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "ImgConvert Web",
+            "url": "https://imgconvert.web.casa/convert/",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any",
+            "inLanguage": ["zh-CN", "en"],
+            "description": "在浏览器 Worker 中本地转换 JPEG、PNG、WebP、AVIF、BMP、静态 GIF、安全 SVG 与选定 PDF 页面，不上传原图。"
           },
           {
             "@type": "FAQPage",
@@ -104,10 +114,18 @@
               },
               {
                 "@type": "Question",
+                "name": "支持哪些输入和输出格式？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "桌面版支持 PDF、SVG、HEIC 和常见图片输入；Web 版支持 JPEG、PNG、静态 WebP、AVIF、BMP、静态 GIF、安全 SVG 与 PDF。两者均可输出 AVIF、WebP、JPEG 与 PNG。"
+                }
+              },
+              {
+                "@type": "Question",
                 "name": "在哪里获取最新版本？",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Windows 版可从 Microsoft Store 获取，Linux 可通过 Snap Store 安装；其他可用安装包和校验信息在 GitHub Releases。"
+                  "text": "可直接打开 Web 版；macOS 版可从 Mac App Store 获取，Windows 版可从 Microsoft Store 获取，Linux 可通过 Snap Store 安装；其他可用安装包和校验信息在 GitHub Releases。"
                 }
               }
             ]
@@ -123,25 +141,27 @@
         <main>
           <h1>ImgConvert：本地图片转换、批量压缩与格式转换</h1>
           <p>
-            ImgConvert 是一款本地优先的跨平台桌面图片转换工具，用于批量转换、压缩和整理
-            JPEG、PNG、WebP、AVIF 等图片。原图不上传，处理在你的设备上完成。
+            ImgConvert 提供跨平台桌面应用和浏览器内本地处理的 Web 版，用于转换、压缩和整理
+            PDF、SVG、HEIC、JPEG、PNG、WebP、AVIF 等文件。具体格式能力因版本而异；原图不上传。
           </p>
-          <h2>本地处理，而不是网页上传</h2>
+          <h2>设备内处理，而不是上传转换</h2>
           <p>
-            图片转换、压缩、缩略图生成和队列管理均在本机完成。应用不包含账号系统、广告 SDK、行为统计
-            SDK 或第三方埋点。
+            桌面版在本机处理，Web 版在浏览器 Worker 中处理。产品不包含账号系统、广告 SDK、行为统计
+            SDK 或第三方埋点，也不把原图发送到转换服务器。
           </p>
           <h2>格式与批量工作流</h2>
           <p>
             可将文件、目录和你主动粘贴的剪贴板图片集中到同一个任务队列；单张图片可单独选择输出格式。支持
-            AVIF、WebP、JPEG 和 PNG 输出；HEIC 是平台能力支持的只读导入。
+            AVIF、WebP、JPEG 和 PNG 输出；PDF、SVG、HEIC 及常见图片格式均可作为输入。
           </p>
           <h2>常见问题</h2>
           <p>图片不会被上传到服务器。更多数据处理、缓存与元数据说明请阅读隐私政策。</p>
           <p>
             <a href="/privacy/">隐私政策</a>
             · <a href="/legal/">开源与法律信息</a> · <a href="/docs/">产品文档</a> ·
-            <a href="/blog/">Blog</a> · <a href="https://snapcraft.io/imgconvert">Snap Store</a> ·
+            <a href="/blog/">Blog</a> · <a href="/convert/">直接使用网页版</a> ·
+            <a href="https://snapcraft.io/imgconvert">Snap Store</a> ·
+            <a href="https://apps.apple.com/cn/app/imgconvert/id6803600249">Mac App Store</a> ·
             <a href="https://github.com/web-casa/ImgConvert/releases/latest">下载最新版本</a>
             ·
             <a href="https://apps.microsoft.com/store/detail/9P1BWD965DBX?cid=DevShareMCLPCS"

@@ -1,0 +1,26 @@
+{
+  "name": "@imgconvert/web-magick-wasm-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.34.4",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.worker.json && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "license:check": "node ./scripts/check-bundled-licenses.mjs",
+    "license:report": "node ./scripts/check-bundled-licenses.mjs --report-only",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node ./scripts/run-browser-spike.mjs",
+    "technical:check": "pnpm run build && pnpm run test",
+    "promotion:check": "pnpm run technical:check && pnpm run license:check"
+  },
+  "dependencies": {
+    "@imagemagick/magick-wasm": "0.0.43"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "typescript": "6.0.3",
+    "vite": "8.1.0"
+  }
+}

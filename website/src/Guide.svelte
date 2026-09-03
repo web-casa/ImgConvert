@@ -35,7 +35,14 @@
 <div class="guide-shell">
   <header class="legal-topbar guide-topbar">
     <a class="brand" href={homeUrl} aria-label="ImgConvert home">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <img
+        class="brand-logo"
+        src="/images/product/app-icon.png"
+        alt=""
+        width="30"
+        height="30"
+        aria-hidden="true"
+      />
       <span class="brand-name">ImgConvert</span>
     </a>
     <nav class="legal-nav" aria-label={content.common.navigation}>
@@ -44,6 +51,7 @@
       <a href={docsUrl}>{content.common.docs}</a>
       <a href={blogUrl}>{content.common.blog}</a>
       <a href={privacyUrl}>{content.common.privacy}</a>
+      <a href={links.webApp}>{content.common.webApp}</a>
       <span class="language-switch" aria-label={content.common.language}>
         <a
           class:active={locale === "zh"}
@@ -230,7 +238,14 @@
   <footer class="footer guide-footer">
     <div class="footer-brand">
       <a class="brand" href={homeUrl} aria-label="ImgConvert home">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <img
+          class="brand-logo"
+          src="/images/product/app-icon.png"
+          alt=""
+          width="30"
+          height="30"
+          aria-hidden="true"
+        />
         <span class="brand-name">ImgConvert</span>
       </a>
       <p>{content.common.localNote}</p>
@@ -240,6 +255,7 @@
       <a href={docsUrl}>{content.common.docs}</a>
       <a href={blogUrl}>{content.common.blog}</a>
       <a href={privacyUrl}>{content.common.privacy}</a>
+      <a href={links.webApp}>{content.common.webApp}</a>
       <a href={guide.primaryCta.href} target="_blank" rel="noreferrer">{content.common.download}</a>
       <a href={links.repository} target="_blank" rel="noreferrer">GitHub</a>
     </div>

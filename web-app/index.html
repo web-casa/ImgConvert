@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f8f5ed" />
+    <meta name="application-name" content="ImgConvert" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="ImgConvert" />
+    <meta
+      name="description"
+      content="ImgConvert Web converts JPEG, PNG, WebP, AVIF, BMP, static GIF, validated SVG, and PDF locally in browser workers without uploading source files."
+    />
+    <link rel="manifest" href="/convert/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/convert/icons/icon-192.png" sizes="192x192" />
+    <title>ImgConvert Web</title>
+  </head>
+  <body>
+    <div id="app">
+      <noscript>
+        <main>
+          <h1>ImgConvert Web</h1>
+          <p>
+            JavaScript is required because image conversion runs locally in browser workers. Source
+            files are not sent to a conversion server.
+          </p>
+          <p><a href="/">Home</a> · <a href="/privacy/">Privacy</a></p>
+        </main>
+      </noscript>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

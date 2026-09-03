@@ -57,6 +57,7 @@ export type ResourceCommon = {
   docs: string;
   guides: string;
   privacy: string;
+  webApp: string;
   language: string;
   navigation: string;
   skip: string;

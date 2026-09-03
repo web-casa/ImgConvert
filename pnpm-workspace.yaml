@@ -1,7 +1,11 @@
 packages:
   - .
   - docs-site
+  - packages/*
+  - web-app
   - website
 
 overrides:
   svelte-i18n>esbuild: ^0.25.0
+patchedDependencies:
+  saxes@6.0.0: patches/saxes@6.0.0.patch

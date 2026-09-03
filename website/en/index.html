@@ -5,14 +5,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#17563d" />
+    <meta name="theme-color" content="#fcf9f3" />
     <meta
       name="description"
-      content="ImgConvert is a local-first, cross-platform image converter for batch conversion and compression of JPEG, PNG, WebP, and AVIF images. Your originals stay on your device."
+      content="ImgConvert offers cross-platform desktop apps and an in-browser local Web app for image, PDF, and SVG conversion without uploading originals."
     />
     <meta
       name="keywords"
-      content="local image converter, batch image conversion, image compression, image format converter, AVIF converter, WebP converter, JPEG converter, PNG converter, HEIC import"
+      content="local image converter, batch image conversion, image compression, PDF to image, SVG input, AVIF converter, WebP converter, JPEG converter, PNG converter, HEIC import"
     />
     <meta
       name="robots"
@@ -29,23 +29,23 @@
     <meta property="og:title" content="ImgConvert — Local image conversion & batch compression" />
     <meta
       property="og:description"
-      content="Batch-convert and compress JPEG, PNG, WebP, and AVIF images locally. Your originals stay on your device."
+      content="Accept PDF, SVG, HEIC, and common images, then batch-convert them locally to JPEG, PNG, WebP, or AVIF."
     />
     <meta property="og:url" content="https://imgconvert.web.casa/en/" />
     <meta
       property="og:image"
-      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+      content="https://imgconvert.web.casa/images/product/screenshots/100.png"
     />
     <meta property="og:image:alt" content="The ImgConvert local batch image conversion workspace" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="ImgConvert — Local image conversion & batch compression" />
     <meta
       name="twitter:description"
-      content="Batch-convert and compress JPEG, PNG, WebP, and AVIF images locally. Your originals stay on your device."
+      content="Accept PDF, SVG, HEIC, and common images, then batch-convert them locally to JPEG, PNG, WebP, or AVIF."
     />
     <meta
       name="twitter:image"
-      content="https://imgconvert.web.casa/images/product/main-workspace.png"
+      content="https://imgconvert.web.casa/images/product/screenshots/100.png"
     />
     <meta
       name="twitter:image:alt"
@@ -54,7 +54,7 @@
     <link
       rel="preload"
       as="image"
-      href="/images/product/main-workspace.avif"
+      href="/images/product/screenshots/100.avif"
       type="image/avif"
       fetchpriority="high"
     />
@@ -75,16 +75,26 @@
             "name": "ImgConvert",
             "url": "https://imgconvert.web.casa/en/",
             "downloadUrl": [
+              "https://apps.apple.com/cn/app/imgconvert/id6803600249",
               "https://snapcraft.io/imgconvert",
               "https://github.com/web-casa/ImgConvert/releases/latest",
-              "https://apps.microsoft.com/store/detail/9P1BWD965DBX"
+              "https://apps.microsoft.com/store/detail/9P1BWD965DBX?cid=DevShareMCLPCS"
             ],
             "applicationCategory": "MultimediaApplication",
             "operatingSystem": "macOS, Windows, Linux",
             "inLanguage": "en",
-            "description": "A local-first, cross-platform app for batch image conversion and compression. Your images stay on your device.",
-            "image": "https://imgconvert.web.casa/images/product/main-workspace.png",
+            "description": "A local-first, cross-platform app for batch image conversion and compression with PDF, SVG, and HEIC input. Your images stay on your device.",
+            "image": "https://imgconvert.web.casa/images/product/screenshots/100.png",
             "sameAs": "https://github.com/web-casa/ImgConvert"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "ImgConvert Web",
+            "url": "https://imgconvert.web.casa/convert/",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any",
+            "inLanguage": ["zh-CN", "en"],
+            "description": "Convert JPEG, PNG, WebP, AVIF, BMP, static GIF, validated SVG, and selected PDF pages locally in browser workers without uploading originals."
           },
           {
             "@type": "FAQPage",
@@ -107,10 +117,18 @@
               },
               {
                 "@type": "Question",
+                "name": "Which input and output formats are supported?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Desktop accepts PDF, SVG, HEIC, and common images. Web accepts JPEG, PNG, static WebP, AVIF, BMP, static GIF, validated SVG, and PDF. Both export AVIF, WebP, JPEG, and PNG."
+                }
+              },
+              {
+                "@type": "Question",
                 "name": "Where do I get the newest build?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Get the Windows app from Microsoft Store or install Linux through Snap Store. Other available installers and checksums are published on GitHub Releases."
+                  "text": "Open the Web app directly, get macOS from Mac App Store, Windows from Microsoft Store, or install Linux through Snap Store. Other installers and checksums are on GitHub Releases."
                 }
               }
             ]
@@ -126,21 +144,21 @@
         <main>
           <h1>ImgConvert: local image conversion, batch compression, and format conversion</h1>
           <p>
-            ImgConvert is a local-first, cross-platform desktop image converter for batch
-            conversion, compression, and organization of JPEG, PNG, WebP, and AVIF images. Your
-            originals stay on your device.
+            ImgConvert offers cross-platform desktop apps and an in-browser local Web app for
+            converting and compressing PDF, SVG, HEIC, JPEG, PNG, WebP, and AVIF files. Exact format
+            support differs by edition; originals stay on your device.
           </p>
-          <h2>Local processing, not web upload</h2>
+          <h2>On-device processing, not conversion upload</h2>
           <p>
-            Image conversion, compression, thumbnail generation, and queue management run on your
-            device. The app contains no account system, ad SDK, behavioral analytics SDK, or
-            third-party tracking.
+            Desktop runs locally and Web runs in browser workers. Neither sends originals to a
+            conversion server. The product contains no account system, ad SDK, behavioral analytics
+            SDK, or third-party tracking.
           </p>
           <h2>Formats and batch workflow</h2>
           <p>
             Bring files, folders, and clipboard images you intentionally paste into one queue, then
-            choose an output format per image. AVIF, WebP, JPEG, and PNG are output formats; HEIC is
-            a platform-capability read-only import.
+            choose an output format per image. AVIF, WebP, JPEG, and PNG are output formats; PDF,
+            SVG, HEIC, and common image formats are accepted as input.
           </p>
           <h2>Common questions</h2>
           <p>
@@ -151,7 +169,9 @@
             <a href="/en/privacy/">Privacy policy</a>
             · <a href="/en/legal/">Open source &amp; legal</a> ·
             <a href="/en/docs/">Documentation</a> · <a href="/en/blog/">Blog</a> ·
+            <a href="/convert/">Open the Web app</a> ·
             <a href="https://snapcraft.io/imgconvert">Snap Store</a> ·
+            <a href="https://apps.apple.com/cn/app/imgconvert/id6803600249">Mac App Store</a> ·
             <a href="https://github.com/web-casa/ImgConvert/releases/latest"
               >Get the latest release</a
             >

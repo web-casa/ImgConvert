@@ -23,6 +23,7 @@ type LegalLocaleContent = {
     home: string;
     privacy: string;
     legal: string;
+    webApp: string;
     language: string;
     skip: string;
   };
@@ -56,6 +57,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       home: "首页",
       privacy: "隐私政策",
       legal: "开源与法律信息",
+      webApp: "网页版",
       language: "语言",
       skip: "跳至主要内容",
     },
@@ -66,21 +68,21 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       eyebrow: "PRIVACY POLICY",
       title: "用清楚的话，\n说明隐私。",
       intro:
-        "ImgConvert 是一款在本机运行的图片批量转换工具。我们默认按“本地优先、最小收集”的原则处理数据。",
-      effectiveDate: "生效日期：2026-08-26",
+        "ImgConvert 提供桌面版和浏览器内本地处理的 Web 版。我们默认按“本地优先、最小收集”的原则处理数据。",
+      effectiveDate: "生效日期：2026-09-03",
       sourceNote: "以下内容与项目公开隐私政策保持一致。",
       sections: [
         {
           title: "适用范围",
           paragraphs: [
-            "本政策适用于当前 ImgConvert 的官方桌面版。若不同分发渠道的数据处理方式不同，本政策会明确标注对应渠道。",
-            "本政策不替代 Apple、Microsoft、GitHub 或操作系统提供方各自的隐私政策。",
+            "本政策适用于当前 ImgConvert 的官方桌面版和位于 imgconvert.web.casa/convert/ 的 Web 版。若不同分发渠道的数据处理方式不同，本政策会明确标注对应渠道。",
+            "本政策不替代 Apple、Microsoft、GitHub、Cloudflare 或操作系统及浏览器提供方各自的隐私政策。",
           ],
         },
         {
           title: "核心承诺",
           items: [
-            "图片转换、压缩、缩略图生成和处理均在本机完成。",
+            "图片转换、压缩、缩略图生成和处理均在你的设备上完成；Web 版在浏览器 Worker 中处理。",
             "不上传，也不会向我们或第三方收集你的图片、文件路径、剪贴板内容或转换结果。",
             "不包含广告 SDK、行为统计 SDK、第三方埋点或账号系统。",
             "Mac App Store 和 Microsoft Store 版本均不启用应用内更新，软件更新由各自的应用商店提供。",
@@ -109,11 +111,18 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           outro: "应用不会后台扫描相册、硬盘或网络位置。",
         },
         {
+          title: "Web 版浏览器处理",
+          paragraphs: [
+            "Web 版从同源网站加载界面、Worker 和 WASM 编解码资源。你主动选择或粘贴的输入文件只在当前浏览器会话的内存中处理，不会发送给 ImgConvert 或第三方转换接口。转换结果只会在你主动下载、保存目录或导出 ZIP 时写入你选择的位置；Web 版不会把输入文件、文件名、缩略图或转换结果持久化到浏览器存储。",
+            "Web 版会把语言、主题和转换参数保存在浏览器 localStorage 中。启用离线能力后，Service Worker 会在 Cache Storage 中保存公开的应用界面、Worker、WASM、图标和 manifest；这些缓存不包含用户文件或转换结果。页面内的“清除本地数据”操作只删除 ImgConvert Web 自己的设置与缓存，不触碰其他同源应用的数据，也不会删除你已经下载的文件。",
+          ],
+        },
+        {
           title: "本机设置、缓存与临时文件",
           paragraphs: [
             "应用会在本机保存转换偏好设置。若你主动选择自定义输出目录，其路径会保存在本机设置中，以便下次继续使用。在允许用户选择 HEIC helper 的版本中，所选 helper 的路径也可能保存在本机。",
-            "转换过程中，应用还可能在本机临时目录或应用数据目录中创建临时文件、缩略图缓存和结果缓存记录。结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小，不包含图片字节或文件路径；它可能在当前任务结束后继续保留，直至被清除。",
-            "临时文件仅用于完成当前转换任务，用户可以随时删除。设置、缓存和临时文件都不会同步到任何服务器；你可以在应用中关闭结果复用。如需删除已保存的设置和缓存记录，请删除相应的本机应用数据或缓存目录。",
+            "桌面版转换过程中还可能在本机临时目录或应用数据目录中创建临时文件、缩略图缓存和结果缓存记录。结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小，不包含图片字节或文件路径；它可能在当前任务结束后继续保留，直至被清除。",
+            "临时文件仅用于完成当前转换任务，用户可以随时删除。设置、缓存和临时文件都不会同步到任何服务器；你可以在桌面应用中关闭结果复用。如需删除已保存的设置和缓存记录，请删除相应的本机应用数据或缓存目录。",
           ],
         },
         {
@@ -133,7 +142,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "元数据处理",
           paragraphs: [
-            "默认情况下，输出图片不会自动保留原图元数据。只有在你明确开启“保留元数据”选项时，应用才会把受支持的 ICC、EXIF、XMP 等元数据写入输出文件。",
+            "桌面版默认不会自动保留原图元数据；只有在你明确开启“保留元数据”选项时，应用才会把受支持的 ICC、EXIF、XMP 等元数据写入输出文件。Web v1 固定移除源 EXIF、XMP、IPTC 与 ICC，不提供保留元数据选项。",
           ],
         },
         {
@@ -144,7 +153,8 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           title: "更新与第三方服务",
           paragraphs: [
             "Mac App Store 和 Microsoft Store 版本不使用应用内更新通道。单独配置的直发版本仅会在你主动检查或安装更新时连接 GitHub Releases；该连接受 GitHub 隐私政策约束，且不会上传你的图片或转换数据。",
-            "除上述可选、由用户主动触发的直发更新连接外，ImgConvert 不会为了应用运行调用第三方网络服务，也不包含分析、广告、崩溃报告或远程配置服务。",
+            "除上述可选、由用户主动触发的直发更新连接外，ImgConvert 不会为了桌面应用运行调用第三方网络服务，也不包含分析、广告、崩溃报告或远程配置服务。",
+            "访问 Web 版需要从 imgconvert.web.casa 加载静态应用资源；检查 Web 版更新也会请求同一来源。图片转换本身不使用网络接口。网站由 Cloudflare Pages 托管，因此常规 HTTP 请求会经过 Cloudflare 基础设施并受其隐私政策约束，但 /convert/ 不启用 Cloudflare Web Analytics 或其他客户端行为统计脚本。",
           ],
         },
         {
@@ -191,6 +201,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       home: "Home",
       privacy: "Privacy",
       legal: "Open source & legal",
+      webApp: "Web app",
       language: "Language",
       skip: "Skip to main content",
     },
@@ -201,21 +212,21 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       eyebrow: "PRIVACY POLICY",
       title: "Privacy,\nin plain language.",
       intro:
-        "ImgConvert is a local image batch-conversion tool. We process data according to the principles of local-first operation and minimal collection.",
-      effectiveDate: "Effective date: August 26, 2026",
+        "ImgConvert offers desktop releases and a Web app that processes files locally in the browser. We follow local-first operation and minimal collection.",
+      effectiveDate: "Effective date: September 3, 2026",
       sourceNote: "This page stays aligned with the public project privacy policy.",
       sections: [
         {
           title: "Scope",
           paragraphs: [
-            "This policy covers the current official ImgConvert desktop releases. Where a data practice differs by distribution channel, this policy identifies that channel specifically.",
-            "It does not replace the privacy policies of Apple, Microsoft, GitHub, or your operating-system provider.",
+            "This policy covers the current official ImgConvert desktop releases and the Web app at imgconvert.web.casa/convert/. Where a data practice differs by distribution channel, this policy identifies that channel specifically.",
+            "It does not replace the privacy policies of Apple, Microsoft, GitHub, Cloudflare, or your operating-system or browser provider.",
           ],
         },
         {
           title: "Core commitments",
           items: [
-            "Image conversion, compression, thumbnail generation, and processing run on your device.",
+            "Image conversion, compression, thumbnail generation, and processing run on your device; the Web app performs this work in browser workers.",
             "We do not upload or collect your images, file paths, clipboard content, or conversion results for us or a third party.",
             "ImgConvert contains no advertising SDK, behavioral analytics SDK, third-party tracking, or account system.",
             "The Mac App Store and Microsoft Store editions do not enable an in-app updater. Their software updates are delivered by the respective store.",
@@ -247,10 +258,17 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
             "The app does not scan photo libraries, disks, or network locations in the background.",
         },
         {
+          title: "Web app browser processing",
+          paragraphs: [
+            "The Web app loads its interface, workers, and WASM codecs from the same-origin site. Input files that you actively select or paste are processed only in the memory of the current browser session. They are not sent to ImgConvert or a third-party conversion endpoint. Results are written only when you actively download them, choose an output directory, or export a ZIP. The Web app does not persist input files, file names, thumbnails, or conversion results in browser storage.",
+            "The Web app saves language, theme, and conversion settings in browser localStorage. When offline support is enabled, its service worker stores only public application-shell, worker, WASM, icon, and manifest assets in Cache Storage. Those caches do not contain user files or results. The in-app Clear Local Data action removes only ImgConvert Web preferences and caches; it does not touch unrelated same-origin data or files that you have downloaded.",
+          ],
+        },
+        {
           title: "Local settings, caches, and temporary files",
           paragraphs: [
             "ImgConvert stores conversion preferences locally. If you actively choose a custom output directory, its path is stored in local settings for your next use. On editions that allow a user-selected HEIC helper, that selected helper path may also be stored locally.",
-            "During conversion, ImgConvert may also create temporary files, thumbnail caches, and result-cache records in the local temporary directory or app-data directory. Result-cache records contain only hashes and file sizes used to verify or reuse conversion results; they do not contain image bytes or file paths and may remain after a task completes until you clear them.",
+            "During desktop conversion, ImgConvert may also create temporary files, thumbnail caches, and result-cache records in the local temporary directory or app-data directory. Result-cache records contain only hashes and file sizes used to verify or reuse conversion results; they do not contain image bytes or file paths and may remain after a task completes until you clear them.",
             "Temporary files are used only to complete the current conversion task, and you may delete them at any time. Settings, caches, and temporary files are never synchronized to a server; you can disable result reuse in the app. To remove saved settings and cache records, delete the relevant local app-data or cache directory.",
           ],
         },
@@ -271,7 +289,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "Metadata handling",
           paragraphs: [
-            "Output images do not preserve source metadata by default. Only when you explicitly enable the Preserve metadata setting does ImgConvert write supported ICC, EXIF, XMP, or IPTC metadata to the output file.",
+            "The desktop app does not preserve source metadata by default. Only when you explicitly enable Preserve metadata does it write supported ICC, EXIF, XMP, or IPTC metadata to the output file. Web v1 always removes source EXIF, XMP, IPTC, and ICC data and does not offer a metadata-preservation setting.",
           ],
         },
         {
@@ -284,7 +302,8 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           title: "Updates and third-party services",
           paragraphs: [
             "The Mac App Store and Microsoft Store editions do not use an in-app update channel. A separately configured direct-distribution build can contact GitHub Releases only after you choose to check for or install an update; that connection is governed by GitHub's privacy practices and does not upload your images or conversion data.",
-            "Apart from that optional, user-initiated direct-update connection, ImgConvert does not call third-party network services for app operation. It does not include analytics, advertising, crash reporting, or remote-configuration services.",
+            "Apart from that optional, user-initiated direct-update connection, ImgConvert does not call third-party network services for desktop app operation. It does not include analytics, advertising, crash reporting, or remote-configuration services.",
+            "Visiting the Web app loads static application resources from imgconvert.web.casa; checking for a Web app update also requests that same origin. Image conversion itself uses no network endpoint. The site is hosted on Cloudflare Pages, so ordinary HTTP requests pass through Cloudflare infrastructure and are subject to Cloudflare's privacy practices, but /convert/ does not enable Cloudflare Web Analytics or another client-side behavioral analytics script.",
           ],
         },
         {

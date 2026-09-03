@@ -79,28 +79,44 @@
 <div class="resource-shell">
   <header class="legal-topbar resource-topbar">
     <a class="brand" href={homeUrl} aria-label="ImgConvert home">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <img
+        class="brand-logo"
+        src="/images/product/app-icon.png"
+        alt=""
+        width="30"
+        height="30"
+        aria-hidden="true"
+      />
       <span class="brand-name">ImgConvert</span>
     </a>
     <nav class="legal-nav" aria-label={content.common.navigation}>
       <a href={homeUrl}>{content.common.home}</a>
-      <a class:active={page.kind === "docs"} href={hubPath(locale, "docs")}>{content.common.docs}</a
+      <a
+        class:active={page.kind === "docs"}
+        href={hubPath(locale, "docs")}
+        aria-current={page.kind === "docs" ? "page" : undefined}>{content.common.docs}</a
       >
-      <a class:active={page.kind === "blog"} href={hubPath(locale, "blog")}>{content.common.blog}</a
+      <a
+        class:active={page.kind === "blog"}
+        href={hubPath(locale, "blog")}
+        aria-current={page.kind === "blog" ? "page" : undefined}>{content.common.blog}</a
       >
       <a href={guidesUrl}>{content.common.guides}</a>
       <a href={privacyUrl}>{content.common.privacy}</a>
+      <a href={links.webApp}>{content.common.webApp}</a>
       <span class="language-switch" aria-label={content.common.language}>
         <a
           class:active={locale === "zh"}
           href={locale === "zh" ? resourcePath(locale, page.id) : alternatePageUrl}
-          lang="zh-CN">中</a
+          lang="zh-CN"
+          aria-current={locale === "zh" ? "page" : undefined}>中</a
         >
         <span aria-hidden="true">/</span>
         <a
           class:active={locale === "en"}
           href={locale === "en" ? resourcePath(locale, page.id) : alternatePageUrl}
-          lang="en">EN</a
+          lang="en"
+          aria-current={locale === "en" ? "page" : undefined}>EN</a
         >
       </span>
     </nav>
@@ -240,7 +256,14 @@
   <footer class="footer resource-footer">
     <div class="footer-brand">
       <a class="brand" href={homeUrl} aria-label="ImgConvert home">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <img
+          class="brand-logo"
+          src="/images/product/app-icon.png"
+          alt=""
+          width="30"
+          height="30"
+          aria-hidden="true"
+        />
         <span class="brand-name">ImgConvert</span>
       </a>
       <p>{content.common.localNote}</p>
@@ -250,6 +273,7 @@
       <a href={hubPath(locale, "blog")}>{content.common.blog}</a>
       <a href={guidesUrl}>{content.common.guides}</a>
       <a href={privacyUrl}>{content.common.privacy}</a>
+      <a href={links.webApp}>{content.common.webApp}</a>
       <a href={links.repository} target="_blank" rel="noreferrer">GitHub</a>
     </div>
   </footer>

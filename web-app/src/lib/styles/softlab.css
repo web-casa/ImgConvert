@@ -1,0 +1,364 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2026 ImgConvert contributors */
+
+/*
+ * 引导流程布局(原 softlab 设计,已转正为唯一设计):暖奶纸底、品牌绿 accent、
+ * 大圆角、暖绿灰柔和阴影。步进器 + 左侧任务流 + 右侧粘性队列 + 底部绿色统计卡。
+ * token 与导航/底色已在 app.css 合并;本文件保留结构性规则,
+ * 用 :root 前缀(0-1-1)保证压过 app.css 同名类规则(0-1-0)。
+ * 绿色统计卡仅浅色态;暗色沿用 app.css 的 dark token。
+ */
+
+/* ---- 处理路径卡:绿色系(浅绿底 + 深绿标题/数字/出站读数),仅浅色态 ---- */
+:root:not([data-theme="dark"]) .local-ledger {
+  border-color: color-mix(in srgb, var(--green) 32%, transparent);
+  background: var(--green-soft);
+  box-shadow:
+    0 2px 6px rgb(46 80 52 / 7%),
+    0 14px 36px rgb(46 80 52 / 10%);
+}
+:root:not([data-theme="dark"]) .local-ledger::before {
+  background: var(--green-deep);
+}
+/* 深绿 #326a39 配浅绿 #e5f0e0 约 7:1,过 AA */
+:root:not([data-theme="dark"]) .ledger-heading {
+  color: var(--green-deep);
+}
+:root:not([data-theme="dark"]) .route-steps span {
+  color: var(--green-deep);
+}
+:root:not([data-theme="dark"]) .route-steps li:not(:last-child)::after {
+  border-color: color-mix(in srgb, var(--green) 32%, transparent);
+  background: var(--green-soft);
+}
+:root:not([data-theme="dark"]) .outbound-row {
+  border-top-color: color-mix(in srgb, var(--green) 32%, transparent);
+  background: rgb(50 106 57 / 10%);
+  color: var(--green-deep);
+}
+
+/* ---- 大圆角体系 ---- */
+:root
+  :is(
+    .app-header,
+    .local-ledger,
+    .drop-zone,
+    .queue-panel,
+    .settings-panel,
+    .pwa-panel,
+    .admission-notices
+  ) {
+  border-radius: 24px;
+}
+:root
+  :is(
+    .select-button,
+    .convert-area button,
+    .queue-summary button,
+    .header-link,
+    .icon-button,
+    .item-actions button,
+    .settings-heading > span,
+    .empty-state > span,
+    .drop-icon,
+    .dialog-actions button,
+    .preview-heading button,
+    .preview-summary button,
+    .pwa-actions button,
+    .pwa-icon,
+    select,
+    input[type="number"],
+    input[type="color"],
+    .dialog-icon
+  ) {
+  border-radius: 14px;
+}
+:root .thumbnail {
+  border-radius: 16px;
+}
+:root .brand img {
+  border-radius: 12px;
+}
+:root :is(.clear-dialog, .preview-dialog) {
+  border-radius: 24px;
+}
+
+/* ---- 步进器 ---- */
+:root .stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 22px auto 0;
+}
+:root .step {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 4px 16px 4px 6px;
+  background: var(--paper-raised);
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  font-weight: 680;
+  text-decoration: none;
+  transition:
+    background-color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .step:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+:root .step[aria-current="step"] {
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  color: var(--green-deep);
+}
+:root .step-index {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--paper-soft);
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  place-items: center;
+  transition:
+    background-color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .step[aria-current="step"] .step-index {
+  background: var(--green-deep);
+  color: var(--paper-raised);
+}
+/* 完成态打勾 */
+:root .step.done .step-index {
+  background: var(--green);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+/* ---- 工作台:左侧任务流 + 右侧持续可见的导入回执 ---- */
+:root .v-softlab-main {
+  display: grid;
+  width: min(72rem, 100%);
+  margin: 0 auto;
+  gap: 64px 28px;
+  grid-template-areas:
+    "import queue"
+    "settings queue"
+    "convert queue"
+    "stats queue"
+    "pwa queue";
+  grid-template-columns: minmax(0, 46rem) minmax(20rem, 1fr);
+  padding-top: 40px;
+}
+:root .v-softlab-section {
+  scroll-margin-top: 110px;
+}
+:root .v-softlab-import {
+  grid-area: import;
+}
+:root .v-softlab-settings {
+  grid-area: settings;
+}
+:root .v-softlab-convert {
+  grid-area: convert;
+}
+:root .v-softlab-stats {
+  grid-area: stats;
+}
+:root .v-softlab-pwa {
+  grid-area: pwa;
+}
+:root .v-softlab-queue-rail {
+  position: sticky;
+  top: calc(max(10px, env(safe-area-inset-top)) + 76px);
+  display: grid;
+  max-height: calc(100vh - 104px);
+  max-height: calc(100dvh - 104px - env(safe-area-inset-bottom));
+  align-self: start;
+  grid-area: queue;
+}
+
+/* 大号居中拖放卡片 */
+:root .drop-zone {
+  min-height: 260px;
+  justify-items: center;
+  padding: 44px 34px;
+  text-align: center;
+  grid-template-columns: minmax(0, 1fr);
+}
+:root .drop-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+}
+:root .drop-copy {
+  justify-items: center;
+}
+:root .drop-copy strong {
+  font-size: 1.2rem;
+}
+:root .select-button {
+  margin: 4px auto 0;
+}
+:root .format-row,
+:root .drop-zone small {
+  justify-content: center;
+  grid-column: 1 / -1;
+}
+
+/* 设置卡片:分段格式选择器 */
+:root .settings-panel {
+  position: static;
+}
+:root .format-cards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+:root .format-card {
+  display: grid;
+  min-height: 56px;
+  cursor: pointer;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 720;
+  place-items: center;
+  transition:
+    background-color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .format-card input {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+}
+:root .format-card.selected {
+  border-color: var(--green-deep);
+  background: var(--green-soft);
+  box-shadow: 0 0 0 1px var(--green-deep);
+  color: var(--green-deep);
+}
+:root .format-card:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--green) 72%, transparent);
+  outline-offset: 3px;
+}
+
+/* 质量滑杆大触面 */
+:root input[type="range"] {
+  height: 32px;
+  cursor: pointer;
+}
+
+/* 转换面板:大主按钮 */
+:root .convert-area {
+  padding: 0;
+}
+:root .convert-area button {
+  min-height: 60px;
+  justify-content: center;
+  border-radius: 18px;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 26px rgb(50 106 57 / 24%);
+}
+
+/* 结果列表:每文件一张白卡片 */
+:root .queue-panel {
+  display: grid;
+  min-height: 0;
+  max-height: inherit;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+:root .queue-list {
+  gap: 12px;
+  max-height: none;
+  padding: 14px;
+  scrollbar-gutter: stable;
+}
+:root .queue-item {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper-raised);
+  box-shadow: 0 2px 8px rgb(46 80 52 / 7%);
+}
+:root .queue-item:is(.has-error, .has-result) {
+  box-shadow:
+    inset 4px 0 var(--green),
+    0 2px 8px rgb(46 80 52 / 7%);
+}
+:root .queue-item.has-error {
+  box-shadow:
+    inset 4px 0 var(--red),
+    0 2px 8px rgb(46 80 52 / 7%);
+}
+
+/* ---- 入场动效:fade + translateY,300ms ---- */
+:root .reveal-init {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root .reveal-init.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---- 单栏:队列紧跟上传区,避免导入反馈落到页面下方 ---- */
+@media (max-width: 900px) {
+  :root .v-softlab-main {
+    width: min(46rem, 100%);
+    grid-template-areas:
+      "import"
+      "queue"
+      "settings"
+      "convert"
+      "stats"
+      "pwa";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root .v-softlab-queue-rail {
+    position: static;
+    max-height: none;
+  }
+  :root .v-softlab-queue-rail .queue-panel {
+    max-height: none;
+  }
+}
+
+/* ---- 移动端 ---- */
+@media (max-width: 560px) {
+  :root .stepper {
+    gap: 6px;
+  }
+  :root .step {
+    min-height: 36px;
+    padding-right: 12px;
+    font-size: 0.68rem;
+  }
+  :root .v-softlab-main {
+    gap: 44px;
+    padding-top: 28px;
+  }
+  :root .drop-zone {
+    min-height: 220px;
+    padding: 30px 20px;
+  }
+}

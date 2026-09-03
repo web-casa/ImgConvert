@@ -1,0 +1,29 @@
+{
+  "name": "@imgconvert/web-codecs-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.34.4",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.worker.json && vite build",
+    "benchmark": "node ./scripts/run-large-benchmark.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node ./scripts/run-browser-spike.mjs",
+    "license:check": "node ./scripts/check-licenses.mjs",
+    "technical:check": "pnpm run build && pnpm run test",
+    "promotion:check": "pnpm run technical:check && pnpm run license:check"
+  },
+  "dependencies": {
+    "@jsquash/avif": "2.1.1",
+    "@jsquash/jpeg": "1.6.0",
+    "@jsquash/png": "3.1.1",
+    "@jsquash/webp": "1.5.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "typescript": "6.0.3",
+    "vite": "8.1.0"
+  }
+}

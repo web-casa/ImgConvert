@@ -39,6 +39,8 @@
     </a>
   </p>
   <p>
+    <a href="https://imgconvert.web.casa/convert/"><strong>Open the Web app</strong></a>
+    ·
     <a href="https://github.com/web-casa/ImgConvert/releases/latest">
       <strong>Download the latest release</strong>
     </a>
@@ -74,6 +76,7 @@
 | macOS arm64 / x64   | [DMG][latest-release]                                                             | Signed, notarized, and published                 |
 | Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                                                     | Unsigned direct packages; checksum verified      |
 | Linux amd64 / arm64 | [GitHub packages][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`, RPM, and AppImage published; Snap stable |
+| Web                 | [Open in browser](https://imgconvert.web.casa/convert/)                           | Local browser workers; no source-file upload     |
 | Microsoft Store     | MSIX                                                                              | x64 in Partner Center; arm64 pending             |
 | Mac App Store       | MAS package                                                                       | Pending validation and review                    |
 
@@ -117,7 +120,6 @@
 | Capability          | Details                                                                                                                          |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Conversion          | SVG, static GIF, BMP, AVIF, WebP, JPEG, and PNG input; JPEG/PNG/WebP/AVIF output with true lossless AVIF support                 |
-| PDF to images       | One-way PDF input; all pages or ranges such as `1-3,5`, 72–600 DPI, with JPEG/PNG/WebP/AVIF output                               |
 | Batch workflow      | Files, folders, recursive and clipboard imports; resize rules, scenario presets, progress, and cancellation                      |
 | Performance         | Rust batch conversion, controlled concurrency, memory-aware throttling, and channel-based progress reporting                     |
 | Compression         | Target-size JPEG/WebP, optional `skip-if-larger` / generation-loss policies, smallest-candidate selection, and automatic quality |
@@ -125,7 +127,7 @@
 | Preview             | Exact before/after comparison using the same resize, metadata, color, and encoder workflow as final output                       |
 | Color               | Display P3 ICC tests, explicit sRGB conversion, and color pipeline v2                                                            |
 | HEIC import         | macOS ImageIO, Windows WIC, Linux helper / Flatpak extension; import only                                                        |
-| Privacy             | Images and PDFs stay on the local machine by default; no account or source-file upload required                                  |
+| Privacy             | Desktop and Web process files on the device by default; no account or source-file upload required                                |
 | Release engineering | Tauri updater, cross-platform packages, and licensing / fuzz / benchmark / CI guardrails                                         |
 
 ## Release and project status
@@ -153,6 +155,7 @@ remaining work.
 | ------------- | ----------------------------------------------------------------------------------- |
 | Desktop shell | Tauri 2                                                                             |
 | Frontend      | Svelte 5 runes, shadcn-svelte, Tailwind CSS v4, Solar Icons (`@solar-icons/svelte`) |
+| Web app       | Svelte 5, Vite, isolated workers, lazy WASM codecs, and a `/convert/`-scoped PWA    |
 | Image core    | Rust, `resvg`, `mozjpeg`, `oxipng`, `webp`, `libavif-sys`, `image`                  |
 | HEIC          | No bundled HEIC codec; system provider or optional helper depending on platform     |
 | Toolchain     | pnpm, Node LTS, Rust toolchain, CMake, Meson, Ninja, NASM                           |
@@ -184,6 +187,7 @@ pnpm run check
 pnpm run build
 pnpm run tauri build
 pnpm run docs:web:dev
+pnpm run web:release:build
 
 pnpm run release:readiness
 pnpm run release:readiness:github:ready

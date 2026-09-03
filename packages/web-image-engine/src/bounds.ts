@@ -1,0 +1,1 @@
+export const MAX_RASTER_OUTPUT_BYTES = 64 * 1024 * 1024;
