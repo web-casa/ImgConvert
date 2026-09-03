@@ -410,6 +410,7 @@ preview 不应用 `_headers`，不能替代这些门禁。
 - 元数据测试：按格式写入自有 EXIF/XMP/ICC fixture，验证 `stripAll` 与已开放的 preserve 行为。
 - 图像质量测试：自生成和自有许可 corpus，检查输出可解码、尺寸、alpha、像素误差阈值和完整文件字节。
 - 浏览器 E2E：Playwright Chromium、Firefox、WebKit；覆盖导入、设置、转换、取消、下载、语言、主题和键盘流。
+- 移动预检：独立 Playwright 配置串行执行 Pixel 7/Chromium 与 iPhone 13/WebKit 模拟，覆盖上传后队列可见性、实际转换、下载、溢出和无内容出站；它不替代[真机验收](WEB_CONVERTER_MOBILE_DEVICE_ACCEPTANCE.md)。
 - 隐私 E2E：转换时拦截网络并校验请求目的地、body 与 headers。
 - PWA E2E：首次在线加载、离线重开、版本升级、旧缓存清理和 scope 隔离。
 - 构建测试：验证网站所有既有静态路由未被 Web 应用构建覆盖。

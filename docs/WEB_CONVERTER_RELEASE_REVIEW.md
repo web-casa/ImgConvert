@@ -29,6 +29,7 @@
 | 中 | 小于 64 字节的合法输出会被二次 probe 参数误拒绝 | raster、SVG、PDF 统一使用至少 64 字节的窗口上限，同时仍只读取实际存在字节 |
 | 中 | 转换进行中关闭页面没有未完成工作提示 | `beforeunload` 覆盖 active conversion，并由 E2E 验证取消后恢复正常 |
 | 中 | 只持续检查 375 px 布局 | 自动化增加 768 px 与 1440 px 的水平溢出和关键容器边界检查 |
+| 中 | iPhone 13 的较矮有效视口中，上传后的首个队列项仍可能完全落在首屏外 | 窄屏导入成功后只在队列项不可完整看见时滚动到队列，并尊重 reduced-motion；Pixel 7 与 iPhone 13 移动预检均通过 |
 | 中 | GIF/BMP 色彩配置可能被当作无配置输入 | 识别 GIF `ICCRGBG1012`；BMP V4/V5 仅接受明确 sRGB/Windows 色彩空间，其余 fail closed |
 | 中 | Playwright 只能启动本地 Vite，PWA scope 与同源隐私断言写死 localhost | 增加受限的 `IMGCONVERT_WEB_PREVIEW_ORIGIN`，只接受 HTTPS `*.pages.dev` origin；远程模式不启动本地服务器并按实际 origin 断言 |
 | 中 | Preview smoke 未把 framing、referrer、permissions 与搜索引擎索引状态作为硬门禁 | 所有 HTML 路由新增安全头与 `X-Robots-Tag: noindex` 断言，并补充单元测试 |
@@ -43,6 +44,7 @@
 | Web app 单元测试 | 27/27 通过 |
 | 根测试 | 135/135 通过 |
 | 本地 Playwright Chromium/Firefox/WebKit | 73 通过，2 个目录 API 能力用例按设计跳过；包含右侧 sticky 队列、长队列内部滚动与移动端导入反馈 |
+| 本地移动设备模拟 | Pixel 7/Chromium 与 iPhone 13/WebKit 2/2 通过；上传回执、队列顺序、实际转换、下载、无横向溢出和无内容出站均通过；不替代真机门禁 |
 | Pages Preview Playwright Chromium/Firefox/WebKit | 按引擎隔离验收合计 73 通过，2 个目录 API 能力用例按设计跳过；首次三引擎并发冷加载时 Chromium SVG→AVIF 在 76% 超时，单项复跑及 Chromium 单 worker 完整 25 项均通过；远程配置现已固定为单 worker，避免重型 WASM 编码器争抢宿主资源 |
 | 输入 × 输出 | JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF × JPEG/PNG/WebP/AVIF 实际转换通过 |
 | PWA/隐私/取消 | scope、离线、更新、缓存清除、无内容出站、主动取消与恢复通过 |
@@ -68,6 +70,8 @@
 
 1. 在目标移动 Safari 与 Android Chrome 真机上确定动态像素预算。移动端不强制处理 24 MP，但必须能在重型解码前拒绝超出已确认预算的输入。
 
+   执行步骤与放行记录见 [移动端验收门禁](WEB_CONVERTER_MOBILE_DEVICE_ACCEPTANCE.md)。
+
 2. 只有上述结果写回本清单后，才可以批准 Cloudflare production 发布。本次只部署了 Preview，没有更新或推断 Production 发布授权。
 
 ## 6. 复现命令
@@ -75,6 +79,8 @@
 ```bash
 pnpm run web:release:review:local
 pnpm run web:release:memory
+pnpm run web:app:e2e:mobile
 pnpm run web:release:preview:smoke -- --url=https://<branch>.<project>.pages.dev
 IMGCONVERT_WEB_PREVIEW_ORIGIN=https://<branch>.<project>.pages.dev pnpm --dir web-app test:e2e
+IMGCONVERT_WEB_PREVIEW_ORIGIN=https://<branch>.<project>.pages.dev pnpm --dir web-app test:e2e:mobile
 ```

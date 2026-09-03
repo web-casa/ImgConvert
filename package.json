@@ -24,6 +24,7 @@
     "web:app:check": "pnpm run web:engine:check && pnpm --dir web-app check",
     "web:app:dev": "pnpm run web:engine:build && pnpm --dir web-app dev",
     "web:app:e2e": "pnpm run web:app:build && pnpm --dir web-app test:e2e",
+    "web:app:e2e:mobile": "pnpm run web:app:build && pnpm --dir web-app test:e2e:mobile",
     "web:release:assemble": "node scripts/assemble-web-release.mjs",
     "web:release:check": "node scripts/check-web-release.mjs",
     "web:release:build": "pnpm run website:build && pnpm run web:app:build && pnpm run web:release:assemble && pnpm run web:release:check",

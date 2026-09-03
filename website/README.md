@@ -45,6 +45,7 @@ MIME types and response headers before promoting the same commit:
 pnpm run web:release:build
 pnpm run web:release:preview:smoke -- --url=https://BRANCH.PROJECT.pages.dev
 IMGCONVERT_WEB_PREVIEW_ORIGIN=https://BRANCH.PROJECT.pages.dev pnpm --dir web-app test:e2e
+IMGCONVERT_WEB_PREVIEW_ORIGIN=https://BRANCH.PROJECT.pages.dev pnpm --dir web-app test:e2e:mobile
 ```
 
 The smoke command accepts only an HTTPS `*.pages.dev` origin and is read-only. It verifies the
@@ -56,6 +57,12 @@ WebKit. Remote projects run through one Playwright worker so cold AVIF WASM enco
 for host memory; local runs retain normal parallel workers. A local Vite preview is useful for
 visual checks but does not apply Cloudflare Pages `_headers`, so it cannot replace these
 deployed-preview gates.
+
+The dedicated mobile preflight runs Pixel 7/Chromium and iPhone 13/WebKit emulation serially. It
+checks that an imported file produces an immediately visible queue receipt, completes a real local
+conversion and download, stays within the viewport, and sends no content cross-origin. Emulation is
+not a substitute for the physical-device memory and pixel-budget gate documented in
+`docs/WEB_CONVERTER_MOBILE_DEVICE_ACCEPTANCE.md`.
 
 After a preview deployment passes, promote the reviewed commit to the production branch and keep
 `imgconvert.web.casa` configured through **Pages → Custom domains**. The output contains `_headers`,

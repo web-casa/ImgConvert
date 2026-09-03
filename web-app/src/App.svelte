@@ -30,7 +30,7 @@
   import Download from "@lucide/svelte/icons/download";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import X from "@lucide/svelte/icons/x";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
 
   import BatchExportPanel from "./lib/BatchExportPanel.svelte";
   import ConvertDock from "./lib/ConvertDock.svelte";
@@ -351,6 +351,25 @@
     }
   }
 
+  async function revealQueueOnNarrowViewport(): Promise<void> {
+    await tick();
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+
+    const queueRail = document.querySelector<HTMLElement>(".v-softlab-queue-rail");
+    const firstItem = queueRail?.querySelector<HTMLElement>(".queue-item");
+    if (!queueRail || !firstItem) return;
+
+    const itemBounds = firstItem.getBoundingClientRect();
+    const topInset = 96;
+    const bottomInset = 16;
+    if (itemBounds.top >= topInset && itemBounds.bottom <= window.innerHeight - bottomInset) return;
+
+    queueRail.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
+
   function addFiles(files: readonly File[]): void {
     if (files.length === 0) return;
     const admission = admitFiles(entries.length, totalBytes, files);
@@ -361,7 +380,10 @@
     }));
     if (admission.accepted.length > 0 && !batchExportBusy) batchExportState = "idle";
     for (const file of admission.accepted) entries.push(createQueueEntry(file));
-    if (admission.accepted.length > 0) void pumpProbeQueue();
+    if (admission.accepted.length > 0) {
+      void pumpProbeQueue();
+      void revealQueueOnNarrowViewport();
+    }
   }
 
   function handlePaste(event: ClipboardEvent): void {
