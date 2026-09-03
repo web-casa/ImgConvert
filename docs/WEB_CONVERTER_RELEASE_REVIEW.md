@@ -16,6 +16,7 @@
 - Raster Worker 重新探测收到的真实字节，不信任主线程传入的格式、尺寸和色彩配置声明；EXIF 方向 5–8 按归一化后的宽高复核。
 - Worker 结果消息增加 64 MiB 硬上限；raster、SVG、PDF 输出复检均兼容小于 64 字节的合法文件。
 - 转换进行中触发离开页面保护；375、768、1440 三档布局加入持续回归检查。
+- Web 转换器导航与页脚对齐官网的信息结构、文案和响应式边界；仅保留转换器所需的主题切换，并增加首页常量防漂移测试。
 - 新增可复现门禁：`web:release:review:local` 与 `web:release:memory`。
 
 ## 2. Review 发现与修复
@@ -33,6 +34,7 @@
 | 中 | GIF/BMP 色彩配置可能被当作无配置输入 | 识别 GIF `ICCRGBG1012`；BMP V4/V5 仅接受明确 sRGB/Windows 色彩空间，其余 fail closed |
 | 中 | Playwright 只能启动本地 Vite，PWA scope 与同源隐私断言写死 localhost | 增加受限的 `IMGCONVERT_WEB_PREVIEW_ORIGIN`，只接受 HTTPS `*.pages.dev` origin；远程模式不启动本地服务器并按实际 origin 断言 |
 | 中 | Preview smoke 未把 framing、referrer、permissions 与搜索引擎索引状态作为硬门禁 | 所有 HTML 路由新增安全头与 `X-Robots-Tag: noindex` 断言，并补充单元测试 |
+| 中 | Web 转换器仍使用独立的简化导航与页脚，且平板导航、移动页脚边界与官网存在偏差 | 复用官网链接层级与双语文案，补齐移动菜单键盘行为；375/768/1440 线上量测的导航 x/y/宽/高与页脚 x/宽/高差值均为 0 |
 
 ## 3. 已通过门禁
 
@@ -41,11 +43,11 @@
 | `pnpm run quality:frontend` | 通过：类型、lint、Prettier、dead-code、构建、i18n、docs 与发布产物检查全绿 |
 | conversion contract | 16/16 通过 |
 | web image engine | 61/61 通过 |
-| Web app 单元测试 | 27/27 通过 |
+| Web app 单元测试 | 34/34 通过；包含与官网导航、页脚文案及外链常量的防漂移断言 |
 | 根测试 | 135/135 通过 |
-| 本地 Playwright Chromium/Firefox/WebKit | 73 通过，2 个目录 API 能力用例按设计跳过；包含右侧 sticky 队列、长队列内部滚动与移动端导入反馈 |
+| 本地 Playwright Chromium/Firefox/WebKit | 76 通过，2 个目录 API 能力用例按设计跳过；包含右侧 sticky 队列、长队列内部滚动、移动端导入反馈及站点导航/页脚一致性 |
 | 本地移动设备模拟 | Pixel 7/Chromium 与 iPhone 13/WebKit 2/2 通过；上传回执、队列顺序、实际转换、下载、无横向溢出和无内容出站均通过；不替代真机门禁 |
-| Pages Preview Playwright Chromium/Firefox/WebKit | 冻结 commit 以远程单 worker 连续执行，73 通过、2 个目录 API 能力用例按设计跳过，13.7 分钟内无失败或重试；避免重型 WASM 编码器争抢测试宿主资源 |
+| Pages Preview Playwright Chromium/Firefox/WebKit | 既有完整功能矩阵 73 通过、2 项按能力跳过；当前冻结 commit 的导航/页脚与 375 px 定向回归 6/6 通过，Pixel 7 与 iPhone 13 远程回归 2/2 通过 |
 | 输入 × 输出 | JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF × JPEG/PNG/WebP/AVIF 实际转换通过 |
 | PWA/隐私/取消 | scope、离线、更新、缓存清除、无内容出站、主动取消与恢复通过 |
 | 响应式与键盘 | 375/768/1440 无水平溢出；skip link、主题、关键控件键盘路径通过 |
@@ -57,11 +59,11 @@
 ## 4. Cloudflare Pages Preview 验收
 
 - Preview：<https://web-011-preview-20260903.imgconvert-cis.pages.dev>
-- Deployment ID：`9bdc6d9c-9346-42b1-b4d9-e35edc37d3e4`
-- 来源：分支标识 `web-011-preview-20260903`，commit `30e9c6d`；环境确认为 Preview，Production deployment 仍为 `3d3e7ff0-899b-4230-929d-91e503c08832`，未更新。
+- Deployment ID：`5737f0b8-369f-41d8-87ba-ebc7c0e56d25`
+- 来源：分支标识 `web-011-preview-20260903`，commit `6ea348e`；环境确认为 Preview，Production deployment 仍为 `3d3e7ff0-899b-4230-929d-91e503c08832`，未更新。
 - 真实响应 smoke：11 个 HTML 路由与 17 个 converter 资产通过 MIME、CSP、cache、Service Worker scope、`nosniff`、framing、referrer、permissions 和 `noindex` 门禁。
-- 真实浏览器：远程配置以单 worker 连续执行 Chromium、Firefox、WebKit；JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF 到 4 种 raster 输出、下载、离线、PWA 更新、缓存清除、取消恢复与无内容出站共 73 项通过，2 项目录 API 按能力跳过，无失败或重试。
-- 视觉复审：首页、Web 转换器、Docs、Blog、Legal、Privacy 在 375/768/1440 宽度没有水平溢出、遮挡、空白路由或控制台错误，现有 Kimi 视觉结构保持一致；导入队列在宽屏右侧 sticky，长队列在栏内滚动，窄屏紧跟上传区。
+- 真实浏览器：既有远程完整矩阵覆盖 JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF 到 4 种 raster 输出、下载、离线、PWA 更新、缓存清除、取消恢复与无内容出站，共 73 项通过、2 项目录 API 按能力跳过；当前冻结 commit 另以 Chromium、Firefox、WebKit 完成导航/页脚与 375 px 定向回归 6/6，无失败或重试。
+- 视觉复审：首页、Web 转换器、Docs、Blog、Legal、Privacy 在 375/768/1440 宽度没有水平溢出、遮挡、空白路由或控制台错误，现有 Kimi 视觉结构保持一致；首页与 Web 转换器的导航 x/y/宽/高、页脚内容区 x/宽/高线上量测差值均为 0；导入队列在宽屏右侧 sticky，长队列在栏内滚动，窄屏紧跟上传区。
 - 移动模拟：Pixel 7/Chromium（412 × 839）与 iPhone 13/WebKit（390 × 664）远程预检 2/2 通过；上传后队列自动进入可视区域，实际转换和下载完成，无横向溢出、跨源请求或页面异常；该结果不替代移动 Safari/Android Chrome 真机内存门禁。
 
 ## 5. 仍需外部环境完成

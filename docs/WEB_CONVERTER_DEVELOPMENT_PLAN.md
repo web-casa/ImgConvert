@@ -21,13 +21,13 @@
 > preview 响应 smoke、官网及内容页 Web 入口，并同步隐私、法律和运维文档。`WEB-011` 补齐
 > 24/32-bit BMP 与单帧 GIF 输入、动画 GIF 拒绝和不可忽略提示；Worker 会重新探测输入字节、
 > 复核方向归一化后的解码尺寸，并限制结果消息为 64 MiB。当前 contract 16 项、engine 61 项、
-> web-app 27 项单测、根 135 项测试及三浏览器 73 项 E2E 均通过；另有 2 项目录 API 用例因浏览器
+> web-app 34 项单测、根 135 项测试及三浏览器 76 项 E2E 均通过；另有 2 项目录 API 用例因浏览器
 > 不支持而按设计跳过。组装后的 19 个关键路由与 22 个 Web App 文件通过产物门禁，24 MP
 > Chromium 8 次内存趋势复测通过，npm audit 与许可证/NOTICE 门禁通过。Cloudflare Pages
 > Preview `web-011-preview-20260903.imgconvert-cis.pages.dev`（Deployment
-> `9bdc6d9c-9346-42b1-b4d9-e35edc37d3e4`，来源 commit `30e9c6d`）已通过真实响应 smoke、
-> 安全头与 `noindex` 检查，以及单 worker 的 Chromium/Firefox/WebKit 73 项远程 E2E；另有 2 项
-> 目录 API 用例按能力跳过。Pixel 7/Chromium 与 iPhone 13/WebKit 移动模拟的上传、自动展示
+> `5737f0b8-369f-41d8-87ba-ebc7c0e56d25`，来源 commit `6ea348e`）已通过真实响应 smoke、
+> 安全头与 `noindex` 检查；既有单 worker Chromium/Firefox/WebKit 完整矩阵 73 项通过、2 项
+> 目录 API 用例按能力跳过，当前 commit 的站点导航/页脚定向远程回归 6/6 通过。Pixel 7/Chromium 与 iPhone 13/WebKit 移动模拟的上传、自动展示
 > 队列反馈、转换和下载 2/2 通过。Production 未被更新，正式发布仍需移动 Safari 与 Android
 > Chrome 真机预算确认。
 > 详见
