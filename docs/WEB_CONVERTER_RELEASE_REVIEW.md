@@ -45,7 +45,7 @@
 | 根测试 | 135/135 通过 |
 | 本地 Playwright Chromium/Firefox/WebKit | 73 通过，2 个目录 API 能力用例按设计跳过；包含右侧 sticky 队列、长队列内部滚动与移动端导入反馈 |
 | 本地移动设备模拟 | Pixel 7/Chromium 与 iPhone 13/WebKit 2/2 通过；上传回执、队列顺序、实际转换、下载、无横向溢出和无内容出站均通过；不替代真机门禁 |
-| Pages Preview Playwright Chromium/Firefox/WebKit | 按引擎隔离验收合计 73 通过，2 个目录 API 能力用例按设计跳过；首次三引擎并发冷加载时 Chromium SVG→AVIF 在 76% 超时，单项复跑及 Chromium 单 worker 完整 25 项均通过；远程配置现已固定为单 worker，避免重型 WASM 编码器争抢宿主资源 |
+| Pages Preview Playwright Chromium/Firefox/WebKit | 冻结 commit 以远程单 worker 连续执行，73 通过、2 个目录 API 能力用例按设计跳过，13.7 分钟内无失败或重试；避免重型 WASM 编码器争抢测试宿主资源 |
 | 输入 × 输出 | JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF × JPEG/PNG/WebP/AVIF 实际转换通过 |
 | PWA/隐私/取消 | scope、离线、更新、缓存清除、无内容出站、主动取消与恢复通过 |
 | 响应式与键盘 | 375/768/1440 无水平溢出；skip link、主题、关键控件键盘路径通过 |
@@ -57,12 +57,12 @@
 ## 4. Cloudflare Pages Preview 验收
 
 - Preview：<https://web-011-preview-20260903.imgconvert-cis.pages.dev>
-- Deployment ID：`798fe03a-6aa4-461d-9480-f7aa76dc89c8`
-- 分支标识：`web-011-preview-20260903`；环境确认为 Preview，Production deployment 未变。
+- Deployment ID：`9bdc6d9c-9346-42b1-b4d9-e35edc37d3e4`
+- 来源：分支标识 `web-011-preview-20260903`，commit `30e9c6d`；环境确认为 Preview，Production deployment 仍为 `3d3e7ff0-899b-4230-929d-91e503c08832`，未更新。
 - 真实响应 smoke：11 个 HTML 路由与 17 个 converter 资产通过 MIME、CSP、cache、Service Worker scope、`nosniff`、framing、referrer、permissions 和 `noindex` 门禁。
-- 真实浏览器：JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF 到 4 种 raster 输出、下载、离线、PWA 更新、缓存清除、取消恢复与无内容出站均通过；Chromium 为避免 AVIF WASM 并发资源竞争，另以单 worker 完整复跑 25/25 通过。
+- 真实浏览器：远程配置以单 worker 连续执行 Chromium、Firefox、WebKit；JPEG/PNG/WebP/AVIF/BMP/GIF/SVG/PDF 到 4 种 raster 输出、下载、离线、PWA 更新、缓存清除、取消恢复与无内容出站共 73 项通过，2 项目录 API 按能力跳过，无失败或重试。
 - 视觉复审：首页、Web 转换器、Docs、Blog、Legal、Privacy 在 375/768/1440 宽度没有水平溢出、遮挡、空白路由或控制台错误，现有 Kimi 视觉结构保持一致；导入队列在宽屏右侧 sticky，长队列在栏内滚动，窄屏紧跟上传区。
-- 移动模拟：Pixel 7/Chromium（412 × 839）与 iPhone 13/WebKit（390 × 664）均完成远程上传、首屏队列计数反馈和实际转换，无横向溢出或页面异常；该结果不替代移动 Safari/Android Chrome 真机内存门禁。
+- 移动模拟：Pixel 7/Chromium（412 × 839）与 iPhone 13/WebKit（390 × 664）远程预检 2/2 通过；上传后队列自动进入可视区域，实际转换和下载完成，无横向溢出、跨源请求或页面异常；该结果不替代移动 Safari/Android Chrome 真机内存门禁。
 
 ## 5. 仍需外部环境完成
 

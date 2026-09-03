@@ -25,10 +25,11 @@
 > 不支持而按设计跳过。组装后的 19 个关键路由与 22 个 Web App 文件通过产物门禁，24 MP
 > Chromium 8 次内存趋势复测通过，npm audit 与许可证/NOTICE 门禁通过。Cloudflare Pages
 > Preview `web-011-preview-20260903.imgconvert-cis.pages.dev`（Deployment
-> `798fe03a-6aa4-461d-9480-f7aa76dc89c8`）已通过真实响应 smoke、安全头与 `noindex` 检查、
-> 关键页面视觉复审，以及按引擎隔离的 Chromium/Firefox/WebKit 73 项远程 E2E；另有 2 项目录
-> API 用例按能力跳过。Pixel 7/Chromium 与 iPhone 13/WebKit 移动模拟的上传、队列反馈和转换
-> 也已通过。Production 未被更新，正式发布仍需移动 Safari 与 Android Chrome 真机预算确认。
+> `9bdc6d9c-9346-42b1-b4d9-e35edc37d3e4`，来源 commit `30e9c6d`）已通过真实响应 smoke、
+> 安全头与 `noindex` 检查，以及单 worker 的 Chromium/Firefox/WebKit 73 项远程 E2E；另有 2 项
+> 目录 API 用例按能力跳过。Pixel 7/Chromium 与 iPhone 13/WebKit 移动模拟的上传、自动展示
+> 队列反馈、转换和下载 2/2 通过。Production 未被更新，正式发布仍需移动 Safari 与 Android
+> Chrome 真机预算确认。
 > 详见
 > [WEB_CONVERTER_P0_REPORT.md](WEB_CONVERTER_P0_REPORT.md)。
 
