@@ -39,6 +39,7 @@
   import PwaPanel from "./lib/PwaPanel.svelte";
   import QueueList from "./lib/QueueList.svelte";
   import SettingsPanel from "./lib/SettingsPanel.svelte";
+  import SiteFooter from "./lib/SiteFooter.svelte";
   import StatsPanel from "./lib/StatsPanel.svelte";
   import { reveal } from "./lib/reveal";
   import {
@@ -244,10 +245,6 @@
     url.searchParams.set("lang", locale);
     history.replaceState(null, "", url);
     applyDocumentPreferences();
-  }
-
-  function toggleLocale(): void {
-    setLocale(locale === "zh" ? "en" : "zh");
   }
 
   function toggleTheme(): void {
@@ -1108,8 +1105,8 @@
   {batchRunning ? copy.states.converting : activeCount > 0 ? copy.states.probing : copy.rail.ready}
 </p>
 
-<div class="web-app-shell">
-  <Header {copy} {locale} {theme} onToggleLocale={toggleLocale} onToggleTheme={toggleTheme} />
+<div class="web-app-shell" id="top">
+  <Header {copy} {locale} {theme} onSetLocale={setLocale} onToggleTheme={toggleTheme} />
 
   <nav class="stepper" aria-label={copy.intro.eyebrow}>
     <a
@@ -1147,7 +1144,7 @@
     </a>
   </nav>
 
-  <main id="main-content" class="v-softlab-main">
+  <main id="main-content" class="v-softlab-main" tabindex="-1">
     <h1 class="sr-only">{copy.intro.title}</h1>
     <section id="sl-import" class="v-softlab-section v-softlab-import" use:reveal>
       <Dropzone {copy} {notices} onFiles={addFiles} />
@@ -1238,20 +1235,7 @@
     </section>
   </main>
 
-  <footer>
-    <div class="footer-summary">
-      <strong translate="no">ImgConvert</strong><span>{copy.footer.milestone}</span><span
-        >{copy.footer.privacy}</span
-      >
-    </div>
-    <nav aria-label={copy.footer.linksLabel}>
-      <a href={locale === "zh" ? "/privacy/" : "/en/privacy/"}>{copy.footer.privacyPolicy}</a>
-      <a href={locale === "zh" ? "/legal/" : "/en/legal/"}>{copy.footer.legal}</a>
-      <a href="https://github.com/web-casa/ImgConvert" target="_blank" rel="noreferrer"
-        >{copy.footer.source}</a
-      >
-    </nav>
-  </footer>
+  <SiteFooter {copy} {locale} />
 </div>
 
 <dialog

@@ -352,7 +352,10 @@ test("converts locally, compares the result, downloads it, and clears memory", a
   await convertButton(page).click();
   await expect(queueItem).toContainText("Ready to download", { timeout: 90_000 });
   await expect(queueItem).toContainText("PNG");
-  await page.getByRole("button", { name: "切换为中文" }).click();
+  await page
+    .getByRole("navigation", { name: "Language selection" })
+    .getByRole("link", { name: "中" })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("图片留在原地");
   await page.getByRole("button", { name: "清空队列" }).click();
   await page.getByRole("button", { name: "清空文件" }).click();
@@ -1032,6 +1035,66 @@ test("keeps the 375 px layout inside the viewport and exposes keyboard focus", a
     expect(geometry.workbenchLeft).toBeGreaterThanOrEqual(0);
     expect(geometry.workbenchRight).toBeLessThanOrEqual(viewport.width);
   }
+});
+
+test("matches the marketing navigation and footer across desktop and mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("?lang=en");
+
+  const header = page.locator(".app-header");
+  const primaryNavigation = header.getByRole("navigation", { name: "Primary navigation" });
+  await expect(primaryNavigation.getByRole("link", { name: "Product" })).toHaveAttribute(
+    "href",
+    "/en/#features",
+  );
+  await expect(primaryNavigation.getByRole("link", { name: "Formats" })).toHaveAttribute(
+    "href",
+    "/en/#formats",
+  );
+  await expect(primaryNavigation.getByRole("link", { name: "Guides" })).toHaveAttribute(
+    "href",
+    "/en/#guides",
+  );
+  await expect(primaryNavigation.getByRole("link", { name: "FAQ" })).toHaveAttribute(
+    "href",
+    "/en/#faq",
+  );
+  await expect(primaryNavigation.getByRole("link", { name: "Web app" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(header.getByRole("link", { name: "Download" })).toHaveAttribute(
+    "href",
+    "/en/#download",
+  );
+
+  const footer = page.locator(".app-footer");
+  await expect(footer.getByRole("link", { name: "Guides" })).toHaveAttribute("href", "/en/#guides");
+  await expect(footer.getByRole("link", { name: "Documentation" })).toHaveAttribute(
+    "href",
+    "/en/docs/",
+  );
+  await expect(footer.getByRole("link", { name: "Privacy" })).toHaveAttribute(
+    "href",
+    "/en/privacy/",
+  );
+  await expect(footer.getByRole("link", { name: "Open Web app" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const menuButton = header.getByRole("button", { name: "Open navigation" });
+  await expect(menuButton).toBeVisible();
+  await expect(primaryNavigation).toBeHidden();
+  await menuButton.click();
+  await expect(primaryNavigation).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(primaryNavigation).toBeHidden();
+  await expect(menuButton).toBeFocused();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
 
 test("keeps the import queue beside the workbench and sticky on wide screens", async ({ page }) => {

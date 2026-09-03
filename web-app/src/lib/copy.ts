@@ -54,21 +54,34 @@ interface Copy {
   };
   errors: Record<QueueFailureCode, string>;
   footer: {
+    back: string;
+    blog: string;
+    docs: string;
+    guides: string;
     legal: string;
     linksLabel: string;
-    milestone: string;
     privacy: string;
-    privacyPolicy: string;
-    source: string;
+    macStore: string;
+    repository: string;
+    store: string;
+    tagline: string;
+    webApp: string;
   };
   header: {
-    desktop: string;
-    help: string;
+    close: string;
+    download: string;
+    faq: string;
+    formats: string;
+    github: string;
+    guides: string;
     home: string;
-    language: string;
-    privacy: string;
+    languageLabel: string;
+    menu: string;
+    primaryLabel: string;
+    product: string;
     themeDark: string;
     themeLight: string;
+    webApp: string;
   };
   intro: { body: string; eyebrow: string; title: string };
   queue: {
@@ -266,21 +279,34 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
         "This is not a supported Web image. Choose JPEG, PNG, static WebP, AVIF, BMP, static GIF, SVG, or PDF.",
     },
     footer: {
+      back: "Back to top",
+      blog: "Blog",
+      docs: "Documentation",
+      guides: "Guides",
       legal: "Open source & legal",
-      linksLabel: "Product and legal links",
-      milestone: "WEB-011 · Release review",
-      privacy: "No upload endpoint is used by this page.",
-      privacyPolicy: "Privacy",
-      source: "Source code",
+      linksLabel: "Footer navigation",
+      privacy: "Privacy",
+      macStore: "Mac App Store",
+      repository: "GitHub",
+      store: "Microsoft Store",
+      tagline: "Local image conversion for desktop and the browser.",
+      webApp: "Open Web app",
     },
     header: {
-      desktop: "Desktop App",
-      help: "Help",
+      close: "Close navigation",
+      download: "Download",
+      faq: "FAQ",
+      formats: "Formats",
+      github: "GitHub",
+      guides: "Guides",
       home: "ImgConvert home",
-      language: "切换为中文",
-      privacy: "Files Stay Local",
+      languageLabel: "Language selection",
+      menu: "Open navigation",
+      primaryLabel: "Primary navigation",
+      product: "Product",
       themeDark: "Use Dark Theme",
       themeLight: "Use Light Theme",
+      webApp: "Web app",
     },
     intro: {
       body: "Convert raster images, validated vector SVG, and selected PDF pages in local workers, then export verified results together.",
@@ -482,21 +508,34 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
         "这不是 Web 版支持的图片，请选择 JPEG、PNG、静态 WebP、AVIF、BMP、静态 GIF、SVG 或 PDF。",
     },
     footer: {
+      back: "回到顶部",
+      blog: "Blog",
+      docs: "产品文档",
+      guides: "实用指南",
       legal: "开源与法律信息",
-      linksLabel: "产品与法律链接",
-      milestone: "WEB-011 · 发布复审",
-      privacy: "本页面没有图片上传接口。",
-      privacyPolicy: "隐私政策",
-      source: "源代码",
+      linksLabel: "页脚导航",
+      privacy: "隐私政策",
+      macStore: "Mac App Store",
+      repository: "GitHub",
+      store: "Microsoft Store",
+      tagline: "桌面与浏览器内本地处理的图片转换工具。",
+      webApp: "打开网页版",
     },
     header: {
-      desktop: "桌面应用",
-      help: "帮助",
+      close: "关闭导航",
+      download: "下载应用",
+      faq: "FAQ",
+      formats: "格式",
+      github: "GitHub",
+      guides: "指南",
       home: "ImgConvert 首页",
-      language: "Switch to English",
-      privacy: "文件留在本地",
+      languageLabel: "语言选择",
+      menu: "打开导航",
+      primaryLabel: "主要导航",
+      product: "产品",
       themeDark: "切换到深色模式",
       themeLight: "切换到浅色模式",
+      webApp: "网页版",
     },
     intro: {
       body: "在本地 Worker 中转换栅格图片、安全 SVG 和选定 PDF 页面，校验后可将结果一起导出。",
