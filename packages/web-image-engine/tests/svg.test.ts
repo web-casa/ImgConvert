@@ -196,6 +196,34 @@ describe("SVG conversion boundary", () => {
     encode: async () => onePixelPng(),
   };
 
+  it("preserves the output allowance when routing SVG through the raster engine", async () => {
+    let renders = 0;
+    const renderer = {
+      render: async () => {
+        renders++;
+        return onePixelPng();
+      },
+    };
+    await expect(
+      convertSvgRequest({ ...request(), outputByteLimit: 0 }, renderer, codecs),
+    ).resolves.toMatchObject({ ok: false, failure: { code: "output-budget-exceeded" } });
+    expect(renders).toBe(0);
+    await expect(
+      convertSvgRequest(
+        { ...request(), outputByteLimit: onePixelPng().byteLength - 1 },
+        renderer,
+        codecs,
+      ),
+    ).resolves.toMatchObject({ ok: false, failure: { code: "output-budget-exceeded" } });
+    await expect(
+      convertSvgRequest(
+        { ...request(), outputByteLimit: onePixelPng().byteLength },
+        renderer,
+        codecs,
+      ),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
   it("renders a validated SVG and reuses the verified raster output path", async () => {
     const phases: string[] = [];
     const outcome = await convertSvgRequest(

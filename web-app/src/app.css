@@ -481,6 +481,78 @@ main {
   color: var(--green-deep);
 }
 
+.storage-reduction {
+  display: grid;
+  align-items: end;
+  gap: 5px 18px;
+  border-top: 1px solid var(--line);
+  padding: 14px 20px 15px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.storage-reduction-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  color: var(--green-deep);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.storage-reduction-copy small {
+  color: var(--ink-muted);
+  font-size: 0.62rem;
+  font-weight: 560;
+  line-height: 1.4;
+}
+
+.storage-reduction > strong {
+  color: var(--green-deep);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
+.storage-reduction.no-reduction > strong {
+  color: var(--ink-muted);
+  font-family: inherit;
+  font-size: 0.7rem;
+}
+
+.storage-reduction meter {
+  width: 100%;
+  height: 7px;
+  border: 0;
+  background: transparent;
+  grid-column: 1 / -1;
+}
+
+.storage-reduction meter::-webkit-meter-bar {
+  border: 0;
+  border-radius: 99px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(10% - 1px),
+      color-mix(in srgb, var(--paper-raised) 82%, transparent) calc(10% - 1px),
+      color-mix(in srgb, var(--paper-raised) 82%, transparent) 10%
+    ),
+    var(--line-strong);
+  box-shadow: none;
+}
+
+.storage-reduction meter::-webkit-meter-optimum-value {
+  border-radius: 99px;
+  background: var(--green-deep);
+}
+
+.storage-reduction meter::-moz-meter-bar {
+  border-radius: 99px;
+  background: var(--green-deep);
+}
+
 .outbound-row {
   justify-content: flex-start;
   gap: 8px;
@@ -889,6 +961,21 @@ button:disabled {
 }
 
 .result-facts span.larger-result {
+  color: var(--yellow);
+}
+
+.result-reduction {
+  margin-top: 7px;
+  color: var(--green-deep);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  line-height: 1.4;
+  overflow-wrap: normal;
+}
+
+.result-reduction.larger-result {
   color: var(--yellow);
 }
 

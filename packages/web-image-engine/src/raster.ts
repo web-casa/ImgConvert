@@ -191,6 +191,11 @@ export async function convertRasterRequest(
     return failure("unsupported-color-profile", { format: verifiedProbe.format });
   }
 
+  const outputByteLimit = Math.min(
+    limits.maxTotalOutputBytes,
+    request.outputByteLimit ?? limits.maxTotalOutputBytes,
+  );
+  if (outputByteLimit === 0) return failure("output-budget-exceeded");
   const startedAt = performance.now();
   report(onProgress, "loading", 0.05);
   const expectedSourceDimensions = decodedSourceDimensions(verifiedProbe);
@@ -236,6 +241,10 @@ export async function convertRasterRequest(
     }
   } catch {
     return failure("encode-failed", { format: request.settings.output });
+  }
+
+  if (bytes.byteLength > outputByteLimit) {
+    return failure("output-budget-exceeded", { limitBytes: outputByteLimit });
   }
 
   report(onProgress, "validating", 0.9);

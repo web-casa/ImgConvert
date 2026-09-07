@@ -48,6 +48,7 @@
     formatDuration as formatDurationPure,
     resultDelta as resultDeltaPure,
   } from "./lib/format";
+  import { summarizeQueueByteReduction } from "./lib/impact";
   import { translations, type Locale } from "./lib/copy";
   import {
     DEFAULT_WEB_CONVERSION_PREFERENCES,
@@ -63,7 +64,11 @@
     type PwaManager,
     type PwaStatus,
   } from "./lib/pwa";
-  import { ArchiveScheduler, type ArchiveJobHandle } from "./lib/archive-scheduler";
+  import {
+    ArchiveScheduler,
+    nextConversionIncludesPdf,
+    type ArchiveJobHandle,
+  } from "@imgconvert/web-conversion-runtime";
   import {
     BATCH_ARCHIVE_FILE_NAME,
     createBatchExportPlan,
@@ -83,6 +88,7 @@
     isAbortError,
     normalizeProbeFailure,
     probeImageFile,
+    remainingQueueOutputBytes,
     type ImportQueueState,
     type QueueConversionResult,
     type QueueEntry,
@@ -174,6 +180,7 @@
     ),
   );
   const checkedCount = $derived(entries.filter(({ probe }) => probe !== undefined).length);
+  const queueByteReduction = $derived(summarizeQueueByteReduction(entries));
   const activeCount = $derived(
     entries.filter(
       ({ state }) => state === "queued" || state === "probing" || state === "converting",
@@ -199,12 +206,13 @@
   const hasPdfEntries = $derived(
     entries.some(({ probe, state }) => probe?.format === "pdf" && state !== "failed"),
   );
+  const nextBatchIncludesPdf = $derived(nextConversionIncludesPdf(entries));
   const pdfDpiError = $derived(
-    hasPdfEntries &&
+    nextBatchIncludesPdf &&
       (!Number.isSafeInteger(pdfDpi) || pdfDpi < PDF_MIN_DPI || pdfDpi > PDF_MAX_DPI),
   );
   const pdfPageError = $derived.by(() => {
-    if (!hasPdfEntries) return false;
+    if (!nextBatchIncludesPdf) return false;
     try {
       parsePdfPageRange(pdfPageRange);
       return false;
@@ -271,7 +279,13 @@
   }
 
   function resultDelta(entry: QueueEntry): string {
-    return resultDeltaPure(entry, numberLocale, copy.preview.saved, copy.preview.larger);
+    return resultDeltaPure(
+      entry,
+      numberLocale,
+      copy.preview.reduction,
+      copy.preview.larger,
+      copy.preview.sameSize,
+    );
   }
 
   function transition(entry: QueueEntry, next: ImportQueueState): void {
@@ -581,6 +595,12 @@
       transition(entry, "failed");
       return;
     }
+    const outputByteLimit = remainingQueueOutputBytes(entries);
+    if (outputByteLimit === 0) {
+      entry.conversionFailure = createConversionFailure("output-budget-exceeded", true);
+      transition(entry, "failed");
+      return;
+    }
     let bytes: ArrayBuffer;
     try {
       bytes = await entry.file.arrayBuffer();
@@ -612,6 +632,7 @@
         return;
       }
       const request: PdfConversionRequest = {
+        outputByteLimit,
         input: { bytes, name: entry.name, probe },
         jobId: `pdf-${entry.id}`,
         schemaVersion: 1,
@@ -698,6 +719,7 @@
     }
 
     const request: ConversionRequest = {
+      outputByteLimit,
       input: { bytes, name: entry.name, probe },
       jobId: `run-${entry.id}`,
       schemaVersion: 1,
@@ -774,7 +796,7 @@
     batchExportState = "idle";
     if (readyCount === 0) resetCompletedEntries();
     const settings = snapshotSettings();
-    const pdfSettings = hasPdfEntries
+    const pdfSettings = nextBatchIncludesPdf
       ? Object.freeze({ dpi: Math.round(pdfDpi), pages: parsePdfPageRange(pdfPageRange) })
       : undefined;
     const pending: PendingConversion[] = entries
@@ -1102,6 +1124,12 @@
   {copy.queue.imported}; {readyCount}
   {copy.rail.ready}; {convertedCount}
   {copy.rail.converted}; {activeCount}
+  {#if queueByteReduction}
+    ; {copy.rail.outputReduction}:
+    {queueByteReduction.measurement.savedBytes > 0
+      ? formatBytes(queueByteReduction.measurement.savedBytes)
+      : copy.rail.noNetReduction}
+  {/if}
   {batchRunning ? copy.states.converting : activeCount > 0 ? copy.states.probing : copy.rail.ready}
 </p>
 
@@ -1219,7 +1247,14 @@
       aria-label={copy.rail.title}
       use:reveal={{ delay: 110 }}
     >
-      <StatsPanel {copy} importedCount={entries.length} {checkedCount} {convertedCount} />
+      <StatsPanel
+        {copy}
+        importedCount={entries.length}
+        {checkedCount}
+        {convertedCount}
+        {numberLocale}
+        byteReduction={queueByteReduction}
+      />
     </section>
     <section class="v-softlab-section v-softlab-pwa" use:reveal={{ delay: 130 }}>
       <PwaPanel

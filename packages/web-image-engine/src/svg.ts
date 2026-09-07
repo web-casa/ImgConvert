@@ -355,6 +355,7 @@ export async function convertSvgRequest(
     return failure("invalid-settings");
   }
   if (request.input.probe.format !== "svg") return failure("unsupported-input");
+  if (request.outputByteLimit === 0) return failure("output-budget-exceeded");
 
   const startedAt = performance.now();
   let svgProbe: ProbeResult;
@@ -419,6 +420,7 @@ export async function convertSvgRequest(
 
   const rasterRequest: ConversionRequest = {
     input: { bytes: pngBytes, name: request.input.name, probe: renderedProbe },
+    ...(request.outputByteLimit === undefined ? {} : { outputByteLimit: request.outputByteLimit }),
     jobId: request.jobId,
     schemaVersion: 1,
     settings: request.settings,

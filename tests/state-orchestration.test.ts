@@ -296,6 +296,8 @@ describe("desktop state orchestration", () => {
               output: "/tmp/out/source.jpg",
               inSize: 2048,
               outSize: 1024,
+              environmentComparable: true,
+              outputCount: 1,
               warning: null,
             },
           },
@@ -309,6 +311,12 @@ describe("desktop state orchestration", () => {
 
     expect(queue[0]?.status).toBe("done");
     expect(queue[0]?.detail).toContain("2.0 KB → 1.0 KB");
+    expect(queue[0]?.impact).toMatchObject({
+      comparable: true,
+      measurement: { inputBytes: 2048, outputBytes: 1024, savedBytes: 1024 },
+    });
+    setItemTargetFormat("/tmp/source.png", "webp");
+    expect(queue[0]?.impact).toBeUndefined();
   });
 
   it("sends resize, target-size, and metadata workflow fields through the shared batch plan", async () => {

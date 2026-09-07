@@ -88,6 +88,11 @@ describe("macOS notarization receipt", () => {
     ).toThrow(/mutually exclusive/);
   });
 
+  it("does not accept notarization passwords on the process command line", () => {
+    expect(() => parseOptions(["--password=secret"], {})).toThrow(/unknown argument/);
+    expect(parseOptions([], { APPLE_PASSWORD: "secret" })).not.toHaveProperty("password");
+  });
+
   it("normalizes explicit architecture verification for cross-architecture finalization", () => {
     expect(parseOptions(["--expected-architectures=x64,arm64"], {})).toMatchObject({
       expectedArchitectures: ["x86_64", "arm64"],

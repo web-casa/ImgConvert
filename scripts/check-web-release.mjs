@@ -10,6 +10,8 @@ const MAX_TEXT_FILE_BYTES = 5 * 1024 * 1024;
 const REQUIRED_ROUTES = [
   "/",
   "/en/",
+  "/environment/",
+  "/en/environment/",
   "/privacy/",
   "/en/privacy/",
   "/legal/",
@@ -29,6 +31,8 @@ const REQUIRED_ROUTES = [
   "/convert/",
 ];
 const REQUIRED_CONTENT_ROUTES = [
+  "/environment/",
+  "/en/environment/",
   "/privacy/",
   "/en/privacy/",
   "/legal/",

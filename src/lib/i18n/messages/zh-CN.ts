@@ -1,4 +1,36 @@
 export const zhCN = {
+  environment: {
+    title: "存储与环境情景",
+    smaller: "输出减少 {bytes}",
+    larger: "输出增加 {bytes}",
+    same: "输出大小不变",
+    boundary: "文件变小不代表磁盘空间已释放，也不代表已经节电或减碳。",
+    excluded:
+      "无法确认可比较的单个静态栅格结果，暂不估算。PDF、动图、多输出、AVIF/HEIC 序列状态未知以及旧版本结果均不参与。",
+    batch:
+      "批量：{count} 个合资格结果，另有 {excluded} 个已完成结果未计入。以下统一假设独立于单文件面板。",
+    storage: "存储情景",
+    local: "本地或未知：仅展示字节变化",
+    cloud: "探索云存储假设",
+    originals: "原文件状态",
+    hypothetical: "假设用输出替换原图",
+    confirmed: "我已替换原图（自行确认）",
+    retained: "仍保留原图",
+    days: "保留天数（0–3650）",
+    copies: "副本数",
+    invalid: "请输入 0 至 3650 的整数天数。",
+    estimate: "云存储情景估算",
+    noReduction: "输出没有净减少，不计算正向环境效益。",
+    retainedNotice: "原图仍保留，不计算正向存储减排。",
+    limits:
+      "采用平均容量分摊模型；这是情景范围，不是实际或净减排，也不是置信区间。即使自行确认替换，仍然只是估算。",
+    method: "方法与来源（离线可读）",
+    formula:
+      "模型 v1.0.0：容量（TB）× 保留小时数 × 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × 副本数 = 电量（Wh）。电量 ÷ 1000 × 473 g CO₂/kWh = 克 CO₂。碳强度为 2024 年全球平均；历史系数不代表当前供应商或本地设备。",
+    privacy:
+      "不含转换耗电、网络、硬件制造、处置及反弹效应。参数只在当前面板内存中使用，关闭重置，不保存、不上传。文件大小按二进制 KiB/MiB 显示；模型使用十进制 TB。",
+  },
+
   app: {
     windowTitle: "ImgConvert · 图片与 PDF 批量转换",
     loading: "正在加载…",

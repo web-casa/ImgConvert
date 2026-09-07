@@ -1,0 +1,13 @@
+No account, subscription, credentials or external conversion service is required.
+
+LOCAL CONVERSION
+Click the toolbar icon to open the side panel. Choose local images, keep WebP selected, then click Convert ready files. Preview or download the results; multiple results can be downloaded as ZIP. Full screen opens an independent queue and does not transfer the current files.
+
+OPTIONAL ENVIRONMENTAL SCENARIO
+After conversion, expand Explore storage and environmental impact. The default shows byte changes only. Select the cloud-storage hypothetical, adjust retention days and copies, and try Originals are retained: positive estimates disappear. These are average-allocation scenarios, not measured or net carbon savings. Method and sources are readable offline. Scenario settings stay in that panel's memory and reset on close; they are not saved or uploaded.
+
+HTTPS IMAGE IMPORT
+On an HTTPS page, right-click an HTTPS image and choose Convert with ImgConvert. Review its origin, select Allow and import, and approve the exact-site prompt. Denial makes no request. Approval downloads one image without cookies, authorization or referrer; redirects and responses over 32 MB are rejected. Newly granted access is removed on completion, closure, interruption or recovery; pre-existing access is preserved.
+
+PRIVACY AND LIMITS
+Files and results remain in workspace memory until clear or close. Storage holds bounded preferences, a selected URL/origin handoff expiring after two minutes, and a temporary URL-free permission lease. No analytics, ads, remote executable code, content scripts, page DOM access, general history access or accounts. Animated GIF uses its first frame. The limit is 24 megapixels per rendered image.

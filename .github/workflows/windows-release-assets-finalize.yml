@@ -1,0 +1,160 @@
+name: Windows Release Assets Finalize
+run-name: Attach Windows assets from run ${{ inputs.source_run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful Windows Smoke workflow run ID with both release architectures.
+        required: true
+        type: string
+      release_tag:
+        description: Immutable release tag whose Windows assets will be attached.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-draft-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Verify and attach unsigned Windows installers to draft
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Validate source Windows Smoke run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$SOURCE_RUN_ID" in
+            ''|*[!0-9]*) echo "source_run_id must contain only digits"; exit 1 ;;
+          esac
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "release_tag must be a semantic v-prefixed tag"
+            exit 1
+          }
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          test "$(jq -r '.status' <<< "$run_json")" = "completed" || { echo "source run is not completed"; exit 1; }
+          test "$(jq -r '.conclusion' <<< "$run_json")" = "success" || { echo "source run did not succeed"; exit 1; }
+          test "$(jq -r '.event' <<< "$run_json")" = "workflow_dispatch" || { echo "source run was not manually dispatched"; exit 1; }
+          test "$(jq -r '.head_repository.full_name' <<< "$run_json")" = "$GITHUB_REPOSITORY" || { echo "source repository mismatch"; exit 1; }
+          test "$(jq -r '.name' <<< "$run_json")" = "Windows Smoke" || { echo "source workflow name mismatch"; exit 1; }
+          source_sha="$(jq -r '.head_sha' <<< "$run_json")"
+          workflow_id="$(jq -r '.workflow_id' <<< "$run_json")"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id" --jq '.path')" = ".github/workflows/windows-smoke.yml" || {
+            echo "source workflow path mismatch"
+            exit 1
+          }
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.default_branch')"
+          test "$GITHUB_REF" = "refs/heads/$default_branch" || { echo "finalizer must run from the default branch"; exit 1; }
+          artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+          for architecture in x64 arm64; do
+            artifact_name="imgconvert-windows-${architecture}-release"
+            count="$(jq --arg name "$artifact_name" '[.artifacts[] | select(.name == $name and .expired == false)] | length' <<< "$artifacts_json")"
+            test "$count" = "1" || { echo "source run must contain exactly one live $artifact_name artifact"; exit 1; }
+          done
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Validate immutable tag and draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          DEFAULT_BRANCH: ${{ steps.source.outputs.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          tag_sha="$(git rev-parse "$RELEASE_TAG^{commit}")"
+          test "$tag_sha" = "$SOURCE_SHA" || { echo "release tag does not match source build commit"; exit 1; }
+          git merge-base --is-ancestor "$tag_sha" "origin/$DEFAULT_BRANCH" || { echo "release tag is not on the default branch"; exit 1; }
+          test "$(git show "$RELEASE_TAG:package.json" | jq -r '.version')" = "${RELEASE_TAG#v}" || { echo "release version mismatch"; exit 1; }
+          release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,tagName)"
+          test "$(jq -r '.tagName' <<< "$release_json")" = "$RELEASE_TAG" || { echo "release tag mismatch"; exit 1; }
+          test "$(jq -r '.isDraft' <<< "$release_json")" = "true" || { echo "refusing to attach Windows assets to a non-draft Release"; exit 1; }
+
+      - name: Download and validate smoke-tested installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$GITHUB_WORKSPACE/windows-source-assets"
+          existing_dir="$GITHUB_WORKSPACE/windows-existing-assets"
+          staged_dir="$GITHUB_WORKSPACE/windows-release-assets"
+          mkdir -p "$source_dir/x64" "$source_dir/arm64" "$existing_dir" "$staged_dir"
+          for architecture in x64 arm64; do
+            gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+              --name "imgconvert-windows-${architecture}-release" --dir "$source_dir/$architecture"
+            mapfile -d '' installers < <(find "$source_dir/$architecture" -type f \( -name '*.msi' -o -name '*.exe' \) -print0)
+            for source_path in "${installers[@]}"; do
+              asset_name="$(basename "$source_path")"
+              case "$asset_name" in
+                *$'\n'*|*$'\r'*|*/*|.*|'') echo "unsafe Windows release asset name"; exit 1 ;;
+                *[!A-Za-z0-9._-]*) echo "unsafe Windows release asset name: $asset_name"; exit 1 ;;
+              esac
+              [[ "$asset_name" == *"${RELEASE_TAG#v}"* ]] || { echo "Windows asset version mismatch: $asset_name"; exit 1; }
+              case "$architecture:$asset_name" in
+                x64:*_x64*|x64:*_x86_64*|arm64:*_arm64*|arm64:*_aarch64*) ;;
+                *) echo "Windows asset architecture mismatch: $architecture / $asset_name"; exit 1 ;;
+              esac
+              test -s "$source_path" || { echo "empty Windows release asset: $asset_name"; exit 1; }
+              test ! -e "$staged_dir/$asset_name" || { echo "Windows release asset collision: $asset_name"; exit 1; }
+              cp -- "$source_path" "$staged_dir/$asset_name"
+            done
+          done
+          node scripts/windows-release-assets.mjs --assets-dir="$staged_dir" --release-tag="$RELEASE_TAG"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing_dir"
+          node scripts/refresh-github-release-checksums.mjs --assets-dir="$existing_dir" --verify
+          for source_path in "$staged_dir"/*; do
+            test ! -e "$existing_dir/$(basename "$source_path")" || { echo "Release already has $(basename "$source_path")"; exit 1; }
+          done
+
+      - name: Record final windows release evidence
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          extension_version="$(git show "$RELEASE_TAG:browser-extension/package.json" | jq -er '.version | strings')"
+          node scripts/github-release-evidence.mjs --group=windows \
+            --assets-dir="$GITHUB_WORKSPACE/windows-release-assets" --release-tag="$RELEASE_TAG" \
+            --source-sha="$SOURCE_SHA" --extension-version="$extension_version" --output-dir=release-evidence
+          cp "release-evidence/release-evidence-windows.json" "$GITHUB_WORKSPACE/windows-release-assets/"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: imgconvert-release-evidence-windows-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          path: release-evidence/release-evidence-windows.json
+
+      - name: Append verified windows assets and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: node scripts/append-github-release-assets.mjs --assets-dir="$GITHUB_WORKSPACE/windows-release-assets" --release-tag="$RELEASE_TAG"

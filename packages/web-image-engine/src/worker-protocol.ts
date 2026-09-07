@@ -51,7 +51,11 @@ function isPositiveSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0;
 }
 
-function isConversionOutcome(value: unknown, limits: ResourceLimits): value is ConversionOutcome {
+function isConversionOutcome(
+  value: unknown,
+  limits: ResourceLimits,
+  outputByteLimit: number,
+): value is ConversionOutcome {
   if (!isRecord(value) || typeof value.ok !== "boolean") return false;
   if (!value.ok) return isConversionFailure(value.failure);
   if (!isRecord(value.result)) return false;
@@ -59,7 +63,8 @@ function isConversionOutcome(value: unknown, limits: ResourceLimits): value is C
   if (
     !(bytes instanceof ArrayBuffer) ||
     bytes.byteLength < 1 ||
-    bytes.byteLength > MAX_RASTER_OUTPUT_BYTES ||
+    bytes.byteLength >
+      Math.min(MAX_RASTER_OUTPUT_BYTES, limits.maxTotalOutputBytes, outputByteLimit) ||
     typeof durationMs !== "number" ||
     !Number.isFinite(durationMs) ||
     durationMs < 0 ||
@@ -76,6 +81,7 @@ function isConversionOutcome(value: unknown, limits: ResourceLimits): value is C
 export function isConversionWorkerResult(
   value: unknown,
   limits: ResourceLimits,
+  outputByteLimit: number = limits.maxTotalOutputBytes,
 ): value is ConversionWorkerResult {
   return (
     isRecord(value) &&
@@ -83,7 +89,7 @@ export function isConversionWorkerResult(
     value.schemaVersion === 1 &&
     typeof value.executionId === "string" &&
     value.executionId.length > 0 &&
-    isConversionOutcome(value.outcome, limits)
+    isConversionOutcome(value.outcome, limits, outputByteLimit)
   );
 }
 

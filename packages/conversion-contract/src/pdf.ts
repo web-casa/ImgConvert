@@ -5,7 +5,7 @@ import {
   type ProbeResult,
 } from "./conversion.js";
 import type { ConversionFailure } from "./errors.js";
-import { WEB_V1_DESKTOP_LIMITS, type ResourceLimits } from "./limits.js";
+import { WEB_V1_DESKTOP_LIMITS, assertOutputByteLimit, type ResourceLimits } from "./limits.js";
 
 export const PDF_MIN_DPI = 72;
 export const PDF_MAX_DPI = 600;
@@ -34,6 +34,7 @@ export interface PdfConversionRequest {
     name: string;
     probe: PdfProbeResult;
   }>;
+  readonly outputByteLimit?: number;
   readonly jobId: string;
   readonly schemaVersion: 1;
   readonly settings: PdfConversionSettings;
@@ -122,6 +123,7 @@ export function assertPdfConversionRequest(
   limits: ResourceLimits = WEB_V1_DESKTOP_LIMITS,
 ): asserts value is PdfConversionRequest {
   if (!isRecord(value)) throw new TypeError("PDF conversion request must be an object.");
+  assertOutputByteLimit(value.outputByteLimit, limits);
   if (value.schemaVersion !== 1) throw new TypeError("PDF request schemaVersion must be 1.");
   if (typeof value.jobId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/u.test(value.jobId)) {
     throw new TypeError("PDF request jobId is invalid.");

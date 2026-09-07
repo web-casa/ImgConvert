@@ -45,12 +45,36 @@ for (const [label, text, required] of [
   ["privacy page", privacyPage, "may request macOS Media Library access"],
   ["privacy page", privacyPage, "album-art images"],
   ["privacy page", privacyPage, "built-in macOS ImageIO"],
+  ["privacy page", privacyPage, "Chrome and Edge browser extensions"],
+  ["privacy page", privacyPage, "session storage for at most two minutes"],
+  ["privacy page", privacyPage, "temporary lease containing no image URL"],
+  ["privacy page", privacyPage, "panel closure"],
+  ["privacy page", privacyPage, "access that predates the import"],
+  ["privacy page", privacyPage, "responses are capped at 32 MB"],
+  ["privacy page", privacyPage, "Web history"],
+  ["privacy page", privacyPage, "Website content"],
+  [
+    "privacy page",
+    privacyPage,
+    "ImgConvert's use of information received from browser extension APIs complies with the Chrome Web Store User Data Policy, including the Limited Use requirements",
+  ],
   ["privacy page", privacyPage, "自定义输出目录"],
   ["privacy page", privacyPage, "结果缓存记录"],
   ["privacy page", privacyPage, "你可以在应用中关闭结果复用"],
   ["privacy page", privacyPage, "媒体资料库”访问权限"],
   ["privacy page", privacyPage, "专辑封面图片"],
   ["privacy page", privacyPage, "macOS 内置 ImageIO"],
+  ["privacy page", privacyPage, "Chrome 与 Edge 浏览器扩展"],
+  ["privacy page", privacyPage, "会话存储中最长保留两分钟"],
+  ["privacy page", privacyPage, "不含图片 URL 的临时权限租约"],
+  ["privacy page", privacyPage, "侧栏关闭"],
+  ["privacy page", privacyPage, "导入前已经存在的访问权不会被移除"],
+  ["privacy page", privacyPage, "响应上限为 32 MB"],
+  [
+    "privacy page",
+    privacyPage,
+    "ImgConvert 对从浏览器扩展 API 获得的信息的使用遵守 Chrome Web Store 用户数据政策，包括 Limited Use 要求",
+  ],
   ["privacy page", privacyPage, "https://github.com/web-casa/ImgConvert/issues"],
   ["landing page", landingPage, "url=privacy/"],
   ["Chinese policy", chinesePolicy, "不会为图片转换或分析目的上传、收集或向第三方传输以下信息"],
@@ -60,6 +84,19 @@ for (const [label, text, required] of [
   ["Chinese policy", chinesePolicy, "在允许用户选择 HEIC helper 的版本中"],
   ["Chinese policy", chinesePolicy, "结果缓存记录只包含用于校验或复用转换结果的哈希值和文件大小"],
   ["Chinese policy", chinesePolicy, "你可以在应用中关闭结果复用"],
+  ["Chinese policy", chinesePolicy, "Chrome 与 Edge 浏览器扩展"],
+  ["Chinese policy", chinesePolicy, "最长两分钟的一次性交接"],
+  ["Chinese policy", chinesePolicy, "不含图片 URL 的临时权限租约"],
+  ["Chinese policy", chinesePolicy, "侧栏关闭"],
+  ["Chinese policy", chinesePolicy, "导入前已经存在的访问权不会被移除"],
+  ["Chinese policy", chinesePolicy, "响应上限为 32 MB"],
+  ["Chinese policy", chinesePolicy, "Web history"],
+  ["Chinese policy", chinesePolicy, "Website content"],
+  [
+    "Chinese policy",
+    chinesePolicy,
+    "ImgConvert 对从浏览器扩展 API 获得的信息的使用遵守 Chrome Web Store 用户数据政策，包括 Limited Use 要求",
+  ],
   [
     "English policy",
     englishPolicy,
@@ -75,10 +112,47 @@ for (const [label, text, required] of [
   ["English policy", englishPolicy, "On editions that allow a user-selected HEIC helper"],
   ["English policy", englishPolicy, "Result-cache records contain only hashes and file sizes"],
   ["English policy", englishPolicy, "you can disable result reuse in the app"],
+  ["English policy", englishPolicy, "Chrome and Edge browser extensions"],
+  ["English policy", englishPolicy, "expires after at most two minutes"],
+  ["English policy", englishPolicy, "temporary lease containing no image URL"],
+  ["English policy", englishPolicy, "panel closure"],
+  ["English policy", englishPolicy, "access that predates the import"],
+  ["English policy", englishPolicy, "response is limited to 32 MB"],
+  ["English policy", englishPolicy, "Web history"],
+  ["English policy", englishPolicy, "Website content"],
+  [
+    "English policy",
+    englishPolicy,
+    "ImgConvert's use of information received from browser extension APIs complies with the Chrome Web Store User Data Policy, including the Limited Use requirements",
+  ],
   ["website privacy copy", websiteLegal, "Apple platform access and HEIC decoding"],
   ["website privacy copy", websiteLegal, "Apple 平台访问与 HEIC 解码"],
   ["website privacy copy", websiteLegal, "Mac App Store and Microsoft Store editions"],
   ["website privacy copy", websiteLegal, "Mac App Store 和 Microsoft Store 版本"],
+  ["website privacy copy", websiteLegal, "Chrome and Edge browser extensions"],
+  ["website privacy copy", websiteLegal, "Chrome 与 Edge 浏览器扩展"],
+  ["website privacy copy", websiteLegal, "expires after at most two minutes"],
+  ["website privacy copy", websiteLegal, "temporary lease containing no image URL"],
+  ["website privacy copy", websiteLegal, "panel closure"],
+  ["website privacy copy", websiteLegal, "access that predates the import"],
+  ["website privacy copy", websiteLegal, "最长两分钟的一次性交接"],
+  ["website privacy copy", websiteLegal, "不含图片 URL 的临时权限租约"],
+  ["website privacy copy", websiteLegal, "侧栏关闭"],
+  ["website privacy copy", websiteLegal, "导入前已经存在的访问权不会被移除"],
+  ["website privacy copy", websiteLegal, "response is limited to 32 MB"],
+  ["website privacy copy", websiteLegal, "响应上限为 32 MB"],
+  ["website privacy copy", websiteLegal, "Web history"],
+  ["website privacy copy", websiteLegal, "Website content"],
+  [
+    "website privacy copy",
+    websiteLegal,
+    "ImgConvert's use of information received from browser extension APIs complies with the Chrome Web Store User Data Policy, including the Limited Use requirements",
+  ],
+  [
+    "website privacy copy",
+    websiteLegal,
+    "ImgConvert 对从浏览器扩展 API 获得的信息的使用遵守 Chrome Web Store 用户数据政策，包括 Limited Use 要求",
+  ],
   ["in-app privacy", privacySupportDialog, "../../../PRIVACY.en.md?raw"],
   ["in-app privacy", privacySupportDialog, "../../../PRIVACY.md?raw"],
   ["external links", externalLinks, 'support: "https://github.com/web-casa/ImgConvert/issues"'],
@@ -132,6 +206,12 @@ if (chinesePolicyDate) {
   }
   if (!normalizeWhitespace(privacyPage).includes(`Effective date: ${expectedPrivacyPageDate}`)) {
     failures.push("privacy page visible effective date must match the policy effective date");
+  }
+  if (!normalizeWhitespace(websiteLegal).includes(`生效日期：${chinesePolicyDate}`)) {
+    failures.push("website Chinese effective date must match the policy effective date");
+  }
+  if (!normalizeWhitespace(websiteLegal).includes(`Effective date: ${expectedEnglishDate}`)) {
+    failures.push("website English effective date must match the policy effective date");
   }
 }
 

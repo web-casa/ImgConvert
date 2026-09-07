@@ -94,11 +94,7 @@ if (options.buildDirect) {
   if (options.signDirect) {
     run(
       "node",
-      [
-        "scripts/sign-windows-installers.mjs",
-        `--profile=${options.profile}`,
-        `--bundles=${options.bundles}`,
-      ],
+      [`--profile=${options.profile}`, `--bundles=${options.bundles}`],
       "Windows installer signing",
     );
   }

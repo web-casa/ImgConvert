@@ -222,24 +222,36 @@ function checkTauriCommandSurface() {
   if (/\bconvert_image\b/u.test(tauriLib)) {
     failures.push("unused convert_image must not be exposed as a second conversion IPC command");
   }
+  for (const marker of ["enum ConversionErrorKind", "fn command_error_for_conversion("]) {
+    requireText(
+      tauriConvert,
+      marker,
+      `desktop conversion errors must retain their structured boundary: ${marker}`,
+    );
+  }
+  for (const forbidden of [
+    "INPUT_FILE_NOT_FOUND_PREFIX",
+    "INPUT_PERMISSION_DENIED_PREFIX",
+    "OUTPUT_PERMISSION_DENIED_PREFIX",
+    "impl From<String> for ConversionError",
+    "impl From<&str> for ConversionError",
+  ]) {
+    if (tauriConvert.includes(forbidden)) {
+      failures.push(`desktop conversion errors must not restore string inference: ${forbidden}`);
+    }
+  }
 }
 
 function checkHeicBoundary() {
-  requireText(
-    tauriConvert,
-    'const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";',
-    "Tauri output parser must keep a stable HEIC/HEIF rejection prefix",
-  );
-  requireText(
-    tauriConvert,
-    '"heic" | "heif" => Err(format!(',
-    "Tauri output parser must reject HEIC/HEIF targets",
-  );
-  requireText(
-    tauriConvert,
-    '"{HEIC_OUTPUT_DISABLED_PREFIX};当前仅作为可选导入格式"',
-    "Tauri output parser must reject HEIC/HEIF targets",
-  );
+  if (
+    !/"heic"\s*\|\s*"heif"\s*=>\s*Err\(ConversionError::new\(\s*ConversionErrorKind::UnsupportedFormat,/su.test(
+      tauriConvert,
+    )
+  ) {
+    failures.push(
+      "Tauri output parser must reject HEIC/HEIF targets with the structured UnsupportedFormat kind",
+    );
+  }
   requireText(
     tauriConvert,
     "writable: format_ids(WRITABLE_FORMATS)",

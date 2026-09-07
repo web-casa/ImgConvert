@@ -418,6 +418,8 @@ describe("bounded raster header probing", () => {
           absolutePixels: 10,
           maxFallbackArchiveBytes: 10,
           maxPdfBytes: 10,
+          maxPdfOutputBytes: 10,
+          maxTotalOutputBytes: 10,
           maxPdfPages: 10,
           maxQueueFiles: 10,
           maxRasterBytes: 10,

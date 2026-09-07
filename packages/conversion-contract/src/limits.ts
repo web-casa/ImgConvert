@@ -2,6 +2,8 @@ export interface ResourceLimits {
   readonly absolutePixels: number;
   readonly maxFallbackArchiveBytes: number;
   readonly maxPdfBytes: number;
+  readonly maxPdfOutputBytes: number;
+  readonly maxTotalOutputBytes: number;
   readonly maxPdfPages: number;
   readonly maxQueueFiles: number;
   readonly maxRasterBytes: number;
@@ -15,6 +17,8 @@ export const WEB_V1_DESKTOP_LIMITS = Object.freeze<ResourceLimits>({
   absolutePixels: 64_000_000,
   maxFallbackArchiveBytes: 256 * 1024 * 1024,
   maxPdfBytes: 256 * 1024 * 1024,
+  maxPdfOutputBytes: 128 * 1024 * 1024,
+  maxTotalOutputBytes: 256 * 1024 * 1024,
   maxPdfPages: 500,
   maxQueueFiles: 100,
   maxRasterBytes: 32 * 1024 * 1024,
@@ -29,6 +33,8 @@ export function createResourceLimits(limits: ResourceLimits): ResourceLimits {
     absolutePixels: limits.absolutePixels,
     maxFallbackArchiveBytes: limits.maxFallbackArchiveBytes,
     maxPdfBytes: limits.maxPdfBytes,
+    maxPdfOutputBytes: limits.maxPdfOutputBytes,
+    maxTotalOutputBytes: limits.maxTotalOutputBytes,
     maxPdfPages: limits.maxPdfPages,
     maxQueueFiles: limits.maxQueueFiles,
     maxRasterBytes: limits.maxRasterBytes,
@@ -46,4 +52,16 @@ export function createResourceLimits(limits: ResourceLimits): ResourceLimits {
     throw new RangeError("limits.maxRuntimePixels cannot exceed limits.absolutePixels.");
   }
   return Object.freeze(snapshot);
+}
+
+/** An optional per-job allowance can reduce, but never enlarge, the queue budget. */
+export function assertOutputByteLimit(value: unknown, limits: ResourceLimits): void {
+  if (
+    value !== undefined &&
+    (!Number.isSafeInteger(value) ||
+      (value as number) < 0 ||
+      (value as number) > limits.maxTotalOutputBytes)
+  ) {
+    throw new RangeError("outputByteLimit must be an integer within the total output budget.");
+  }
 }

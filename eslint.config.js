@@ -9,6 +9,8 @@ export default [
   {
     ignores: [
       ".svelte-kit/**",
+      "**/.output/**",
+      "**/.wxt/**",
       "**/.flatpak-builder/**",
       "**/dist/**",
       "node_modules/**",
@@ -18,6 +20,7 @@ export default [
       "src-tauri/target/**",
       "target/**",
       "tmp/**",
+      "artifacts/**",
       "docs-site/**",
       "THIRD_PARTY_LICENSES.md",
     ],
@@ -88,6 +91,15 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
+      },
+    },
+  },
+  {
+    files: ["browser-extension/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        chrome: "readonly",
       },
     },
   },

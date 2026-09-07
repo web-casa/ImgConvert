@@ -47,7 +47,7 @@ insufficient.
 - `Linux Release Assets Finalize` is a manual-only `ubuntu-22.04` job. It does
   not rebuild packages: it downloads the two successful tag-build artifacts,
   verifies their checksums and source/tag provenance, then attaches the direct
-  Linux packages to an existing Release and refreshes the merged checksum file.
+  Linux packages to an existing draft and refreshes the merged checksum file.
 - `macOS Smoke` is manual-only and runs on the free public `macos-15` arm64
   runner. It retains the Apple Silicon AVIF benchmark JSON artifact for 14
   days; signing, asynchronous notarization submission, DMG, and MAS candidate
@@ -63,12 +63,21 @@ insufficient.
   for seven days. `macOS Notarization Finalize` is a separate manual `macos-15`
   job that finalizes one selected architecture at a time, retains an accepted
   result for 14 days, and only uploads it to an already existing same-tag GitHub
-  Release when the original release run recorded `publish_release=true`. It
-  never uses `--clobber`, creates a Release, or changes a Release draft state.
+  Release when the original release run recorded `publish_release=true` and the
+  operator supplies the matching `release_tag`. It
+  never uses `--clobber`, creates a Release, or changes a Release draft state;
+  it rejects a non-draft Release both before and after attachment.
 - `Windows Smoke` is manual-only and runs an x64/arm64 matrix on the free public
-  `windows-latest` and `windows-11-arm` runners. Installer signing and Store
-  MSIX packaging remain opt-in because they require secrets or Store identity
-  work.
+  `windows-latest` and `windows-11-arm` runners. With an exact `release_tag`,
+  direct build and install smoke enabled, it emits short-lived finalizer-only
+  MSI/NSIS artifacts and asserts they are intentionally unsigned. `Windows
+  Release Assets Finalize` validates both run artifacts and their tagged source
+  commit before attaching them to the draft and refreshing `SHA256SUMS`.
+- `GitHub Release Publish` is the only workflow allowed to clear draft mode. It
+  verifies the full Linux/macOS/Windows architecture/package matrix, exact
+  checksum coverage, and the Windows SmartScreen warning before publication.
+- The updater attachment, Linux/macOS/Windows finalizers, and publisher use the
+  same per-tag concurrency group, so verification cannot race an asset update.
 - `Windows Store MSIX` is a manual-only x64/arm64 production submission matrix. It uses
   an exact app tag plus the committed Partner Center identity defaults, disables
   external codecs and Tauri updater, verifies a temporary copy through the

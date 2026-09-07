@@ -108,5 +108,7 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/linux/jpeg-to-avif/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/linux/jpeg-to-avif/" />
   </url>
+  <url><loc>https://imgconvert.web.casa/environment/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/environment/"/><xhtml:link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/environment/"/></url>
+  <url><loc>https://imgconvert.web.casa/en/environment/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://imgconvert.web.casa/environment/"/><xhtml:link rel="alternate" hreflang="en" href="https://imgconvert.web.casa/en/environment/"/></url>
   <!-- RESOURCE_URLS -->
 </urlset>

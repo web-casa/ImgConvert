@@ -36,6 +36,11 @@ on:
           - both
           - x64
           - arm64
+      release_tag:
+        description: Optional immutable v-prefixed tag used only to produce finalizer-eligible release artifacts.
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -47,7 +52,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
-  NODE_VERSION: "24"
   RUSTUP_HOME: C:\rustup
   CARGO_HOME: C:\cargo
   CARGO_TARGET_DIR: C:\imgconvert-target
@@ -67,6 +71,30 @@ jobs:
       WINDOWS_STORE_PROCESSOR_ARCHITECTURE: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate optional direct-release tag
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {
+            echo "release_tag must be a semantic v-prefixed tag"
+            exit 1
+          }
+          test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$GITHUB_SHA" || {
+            echo "release_tag must point to the exact Windows build commit"
+            exit 1
+          }
+          package_version="$(node -p "require('./package.json').version")"
+          test "$package_version" = "${RELEASE_TAG#v}" || {
+            echo "release_tag does not match package.json version"
+            exit 1
+          }
 
       - name: Verify Windows runner architecture
         shell: pwsh
@@ -114,7 +142,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -301,12 +329,42 @@ jobs:
           }
           pnpm run release:windows:smoke -- @smokeArgs
 
+      - name: Verify release installers are intentionally unsigned
+        if: ${{ inputs.release_tag != '' && inputs.build_direct && inputs.install_smoke && inputs.bundles == 'msi,nsis' }}
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_ARCHITECTURE: ${{ matrix.arch }}
+        shell: pwsh
+        run: |
+          node scripts/windows-release-assets.mjs "--bundle-root=$env:CARGO_TARGET_DIR/release/bundle" "--release-tag=$env:RELEASE_TAG" "--architecture=$env:RELEASE_ARCHITECTURE"
+          if ($LASTEXITCODE -ne 0) { throw "Windows release installer matrix validation failed" }
+          $installers = @(
+            Get-ChildItem -LiteralPath "$env:CARGO_TARGET_DIR/release/bundle/msi" -Filter *.msi -File
+            Get-ChildItem -LiteralPath "$env:CARGO_TARGET_DIR/release/bundle/nsis" -Filter *.exe -File
+          )
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $installer.FullName
+            if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
+              throw "GitHub direct installer must be intentionally unsigned: $($installer.Name) ($($signature.Status))"
+            }
+          }
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_direct }}
+        if: ${{ inputs.build_direct && inputs.release_tag == '' }}
         with:
           name: imgconvert-windows-${{ matrix.arch }}-installers
           if-no-files-found: error
           retention-days: 3
+          path: |
+            ${{ env.CARGO_TARGET_DIR }}/release/bundle/msi/*.msi
+            ${{ env.CARGO_TARGET_DIR }}/release/bundle/nsis/*.exe
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: ${{ inputs.release_tag != '' && inputs.build_direct && inputs.install_smoke && inputs.bundles == 'msi,nsis' }}
+        with:
+          name: imgconvert-windows-${{ matrix.arch }}-release
+          if-no-files-found: error
+          retention-days: 14
           path: |
             ${{ env.CARGO_TARGET_DIR }}/release/bundle/msi/*.msi
             ${{ env.CARGO_TARGET_DIR }}/release/bundle/nsis/*.exe

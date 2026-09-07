@@ -38,6 +38,7 @@ export interface ConversionSchedulerSnapshot {
 }
 
 export interface ConversionSchedulerOptions {
+  readonly idleTimeoutMs?: number;
   readonly limits?: ResourceLimits;
   readonly maxQueueFiles?: number;
   readonly timeoutMs?: number;
@@ -61,6 +62,8 @@ interface WorkerSlot {
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function cancelledOutcome(jobId: string): ConversionOutcome {
   return Object.freeze({
@@ -108,7 +111,10 @@ function freezeWorkerOutcome(message: ConversionWorkerResult): ConversionOutcome
   });
 }
 
-function takeRequestOwnership(request: ConversionRequest): ConversionRequest {
+function takeRequestOwnership(
+  request: ConversionRequest,
+  outputByteLimit: number,
+): ConversionRequest {
   const bytes = structuredClone(request.input.bytes, { transfer: [request.input.bytes] });
   return Object.freeze({
     input: Object.freeze({
@@ -119,6 +125,7 @@ function takeRequestOwnership(request: ConversionRequest): ConversionRequest {
         metadata: Object.freeze({ ...request.input.probe.metadata }),
       }),
     }),
+    outputByteLimit,
     jobId: request.jobId,
     schemaVersion: 1,
     settings: Object.freeze({
@@ -132,6 +139,7 @@ function takeRequestOwnership(request: ConversionRequest): ConversionRequest {
 
 export class SerialConversionScheduler {
   readonly #limits: ResourceLimits;
+  readonly #idleTimeoutMs: number;
   readonly #liveJobIds = new Set<string>();
   readonly #maxQueueFiles: number;
   readonly #queue: PendingJob[] = [];
@@ -140,6 +148,7 @@ export class SerialConversionScheduler {
   #active: ActiveJob | undefined;
   #disposed = false;
   #executionSequence = 0;
+  #idleTimer: ReturnType<typeof setTimeout> | undefined;
   #pumpScheduled = false;
   #workerGeneration = 0;
   #workerSlot: WorkerSlot | undefined;
@@ -149,6 +158,7 @@ export class SerialConversionScheduler {
       throw new TypeError("workerFactory must be a function.");
     }
     this.#limits = createResourceLimits(options.limits ?? WEB_V1_DESKTOP_LIMITS);
+    this.#idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
     this.#maxQueueFiles = options.maxQueueFiles ?? this.#limits.maxQueueFiles;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     if (!Number.isSafeInteger(this.#maxQueueFiles) || this.#maxQueueFiles < 1) {
@@ -160,9 +170,16 @@ export class SerialConversionScheduler {
     if (
       !Number.isSafeInteger(this.#timeoutMs) ||
       this.#timeoutMs < 1 ||
-      this.#timeoutMs > 2_147_483_647
+      this.#timeoutMs > MAX_TIMEOUT_MS
     ) {
       throw new RangeError("timeoutMs must be an integer from 1 to 2147483647 milliseconds.");
+    }
+    if (
+      !Number.isSafeInteger(this.#idleTimeoutMs) ||
+      this.#idleTimeoutMs < 1 ||
+      this.#idleTimeoutMs > MAX_TIMEOUT_MS
+    ) {
+      throw new RangeError("idleTimeoutMs must be an integer from 1 to 2147483647 milliseconds.");
     }
     this.#workerFactory = options.workerFactory;
   }
@@ -179,7 +196,14 @@ export class SerialConversionScheduler {
     if (this.#liveJobIds.size >= this.#maxQueueFiles) {
       throw new RangeError("Conversion queue has reached its file limit.");
     }
-    const ownedRequest = takeRequestOwnership(request);
+    const ownedRequest = takeRequestOwnership(
+      request,
+      Math.min(
+        this.#limits.maxTotalOutputBytes,
+        request.outputByteLimit ?? this.#limits.maxTotalOutputBytes,
+      ),
+    );
+    this.#clearIdleTimer();
 
     let resolveOutcome: ((outcome: ConversionOutcome) => void) | undefined;
     const outcome = new Promise<ConversionOutcome>((resolve) => {
@@ -204,6 +228,7 @@ export class SerialConversionScheduler {
       if (!pending) return false;
       this.#liveJobIds.delete(jobId);
       pending.resolve(cancelledOutcome(jobId));
+      this.#scheduleIdleRecycle();
       return true;
     }
     if (this.#active?.request.jobId === jobId && this.#workerSlot) {
@@ -216,6 +241,7 @@ export class SerialConversionScheduler {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#clearIdleTimer();
     const active = this.#active;
     const slot = this.#workerSlot;
     if (active && slot) {
@@ -281,6 +307,7 @@ export class SerialConversionScheduler {
     if (recycleWorker) this.#recycleWorker(slot);
     active.resolve(outcome);
     this.#schedulePump();
+    if (!recycleWorker) this.#scheduleIdleRecycle();
   }
 
   #onWorkerFailure(slot: WorkerSlot, reason: "error-event" | "message-error"): void {
@@ -313,7 +340,7 @@ export class SerialConversionScheduler {
       }
       return;
     }
-    if (!isConversionWorkerResult(data, this.#limits)) {
+    if (!isConversionWorkerResult(data, this.#limits, active.request.outputByteLimit)) {
       this.#finishActive(
         slot,
         active.executionId,
@@ -331,7 +358,13 @@ export class SerialConversionScheduler {
       );
       return;
     }
-    this.#finishActive(slot, active.executionId, freezeWorkerOutcome(data), false);
+    const outcome = freezeWorkerOutcome(data);
+    this.#finishActive(
+      slot,
+      active.executionId,
+      outcome,
+      !outcome.ok && outcome.failure.code === "worker-failed",
+    );
   }
 
   #pump(): void {
@@ -383,6 +416,7 @@ export class SerialConversionScheduler {
 
   #recycleWorker(slot: WorkerSlot): void {
     if (this.#workerSlot !== slot) return;
+    this.#clearIdleTimer();
     this.#workerSlot = undefined;
     slot.worker.onmessage = null;
     slot.worker.onerror = null;
@@ -392,6 +426,22 @@ export class SerialConversionScheduler {
     } catch {
       // The slot is already detached; a non-standard terminate failure must not strand the queue.
     }
+  }
+
+  #clearIdleTimer(): void {
+    if (this.#idleTimer === undefined) return;
+    clearTimeout(this.#idleTimer);
+    this.#idleTimer = undefined;
+  }
+
+  #scheduleIdleRecycle(): void {
+    this.#clearIdleTimer();
+    const slot = this.#workerSlot;
+    if (!slot || this.#disposed || this.#active || this.#queue.length > 0) return;
+    this.#idleTimer = setTimeout(() => {
+      this.#idleTimer = undefined;
+      if (!this.#active && this.#queue.length === 0) this.#recycleWorker(slot);
+    }, this.#idleTimeoutMs);
   }
 
   #schedulePump(): void {

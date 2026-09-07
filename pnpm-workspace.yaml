@@ -1,11 +1,19 @@
 packages:
   - .
+  - browser-extension
   - docs-site
   - packages/*
   - web-app
   - website
 
 overrides:
+  brace-expansion@1.1.15: 1.1.18
+  brace-expansion@5.0.7: 5.0.9
+  deepmerge-ts@7.1.6: 8.0.2
+  js-yaml@4.3.0: 4.3.1
+  serialize-javascript@6.0.2: 7.1.1
   svelte-i18n>esbuild: ^0.25.0
+  undici@7.28.0: 7.29.0
 patchedDependencies:
+  extract-zip@2.0.1: patches/extract-zip@2.0.1.patch
   saxes@6.0.0: patches/saxes@6.0.0.patch

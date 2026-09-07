@@ -109,6 +109,64 @@ afterEach(() => {
 });
 
 describe("serial conversion scheduler", () => {
+  it.each(["invalid", "cancel"])("still recycles idle workers after %s enqueue", async (mode) => {
+    vi.useFakeTimers();
+    const workers: FakeWorker[] = [];
+    const scheduler = new SerialConversionScheduler({
+      idleTimeoutMs: 25,
+      workerFactory: () => {
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      },
+    });
+    try {
+      const first = scheduler.enqueue(makeRequest("first"));
+      await flushMicrotasks();
+      workers[0]!.respond(success());
+      await first.outcome;
+      if (mode === "invalid") {
+        expect(() =>
+          scheduler.enqueue({
+            ...makeRequest("invalid"),
+            schemaVersion: 0,
+          } as unknown as ConversionRequest),
+        ).toThrow();
+      } else {
+        const queued = scheduler.enqueue(makeRequest("cancel"));
+        expect(queued.cancel()).toBe(true);
+        await expect(queued.outcome).resolves.toMatchObject({
+          ok: false,
+          failure: { code: "cancelled" },
+        });
+      }
+      await vi.advanceTimersByTimeAsync(25);
+      expect(workers[0]!.terminated).toBe(true);
+      const next = scheduler.enqueue(makeRequest("next"));
+      await flushMicrotasks();
+      expect(workers).toHaveLength(2);
+      workers[1]!.respond(success());
+      await expect(next.outcome).resolves.toMatchObject({ ok: true });
+    } finally {
+      scheduler.dispose();
+    }
+  });
+
+  it("preserves and enforces the job output allowance at the worker boundary", async () => {
+    const worker = new FakeWorker();
+    const scheduler = new SerialConversionScheduler({ workerFactory: () => worker });
+    const handle = scheduler.enqueue({ ...makeRequest("limited"), outputByteLimit: 3 });
+    await flushMicrotasks();
+    expect(worker.messages[0]!.request.outputByteLimit).toBe(3);
+    worker.respond(success());
+    await expect(handle.outcome).resolves.toMatchObject({
+      ok: false,
+      failure: { code: "worker-failed" },
+    });
+    expect(worker.terminated).toBe(true);
+    scheduler.dispose();
+  });
+
   it("runs exactly one job at a time and reuses a healthy worker", async () => {
     const workers: FakeWorker[] = [];
     const scheduler = new SerialConversionScheduler({
@@ -140,6 +198,37 @@ describe("serial conversion scheduler", () => {
     workers[0]?.respond(success(), 1);
     await expect(second.outcome).resolves.toMatchObject({ ok: true });
     expect(workers[0]?.terminated).toBe(false);
+    scheduler.dispose();
+  });
+
+  it("recycles an idle worker after the configured bounded lifetime", async () => {
+    vi.useFakeTimers();
+    const worker = new FakeWorker();
+    const scheduler = new SerialConversionScheduler({
+      idleTimeoutMs: 25,
+      workerFactory: () => worker,
+    });
+    const handle = scheduler.enqueue(makeRequest("idle"));
+    await flushMicrotasks();
+    worker.respond(success());
+    await handle.outcome;
+    expect(worker.terminated).toBe(false);
+    await vi.advanceTimersByTimeAsync(25);
+    expect(worker.terminated).toBe(true);
+    scheduler.dispose();
+  });
+
+  it("recycles a worker that reports a worker-failed outcome", async () => {
+    const worker = new FakeWorker();
+    const scheduler = new SerialConversionScheduler({ workerFactory: () => worker });
+    const handle = scheduler.enqueue(makeRequest("wasm-init"));
+    await flushMicrotasks();
+    worker.respond({
+      failure: createConversionFailure("worker-failed", true, { reason: "wasm-init" }),
+      ok: false,
+    });
+    await expect(handle.outcome).resolves.toMatchObject({ failure: { code: "worker-failed" } });
+    expect(worker.terminated).toBe(true);
     scheduler.dispose();
   });
 

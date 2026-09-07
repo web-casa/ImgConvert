@@ -333,6 +333,13 @@ test("converts locally, compares the result, downloads it, and clears memory", a
   await convertButton(page).click();
   await expect(queueItem).toContainText("Ready to download", { timeout: 90_000 });
   await expect(queueItem).toContainText("4 × 3");
+  await expect(queueItem.locator(".result-reduction")).toContainText(
+    /(?:less|larger than source|Same file size as source)/u,
+  );
+  const storageReduction = page.locator(".storage-reduction");
+  await expect(storageReduction).toContainText("Net Output Reduction");
+  await expect(storageReduction).toContainText("Comparable Raster Results: 1");
+  await expect(storageReduction.locator("meter")).toBeVisible();
   expect(wasmRequests.length).toBeGreaterThan(0);
   expect(wasmRequests.some((url) => url.includes("avif"))).toBe(false);
   await queueItem.getByRole("button", { name: /Compare Images/u }).click();
@@ -464,6 +471,95 @@ test("renders PDF input to every raster output", async ({ baseURL, page }) => {
   expect(externalRequests).toEqual([]);
 });
 
+test("does not let a completed PDF's invalid settings block new raster inputs", async ({
+  page,
+}) => {
+  await page.goto("?lang=en");
+  await page.locator('input[type="file"]').setInputFiles({
+    buffer: testPdf([{ height: 24, width: 32 }]),
+    mimeType: "application/pdf",
+    name: "completed.pdf",
+  });
+  await expect(page.locator(".queue-item")).toContainText("Ready to configure");
+  await selectOutputFormat(page, "png");
+  await convertButton(page).click();
+  await expect(page.locator(".queue-item")).toContainText("Ready to download", { timeout: 90_000 });
+  const pages = page.getByRole("textbox", { name: "Pages", exact: true });
+  await pages.fill("invalid");
+  await expect(convertButton(page)).toBeDisabled();
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({ buffer: testPng(), mimeType: "image/png", name: "new-image.png" });
+  const image = page.locator(".queue-item").filter({ hasText: "new-image.png" });
+  await expect(image).toContainText("Ready to configure");
+  await expect(convertButton(page)).toBeEnabled();
+  await convertButton(page).click();
+  await expect(image).toContainText("Ready to download", { timeout: 90_000 });
+  // With only completed entries, Convert again will include the PDF and must validate it.
+  await expect(convertButton(page)).toBeDisabled();
+  await pages.fill("1");
+  await expect(convertButton(page)).toBeEnabled();
+});
+
+test("keeps successful PDF pages and explains a Worker output-budget failure", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (
+      message: unknown,
+      transfer: Transferable[] | StructuredSerializeOptions = [],
+    ) {
+      const budget = (globalThis as typeof globalThis & { testPdfOutputLimit?: number })
+        .testPdfOutputLimit;
+      if (
+        budget !== undefined &&
+        typeof message === "object" &&
+        message !== null &&
+        "type" in message &&
+        message.type === "convert-pdf" &&
+        "request" in message
+      ) {
+        const request = message.request as { outputByteLimit: number };
+        message = {
+          ...message,
+          request: { ...request, outputByteLimit: Math.min(request.outputByteLimit, budget) },
+        };
+      }
+      Reflect.apply(original, this, [message, transfer]);
+    };
+  });
+  await page.goto("?lang=en");
+  const baseline = await convertOne(
+    page,
+    testPdf([{ height: 24, width: 32 }]),
+    "baseline.pdf",
+    "png",
+  );
+  await clearQueue(page);
+  // A small per-job allowance exercises real PDF.js/codecs without a large memory fixture.
+  await page.evaluate((limit) => {
+    (globalThis as typeof globalThis & { testPdfOutputLimit?: number }).testPdfOutputLimit = limit;
+  }, baseline.byteLength + 1);
+  await page.locator('input[type="file"]').setInputFiles({
+    buffer: testPdf([
+      { height: 24, width: 32 },
+      { height: 24, width: 32 },
+      { height: 24, width: 32 },
+    ]),
+    mimeType: "application/pdf",
+    name: "bounded.pdf",
+  });
+  const item = page.locator(".queue-item");
+  await expect(item).toContainText("Ready to configure");
+  await page.getByRole("textbox", { name: "Pages", exact: true }).fill("1-3");
+  await convertButton(page).click();
+  await expect(item).toContainText("Ready to download", { timeout: 90_000 });
+  await expect(item).toContainText("2 Pages failed");
+  await expect(item).toContainText("Stored results exceed the local limit");
+  await expect(
+    item.getByRole("button", { name: /Download Result: bounded-page-001.png/u }),
+  ).toBeEnabled();
+});
+
 test("renders selected PDF pages locally with bounded DPI and verified downloads", async ({
   baseURL,
   browserName,
@@ -474,7 +570,9 @@ test("renders selected PDF pages locally with bounded DPI and verified downloads
   const pdfWorkerRequests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (/pdf(?:-codec)?\.worker-/u.test(url.pathname)) pdfWorkerRequests.push(url.pathname);
+    if (/(?:pdf-codec\.worker|pdfjs)-/u.test(url.pathname)) {
+      pdfWorkerRequests.push(url.pathname);
+    }
     if ((url.protocol === "http:" || url.protocol === "https:") && url.origin !== allowedOrigin) {
       externalRequests.push(request.url());
     }
@@ -505,7 +603,7 @@ test("renders selected PDF pages locally with bounded DPI and verified downloads
   expect(pdfWorkerRequests.some((path) => path.includes("pdf-codec.worker-"))).toBe(true);
   if (browserName !== "firefox") {
     // Firefox does not surface nested Worker requests through Page request events.
-    expect(pdfWorkerRequests.some((path) => path.includes("pdf.worker-"))).toBe(true);
+    expect(pdfWorkerRequests.some((path) => path.includes("pdfjs-"))).toBe(true);
   }
 
   const firstDownloadPromise = page.waitForEvent("download");
@@ -579,6 +677,8 @@ test("downloads a bounded local ZIP with collision-safe batch filenames", async 
 });
 
 test("includes a structured failure report when a batch only partly succeeds", async ({ page }) => {
+  // Three browser projects can cold-start codec and archive Workers concurrently on CI-class hosts.
+  test.slow();
   await page.goto("?lang=en");
   await page.locator('input[type="file"]').setInputFiles([
     { buffer: testPng(), mimeType: "image/png", name: "good.png" },

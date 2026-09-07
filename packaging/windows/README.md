@@ -37,9 +37,13 @@ checks, and a hidden real conversion smoke. Manual runs can enable
 to install each generated installer and run the hidden package smoke from the
 installed `ImgConvert.exe`.
 
-The `Windows Smoke` workflow does not expose a direct-signing input. The legacy
-signing helper remains available for private diagnostics, but it is not part of
-the project's release channel or publication criteria.
+The `Windows Smoke` workflow does not expose a direct-signing input, and the
+repository has no direct-installer Authenticode helper. For a release candidate,
+dispatch the workflow at `--ref v<version>` and set `release_tag=v<version>`,
+`architecture=both`, `build_direct=true`,
+`install_smoke=true`, and `bundles=msi,nsis`. After both jobs pass, run `Windows
+Release Assets Finalize` with that run ID and tag; it accepts only the exact
+tagged source commit and attaches both architectures to the existing draft.
 
 Microsoft Store is the only trusted signed Windows channel. Tauri does not make MSIX a
 first-class bundle target for this repo, so the store route uses an explicit

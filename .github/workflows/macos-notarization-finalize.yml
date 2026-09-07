@@ -8,6 +8,11 @@ on:
         description: Successful macOS submission workflow run ID containing the pending DMG.
         required: true
         type: string
+      release_tag:
+        description: Exact draft Release tag when the source run requested release attachment; otherwise leave empty.
+        required: false
+        default: ""
+        type: string
       architecture:
         description: Architecture of the submitted DMG to finalize.
         required: true
@@ -22,16 +27,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: macos-notarization-finalize-${{ inputs.source_run_id }}-${{ inputs.architecture }}
+  group: release-draft-${{ inputs.release_tag || inputs.source_run_id }}
   cancel-in-progress: false
-
-env:
-  NODE_VERSION: "24"
 
 jobs:
   finalize:
     name: Check and finalize macOS notarization
-    runs-on: macos-15
+    runs-on: ${{ inputs.architecture == 'x64' && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 15
     steps:
       - name: Validate source workflow run
@@ -40,10 +42,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           IMGCONVERT_DMG_ARCH: ${{ inputs.architecture }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           case "$SOURCE_RUN_ID" in
             ''|*[!0-9]*) echo "source_run_id must contain only digits"; exit 1 ;;
           esac
+          if [ -n "$INPUT_RELEASE_TAG" ]; then
+            [[ "$INPUT_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || {
+              echo "release_tag must be a semantic v-prefixed tag"
+              exit 1
+            }
+          fi
 
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           test "$(jq -r '.status' <<< "$run_json")" = "completed" || { echo "source run is not completed"; exit 1; }
@@ -90,26 +99,17 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
 
       - name: Check notarization credentials
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
-            test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required with API notarization"; exit 1; }
-            test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required with API notarization"; exit 1; }
-            test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required with API notarization"; exit 1; }
-          else
-            test -n "$APPLE_ID" || { echo "APPLE_ID secret is required without API notarization"; exit 1; }
-            test -n "$APPLE_PASSWORD" || { echo "APPLE_PASSWORD secret is required without API notarization"; exit 1; }
-            test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required without API notarization"; exit 1; }
-          fi
+          test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required for API notarization"; exit 1; }
+          test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required for API notarization"; exit 1; }
+          test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required for API notarization"; exit 1; }
 
       - name: Prepare App Store Connect API key
         id: api_key
@@ -161,9 +161,6 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_PATH: ${{ steps.api_key.outputs.path }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           IMGCONVERT_NOTARY_EXPECTED_REPOSITORY: ${{ github.repository }}
           IMGCONVERT_NOTARY_EXPECTED_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           IMGCONVERT_NOTARY_EXPECTED_WORKFLOW: ${{ steps.source.outputs.workflow_name }}
@@ -208,30 +205,75 @@ jobs:
         if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
           IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
           IMGCONVERT_SOURCE_SHA: ${{ steps.notarization.outputs.source_sha }}
         run: |
+          set -euo pipefail
+          test -n "$INPUT_RELEASE_TAG" || { echo "release_tag is required when attaching a DMG"; exit 1; }
+          test "$INPUT_RELEASE_TAG" = "$IMGCONVERT_RELEASE_TAG" || { echo "release_tag does not match the notarization receipt"; exit 1; }
           tag_sha="$(git rev-parse "$IMGCONVERT_RELEASE_TAG^{commit}")"
           test "$tag_sha" = "$IMGCONVERT_SOURCE_SHA" || { echo "release tag does not match receipt source SHA"; exit 1; }
-          gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id >/dev/null
+          release_json="$(gh release view "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json id,isDraft,tagName)"
+          test "$(jq -r '.tagName' <<< "$release_json")" = "$IMGCONVERT_RELEASE_TAG" || { echo "release tag mismatch"; exit 1; }
+          test "$(jq -r '.isDraft' <<< "$release_json")" = "true" || {
+            echo "refusing to attach a DMG to a non-draft GitHub Release"
+            exit 1
+          }
 
-      - name: Attach verified DMG to existing GitHub Release
+      - name: Normalize verified release DMG name
         if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
         env:
-          GH_TOKEN: ${{ github.token }}
           IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
-        run: gh release upload "$IMGCONVERT_RELEASE_TAG" "$IMGCONVERT_MACOS_DMG" --repo "$GITHUB_REPOSITORY"
-
-      - name: Refresh merged GitHub Release checksums
-        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMGCONVERT_RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+          IMGCONVERT_DMG_ARCH: ${{ inputs.architecture }}
         run: |
           set -euo pipefail
-          checksum_assets="$RUNNER_TEMP/imgconvert-release-checksum-assets"
-          mkdir -p "$checksum_assets"
-          gh release download "$IMGCONVERT_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_assets"
-          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets"
-          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets" --verify
-          gh release upload "$IMGCONVERT_RELEASE_TAG" "$checksum_assets/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"
+          canonical_dmg="$(dirname "$IMGCONVERT_MACOS_DMG")/ImgConvert_${IMGCONVERT_RELEASE_TAG#v}_${IMGCONVERT_DMG_ARCH}.dmg"
+          if [ "$IMGCONVERT_MACOS_DMG" != "$canonical_dmg" ]; then
+            test ! -e "$canonical_dmg" || { echo "canonical DMG path already exists"; exit 1; }
+            mv -- "$IMGCONVERT_MACOS_DMG" "$canonical_dmg"
+          fi
+          echo "IMGCONVERT_MACOS_DMG=$canonical_dmg" >> "$GITHUB_ENV"
+
+      - name: Install and run finalized DMG
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          DMG_ARCHITECTURE: ${{ inputs.architecture }}
+          RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          node scripts/check-macos-bundle-artifacts.mjs --bundles=dmg \
+            --artifact="$IMGCONVERT_MACOS_DMG" --require-signed --require-notarized \
+            --expected-architectures="$DMG_ARCHITECTURE" --expected-version="${RELEASE_TAG#v}" --install-smoke
+          mkdir macos-release-assets
+          cp "$IMGCONVERT_MACOS_DMG" macos-release-assets/
+
+      - name: Record final macos-${{ inputs.architecture }} release evidence
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+          SOURCE_SHA: ${{ steps.notarization.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          extension_version="$(git show "$RELEASE_TAG:browser-extension/package.json" | jq -er '.version | strings')"
+          node scripts/github-release-evidence.mjs --group=macos-${{ inputs.architecture }} \
+            --assets-dir="macos-release-assets" --release-tag="$RELEASE_TAG" \
+            --source-sha="$SOURCE_SHA" --extension-version="$extension_version" --output-dir=release-evidence
+          cp "release-evidence/release-evidence-macos-${{ inputs.architecture }}.json" "macos-release-assets/"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        with:
+          name: imgconvert-release-evidence-macos-${{ inputs.architecture }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          path: release-evidence/release-evidence-macos-${{ inputs.architecture }}.json
+
+      - name: Append verified macos-${{ inputs.architecture }} assets and checksums
+        if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' && steps.notarization.outputs.publish_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.notarization.outputs.release_tag }}
+        shell: bash
+        run: node scripts/append-github-release-assets.mjs --assets-dir="macos-release-assets" --release-tag="$RELEASE_TAG"

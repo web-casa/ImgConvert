@@ -1,0 +1,14 @@
+{
+  "actionTitle": {
+    "message": "Open the local ImgConvert workspace"
+  },
+  "contextMenuConvert": {
+    "message": "Convert with ImgConvert"
+  },
+  "extensionDescription": {
+    "message": "Convert images locally in your browser, with batch processing, previews, and adjustable quality."
+  },
+  "extensionName": {
+    "message": "ImgConvert"
+  }
+}

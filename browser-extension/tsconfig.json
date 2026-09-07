@@ -1,0 +1,14 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "strict": true
+  },
+  "include": [
+    ".wxt/**/*.d.ts",
+    "entrypoints/**/*.ts",
+    "entrypoints/**/*.svelte",
+    "src/**/*.ts",
+    "wxt.config.ts"
+  ]
+}

@@ -4,10 +4,13 @@
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
   import ArrowUpRight from "@lucide/svelte/icons/arrow-up-right";
   import Check from "@lucide/svelte/icons/check";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Download from "@lucide/svelte/icons/download";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import Globe from "@lucide/svelte/icons/globe";
   import Menu from "@lucide/svelte/icons/menu";
+  import MonitorDown from "@lucide/svelte/icons/monitor-down";
+  import Puzzle from "@lucide/svelte/icons/puzzle";
   import ScanSearch from "@lucide/svelte/icons/scan-search";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import ShieldCheck from "@lucide/svelte/icons/shield-check";
@@ -43,9 +46,11 @@
 
   let locale = $state<Locale>(initialLocale);
   let menuOpen = $state(false);
+  let tryMenuOpen = $state(false);
   let downloadStatus = $state("");
   let menuElement: HTMLElement;
   let menuToggle: HTMLButtonElement;
+  let tryMenuToggle: HTMLButtonElement;
   let latestReleaseRequest:
     Promise<{ assets: Array<{ name: string; browser_download_url: string }> }> | undefined;
 
@@ -83,6 +88,11 @@
       href: snapUrl,
       logo: platformLogos[2],
     },
+  ]);
+  const platformCards = $derived([
+    { ...ui.platforms[0], href: "#download", external: false },
+    { ...ui.platforms[1], href: links.webApp, external: false },
+    { ...ui.platforms[2], href: "#browser-extension", external: false },
   ]);
   const downloadCards = $derived([
     {
@@ -172,6 +182,18 @@
     menuOpen = false;
   }
 
+  function openTryMenu() {
+    tryMenuOpen = true;
+  }
+
+  function closeTryMenu() {
+    tryMenuOpen = false;
+  }
+
+  function toggleTryMenu() {
+    tryMenuOpen = !tryMenuOpen;
+  }
+
   async function toggleMenu() {
     menuOpen = !menuOpen;
 
@@ -182,7 +204,16 @@
   }
 
   async function handleKeydown(event: KeyboardEvent) {
-    if (event.key !== "Escape" || !menuOpen) return;
+    if (event.key !== "Escape") return;
+
+    if (tryMenuOpen) {
+      closeTryMenu();
+      await tick();
+      tryMenuToggle.focus();
+      return;
+    }
+
+    if (!menuOpen) return;
 
     closeMenu();
     await tick();
@@ -249,13 +280,12 @@
         bind:this={menuElement}
       >
         <a href="#features" onclick={closeMenu}>{ui.nav.product}</a>
+        <a href="#download" onclick={closeMenu}>{ui.nav.desktop}</a>
+        <a href={links.webApp} onclick={closeMenu}>{ui.nav.webApp}</a>
+        <a href="#browser-extension" onclick={closeMenu}>{ui.nav.extension}</a>
         <a href="#formats" onclick={closeMenu}>{ui.nav.formats}</a>
         <a href="#guides" onclick={closeMenu}>{ui.nav.guides}</a>
         <a href="#faq" onclick={closeMenu}>{ui.nav.faq}</a>
-        <a href={links.webApp} onclick={closeMenu}>{ui.nav.webApp}</a>
-        <a href={links.repository} target="_blank" rel="noreferrer" onclick={closeMenu}
-          >{ui.nav.github}<ArrowUpRight size={14} strokeWidth={2.1} aria-hidden="true" /></a
-        >
       </nav>
 
       <div class="home-nav-actions">
@@ -274,9 +304,48 @@
             aria-current={locale === "en" ? "page" : undefined}>EN</a
           >
         </nav>
-        <a class="home-nav-download" href="#download">
-          {copy.nav.download}<Download size={15} strokeWidth={2.2} aria-hidden="true" />
-        </a>
+        <div
+          class="home-nav-try"
+          role="group"
+          aria-label={ui.navTryNowLabel}
+          onmouseenter={openTryMenu}
+          onmouseleave={closeTryMenu}
+        >
+          <button
+            class="home-nav-download home-nav-try-toggle"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={tryMenuOpen}
+            aria-controls="home-nav-try-menu"
+            bind:this={tryMenuToggle}
+            onclick={toggleTryMenu}
+          >
+            {ui.navTryNow}<ChevronDown size={14} strokeWidth={2.4} aria-hidden="true" />
+          </button>
+          {#if tryMenuOpen}
+            <div
+              class="home-nav-try-menu"
+              id="home-nav-try-menu"
+              role="menu"
+              aria-label={ui.navTryNowLabel}
+            >
+              <a role="menuitem" href="#download" onclick={closeTryMenu}>
+                <Download size={16} strokeWidth={2.1} aria-hidden="true" />
+                <span><strong>{ui.navTryDesktop}</strong><small>{ui.desktopEntryNote}</small></span>
+              </a>
+              <a role="menuitem" href={links.webApp} onclick={closeTryMenu}>
+                <Globe size={16} strokeWidth={2.1} aria-hidden="true" />
+                <span><strong>{ui.navTryWeb}</strong><small>{ui.webEntryNote}</small></span>
+              </a>
+              <a role="menuitem" href="#browser-extension" onclick={closeTryMenu}>
+                <Puzzle size={16} strokeWidth={2.1} aria-hidden="true" />
+                <span
+                  ><strong>{ui.navTryExtension}</strong><small>{ui.extensionEntryNote}</small></span
+                >
+              </a>
+            </div>
+          {/if}
+        </div>
         <button
           class="home-menu-toggle"
           type="button"
@@ -318,6 +387,14 @@
             <a class="home-web-launch" href={links.webApp}>
               <Globe size={17} strokeWidth={2.1} aria-hidden="true" />
               <span><strong>{ui.webEntryAction}</strong><small>{ui.webEntryNote}</small></span>
+              <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
+            </a>
+            <a class="home-extension-launch" href="#browser-extension">
+              <Puzzle size={17} strokeWidth={2.1} aria-hidden="true" />
+              <span
+                ><strong>{ui.extensionEntryAction}</strong><small>{ui.extensionEntryNote}</small
+                ></span
+              >
               <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
             </a>
             <a class="home-all-downloads" href="#download">
@@ -567,6 +644,111 @@
       </div>
     </section>
 
+    <section
+      class="home-platforms home-container"
+      id="platforms"
+      aria-labelledby="home-platforms-title"
+    >
+      <div class="home-section-heading">
+        <p class="home-eyebrow">{ui.platformsEyebrow}</p>
+        <h2 id="home-platforms-title">{ui.platformsTitle}</h2>
+        <p>{ui.platformsBody}</p>
+      </div>
+
+      <div class="home-platform-cards">
+        {#each platformCards as platform, index (platform.name)}
+          <article>
+            <div class="home-platform-top">
+              <span class="home-platform-icon" aria-hidden="true">
+                {#if index === 0}
+                  <MonitorDown size={19} strokeWidth={2} />
+                {:else if index === 1}
+                  <Globe size={19} strokeWidth={2} />
+                {:else}
+                  <Puzzle size={19} strokeWidth={2} />
+                {/if}
+              </span>
+              <span class="home-platform-badge">{platform.badge}</span>
+            </div>
+            <h3>{platform.name}</h3>
+            <p class="home-platform-tagline">{platform.tagline}</p>
+            <p class="home-platform-body">{platform.body}</p>
+            {#if index === 2}
+              <div class="home-extension-card-actions">
+                <button type="button" disabled>
+                  {ui.extensionStoreAction}<small>{ui.extensionStoreNote}</small>
+                </button>
+                {#if links.extensionChromeZip}
+                  <a href={links.extensionChromeZip} target="_blank" rel="noreferrer">
+                    {ui.extensionZipAction}<ArrowUpRight
+                      size={15}
+                      strokeWidth={2.2}
+                      aria-hidden="true"
+                    />
+                  </a>
+                {:else}
+                  <button type="button" disabled
+                    >{ui.extensionZipAction}<small>{ui.extensionZipNote}</small></button
+                  >
+                {/if}
+                {#if links.extensionSource}
+                  <a href={links.extensionSource} target="_blank" rel="noreferrer">
+                    {ui.extensionSourceAction}<ArrowUpRight
+                      size={15}
+                      strokeWidth={2.2}
+                      aria-hidden="true"
+                    />
+                  </a>
+                {:else}
+                  <button type="button" disabled
+                    >{ui.extensionSourceAction}<small>{ui.extensionZipNote}</small></button
+                  >
+                {/if}
+              </div>
+            {:else if platform.external}
+              <a href={platform.href} target="_blank" rel="noreferrer">
+                {platform.action}<ArrowUpRight size={15} strokeWidth={2.2} aria-hidden="true" />
+              </a>
+            {:else}
+              <a href={platform.href}>
+                {platform.action}<ArrowRight size={15} strokeWidth={2.2} aria-hidden="true" />
+              </a>
+            {/if}
+          </article>
+        {/each}
+      </div>
+
+      <div class="home-compare">
+        <div class="home-section-heading">
+          <p class="home-eyebrow">{ui.compareEyebrow}</p>
+          <h3 id="home-compare-title">{ui.compareTitle}</h3>
+        </div>
+        <div class="home-compare-table" role="region" aria-labelledby="home-compare-title">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">{ui.compareHeaders.feature}</th>
+                <th scope="col">{ui.compareHeaders.desktop}</th>
+                <th scope="col">{ui.compareHeaders.web}</th>
+                <th scope="col">{ui.compareHeaders.extension}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each ui.compareRows as row (row.feature)}
+                <tr>
+                  <th scope="row">{row.feature}</th>
+                  <td>{row.desktop}</td>
+                  <td>{row.web}</td>
+                  <td>{row.extension}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <p class="home-compare-note">{ui.compareNote}</p>
+      </div>
+    </section>
+
     <section class="home-downloads" id="download" aria-labelledby="home-downloads-title">
       <div class="home-container">
         <div class="home-section-heading home-section-heading-light">
@@ -575,7 +757,29 @@
           <p>{copy.downloads.body}</p>
         </div>
 
-        <div class="home-download-grid">
+        <nav class="home-download-channels" aria-label={ui.channelNavLabel}>
+          <a href="#desktop-downloads">
+            <MonitorDown size={19} strokeWidth={2} aria-hidden="true" />
+            <span><strong>{ui.desktopEntryAction}</strong><small>{ui.desktopEntryNote}</small></span
+            >
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
+          </a>
+          <a href={links.webApp}>
+            <Globe size={19} strokeWidth={2} aria-hidden="true" />
+            <span><strong>{ui.webEntryAction}</strong><small>{ui.webEntryNote}</small></span>
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
+          </a>
+          <a href="#browser-extension">
+            <Puzzle size={19} strokeWidth={2} aria-hidden="true" />
+            <span
+              ><strong>{ui.extensionEntryAction}</strong><small>{ui.extensionEntryNote}</small
+              ></span
+            >
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
+          </a>
+        </nav>
+
+        <div class="home-download-grid" id="desktop-downloads">
           {#each downloadCards as card (card.key)}
             <article class:recommended={card.key === detectedPlatform}>
               {#if card.key === detectedPlatform}
@@ -631,6 +835,51 @@
             </article>
           {/each}
         </div>
+
+        <article
+          class="home-extension-install"
+          id="browser-extension"
+          aria-labelledby="home-extension-install-title"
+        >
+          <div class="home-extension-install-copy">
+            <span class="home-extension-install-icon" aria-hidden="true">
+              <Puzzle size={25} strokeWidth={1.9} />
+            </span>
+            <div>
+              <p class="home-eyebrow">CHROME · EDGE</p>
+              <h3 id="home-extension-install-title">{ui.extensionManualTitle}</h3>
+              <p>{ui.extensionManualBody}</p>
+            </div>
+          </div>
+          <div class="home-extension-install-actions">
+            <button type="button" disabled>
+              <span>{ui.extensionStoreAction}<small>{ui.extensionStoreNote}</small></span>
+            </button>
+            {#if links.extensionChromeZip}
+              <a href={links.extensionChromeZip} target="_blank" rel="noreferrer">
+                <span
+                  ><strong>{ui.extensionZipAction}</strong><small>{ui.extensionZipNote}</small
+                  ></span
+                >
+                <ArrowUpRight size={16} strokeWidth={2.2} aria-hidden="true" />
+              </a>
+            {:else}
+              <button type="button" disabled
+                >{ui.extensionZipAction}<small>{ui.extensionZipNote}</small></button
+              >
+            {/if}
+            {#if links.extensionSource}
+              <a href={links.extensionSource} target="_blank" rel="noreferrer">
+                <span><strong>{ui.extensionSourceAction}</strong><small>GitHub</small></span>
+                <ArrowUpRight size={16} strokeWidth={2.2} aria-hidden="true" />
+              </a>
+            {:else}
+              <button type="button" disabled
+                >{ui.extensionSourceAction}<small>{ui.extensionZipNote}</small></button
+              >
+            {/if}
+          </div>
+        </article>
 
         <div class="home-linux-support">
           <div class="home-linux-copy">
@@ -767,6 +1016,14 @@
             <span><strong>{ui.webEntryAction}</strong><small>{ui.webEntryNote}</small></span>
             <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
           </a>
+          <a class="home-extension-launch" href="#browser-extension">
+            <Puzzle size={17} strokeWidth={2.1} aria-hidden="true" />
+            <span
+              ><strong>{ui.extensionEntryAction}</strong><small>{ui.extensionEntryNote}</small
+              ></span
+            >
+            <ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
+          </a>
           <a class="home-all-downloads" href="#download">
             {copy.hero.allDownloads}<ArrowRight size={16} strokeWidth={2.2} aria-hidden="true" />
           </a>
@@ -797,12 +1054,17 @@
         <p>{copy.footer.tagline}</p>
       </div>
       <nav aria-label={ui.nav.footerLabel}>
+        <a href="#download">{ui.desktopEntryAction}</a>
+        <a href={links.webApp}>{copy.footer.webApp}</a>
+        <a href="#browser-extension">{ui.extensionEntryAction}</a>
         <a href="#guides">{copy.footer.guides}</a>
         <a href={localeDocsUrl}>{copy.footer.docs}</a>
         <a href={localeBlogUrl}>{copy.footer.blog}</a>
+        <a href={locale === "zh" ? "/environment/" : "/en/environment/"}
+          >{locale === "zh" ? "存储与环境" : "Storage & environment"}</a
+        >
         <a href={localePrivacyUrl}>{copy.footer.privacy}</a>
         <a href={localeLegalUrl}>{copy.footer.legal}</a>
-        <a href={links.webApp}>{copy.footer.webApp}</a>
         <a href={masUrl} target="_blank" rel="noreferrer">{copy.footer.macStore}</a>
         <a href={storeUrl} target="_blank" rel="noreferrer">{copy.footer.store}</a>
         <a href={links.repository} target="_blank" rel="noreferrer">{copy.footer.repository}</a>

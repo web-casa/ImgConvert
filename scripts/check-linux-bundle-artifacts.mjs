@@ -201,6 +201,16 @@ function inspectRpm(artifact) {
     return ["rpm2cpio and cpio are required to extract .rpm artifacts"];
   }
 
+  const version = commandOutput("rpm", ["-qp", "--queryformat", "%{VERSION}", artifact]);
+  if (!version.ok) {
+    return [`rpm version query failed for ${path.relative(repoRoot, artifact)}: ${version.stderr}`];
+  }
+  if (version.stdout.trim() !== packageJson.version) {
+    return [
+      `rpm version mismatch: expected ${packageJson.version}, got ${version.stdout.trim() || "<missing>"}`,
+    ];
+  }
+
   const query = commandOutput("rpm", ["-qpl", artifact]);
   if (!query.ok) {
     return [`rpm -qpl failed for ${path.relative(repoRoot, artifact)}: ${query.stderr}`];
@@ -400,7 +410,9 @@ function inspectExtractedLinuxBundle(root, source) {
   if (!existsSync(binary)) {
     failures.push(`${source} missing usr/bin/imgconvert`);
   } else {
-    failures.push(...inspectLinuxExecutable(binary, source));
+    failures.push(
+      ...inspectLinuxExecutable(binary, source, source === "AppImage" ? root : undefined),
+    );
   }
   failures.push(...inspectGlibcTree(root, source));
 
@@ -432,7 +444,7 @@ function inspectExtractedLinuxBundle(root, source) {
   return failures;
 }
 
-function inspectLinuxExecutable(binary, source) {
+function inspectLinuxExecutable(binary, source, appImageRoot) {
   if (!commandExists("file")) {
     return ["file is required to inspect Linux executable architecture"];
   }
@@ -454,13 +466,41 @@ function inspectLinuxExecutable(binary, source) {
   if (!commandExists("ldd")) {
     return ["ldd is required to inspect Linux runtime dependencies"];
   }
-  const dependencies = commandOutput("ldd", [binary]);
+  // Match AppRun.wrapped's private search directories, without inheriting host overrides.
+  const libraryPath = appImageRoot
+    ? [
+        "usr/lib",
+        "usr/lib/i386-linux-gnu",
+        "usr/lib/x86_64-linux-gnu",
+        "usr/lib32",
+        "usr/lib64",
+        "lib",
+        "lib/i386-linux-gnu",
+        "lib/x86_64-linux-gnu",
+        "lib32",
+        "lib64",
+      ]
+        .map((relative) => path.join(appImageRoot, relative))
+        .join(":")
+    : "";
+  const dependencies = commandOutput("ldd", [binary], {
+    ...process.env,
+    LD_LIBRARY_PATH: libraryPath,
+  });
   const output = `${dependencies.stdout}\n${dependencies.stderr}`.trim();
   const staticBinary = /not a dynamic executable|statically linked/i.test(output);
   if (!dependencies.ok && !staticBinary) {
     return [`ldd failed for ${source} binary: ${output || "unknown error"}`];
   }
   if (staticBinary) {
+    // A foreign-architecture dynamic ELF can also make ldd say "not a dynamic
+    // executable". Confirm its dependency table before accepting that result.
+    const dynamic = commandOutput("readelf", ["-d", binary]);
+    if (!dynamic.ok || /\(NEEDED\)/.test(dynamic.stdout)) {
+      return [
+        `cannot verify ${source} runtime dependencies: ldd reported ${output}; inspect in a matching-architecture runtime`,
+      ];
+    }
     return [];
   }
   const missing = output
@@ -502,7 +542,13 @@ function inspectGlibcTree(root, source) {
     if (!isElf(file)) {
       continue;
     }
-    failures.push(...inspectLinuxExecutable(file, `${source} bundled ELF`));
+    failures.push(
+      ...inspectLinuxExecutable(
+        file,
+        `${source} bundled ELF`,
+        source === "AppImage" ? root : undefined,
+      ),
+    );
     const result = commandOutput("readelf", ["--version-info", file]);
     if (!result.ok) {
       continue;
@@ -597,8 +643,9 @@ function commandExists(command) {
   return result.status === 0;
 }
 
-function commandOutput(command, args) {
+function commandOutput(command, args, env = process.env) {
   const result = spawnSync(command, args, {
+    env,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });

@@ -102,7 +102,10 @@ interface Copy {
     converted: string;
     imported: string;
     localOnly: string;
+    noNetReduction: string;
     outbound: string;
+    outputReduction: string;
+    outputReductionBasis: string;
     ready: string;
     title: string;
     verified: string;
@@ -135,8 +138,9 @@ interface Copy {
     duration: string;
     larger: string;
     original: string;
+    reduction: string;
     renderedPage: string;
-    saved: string;
+    sameSize: string;
     title: string;
   };
   pwa: {
@@ -228,6 +232,8 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
       "input-empty": "This file is empty. Choose a file that contains image data.",
       "input-too-large": "This file exceeds the Web limit. Open it in the desktop app instead.",
       "invalid-settings": "These output settings are not valid. Check the size and format options.",
+      "output-budget-exceeded":
+        "Stored results exceed the local limit. Select fewer PDF pages, or download and remove completed items before retrying.",
       "output-validation-failed":
         "The output did not pass its format check. Retry or choose another format.",
       "pixel-budget-exceeded":
@@ -332,7 +338,10 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
       converted: "Converted",
       imported: "Imported",
       localOnly: "Browser Memory Only",
+      noNetReduction: "No Net Reduction",
       outbound: "0 B Outbound",
+      outputReduction: "Net Output Reduction",
+      outputReductionBasis: "Comparable Raster Results: {count}",
       ready: "Ready",
       title: "Local Route",
       verified: "Verified",
@@ -364,10 +373,11 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
     preview: {
       converted: "Converted",
       duration: "Local conversion time",
-      larger: "Result is larger than the source",
+      larger: "{size} larger than source",
       original: "Original",
+      reduction: "{percent} smaller · {size} less",
       renderedPage: "Rendered PDF page",
-      saved: "smaller",
+      sameSize: "Same file size as source",
       title: "Before & After",
     },
     pwa: {
@@ -470,6 +480,8 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
       "input-empty": "这个文件是空的，请选择包含图片数据的文件。",
       "input-too-large": "文件超过 Web 版上限，请改用桌面版。",
       "invalid-settings": "输出设置无效，请检查尺寸和格式选项。",
+      "output-budget-exceeded":
+        "结果占用空间已达上限。请减少 PDF 页数，或下载并移除已完成项后重试。",
       "output-validation-failed": "输出没有通过格式校验，请重试或选择其他格式。",
       "pixel-budget-exceeded": "请求尺寸超过浏览器预算，请选择更小的尺寸。",
       "unsafe-pdf": "这个 PDF 包含文档脚本或不支持的活动内容，请导出扁平化 PDF 或使用桌面版。",
@@ -560,7 +572,10 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
       converted: "已转换",
       imported: "已导入",
       localOnly: "仅在浏览器内存中",
+      noNetReduction: "暂无净减少",
       outbound: "出站 0 B",
+      outputReduction: "输出净减少",
+      outputReductionBasis: "可比较的栅格图片结果：{count} 个",
       ready: "可配置",
       title: "本地处理路径",
       verified: "已检测",
@@ -591,10 +606,11 @@ export const translations: Readonly<Record<Locale, Copy>> = Object.freeze({
     preview: {
       converted: "转换结果",
       duration: "本地转换耗时",
-      larger: "结果比源文件更大",
+      larger: "比源文件大 {size}",
       original: "原图",
+      reduction: "缩小 {percent} · 少占 {size}",
       renderedPage: "渲染后的 PDF 页面",
-      saved: "更小",
+      sameSize: "与源文件大小相同",
       title: "转换前后对比",
     },
     pwa: {

@@ -81,8 +81,8 @@ The release workflows additionally enforce these checks:
   applicable, and no linked `libheif`/`libx265`.
 - Windows: PE machine type before packaging, MSIX manifest/package executable
   agreement, `makeappx pack` followed by `makeappx unpack` package inspection,
-  Authenticode verification for signed installers, and installed-binary
-  architecture checks.
+  an explicit `NotSigned` assertion for GitHub direct installers, Store signing
+  separation, and installed-binary architecture checks.
 - Linux: ELF architecture and dynamic-library checks for every packaged ELF,
   GLIBC baseline, metadata checks, and Docker package smokes on Ubuntu 24.04,
   Debian 13, Fedora 42, and the Ubuntu 22.04 AppImageHub baseline.
@@ -97,13 +97,26 @@ pnpm run release:updater:upgrade-smoke -- \
   --from-tag=v<previous> --to-tag=v<current> --platform=linux-x86_64
 ```
 
-After a tag-triggered `Linux Release` matrix succeeds, use the manual `Linux
-Release Assets Finalize` workflow from `main` to attach its verified amd64 and
-arm64 direct packages to the existing same-tag GitHub Release. The finalizer
-checks the source run provenance, immutable tag commit, both per-architecture
-checksum manifests, and the current release checksum manifest before it
-publishes assets. It then replaces only the release-level `SHA256SUMS` with a
-merged manifest and verifies the public download set again.
+All attachment workflows require an existing same-tag **draft** and assert that
+it is still a draft after refreshing the merged `SHA256SUMS`:
+
+1. `Updater Release` creates or extends the draft with signed updater assets.
+2. `Linux Release Assets Finalize` attaches verified amd64/arm64 DEB, RPM, and
+   AppImage assets from the exact tag build.
+3. Run `macOS Notarization Finalize` once for x64 and once for arm64, passing the
+   same `release_tag`; each job accepts only a signed, Apple-accepted, stapled DMG
+   tied to the exact source run and normalizes its public filename by architecture.
+4. Run `Windows Smoke` at `--ref <release_tag>` with the same `release_tag`, both
+   architectures, direct MSI/NSIS, and install smoke enabled, then pass its run ID
+   to `Windows Release Assets Finalize` to attach the intentionally unsigned
+   installers.
+5. Only `GitHub Release Publish` may clear draft mode. It downloads the final
+   candidate, verifies checksums, requires the full 12-package desktop matrix and
+   the Windows unsigned/SmartScreen release-note warning, then publishes.
+
+The updater attachment, all three platform finalizers, and the final publisher
+share one per-tag concurrency lock. A publisher therefore cannot race an asset or
+checksum update for the same draft.
 
 ## Image corpus and resource acceptance
 

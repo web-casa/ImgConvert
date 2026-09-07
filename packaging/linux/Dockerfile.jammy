@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Build with --platform=linux/amd64 or linux/arm64. All output stays in mounted paths.
+FROM ubuntu:22.04
+ARG TARGETARCH
+ARG NODE_VERSION=24.18.0
+ARG PNPM_VERSION=10.34.4
+ARG RUST_VERSION=1.96.0
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl xz-utils build-essential pkg-config cmake meson ninja-build nasm \
+    file desktop-file-utils appstream squashfs-tools xdg-utils xvfb xauth \
+    libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+    patchelf rpm rpm2cpio cpio git && rm -rf /var/lib/apt/lists/*
+RUN set -eu; case "$TARGETARCH" in amd64) node_arch=x64;; arm64) node_arch=arm64;; *) exit 1;; esac; \
+    archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${archive}"; \
+    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+    grep "  ${archive}$" SHASUMS256.txt | sha256sum --check --strict; \
+    mkdir -p /opt/node; tar -xJf "$archive" -C /opt/node --strip-components=1; \
+    rm "$archive" SHASUMS256.txt
+ENV PATH=/opt/node/bin:/root/.cargo/bin:$PATH
+RUN npm install --global "pnpm@${PNPM_VERSION}" && \
+    curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain "$RUST_VERSION" && \
+    rm /tmp/rustup-init.sh
+WORKDIR /workspace

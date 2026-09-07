@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflowsDir = path.join(repoRoot, ".github", "workflows");
@@ -20,6 +21,11 @@ const macosRelease = readWorkflow("macos-release.yml");
 const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
+const windowsReleaseAssetsFinalize = readWorkflow("windows-release-assets-finalize.yml");
+const browserExtensionReleaseAssetsFinalize = readWorkflow(
+  "browser-extension-release-assets-finalize.yml",
+);
+const githubReleasePublish = readWorkflow("github-release-publish.yml");
 const windowsStoreRelease = readWorkflow("windows-store-release.yml");
 const snapStoreMetadata = readWorkflow("snap-store-metadata.yml");
 const snapStoreRelease = readWorkflow("snap-store-release.yml");
@@ -37,6 +43,9 @@ const allWorkflows = [
   ["macos-mas-release.yml", macosMasRelease],
   ["macos-notarization-finalize.yml", macosNotarizationFinalize],
   ["windows-smoke.yml", windowsSmoke],
+  ["windows-release-assets-finalize.yml", windowsReleaseAssetsFinalize],
+  ["browser-extension-release-assets-finalize.yml", browserExtensionReleaseAssetsFinalize],
+  ["github-release-publish.yml", githubReleasePublish],
   ["windows-store-release.yml", windowsStoreRelease],
   ["snap-store-metadata.yml", snapStoreMetadata],
   ["snap-store-release.yml", snapStoreRelease],
@@ -51,6 +60,7 @@ for (const name of readdirSync(workflowsDir)
   .sort()) {
   checkGitHubActionsAreCommitPinned(name, readWorkflow(name));
 }
+checkNodeVersionPolicy();
 
 checkAutomaticLinuxCiWorkflow();
 checkUbuntuAptBootstrap();
@@ -65,12 +75,21 @@ checkManualWorkflow("macos-release.yml", macosRelease);
 checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
 checkManualWorkflow("macos-notarization-finalize.yml", macosNotarizationFinalize);
 checkManualWorkflow("windows-smoke.yml", windowsSmoke);
+checkManualWorkflow("windows-release-assets-finalize.yml", windowsReleaseAssetsFinalize);
+checkManualWorkflow(
+  "browser-extension-release-assets-finalize.yml",
+  browserExtensionReleaseAssetsFinalize,
+);
+checkManualWorkflow("github-release-publish.yml", githubReleasePublish);
 checkManualWorkflow("windows-store-release.yml", windowsStoreRelease);
 checkManualWorkflow("snap-store-metadata.yml", snapStoreMetadata);
 checkManualWorkflow("snap-store-release.yml", snapStoreRelease);
 checkUpdaterReleaseWorkflow();
 checkUpdaterUpgradeSmokeWorkflow();
 checkWindowsSmokeWorkflow();
+checkWindowsReleaseAssetsFinalizeWorkflow();
+checkBrowserExtensionReleaseAssetsFinalizeWorkflow();
+checkGithubReleasePublishWorkflow();
 checkStandardPlatformWorkflow("macos-smoke.yml", macosSmoke, "macOS", "macos-15");
 checkMacosSmokeWorkflow();
 checkMacosIntelSmokeWorkflow();
@@ -93,7 +112,7 @@ checkStandardPlatformWorkflow(
   "macos-notarization-finalize.yml",
   macosNotarizationFinalize,
   "macOS notarization finalizer",
-  "macos-15",
+  "${{ inputs.architecture == 'x64' && 'macos-15-intel' || 'macos-15' }}",
 );
 checkStandardPlatformWorkflow(
   "windows-smoke.yml",
@@ -130,10 +149,11 @@ if (failures.length > 0) {
 console.log("CI cost guardrail check passed (public-repo standard runners only).");
 
 function checkPublicFreeRunnerPolicy(name, text) {
-  if (!text.includes("workflow_dispatch:")) {
+  const workflow = parseWorkflow(name, text);
+  if (!workflow?.on || !Object.hasOwn(workflow.on, "workflow_dispatch")) {
     failures.push(`${name} must be manually dispatchable`);
   }
-  if (hasYamlKeyLine(text, "schedule")) {
+  if (workflow?.on?.schedule) {
     failures.push(`${name} must not use schedule trigger`);
   }
   if (/\bconfirm_paid_runner\b/.test(text) || /\bconfirm_runner\b/.test(text)) {
@@ -155,14 +175,17 @@ function checkPublicFreeRunnerPolicy(name, text) {
 }
 
 function checkGitHubActionsAreCommitPinned(name, text) {
-  for (const [index, line] of text.split(/\r?\n/).entries()) {
-    const match = line.match(/^\s*(?:-\s+)?uses:\s*([^@\s]+)@([^\s#]+)/u);
+  const workflow = parseWorkflow(name, text);
+  for (const step of workflowSteps(workflow)) {
+    if (typeof step?.uses !== "string") continue;
+    const match = step.uses.match(/^([^@\s]+)@([^\s]+)$/u);
     if (!match) {
+      failures.push(`${name} contains an invalid uses value: ${step.uses}`);
       continue;
     }
     const [, action, ref] = match;
     if (!/^[a-f0-9]{40}$/iu.test(ref)) {
-      failures.push(`${name}:${index + 1} must pin ${action} to a full commit SHA`);
+      failures.push(`${name} must pin ${action} to a full commit SHA`);
     }
   }
 }
@@ -178,10 +201,14 @@ function isAllowedRunner(runner) {
     "macos-15",
     "macos-15-intel",
     "${{ matrix.runner }}",
+    "${{ inputs.architecture == 'x64' && 'macos-15-intel' || 'macos-15' }}",
   ].includes(runner);
 }
 
 function checkAutomaticLinuxCiWorkflow() {
+  if (!packageJson.scripts?.["quality:frontend"]?.includes("pnpm run extension:check")) {
+    failures.push("quality:frontend must run extension:check for regular PR CI");
+  }
   requireBooleanInputDefault(ci, "platform_checks", false, "ci.yml");
   requireBooleanInputDefault(ci, "fuzz_corpus", false, "ci.yml");
   requireBooleanInputDefault(ci, "package_smoke", false, "ci.yml");
@@ -212,20 +239,24 @@ function checkAutomaticLinuxCiWorkflow() {
   }
   const rustCacheAction = "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6";
   const rustCacheCount = ci.split(rustCacheAction).length - 1;
-  if (rustCacheCount !== 2) {
+  if (rustCacheCount !== 3) {
     failures.push(
-      `ci.yml must cache the fuzz and Tauri desktop jobs with pinned rust-cache (found ${rustCacheCount})`,
+      `ci.yml must cache fuzz, Tauri desktop, and security tools with pinned rust-cache (found ${rustCacheCount})`,
     );
   }
   for (const marker of [
     "shared-key: ubuntu-fuzz-corpus",
     "shared-key: ubuntu-tauri-backend-e2e",
+    "shared-key: ubuntu-security-tools",
     "src-tauri/fuzz -> target",
     "cache-bin: true",
   ]) {
     if (!ci.includes(marker)) {
       failures.push(`ci.yml Rust cache configuration is missing: ${marker}`);
     }
+  }
+  if (!ci.includes("cargo install cargo-audit --version 0.22.2 --locked")) {
+    failures.push("ci.yml must pin cargo-audit for reproducible security tooling");
   }
   if (!ci.includes("inputs.package_smoke_arm64")) {
     failures.push("ci.yml package smoke matrix must require package_smoke_arm64 on dispatch");
@@ -338,12 +369,12 @@ function checkLinuxReleaseAssetsFinalizeWorkflow() {
     "gh run download",
     "gh release download",
     "sha256sum --check --strict",
-    "gh release upload",
-    '"$checksum_assets/SHA256SUMS" --clobber',
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
     "refresh-github-release-checksums.mjs",
-    "Refresh merged GitHub Release checksums",
+    "imgconvert-release-evidence-",
     "--verify",
-    "Verify public release assets and merged checksums",
+    "Append verified linux assets and checksums",
   ]) {
     if (!linuxReleaseAssetsFinalize.includes(marker)) {
       failures.push(`linux-release-assets-finalize.yml missing marker: ${marker}`);
@@ -372,8 +403,11 @@ function checkManualWorkflow(name, text) {
 
 function checkUpdaterReleaseWorkflow() {
   requireBooleanInputDefault(updaterRelease, "publish_release", false, "release-updater.yml");
-  requireBooleanInputDefault(updaterRelease, "draft_release", true, "release-updater.yml");
   requireBooleanInputDefault(updaterRelease, "prerelease", false, "release-updater.yml");
+  const workflow = parseWorkflow("release-updater.yml", updaterRelease);
+  if (workflow?.on?.workflow_dispatch?.inputs?.draft_release) {
+    failures.push("release-updater.yml must not allow callers to disable draft mode");
+  }
 
   if (!/^permissions:\s*\n\s+contents:\s*read\s*$/mu.test(updaterRelease)) {
     failures.push("release-updater.yml must default to read-only contents permissions");
@@ -407,8 +441,8 @@ function checkUpdaterReleaseWorkflow() {
       "needs: linux-updater",
       "contents: write",
       "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-      "softprops/action-gh-release",
-      "release-publish-assets/latest.json",
+      'gh release create "$RELEASE_TAG"',
+      "release-publish-assets/*",
       "release-publish-assets/SHA256SUMS",
       "release-assets/target/appimagehub/SHA256SUMS",
       "Re-verify staged updater signature",
@@ -421,8 +455,10 @@ function checkUpdaterReleaseWorkflow() {
       "latest.json updater URL does not match this release",
       "RELEASE_REPOSITORY",
       "refresh-github-release-checksums.mjs",
-      "Refresh merged GitHub Release checksums",
+      "github-release-evidence.mjs",
       "--verify",
+      "--draft --verify-tag",
+      "cmp release-publish-assets/SHA256SUMS release-checksum-assets/SHA256SUMS",
     ]) {
       if (!publishJob.includes(marker)) {
         failures.push(`release-updater.yml publish-release job missing marker: ${marker}`);
@@ -438,6 +474,14 @@ function checkUpdaterReleaseWorkflow() {
         "release-updater.yml publish-release job must re-verify staged updater artifacts with the public key",
       );
     }
+  }
+
+  const releaseStep = workflow?.jobs?.["publish-release"]?.steps?.find(
+    (step) =>
+      typeof step?.run === "string" && step.run.includes('gh release create "$RELEASE_TAG"'),
+  );
+  if (!releaseStep?.run.includes("--draft --verify-tag")) {
+    failures.push("release-updater.yml must only create an initial draft for an existing tag");
   }
 
   if (!updaterRelease.includes("pnpm run release:linux:updater")) {
@@ -606,6 +650,20 @@ function checkMacosMasReleaseWorkflow() {
 
 function checkMacosNotarizationFinalizeWorkflow() {
   requireStringInput(macosNotarizationFinalize, "source_run_id", "macos-notarization-finalize.yml");
+  const releaseTagInput = parseWorkflow(
+    "macos-notarization-finalize.yml",
+    macosNotarizationFinalize,
+  )?.on?.workflow_dispatch?.inputs?.release_tag;
+  if (
+    !releaseTagInput ||
+    releaseTagInput.type !== "string" ||
+    releaseTagInput.required !== false ||
+    releaseTagInput.default !== ""
+  ) {
+    failures.push(
+      "macos-notarization-finalize.yml must define an optional empty release_tag input",
+    );
+  }
   for (const marker of [
     "actions: read",
     "contents: write",
@@ -623,10 +681,11 @@ function checkMacosNotarizationFinalizeWorkflow() {
     "notarization_status == 'Accepted'",
     "imgconvert-macos-${{ inputs.architecture }}-dmg-notarized",
     "gh release view",
-    "gh release upload",
-    "refresh-github-release-checksums.mjs",
-    "Refresh merged GitHub Release checksums",
-    "--verify",
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
+    "--install-smoke",
+    "release_tag does not match the notarization receipt",
+    "Normalize verified release DMG name",
   ]) {
     if (!macosNotarizationFinalize.includes(marker)) {
       failures.push(`macos-notarization-finalize.yml missing marker: ${marker}`);
@@ -727,6 +786,102 @@ function checkWindowsSmokeWorkflow() {
   }
 }
 
+function checkWindowsReleaseAssetsFinalizeWorkflow() {
+  requireStringInput(
+    windowsReleaseAssetsFinalize,
+    "source_run_id",
+    "windows-release-assets-finalize.yml",
+  );
+  requireStringInput(
+    windowsReleaseAssetsFinalize,
+    "release_tag",
+    "windows-release-assets-finalize.yml",
+  );
+  for (const marker of [
+    "Validate source Windows Smoke run",
+    "imgconvert-windows-${architecture}-release",
+    "windows-smoke.yml",
+    "refusing to attach Windows assets to a non-draft Release",
+    "gh run download",
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
+    "windows-release-assets.mjs",
+  ]) {
+    if (!windowsReleaseAssetsFinalize.includes(marker)) {
+      failures.push(`windows-release-assets-finalize.yml missing marker: ${marker}`);
+    }
+  }
+  const workflow = parseWorkflow(
+    "windows-release-assets-finalize.yml",
+    windowsReleaseAssetsFinalize,
+  );
+  if (workflow?.permissions?.actions !== "read" || workflow?.permissions?.contents !== "write") {
+    failures.push("Windows release finalizer requires actions: read and contents: write only");
+  }
+  if (workflow?.concurrency?.group !== "release-draft-${{ inputs.release_tag }}") {
+    failures.push("Windows release finalizer must share the per-tag Release draft lock");
+  }
+}
+
+function checkBrowserExtensionReleaseAssetsFinalizeWorkflow() {
+  requireStringInput(
+    browserExtensionReleaseAssetsFinalize,
+    "release_tag",
+    "browser-extension-release-assets-finalize.yml",
+  );
+  for (const marker of [
+    "Build, verify, and attach Chrome and Edge ZIPs to draft",
+    "pnpm run extension:check",
+    "pnpm run extension:zip",
+    "refusing to attach extension assets to a non-draft Release",
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
+    "imgconvert-release-evidence-extensions-",
+  ]) {
+    if (!browserExtensionReleaseAssetsFinalize.includes(marker)) {
+      failures.push(`browser-extension-release-assets-finalize.yml missing marker: ${marker}`);
+    }
+  }
+  const workflow = parseWorkflow(
+    "browser-extension-release-assets-finalize.yml",
+    browserExtensionReleaseAssetsFinalize,
+  );
+  if (workflow?.permissions?.contents !== "write") {
+    failures.push("Browser extension release finalizer requires contents: write only");
+  }
+  if (workflow?.concurrency?.group !== "release-draft-${{ inputs.release_tag }}") {
+    failures.push("Browser extension release finalizer must share the per-tag Release draft lock");
+  }
+}
+
+function checkGithubReleasePublishWorkflow() {
+  requireStringInput(githubReleasePublish, "release_tag", "github-release-publish.yml");
+  for (const marker of [
+    "Verify immutable tag and draft state",
+    "verify-github-release-publication.mjs",
+    "--check-snapshot=",
+    "actions: read",
+    'gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false',
+  ]) {
+    if (!githubReleasePublish.includes(marker)) {
+      failures.push(`github-release-publish.yml missing marker: ${marker}`);
+    }
+  }
+  const workflow = parseWorkflow("github-release-publish.yml", githubReleasePublish);
+  if (workflow?.permissions?.contents !== "write") {
+    failures.push("GitHub Release publisher requires contents: write");
+  }
+  if (workflow?.concurrency?.group !== "release-draft-${{ inputs.release_tag }}") {
+    failures.push("GitHub Release publisher must share the per-tag Release draft lock");
+  }
+  const editSteps = workflowSteps(workflow).filter(
+    (step) => typeof step?.run === "string" && step.run.includes("gh release edit"),
+  );
+  if (editSteps.length !== 1 || !editSteps[0].run.includes("--draft=false")) {
+    failures.push("only the complete GitHub Release publisher may clear draft mode");
+  }
+}
+
 function checkSnapStoreMetadataWorkflow() {
   if (!snapStoreMetadata.includes("scripts/ci-install-apt-packages.sh python3-pymacaroons")) {
     failures.push("snap-store-metadata.yml must use the bounded Ubuntu dependency bootstrap");
@@ -751,37 +906,55 @@ function checkPagesWorkflow() {
   }
 }
 
+function checkNodeVersionPolicy() {
+  const versionFile = path.join(repoRoot, ".node-version");
+  if (!existsSync(versionFile) || readFileSync(versionFile, "utf8").trim() !== "24") {
+    failures.push(".node-version must centrally pin Node 24 for GitHub Actions");
+    return;
+  }
+  for (const [name, text] of allWorkflows) {
+    const workflow = parseWorkflow(name, text);
+    for (const step of workflowSteps(workflow)) {
+      if (typeof step?.uses !== "string" || !step.uses.startsWith("actions/setup-node@")) {
+        continue;
+      }
+      if (step.with?.["node-version-file"] !== ".node-version") {
+        failures.push(`${name} setup-node must use the shared .node-version file`);
+      }
+      if (Object.hasOwn(step.with ?? {}, "node-version")) {
+        failures.push(`${name} must not duplicate a node-version beside .node-version`);
+      }
+    }
+  }
+}
+
 function requireBooleanInputDefault(text, inputName, expected, workflowName) {
-  const inputBlock = text.match(
-    new RegExp(`\\n\\s{6}${escapeRegExp(inputName)}:\\n(?<body>(?:\\s{8}.+\\n)+)`),
-  );
-  if (!inputBlock?.groups?.body) {
+  const input = parseWorkflow(workflowName, text)?.on?.workflow_dispatch?.inputs?.[inputName];
+  if (!input || typeof input !== "object") {
     failures.push(`${workflowName} must define workflow_dispatch input ${inputName}`);
     return;
   }
-  if (!new RegExp(`\\n\\s{8}type:\\s*boolean\\b`).test(inputBlock.groups.body)) {
+  if (input.type !== "boolean") {
     failures.push(`${workflowName} input ${inputName} must be boolean`);
   }
-  if (!new RegExp(`\\n\\s{8}default:\\s*${expected}\\b`).test(inputBlock.groups.body)) {
+  if (input.default !== expected) {
     failures.push(`${workflowName} input ${inputName} must default to ${expected}`);
   }
 }
 
 function requireStringInput(text, inputName, workflowName) {
-  const inputBlock = text.match(
-    new RegExp(`\\n\\s{6}${escapeRegExp(inputName)}:\\n(?<body>(?:\\s{8}.+\\n)+)`),
-  );
-  if (!inputBlock?.groups?.body) {
+  const input = parseWorkflow(workflowName, text)?.on?.workflow_dispatch?.inputs?.[inputName];
+  if (!input || typeof input !== "object") {
     failures.push(`${workflowName} must define workflow_dispatch input ${inputName}`);
     return;
   }
-  if (!/\n\s{8}required:\s*true\b/.test(inputBlock.groups.body)) {
+  if (input.required !== true) {
     failures.push(`${workflowName} input ${inputName} must be required`);
   }
-  if (!/\n\s{8}type:\s*string\b/.test(inputBlock.groups.body)) {
+  if (input.type !== "string") {
     failures.push(`${workflowName} input ${inputName} must be string`);
   }
-  if (/\n\s{8}default\s*:/.test(inputBlock.groups.body)) {
+  if (Object.hasOwn(input, "default")) {
     failures.push(`${workflowName} input ${inputName} must not default to a mutable ref`);
   }
 }
@@ -805,7 +978,27 @@ function workflowJobBody(text, jobId) {
 }
 
 function readWorkflow(name) {
-  return readFileSync(path.join(workflowsDir, name), "utf8");
+  // Marker checks operate on executable/configuration text, never comments.
+  // YAML is parsed separately for structural assertions below.
+  return readFileSync(path.join(workflowsDir, name), "utf8").replace(/^[ \t]*#.*$/gmu, "");
+}
+
+function parseWorkflow(name, text) {
+  try {
+    const workflow = parseYaml(text);
+    if (!workflow || typeof workflow !== "object") throw new Error("root must be a mapping");
+    return workflow;
+  } catch (error) {
+    failures.push(`${name} is not valid YAML: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
+}
+
+function workflowSteps(workflow) {
+  if (!workflow?.jobs || typeof workflow.jobs !== "object") return [];
+  return Object.values(workflow.jobs).flatMap((job) =>
+    Array.isArray(job?.steps) ? job.steps : [],
+  );
 }
 
 function readJson(file) {

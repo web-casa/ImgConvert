@@ -48,6 +48,17 @@ test("uploads, exposes the queue, and converts without leaving the device", asyn
 
   await page.getByRole("button", { name: "Start Conversion" }).click();
   await expect(queueItem).toContainText("Ready to download", { timeout: 90_000 });
+  await expect(queueItem.locator(".result-reduction")).toContainText(
+    /(?:less|larger than source|Same file size as source)/u,
+  );
+  const storageReduction = page.locator(".storage-reduction");
+  await storageReduction.scrollIntoViewIfNeeded();
+  await expect(storageReduction).toContainText("Net Output Reduction");
+  await expect(storageReduction).toContainText("Comparable Raster Results: 1");
+  await expect(storageReduction.locator("meter")).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+  ).toBeLessThanOrEqual(0);
   const downloadPromise = page.waitForEvent("download");
   await queueItem.getByRole("button", { name: /Download Result/u }).click();
   const download = await downloadPromise;

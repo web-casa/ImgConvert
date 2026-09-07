@@ -30,6 +30,7 @@ export interface PdfConversionJobHandle {
 }
 
 export interface PdfConversionSchedulerOptions {
+  readonly idleTimeoutMs?: number;
   readonly limits?: ResourceLimits;
   readonly timeoutMs?: number;
   readonly workerFactory: () => PdfConversionWorkerLike;
@@ -44,6 +45,7 @@ interface ActiveJob {
 }
 
 const DEFAULT_PDF_TIMEOUT_MS = 300_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function failure(
@@ -69,7 +71,10 @@ function failure(
   });
 }
 
-function takeOwnership(request: PdfConversionRequest): PdfConversionRequest {
+function takeOwnership(
+  request: PdfConversionRequest,
+  outputByteLimit: number,
+): PdfConversionRequest {
   const bytes = structuredClone(request.input.bytes, { transfer: [request.input.bytes] });
   return Object.freeze({
     input: Object.freeze({
@@ -77,6 +82,7 @@ function takeOwnership(request: PdfConversionRequest): PdfConversionRequest {
       name: request.input.name,
       probe: Object.freeze({ ...request.input.probe }),
     }),
+    outputByteLimit,
     jobId: request.jobId,
     schemaVersion: 1,
     settings: Object.freeze({
@@ -133,12 +139,14 @@ function freezeOutcome(outcome: PdfConversionOutcome): PdfConversionOutcome {
 }
 
 export class PdfConversionScheduler {
+  readonly #idleTimeoutMs: number;
   readonly #limits: ResourceLimits;
   readonly #timeoutMs: number;
   readonly #workerFactory: () => PdfConversionWorkerLike;
   #active: ActiveJob | undefined;
   #disposed = false;
   #executionSequence = 0;
+  #idleTimer: ReturnType<typeof setTimeout> | undefined;
   #worker: PdfConversionWorkerLike | undefined;
 
   constructor(options: PdfConversionSchedulerOptions) {
@@ -146,6 +154,7 @@ export class PdfConversionScheduler {
       throw new TypeError("workerFactory must be a function.");
     }
     this.#limits = createResourceLimits(options.limits ?? WEB_V1_DESKTOP_LIMITS);
+    this.#idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_PDF_TIMEOUT_MS;
     if (
       !Number.isSafeInteger(this.#timeoutMs) ||
@@ -153,6 +162,13 @@ export class PdfConversionScheduler {
       this.#timeoutMs > MAX_TIMEOUT_MS
     ) {
       throw new RangeError(`timeoutMs must be an integer from 1 to ${MAX_TIMEOUT_MS}.`);
+    }
+    if (
+      !Number.isSafeInteger(this.#idleTimeoutMs) ||
+      this.#idleTimeoutMs < 1 ||
+      this.#idleTimeoutMs > MAX_TIMEOUT_MS
+    ) {
+      throw new RangeError(`idleTimeoutMs must be an integer from 1 to ${MAX_TIMEOUT_MS}.`);
     }
     this.#workerFactory = options.workerFactory;
   }
@@ -164,7 +180,15 @@ export class PdfConversionScheduler {
     if (this.#disposed) throw new Error("PDF scheduler has been disposed.");
     if (this.#active) throw new Error("PDF scheduler already has an active job.");
     assertPdfConversionRequest(request, this.#limits);
-    const owned = takeOwnership(request);
+    const owned = takeOwnership(
+      request,
+      Math.min(
+        this.#limits.maxPdfOutputBytes,
+        this.#limits.maxTotalOutputBytes,
+        request.outputByteLimit ?? this.#limits.maxTotalOutputBytes,
+      ),
+    );
+    this.#clearIdleTimer();
     let resolveOutcome: ((outcome: PdfConversionOutcome) => void) | undefined;
     const outcome = new Promise<PdfConversionOutcome>((resolve) => {
       resolveOutcome = resolve;
@@ -196,6 +220,7 @@ export class PdfConversionScheduler {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#clearIdleTimer();
     const active = this.#active;
     if (active) this.#finish(active.executionId, failure(active.request.jobId, "cancelled"), true);
     else this.#recycleWorker();
@@ -268,7 +293,7 @@ export class PdfConversionScheduler {
       }
       return;
     }
-    if (!isPdfConversionWorkerResult(data, this.#limits)) {
+    if (!isPdfConversionWorkerResult(data, this.#limits, active.request.outputByteLimit)) {
       this.#finish(active.executionId, failure(active.request.jobId, "invalid-message"), true);
       return;
     }
@@ -284,7 +309,12 @@ export class PdfConversionScheduler {
       this.#finish(active.executionId, failure(active.request.jobId, "output-mismatch"), true);
       return;
     }
-    this.#finish(active.executionId, freezeOutcome(data.outcome), false);
+    const outcome = freezeOutcome(data.outcome);
+    this.#finish(
+      active.executionId,
+      outcome,
+      !outcome.ok && outcome.failure.code === "worker-failed",
+    );
   }
 
   #onFailure(worker: PdfConversionWorkerLike, reason: "error-event" | "message-error"): void {
@@ -300,9 +330,11 @@ export class PdfConversionScheduler {
     this.#active = undefined;
     if (recycle) this.#recycleWorker();
     active.resolve(outcome);
+    if (!recycle) this.#scheduleIdleRecycle();
   }
 
   #recycleWorker(): void {
+    this.#clearIdleTimer();
     const worker = this.#worker;
     this.#worker = undefined;
     if (!worker) return;
@@ -314,6 +346,22 @@ export class PdfConversionScheduler {
     } catch {
       // A non-standard terminate failure cannot retain scheduler ownership.
     }
+  }
+
+  #clearIdleTimer(): void {
+    if (this.#idleTimer === undefined) return;
+    clearTimeout(this.#idleTimer);
+    this.#idleTimer = undefined;
+  }
+
+  #scheduleIdleRecycle(): void {
+    this.#clearIdleTimer();
+    const worker = this.#worker;
+    if (!worker || this.#disposed || this.#active) return;
+    this.#idleTimer = setTimeout(() => {
+      this.#idleTimer = undefined;
+      if (!this.#active && this.#worker === worker) this.#recycleWorker();
+    }, this.#idleTimeoutMs);
   }
 }
 

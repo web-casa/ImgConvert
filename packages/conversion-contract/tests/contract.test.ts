@@ -7,6 +7,7 @@ import {
   WEB_007_PDF_CAPABILITIES,
   WEB_V1_DESKTOP_LIMITS,
   assertConversionRequest,
+  assertOutputByteLimit,
   assertJobTransition,
   canTransitionJob,
   createBackendCapabilities,
@@ -136,6 +137,25 @@ describe("safe failures", () => {
 });
 
 describe("resource limits", () => {
+  it("accepts zero/exact job allowances and rejects invalid or enlarged budgets", () => {
+    for (const limit of [undefined, 0, 1, WEB_V1_DESKTOP_LIMITS.maxTotalOutputBytes]) {
+      expect(() => assertOutputByteLimit(limit, WEB_V1_DESKTOP_LIMITS)).not.toThrow();
+    }
+    for (const limit of [
+      -1,
+      NaN,
+      Infinity,
+      1.5,
+      "20",
+      WEB_V1_DESKTOP_LIMITS.maxTotalOutputBytes + 1,
+    ]) {
+      expect(() => assertOutputByteLimit(limit, WEB_V1_DESKTOP_LIMITS)).toThrow();
+    }
+    for (const field of ["maxPdfOutputBytes", "maxTotalOutputBytes"] as const) {
+      expect(() => createResourceLimits({ ...WEB_V1_DESKTOP_LIMITS, [field]: 0 })).toThrow();
+    }
+  });
+
   it("copies, freezes, and validates limits through one shared boundary", () => {
     const mutable = { ...WEB_V1_DESKTOP_LIMITS };
     const limits = createResourceLimits(mutable);

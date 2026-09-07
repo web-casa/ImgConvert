@@ -13,8 +13,8 @@ import {
   assertArchiveRequest,
   type ArchiveOutcome,
   type ArchiveWorkerCommand,
-} from "../src/lib/archive-protocol";
-import { ArchiveScheduler, type ArchiveWorkerLike } from "../src/lib/archive-scheduler";
+} from "@imgconvert/web-conversion-runtime";
+import { ArchiveScheduler, type ArchiveWorkerLike } from "@imgconvert/web-conversion-runtime";
 import {
   DirectoryExportError,
   writeBatchToDirectory,
@@ -206,6 +206,34 @@ describe("archive protocol and scheduler", () => {
     await expect(handle.outcome).resolves.toEqual({ ok: false, reason: "cancelled" });
     expect(worker.terminated).toBe(true);
     scheduler.dispose();
+  });
+
+  it("recycles a completed archive worker after its idle lifetime", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = new FakeArchiveWorker();
+      const scheduler = new ArchiveScheduler({
+        idleTimeoutMs: 25,
+        workerFactory: () => worker,
+      });
+      const handle = scheduler.enqueue("archive-idle", {
+        files: [{ blob: new Blob(["x"]), name: "x.png" }],
+        maxBytes: 1024,
+      });
+      await Promise.resolve();
+      worker.progress(1, 1);
+      worker.respond({
+        archive: new Blob(["PK\u0003\u0004"], { type: "application/zip" }),
+        entryCount: 1,
+        ok: true,
+      });
+      await handle.outcome;
+      await vi.advanceTimersByTimeAsync(25);
+      expect(worker.terminated).toBe(true);
+      scheduler.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

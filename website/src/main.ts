@@ -31,6 +31,10 @@ async function loadPage() {
     return (await import("./Legal.svelte")).default;
   }
 
+  if (pathname === "/environment" || pathname === "/en/environment") {
+    return (await import("./Environment.svelte")).default;
+  }
+
   return (await import("./App.svelte")).default;
 }
 

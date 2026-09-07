@@ -1,0 +1,79 @@
+name: GitHub Release Publish
+run-name: Publish complete release ${{ inputs.release_tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Complete draft Release to verify and publish.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: release-draft-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify complete platform matrix and publish
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Verify immutable tag and draft state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || { echo "invalid release tag"; exit 1; }
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.default_branch')"
+          test "$GITHUB_REF" = "refs/heads/$default_branch" || { echo "publisher must run from the default branch"; exit 1; }
+          git fetch --force --tags origin
+          tag_sha="$(git rev-parse "$RELEASE_TAG^{commit}")"
+          git merge-base --is-ancestor "$tag_sha" "origin/$default_branch" || { echo "release tag is not on the default branch"; exit 1; }
+          test "$(git show "$RELEASE_TAG:package.json" | jq -r '.version')" = "${RELEASE_TAG#v}" || { echo "release tag version mismatch"; exit 1; }
+          release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,tagName)"
+          test "$(jq -r '.tagName' <<< "$release_json")" = "$RELEASE_TAG" || { echo "release tag mismatch"; exit 1; }
+          test "$(jq -r '.isDraft' <<< "$release_json")" = "true" || { echo "Release is not a draft"; exit 1; }
+
+      - name: Download and verify complete candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          extension_version="$(git show "$RELEASE_TAG:browser-extension/package.json" | jq -er '.version | strings')"
+          node scripts/verify-github-release-publication.mjs \
+            --assets-dir="$GITHUB_WORKSPACE/github-release-assets" \
+            --release-tag="$RELEASE_TAG" --source-sha="$(git rev-parse "$RELEASE_TAG^{commit}")" \
+            --snapshot="$GITHUB_WORKSPACE/verified-release-snapshot.json" \
+            --extension-version="$extension_version"
+
+      - name: Publish verified complete Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-github-release-publication.mjs --release-tag="$RELEASE_TAG" --check-snapshot="$GITHUB_WORKSPACE/verified-release-snapshot.json"
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = "false" || {
+            echo "Release publication did not complete"
+            exit 1
+          }

@@ -4,21 +4,29 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const sessionRoot = mkdtempSync(path.join(os.tmpdir(), "imgconvert-desktop-e2e-"));
+// WDIO imports this config in both launcher and worker. Only the launcher owns fixtures.
+const ownsSessionRoot = !process.env.IMGCONVERT_DESKTOP_E2E_SESSION_ROOT;
+const sessionRoot =
+  process.env.IMGCONVERT_DESKTOP_E2E_SESSION_ROOT ??
+  mkdtempSync(path.join(os.tmpdir(), "imgconvert-desktop-e2e-"));
 const input = path.join(sessionRoot, "fixture.png");
 const pdfInput = path.join(sessionRoot, "document.pdf");
 const outDir = path.join(sessionRoot, "output");
 const configDir = path.join(sessionRoot, "config");
-mkdirSync(outDir);
-mkdirSync(configDir);
-copyFileSync(path.resolve("public/favicon.png"), input);
-writeFileSync(pdfInput, minimalPdf(2));
+if (ownsSessionRoot) {
+  mkdirSync(outDir);
+  mkdirSync(configDir);
+  copyFileSync(path.resolve("public/favicon.png"), input);
+  writeFileSync(pdfInput, minimalPdf(2));
+}
 
 process.env.IMGCONVERT_DESKTOP_E2E_INPUT = input;
 process.env.IMGCONVERT_DESKTOP_E2E_PDF_INPUT = pdfInput;
 process.env.IMGCONVERT_DESKTOP_E2E_OUT_DIR = outDir;
 process.env.IMGCONVERT_ENABLE_DESKTOP_E2E = "1";
 process.env.XDG_CONFIG_HOME = configDir;
+process.env.XDG_CACHE_HOME = path.join(sessionRoot, "cache");
+process.env.XDG_DATA_HOME = path.join(sessionRoot, "data");
 process.env.LANG = "en_US.UTF-8";
 process.env.IMGCONVERT_DESKTOP_E2E_SESSION_ROOT = sessionRoot;
 
@@ -62,7 +70,7 @@ export const config = {
   },
   onComplete() {
     closeDriver();
-    if (path.basename(sessionRoot).startsWith("imgconvert-desktop-e2e-")) {
+    if (ownsSessionRoot && path.basename(sessionRoot).startsWith("imgconvert-desktop-e2e-")) {
       rmSync(sessionRoot, { recursive: true, force: true });
     }
   },

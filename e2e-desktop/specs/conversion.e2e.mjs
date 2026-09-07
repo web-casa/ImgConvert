@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 describe("desktop conversion", () => {
@@ -82,6 +82,84 @@ describe("desktop conversion", () => {
       expect(readJpegDimensions(pageBytes)).toEqual([36, 36]);
       expect(pageBytes.length).toBeLessThanOrEqual(16 * 1024);
     }
+  });
+
+  it("uses native byte evidence and excludes PDF from environmental scenarios", async () => {
+    const panels = await $$('[data-testid="environment-panel"]');
+    expect(panels.length).toBe(3);
+    const single = panels[0];
+    const pdf = panels[1];
+    const batch = panels[2];
+    const original = readFileSync(process.env.IMGCONVERT_DESKTOP_E2E_INPUT);
+    const originalPdf = readFileSync(process.env.IMGCONVERT_DESKTOP_E2E_PDF_INPUT);
+    const inputBytes = original.length;
+    const outputBytes = readFileSync(
+      path.join(process.env.IMGCONVERT_DESKTOP_E2E_OUT_DIR, "fixture_done.jpg"),
+    ).length;
+    expect(inputBytes).toBeGreaterThan(outputBytes);
+    const saved = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 }).format(
+      (inputBytes - outputBytes) / 1024,
+    );
+    // Compare visible facts to disk bytes, independently of the IPC result.
+    expect(inputBytes - outputBytes).toBeGreaterThanOrEqual(1024);
+    expect(inputBytes - outputBytes).toBeLessThan(1024 * 1024);
+    expect(await single.$('[data-testid="environment-measurement"]').getText()).toBe(
+      `Output smaller by ${saved} KiB`,
+    );
+    const summary = await single.$("details > summary");
+    await summary.click();
+    const storage = await single.$("select");
+    expect(await storage.getValue()).toBe("false");
+    await storage.selectByIndex(1);
+    await browser.waitUntil(async () =>
+      (await single.getText()).includes("Cloud storage scenario estimate"),
+    );
+    mkdirSync(path.resolve("artifacts/desktop-e2e"), { recursive: true });
+    await browser.saveScreenshot(path.resolve("artifacts/desktop-e2e/environment-en.png"));
+    await $('button[title="Language"]').click();
+    await browser.waitUntil(async () => (await single.getText()).includes("云存储情景估算"));
+    await browser.saveScreenshot(path.resolve("artifacts/desktop-e2e/environment-zh.png"));
+    await $('button[title="语言"]').click();
+    await browser.waitUntil(async () =>
+      (await single.getText()).includes("Cloud storage scenario estimate"),
+    );
+    const selects = await single.$$("select");
+    await selects[1].selectByAttribute("value", "retained");
+    await browser.waitUntil(async () => (await single.getText()).includes("Retaining originals"));
+    expect(await single.getText()).not.toContain("Cloud storage scenario estimate");
+    await summary.click();
+    await summary.click();
+    expect(await storage.getValue()).toBe("false");
+    await pdf.$("details > summary").click();
+    expect(await pdf.getText()).toContain(
+      "A comparable single static raster result has not been confirmed",
+    );
+    expect((await pdf.$$("select")).length).toBe(0);
+    expect(await batch.getText()).toContain(
+      "Batch: 1 eligible results; 1 other completed results excluded",
+    );
+    expect(await batch.$('[data-testid="environment-measurement"]').getText()).toBe(
+      await single.$('[data-testid="environment-measurement"]').getText(),
+    );
+    // Existing inputs are still present and unchanged by scenario interactions.
+    expect(readFileSync(process.env.IMGCONVERT_DESKTOP_E2E_INPUT)).toEqual(original);
+    expect(readFileSync(process.env.IMGCONVERT_DESKTOP_E2E_PDF_INPUT)).toEqual(originalPdf);
+    expect(existsSync(process.env.IMGCONVERT_DESKTOP_E2E_PDF_INPUT)).toBe(true);
+  });
+
+  it("clears prior impact when a native retry is skipped", async () => {
+    await $('[data-slot="select-trigger"][aria-label="Target format for fixture.png"]').click();
+    const search = await $('input[placeholder="Search formats"]');
+    await search.setValue("jpeg");
+    await browser.keys("Enter");
+    await browser.waitUntil(async () => (await queueStatuses())[0] === "pending");
+    expect((await $$('[data-testid="environment-panel"]')).length).toBe(1);
+    await $('[data-testid="start-conversion"]').click();
+    await browser.waitUntil(async () => (await queueStatuses())[0] === "skipped", {
+      timeout: 20000,
+    });
+    // Only the excluded PDF result remains; neither the PNG nor batch keeps old evidence.
+    expect((await $$('[data-testid="environment-panel"]')).length).toBe(1);
   });
 });
 

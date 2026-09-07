@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
+import publicRelease from "../../../docs/public-release.json";
 
 export type Locale = "zh" | "en";
 
@@ -11,6 +12,9 @@ export const snapUrl = "https://snapcraft.io/imgconvert";
 
 export const links = {
   webApp: "/convert/",
+  extensionSource: publicRelease.browserExtension.sourceUrl as string | null,
+  extensionChromeZip: publicRelease.browserExtension.chromeZipUrl as string | null,
+  extensionEdgeZip: publicRelease.browserExtension.edgeZipUrl as string | null,
   repository: "https://github.com/web-casa/ImgConvert",
   issues: "https://github.com/web-casa/ImgConvert/issues",
   license: "https://github.com/web-casa/ImgConvert/blob/main/LICENSE",

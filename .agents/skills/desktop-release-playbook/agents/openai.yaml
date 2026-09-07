@@ -1,0 +1,4 @@
+interface:
+  display_name: "跨平台桌面构建与商店发布"
+  short_description: "核对桌面构建、签名、沙箱权限、三类商店渠道与可追溯发布证据"
+  default_prompt: "使用 $desktop-release-playbook 检查当前桌面软件的指定发布渠道，复用仓库流程并报告已验证项和剩余阻塞。"

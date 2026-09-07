@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <script lang="ts">
+  import EnvironmentalImpact from "./EnvironmentalImpact.svelte";
   import { onMount } from "svelte";
   import { t } from "svelte-i18n";
   import {
@@ -198,4 +199,12 @@
       <CloseIcon size={16} />
     </button>
   </div>
+  {#if item.status === "done"}
+    <div class="w-full min-w-0">
+      {#key item.impact}<EnvironmentalImpact
+          measurement={item.impact?.measurement}
+          comparable={item.impact?.comparable === true}
+        />{/key}
+    </div>
+  {/if}
 </li>

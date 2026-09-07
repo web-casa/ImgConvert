@@ -9,6 +9,8 @@ export default defineConfig({
       input: {
         zh: resolve(import.meta.dirname, "index.html"),
         en: resolve(import.meta.dirname, "en/index.html"),
+        environmentZh: resolve(import.meta.dirname, "environment/index.html"),
+        environmentEn: resolve(import.meta.dirname, "en/environment/index.html"),
         privacyZh: resolve(import.meta.dirname, "privacy/index.html"),
         privacyEn: resolve(import.meta.dirname, "en/privacy/index.html"),
         legalZh: resolve(import.meta.dirname, "legal/index.html"),

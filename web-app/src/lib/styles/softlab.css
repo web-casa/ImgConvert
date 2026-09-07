@@ -292,10 +292,16 @@
   scrollbar-gutter: stable;
 }
 :root .queue-item {
+  align-items: start;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--paper-raised);
   box-shadow: 0 2px 8px rgb(46 80 52 / 7%);
+  grid-template-columns: 66px minmax(0, 1fr);
+}
+:root .v-softlab-queue-rail .item-actions {
+  justify-self: end;
+  grid-column: 2;
 }
 :root .queue-item:is(.has-error, .has-result) {
   box-shadow:
@@ -360,5 +366,8 @@
   :root .drop-zone {
     min-height: 220px;
     padding: 30px 20px;
+  }
+  :root .queue-item {
+    grid-template-columns: 54px minmax(0, 1fr);
   }
 }

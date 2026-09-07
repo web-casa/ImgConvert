@@ -1,11 +1,14 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# v0.3.1 cross-platform release candidate
+# v0.3.1 release
 
-This candidate carries the reviewed workflow, PDF, security, UI, and fixed
-external-link work since the public v0.2.22 release. It remains unpublished
-until every required direct artifact has passed its native build, signing,
-installation, runtime, and checksum gates.
+Published on 2026-09-02 at [GitHub Release v0.3.1](https://github.com/web-casa/ImgConvert/releases/tag/v0.3.1).
+The public tag and asset inventory were checked through the GitHub API on 2026-09-05.
+
+This release carries the workflow, PDF, security, UI, and external-link changes since v0.2.22.
+It has no browser-extension ZIPs. It predates the release evidence gate added in
+[the follow-up review fixes](PROJECT_REVIEW_RELEASE_FIXES_2026-09-05.md); its publication does
+not imply that the historical assets have passed those new checks.
 
 ## Product changes
 
@@ -30,7 +33,7 @@ installation, runtime, and checksum gates.
 - Expands fuzz replay, desktop E2E, release guardrails, capability checks, and
   release-readiness validation.
 
-## Candidate policy
+## Distribution policy at release time
 
 - GitHub direct artifacts must cover Linux, macOS, and Windows on x64/amd64 and
   arm64 before the draft Release can be published.

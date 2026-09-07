@@ -4,7 +4,7 @@ import {
   type PdfConversionRequest,
 } from "@imgconvert/conversion-contract";
 import { deflateSync } from "node:zlib";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   HeaderProbeError,
@@ -137,6 +137,69 @@ describe("bounded PDF header probe", () => {
 });
 
 describe("PDF conversion boundary", () => {
+  it.each(["document", "queue"])(
+    "stops rendering when the cumulative %s output budget is exhausted",
+    async (scope) => {
+      const size = onePixelPng().byteLength;
+      const renderPage = vi.fn(documentAdapter().renderPage);
+      const destroy = vi.fn(async () => undefined);
+      const limits = {
+        ...WEB_V1_DESKTOP_LIMITS,
+        maxPdfOutputBytes:
+          scope === "document" ? size * 2 - 1 : WEB_V1_DESKTOP_LIMITS.maxPdfOutputBytes,
+      };
+      const input = {
+        ...request([1, 2, 3]),
+        ...(scope === "queue" ? { outputByteLimit: size * 2 - 1 } : {}),
+      };
+      const outcome = await convertPdfRequest(
+        input,
+        { load: async () => ({ ...documentAdapter(), destroy, renderPage }) },
+        codecs,
+        undefined,
+        limits,
+      );
+      expect(outcome).toMatchObject({
+        ok: true,
+        result: {
+          pages: [
+            { ok: true, pageNumber: 1 },
+            { ok: false, pageNumber: 2, failure: { code: "output-budget-exceeded" } },
+            { ok: false, pageNumber: 3, failure: { code: "output-budget-exceeded" } },
+          ],
+        },
+      });
+      expect(renderPage).toHaveBeenCalledTimes(2);
+      expect(destroy).toHaveBeenCalledOnce();
+      if (!outcome.ok) throw new Error("Expected partial success");
+      expect(
+        outcome.result.pages.reduce(
+          (sum, page) => sum + (page.ok ? page.result.bytes.byteLength : 0),
+          0,
+        ),
+      ).toBe(size);
+    },
+  );
+
+  it("accepts the exact PDF byte budget and does not render after it is full", async () => {
+    const renderPage = vi.fn(documentAdapter().renderPage);
+    const outcome = await convertPdfRequest(
+      { ...request([1, 2]), outputByteLimit: onePixelPng().byteLength },
+      { load: async () => ({ ...documentAdapter(), renderPage }) },
+      codecs,
+    );
+    expect(renderPage).toHaveBeenCalledOnce();
+    expect(outcome).toMatchObject({
+      ok: true,
+      result: { pages: [{ ok: true }, { ok: false, failure: { code: "output-budget-exceeded" } }] },
+    });
+    const load = vi.fn(async () => documentAdapter());
+    await expect(
+      convertPdfRequest({ ...request(), outputByteLimit: 0 }, { load }, codecs),
+    ).resolves.toMatchObject({ ok: false, failure: { code: "output-budget-exceeded" } });
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it("renders selected pages serially and validates each raster output", async () => {
     const rendered: number[] = [];
     const progress: number[] = [];
@@ -329,6 +392,95 @@ describe("PDF scheduler", () => {
     });
     await expect(handle.outcome).resolves.toMatchObject({ ok: true });
     scheduler.dispose();
+  });
+
+  it("keeps idle recycling after a rejected PDF request", async () => {
+    vi.useFakeTimers();
+    const worker = new FakePdfWorker();
+    const scheduler = new PdfConversionScheduler({
+      idleTimeoutMs: 25,
+      workerFactory: () => worker,
+    });
+    try {
+      const outcome = await convertPdfRequest(
+        request([1]),
+        { load: async () => documentAdapter() },
+        codecs,
+      );
+      const handle = scheduler.enqueue(request([1]));
+      await Promise.resolve();
+      worker.respond(outcome);
+      await handle.outcome;
+      expect(() => scheduler.enqueue({ ...request(), outputByteLimit: -1 })).toThrow();
+      await vi.advanceTimersByTimeAsync(25);
+      expect(worker.terminated).toBe(true);
+    } finally {
+      scheduler.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a worker whose cumulative output exceeds the job allowance", async () => {
+    const outcome = await convertPdfRequest(
+      request([1, 2]),
+      { load: async () => documentAdapter() },
+      codecs,
+    );
+    const worker = new FakePdfWorker();
+    const scheduler = new PdfConversionScheduler({ workerFactory: () => worker });
+    const handle = scheduler.enqueue({
+      ...request([1, 2]),
+      outputByteLimit: onePixelPng().byteLength,
+    });
+    await Promise.resolve();
+    expect(worker.messages[0]!.request.outputByteLimit).toBe(onePixelPng().byteLength);
+    worker.respond(outcome);
+    await expect(handle.outcome).resolves.toMatchObject({
+      ok: false,
+      failure: { code: "worker-failed" },
+    });
+    expect(worker.terminated).toBe(true);
+    scheduler.dispose();
+  });
+
+  it("recycles a healthy PDF worker after its idle lifetime", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = new FakePdfWorker();
+      const scheduler = new PdfConversionScheduler({
+        idleTimeoutMs: 25,
+        workerFactory: () => worker,
+      });
+      const handle = scheduler.enqueue(request([1]));
+      await Promise.resolve();
+      worker.respond({
+        ok: true,
+        result: {
+          durationMs: 2,
+          pageCount: 1,
+          pages: [
+            {
+              ok: true,
+              pageNumber: 1,
+              result: {
+                bytes: onePixelPng(),
+                durationMs: 1,
+                format: "png",
+                height: 1,
+                pageNumber: 1,
+                width: 1,
+              },
+            },
+          ],
+        },
+      });
+      await handle.outcome;
+      await vi.advanceTimersByTimeAsync(25);
+      expect(worker.terminated).toBe(true);
+      scheduler.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("terminates the worker after malformed output or mismatched progress", async () => {

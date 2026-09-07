@@ -1,0 +1,104 @@
+{
+  "assetSchemaVersion": 2,
+  "browser": "Chromium 149.0.7827.102 built on Debian GNU/Linux 13 (trixie)",
+  "build": {
+    "manifestVersion": 3,
+    "sha256": "8d1cd96165bfa09841a4f03885374489b1838a1d66641891fcf166927753c7e4",
+    "target": "chrome-mv3",
+    "version": "0.3.3"
+  },
+  "generatedAt": "2026-09-05T16:09:23.948Z",
+  "productVersion": "0.3.3",
+  "sources": [
+    {
+      "name": "app-icon.png",
+      "path": "src-tauri/icons/icon.png",
+      "purpose": "graphics",
+      "sha256": "e631253e40b789479869683dac81a936717c7690c364887b2525518b1fe77521"
+    },
+    {
+      "name": "studio-photo.png",
+      "path": "website/public/images/generated/local-atelier.png",
+      "purpose": "screenshots",
+      "sha256": "9cff356436ab16bbc56511cd24e12c3038e33edf8fe72005d6aaeaaf6328bbad"
+    },
+    {
+      "name": "private-workspace.webp",
+      "path": "website/public/images/generated/private-vault.webp",
+      "purpose": "screenshots",
+      "sha256": "a15b98c4d1232b1695536b7e519c77d0bca0df24222614e17f47a26f3fc39128"
+    }
+  ],
+  "assets": [
+    {
+      "bytes": 102970,
+      "path": "en-US/01-local-batch-converted.png",
+      "sha256": "a90e6cfcc0d124fcdf2dda90a36f3fa18da0a71f73a2c9bd14419cf2ec265e8d"
+    },
+    {
+      "bytes": 104931,
+      "path": "en-US/02-output-controls.png",
+      "sha256": "854dd49b5c10ac6b4496c8052504b416cf63548c38b6c3c29d800457014fec8f"
+    },
+    {
+      "bytes": 366579,
+      "path": "en-US/03-verified-preview.png",
+      "sha256": "81c8fc4fb90bb5e937ead171da3b35b3841ea2c81df3496edc4ec6daeda340ba"
+    },
+    {
+      "bytes": 105024,
+      "path": "en-US/04-local-first-overview.png",
+      "sha256": "d913d635bcc2d0a8e65dac421f95385a0551f8e6d9c97dd053c94a7115b7327d"
+    },
+    {
+      "bytes": 97506,
+      "path": "en-US/05-dark-workbench.png",
+      "sha256": "27d9fde3b0d6500df6f5ca8029f3303b5a8779242f3f67c28e3953c45b3de46a"
+    },
+    {
+      "bytes": 17716,
+      "path": "shared/chrome-store-icon-128.png",
+      "sha256": "187262d1d2c3531b03cba3c6199db4a394ddbe99deee80a61cc37a41bb4cc283"
+    },
+    {
+      "bytes": 73791,
+      "path": "shared/edge-store-logo-300.png",
+      "sha256": "c14a9cf29bf15f7b20b377854dad7e471f350d0571b474ec71ff2c6bb6a694c8"
+    },
+    {
+      "bytes": 160632,
+      "path": "shared/marquee-promo-1400x560.png",
+      "sha256": "6dba6873a4a7d66b314258f62df7d1b263d2f5d168de0d38a4b879a85ab6e26f"
+    },
+    {
+      "bytes": 57049,
+      "path": "shared/small-promo-440x280.png",
+      "sha256": "f58cba33890f611366acd4078d82bf06ed5f7861dbfbb65f1a70b3408cf0b4de"
+    },
+    {
+      "bytes": 102910,
+      "path": "zh-CN/01-local-batch-converted.png",
+      "sha256": "6a2f77dae671ccdb0fb375e1ef123084cded586111cffdc150de49522ae41921"
+    },
+    {
+      "bytes": 104452,
+      "path": "zh-CN/02-output-controls.png",
+      "sha256": "e6669518823597f8c0c9fe4999efe93575342688f99def1be6434f11a9867acf"
+    },
+    {
+      "bytes": 365633,
+      "path": "zh-CN/03-verified-preview.png",
+      "sha256": "2d177d7d23ccda4be8c049ccec62ee624764d67fb952c12491bb5e88a7994c96"
+    },
+    {
+      "bytes": 103806,
+      "path": "zh-CN/04-local-first-overview.png",
+      "sha256": "a1c19a2eea3b09f1b05f034e7791b35717b10a5cbaa70db53eea1c56051b6d7e"
+    },
+    {
+      "bytes": 95982,
+      "path": "zh-CN/05-dark-workbench.png",
+      "sha256": "3d307a9f09d2d784d0eebd496e47a9a7be78be74d81cf76b98e1c68b66008780"
+    }
+  ]
+}

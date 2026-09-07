@@ -1,4 +1,11 @@
 {
-  "version": "0.2.22",
-  "published": true
+  "version": "0.3.1",
+  "published": true,
+  "verifiedAt": "2026-09-05",
+  "browserExtension": {
+    "version": null,
+    "sourceUrl": null,
+    "chromeZipUrl": null,
+    "edgeZipUrl": null
+  }
 }

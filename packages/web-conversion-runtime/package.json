@@ -1,0 +1,55 @@
+{
+  "name": "@imgconvert/web-conversion-runtime",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./workers/archive": {
+      "types": "./dist/workers/archive.d.ts",
+      "import": "./dist/workers/archive.js"
+    },
+    "./workers/pdf": {
+      "types": "./dist/workers/pdf.d.ts",
+      "import": "./dist/workers/pdf.js"
+    },
+    "./workers/raster": {
+      "types": "./dist/workers/raster.d.ts",
+      "import": "./dist/workers/raster.js"
+    },
+    "./workers/svg": {
+      "types": "./dist/workers/svg.d.ts",
+      "import": "./dist/workers/svg.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@imgconvert/conversion-contract": "workspace:*",
+    "@imgconvert/web-image-engine": "workspace:*",
+    "@jsquash/avif": "2.1.1",
+    "@jsquash/jpeg": "1.6.0",
+    "@jsquash/png": "3.1.1",
+    "@jsquash/webp": "1.5.0",
+    "@resvg/resvg-wasm": "2.6.2",
+    "@zip.js/zip.js": "2.9.0",
+    "gifuct-js": "2.1.2",
+    "pdfjs-dist": "6.3.289"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  }
+}

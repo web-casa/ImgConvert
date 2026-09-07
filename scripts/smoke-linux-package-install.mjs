@@ -12,8 +12,11 @@ const options = {
   target: "",
   bundle: "deb",
   image: "",
+  platform: "",
   timeoutSeconds: 15,
   convertSmoke: false,
+  upgradeFrom: "",
+  replaceFrom: "",
 };
 
 for (const arg of process.argv.slice(2)) {
@@ -27,8 +30,14 @@ for (const arg of process.argv.slice(2)) {
     options.bundle = arg.slice("--bundle=".length).toLowerCase();
   } else if (arg.startsWith("--image=")) {
     options.image = arg.slice("--image=".length);
+  } else if (arg.startsWith("--platform=")) {
+    options.platform = arg.slice("--platform=".length);
   } else if (arg.startsWith("--timeout=")) {
     options.timeoutSeconds = Number.parseInt(arg.slice("--timeout=".length), 10);
+  } else if (arg.startsWith("--upgrade-from=")) {
+    options.upgradeFrom = path.resolve(arg.slice("--upgrade-from=".length));
+  } else if (arg.startsWith("--replace-from=")) {
+    options.replaceFrom = path.resolve(arg.slice("--replace-from=".length));
   } else if (arg === "--convert-smoke") {
     options.convertSmoke = true;
   } else {
@@ -44,6 +53,50 @@ if (!["deb", "rpm", "appimage"].includes(options.bundle)) {
 }
 if (!Number.isFinite(options.timeoutSeconds) || options.timeoutSeconds < 3) {
   fail(`unsupported timeout: ${options.timeoutSeconds}`);
+}
+
+const targetPlatform = /x86_64|amd64/.test(options.target)
+  ? "linux/amd64"
+  : /aarch64|arm64/.test(options.target)
+    ? "linux/arm64"
+    : "";
+if (
+  options.platform &&
+  (!options.image || !["linux/amd64", "linux/arm64"].includes(options.platform))
+) {
+  fail("--platform requires --image and must be linux/amd64 or linux/arm64");
+}
+if (options.platform && targetPlatform && options.platform !== targetPlatform) {
+  fail("--platform conflicts with --target architecture");
+}
+if (options.image && !options.platform) options.platform = targetPlatform;
+
+if (options.upgradeFrom) {
+  if (!options.image || !["deb", "rpm"].includes(options.bundle)) {
+    fail("--upgrade-from requires --image and a deb or rpm bundle; host removal is not supported");
+  }
+  if (
+    !existsSync(options.upgradeFrom) ||
+    !statSync(options.upgradeFrom).isFile() ||
+    !options.upgradeFrom.endsWith(`.${options.bundle}`)
+  ) {
+    fail("--upgrade-from must identify an existing package of the same bundle type");
+  }
+  options.convertSmoke = true;
+}
+
+if (options.replaceFrom) {
+  if (!options.image || options.bundle !== "appimage" || options.upgradeFrom) {
+    fail("--replace-from requires --image and appimage, without --upgrade-from");
+  }
+  if (
+    !existsSync(options.replaceFrom) ||
+    !statSync(options.replaceFrom).isFile() ||
+    !options.replaceFrom.endsWith(".AppImage")
+  ) {
+    fail("--replace-from must identify an existing AppImage");
+  }
+  options.convertSmoke = true;
 }
 
 const artifact = findArtifact();
@@ -101,8 +154,15 @@ function smokeInDocker(artifact) {
       ...docker.prefixArgs,
       "run",
       "--rm",
+      ...(options.platform ? ["--platform", options.platform] : []),
       "-v",
       `${absolute}:${mounted}:ro`,
+      ...(options.upgradeFrom
+        ? ["-v", `${options.upgradeFrom}:/tmp/imgconvert-previous.${options.bundle}:ro`]
+        : []),
+      ...(options.replaceFrom
+        ? ["-v", `${options.replaceFrom}:/tmp/imgconvert-previous.AppImage:ro`]
+        : []),
       options.image,
       "sh",
       "-lc",
@@ -113,12 +173,19 @@ function smokeInDocker(artifact) {
 }
 
 function dockerSmokeScript(artifact) {
+  if (options.upgradeFrom) return dockerLifecycleScript(artifact);
+  if (options.replaceFrom) return dockerAppImageReplacementScript(artifact);
+  return dockerBasicSmokeScript(artifact);
+}
+
+function dockerBasicSmokeScript(artifact) {
   const appimageRuntimeArtifact = "/tmp/imgconvert-package-run.AppImage";
   const aptGet =
     "apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30";
-  const launch = launchCommand(
+  // Launch smoke uses exit; isolate it so conversion smoke still executes.
+  const launch = `(\n${launchCommand(
     options.bundle === "appimage" ? appimageRuntimeArtifact : "imgconvert",
-  );
+  )}\n)`;
   const convertSmoke = options.convertSmoke
     ? conversionSmokeCommand(options.bundle === "appimage" ? appimageRuntimeArtifact : "imgconvert")
     : ":";
@@ -154,6 +221,111 @@ function dockerSmokeScript(artifact) {
     launch,
     convertSmoke,
   ].join("; ");
+}
+
+function dockerAppImageReplacementScript(artifact) {
+  const runtime = "/tmp/imgconvert-package-run.AppImage";
+  const convert = `(\n${conversionSmokeCommand(runtime)}\n)`;
+  const launch = `(\n${launchCommand(runtime)}\n)`;
+  return [
+    "set -eu",
+    `if cmp -s /tmp/imgconvert-previous.AppImage ${quoteShell(artifact)}; then echo "replacement requires different bytes" >&2; exit 1; fi`,
+    "export XDG_CONFIG_HOME=/tmp/imgconvert-replacement/config XDG_DATA_HOME=/tmp/imgconvert-replacement/data XDG_CACHE_HOME=/tmp/imgconvert-replacement/cache",
+    'mkdir -p "$XDG_CONFIG_HOME/com.ivmm.imgconvert" /tmp/imgconvert-replacement/pictures',
+    "export IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR=/tmp/imgconvert-replacement/old-output",
+    dockerBasicSmokeScript("/tmp/imgconvert-previous.AppImage"),
+    "cp /tmp/imgconvert-replacement/old-output/smoke.png /tmp/imgconvert-replacement/pictures/original.png",
+    `printf '%s\n' '{"settings":{"locale":"zh-CN","quality":37}}' > "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"`,
+    'sha256sum "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json" /tmp/imgconvert-replacement/pictures/original.png /tmp/imgconvert-replacement/old-output/* > /tmp/replacement-before.sha256',
+    "sha256sum /tmp/imgconvert-replacement/pictures/original.png /tmp/imgconvert-replacement/old-output/* > /tmp/replacement-images.sha256",
+    `cp ${quoteShell(artifact)} ${runtime}.next`,
+    `chmod 0755 ${runtime}.next`,
+    `mv ${runtime}.next ${runtime}`,
+    `cmp ${quoteShell(artifact)} ${runtime}`,
+    "sha256sum --check --strict /tmp/replacement-before.sha256",
+    "export IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR=/tmp/imgconvert-replacement/new-output",
+    convert,
+    launch,
+    "sha256sum --check --strict /tmp/replacement-images.sha256",
+    `grep -Eq '"locale"[[:space:]]*:[[:space:]]*"zh-CN"' "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"`,
+    `grep -Eq '"quality"[[:space:]]*:[[:space:]]*37([,}[:space:]])' "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"`,
+    'sha256sum "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json" /tmp/imgconvert-replacement/pictures/original.png /tmp/imgconvert-replacement/old-output/* /tmp/imgconvert-replacement/new-output/* > /tmp/replacement-remove.sha256',
+    `rm ${runtime}`,
+    `[ ! -e ${runtime} ]`,
+    "sha256sum --check --strict /tmp/replacement-remove.sha256",
+    'echo "imgconvert AppImage replacement passed: old/new conversion; removed; user files preserved"',
+  ].join("\n");
+}
+
+function dockerLifecycleScript(artifact) {
+  const deb = options.bundle === "deb";
+  const previous = `/tmp/imgconvert-previous.${options.bundle}`;
+  const apt =
+    "apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30";
+  const install = (file) =>
+    deb
+      ? `DEBIAN_FRONTEND=noninteractive ${apt} install -y --no-install-recommends ${quoteShell(file)}`
+      : `dnf -y --setopt=install_weak_deps=False install ${quoteShell(file)}`;
+  const field = (file, name) =>
+    deb
+      ? `dpkg-deb -f ${quoteShell(file)} ${name}`
+      : `rpm -qp --queryformat ${quoteShell(`%{${name === "Package" ? "NAME" : name === "Architecture" ? "ARCH" : "VERSION"}}`)} ${quoteShell(file)}`;
+  const installedVersion = deb
+    ? "dpkg-query -W -f '${Version}' \"$package\""
+    : "rpm -q --queryformat '%{VERSION}' \"$package\"";
+  const launch = `(\n${launchCommand("imgconvert")}\n)`;
+  const convert = `(\n${conversionSmokeCommand("imgconvert")}\n)`;
+  return [
+    "set -eu",
+    dockerAptMirrorCommand(),
+    ...(deb
+      ? [
+          `${apt} update`,
+          `DEBIAN_FRONTEND=noninteractive ${apt} install -y --no-install-recommends xvfb`,
+        ]
+      : ["dnf -y --setopt=install_weak_deps=False install xorg-x11-server-Xvfb"]),
+    `package=$(${field(artifact, "Package")})`,
+    `[ "$package" = img-convert ]`,
+    `[ "$(${field(previous, "Package")})" = "$package" ]`,
+    `[ "$(${field(previous, "Architecture")})" = "$(${field(artifact, "Architecture")})" ]`,
+    `old_version=$(${field(previous, "Version")})`,
+    `new_version=$(${field(artifact, "Version")})`,
+    'printf "%s\n" "$old_version" | grep -Eq "^[0-9]+\\.[0-9]+\\.[0-9]+$"',
+    'printf "%s\n" "$new_version" | grep -Eq "^[0-9]+\\.[0-9]+\\.[0-9]+$"',
+    '[ "$old_version" != "$new_version" ] || { echo "lifecycle requires different versions" >&2; exit 1; }',
+    '[ "$(printf "%s\n%s\n" "$old_version" "$new_version" | sort -V | head -n 1)" = "$old_version" ]',
+    "export XDG_CONFIG_HOME=/tmp/imgconvert-lifecycle/config XDG_DATA_HOME=/tmp/imgconvert-lifecycle/data XDG_CACHE_HOME=/tmp/imgconvert-lifecycle/cache",
+    'mkdir -p "$XDG_CONFIG_HOME/com.ivmm.imgconvert" /tmp/imgconvert-lifecycle/pictures',
+    install(previous),
+    `[ "$(${installedVersion})" = "$old_version" ]`,
+    "export IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR=/tmp/imgconvert-lifecycle/old-output",
+    convert,
+    launch,
+    "cp /tmp/imgconvert-lifecycle/old-output/smoke.png /tmp/imgconvert-lifecycle/pictures/original.png",
+    'printf \'%s\n\' \'{"settings":{"locale":"zh-CN","quality":37}}\' > "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"',
+    'sha256sum "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json" /tmp/imgconvert-lifecycle/pictures/original.png /tmp/imgconvert-lifecycle/old-output/* > /tmp/before-upgrade.sha256',
+    "sha256sum /tmp/imgconvert-lifecycle/pictures/original.png /tmp/imgconvert-lifecycle/old-output/* > /tmp/user-files-before-upgrade.sha256",
+    install(artifact),
+    `[ "$(${installedVersion})" = "$new_version" ]`,
+    "sha256sum --check --strict /tmp/before-upgrade.sha256",
+    "export IMGCONVERT_PACKAGE_CONVERT_SMOKE_DIR=/tmp/imgconvert-lifecycle/new-output",
+    convert,
+    launch,
+    "sha256sum --check --strict /tmp/user-files-before-upgrade.sha256",
+    'grep -Eq \'"locale"[[:space:]]*:[[:space:]]*"zh-CN"\' "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"',
+    'grep -Eq \'"quality"[[:space:]]*:[[:space:]]*37([,}[:space:]])\' "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json"',
+    'sha256sum "$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json" /tmp/imgconvert-lifecycle/pictures/original.png /tmp/imgconvert-lifecycle/old-output/* /tmp/imgconvert-lifecycle/new-output/* > /tmp/before-remove.sha256',
+    deb
+      ? `${apt} remove -y "$package"`
+      : 'dnf -y --setopt=clean_requirements_on_remove=False remove "$package"',
+    deb
+      ? '[ "$(dpkg-query -W -f \'${db:Status-Status}\' "$package" 2>/dev/null || true)" != installed ]'
+      : 'if rpm -q "$package" >/dev/null 2>&1; then exit 1; fi',
+    'if command -v imgconvert >/dev/null 2>&1; then echo "binary remains after removal" >&2; exit 1; fi',
+    "[ ! -e /usr/share/applications/ImgConvert.desktop ]",
+    "sha256sum --check --strict /tmp/before-remove.sha256",
+    'echo "imgconvert package lifecycle passed: $old_version -> $new_version; removed; user files preserved"',
+  ].join("\n");
 }
 
 function dockerAptMirrorCommand() {
@@ -228,7 +400,18 @@ function conversionSmokeCommand(command) {
     "IMGCONVERT_PACKAGE_CONVERT_SMOKE_FORMATS=jpeg,webp,png,avif",
     ...(options.bundle === "appimage" ? ["APPIMAGE_EXTRACT_AND_RUN=1"] : []),
   ].join(" ");
-  return `env ${env} ${quoted}`;
+  return [
+    "smoke_log=$(mktemp)",
+    `if timeout --kill-after=5s ${options.timeoutSeconds}s env ${env} ${quoted} >"$smoke_log" 2>&1; then`,
+    '  cat "$smoke_log"',
+    '  if ! grep -Fxq "imgconvert package conversion smoke passed: jpeg,webp,png,avif" "$smoke_log"; then',
+    '    rm -f "$smoke_log"; echo "conversion smoke success evidence missing" >&2; exit 1',
+    "  fi",
+    '  rm -f "$smoke_log"',
+    "else",
+    '  code=$?; cat "$smoke_log"; rm -f "$smoke_log"; exit "$code"',
+    "fi",
+  ].join("\n");
 }
 
 function launchCommand(command) {

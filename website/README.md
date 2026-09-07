@@ -37,6 +37,8 @@ Create a Git-connected Pages project against this repository with these settings
 The release command builds the marketing site and Web app independently, safely assembles
 `web-app/dist` into `website/dist/convert`, and checks routes, resource scope, lazy engine loading,
 PWA boundaries, CSP, and cache rules. Do not point the Web app's Vite `outDir` at `website/dist`.
+For a local production-style preview, run `pnpm web:release:preview`; running the website-only build
+does not assemble `/convert/` and is therefore not a valid full-product preview.
 
 Every non-production branch should first produce a Cloudflare Pages preview. Validate its real
 MIME types and response headers before promoting the same commit:

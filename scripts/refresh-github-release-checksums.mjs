@@ -105,7 +105,7 @@ export async function verifyGithubReleaseChecksums(assetsDir) {
   return { outputPath, files: files.map((entry) => entry.name) };
 }
 
-function collectReleaseAssets(assetsDir) {
+export function collectReleaseAssets(assetsDir) {
   const directory = path.resolve(assetsDir);
   if (!existsSync(directory) || !lstatSync(directory).isDirectory()) {
     throw new Error(`asset directory does not exist or is not a directory: ${directory}`);
@@ -146,7 +146,7 @@ function parseChecksumManifest(contents) {
   return manifest;
 }
 
-async function sha256File(filePath) {
+export async function sha256File(filePath) {
   return await new Promise((resolve, reject) => {
     const hash = createHash("sha256");
     const input = createReadStream(filePath);

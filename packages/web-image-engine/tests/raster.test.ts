@@ -159,6 +159,28 @@ describe("raster helpers", () => {
 });
 
 describe("raster conversion boundary", () => {
+  it("enforces a remaining output allowance before returning encoded bytes", async () => {
+    const bytes = onePixelPng();
+    let decodes = 0;
+    const codecs: RasterCodecAdapter = {
+      decode: async () => {
+        decodes++;
+        return new ImageData(new Uint8ClampedArray([100, 162, 87, 128]), 1, 1);
+      },
+      encode: async () => bytes.slice(0),
+    };
+    await expect(
+      convertRasterRequest({ ...request(bytes), outputByteLimit: 0 }, codecs),
+    ).resolves.toMatchObject({ ok: false, failure: { code: "output-budget-exceeded" } });
+    expect(decodes).toBe(0);
+    await expect(
+      convertRasterRequest({ ...request(bytes), outputByteLimit: bytes.byteLength - 1 }, codecs),
+    ).resolves.toMatchObject({ ok: false, failure: { code: "output-budget-exceeded" } });
+    await expect(
+      convertRasterRequest({ ...request(bytes), outputByteLimit: bytes.byteLength }, codecs),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
   it("returns only output that passes a second header and pixel decode", async () => {
     const transparentPixel = new ImageData(new Uint8ClampedArray([100, 162, 87, 128]), 1, 1);
     const codecs: RasterCodecAdapter = {

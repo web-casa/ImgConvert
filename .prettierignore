@@ -1,6 +1,8 @@
 dist
 node_modules
 .codex
+browser-extension/.output
+browser-extension/.wxt
 src-tauri/target
 src-tauri/fuzz/corpus
 src-tauri/fuzz/target
@@ -23,3 +25,6 @@ src-tauri/gen
 Cargo.lock
 src-tauri/Cargo.lock
 pnpm-lock.yaml
+
+# Local build candidates, logs and isolated source snapshots
+/artifacts/

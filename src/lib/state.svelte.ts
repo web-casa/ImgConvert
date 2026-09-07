@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
+import type { DesktopImpactMeasurement } from "./desktop-impact";
+import { captureDesktopImpact } from "./desktop-impact";
 import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -73,6 +75,7 @@ export interface QueueItem {
   localizedDetail?: LocalizedItemDetail | null;
   detailError?: CommandError | null;
   preview?: boolean;
+  impact?: DesktopImpactMeasurement;
 }
 export interface ComparisonPreviewResult {
   input: string;
@@ -172,6 +175,7 @@ export interface ConvertResult {
   input: string;
   output: string;
   inSize: number;
+  environmentComparable?: boolean;
   outSize: number;
   warning?: ConvertWarning | null;
   warnings?: ConvertWarning[];
@@ -1548,13 +1552,18 @@ async function importClipboardImages(images: ClipboardImageInput[]) {
           continue;
         }
 
-        const file = await invoke<ImportScanFile>("import_clipboard_image", {
-          options: {
-            bytes,
-            mimeType: image.mimeType || null,
-            suggestedName: image.suggestedName,
-          },
-        });
+        const headers: Record<string, string> = {};
+        if (image.mimeType) {
+          headers["x-imgconvert-clipboard-mime"] = encodeURIComponent(image.mimeType);
+        }
+        if (image.suggestedName) {
+          try {
+            headers["x-imgconvert-clipboard-name"] = encodeURIComponent(image.suggestedName);
+          } catch {
+            // A malformed UTF-16 filename is optional metadata; the image bytes remain importable.
+          }
+        }
+        const file = await invoke<ImportScanFile>("import_clipboard_image", bytes, { headers });
         files.push({ ...file, temporary: true });
         if (ui.importCancelRequested) break;
       } catch (error) {
@@ -1774,6 +1783,7 @@ export function setItemTargetFormat(path: string, format: string | null) {
   if (normalized && !capabilities.writable.includes(normalized)) return;
   item.targetFormat = normalized;
   if (item.status !== "running") {
+    item.impact = undefined;
     item.status = "pending";
     if (item.preview) {
       setLocalizedItemDetail(item, "state.webPreviewDemo");
@@ -1791,6 +1801,7 @@ export function resetItemFormats() {
   for (const item of queue) {
     item.targetFormat = null;
     if (item.status !== "running") {
+      item.impact = undefined;
       item.status = "pending";
       if (item.preview) {
         setLocalizedItemDetail(item, "state.webPreviewDemo");
@@ -2103,6 +2114,7 @@ async function convertAllWithBatch() {
   if (jobs.length === 0) return;
 
   for (const job of jobs) {
+    job.item.impact = undefined;
     job.item.status = "pending";
     setLocalizedItemDetail(job.item, "state.queued");
     job.item.progress = 0;
@@ -2370,6 +2382,7 @@ function handleBatchProgress(event: BatchProgressEvent, jobs: BatchJob[]) {
       const job = jobs[event.data.index];
       if (!job) return;
       job.item.status = "done";
+      job.item.impact = captureDesktopImpact(event.data.result, job.item.path);
       setNeutralItemDetail(job.item, formatResultDetail(event.data.result));
       job.item.progress = 100;
       job.item.progressStage = null;
@@ -2449,6 +2462,7 @@ function batchProgressStageKey(stage: BatchProgressStage): string {
 function finalizeCancelledJobs(jobs: BatchJob[]) {
   for (const job of jobs) {
     if (job.item.status === "pending" || job.item.status === "running") {
+      job.item.impact = undefined;
       job.item.status = "pending";
       setLocalizedItemDetail(job.item, "state.cancelled");
       job.item.progress = 0;

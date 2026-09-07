@@ -64,7 +64,7 @@
 </p>
 
 > [!NOTE]
-> The latest GitHub Release is **v0.2.22**, with signed/notarized macOS DMGs,
+> The latest GitHub Release is **v0.3.1**, with signed/notarized macOS DMGs,
 > checksum-verified unsigned Windows x64/arm64 MSI and NSIS packages, Linux amd64/arm64 direct
 > packages, and signed Linux x86_64 updater metadata. Snap Store independently provides Linux amd64
 > and arm64 builds on its stable channel.
@@ -77,8 +77,13 @@
 | Windows x64 / arm64 | NSIS EXE, English/Chinese MSI                                                     | Unsigned direct packages; checksum verified      |
 | Linux amd64 / arm64 | [GitHub packages][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`, RPM, and AppImage published; Snap stable |
 | Web                 | [Open in browser](https://imgconvert.web.casa/convert/)                           | Local browser workers; no source-file upload     |
+| Browser extension   | Chrome / Edge MV3                                                                 | Release ZIPs not yet published                   |
 | Microsoft Store     | MSIX                                                                              | x64 in Partner Center; arm64 pending             |
 | Mac App Store       | MAS package                                                                       | Pending validation and review                    |
+
+Browser-extension Release ZIPs are not yet published. Local build and installation instructions
+are available in [browser-extension/README.md](browser-extension/README.md). Download links will
+open after the verified Chrome and Edge ZIPs are included in a public Release.
 
 > [!WARNING]
 > GitHub Release Windows EXE/MSI packages are intentionally not Authenticode-signed
@@ -132,7 +137,7 @@
 
 ## Release and project status
 
-- ✅ **GitHub Release v0.2.22**: provides Linux amd64/arm64 direct packages, signed
+- ✅ **GitHub Release v0.3.1**: provides Linux amd64/arm64 direct packages, signed
   Linux x86_64 updater metadata, and notarized macOS arm64/x64 DMGs. Snap Store stable
   independently serves amd64 and arm64.
 - ✅ **Windows direct packages**: native arm64/x64 workflows build intentionally

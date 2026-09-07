@@ -133,6 +133,7 @@ async function convertRenderedPage(
   limits: ResourceLimits,
   onProgress: PdfProgressReporter | undefined,
   pageIndex: number,
+  outputByteLimit: number,
 ): Promise<PdfPageConversionOutcome> {
   const pixels = rendered.width * rendered.height;
   if (
@@ -176,6 +177,7 @@ async function convertRenderedPage(
       name: request.input.name,
       probe: pngProbe,
     },
+    outputByteLimit,
     jobId: `${request.jobId}_p${pageNumber}`,
     schemaVersion: 1,
     settings: request.settings.raster,
@@ -231,6 +233,12 @@ export async function convertPdfRequest(
     return failure("format-mismatch");
   }
 
+  const outputByteLimit = Math.min(
+    limits.maxPdfOutputBytes,
+    limits.maxTotalOutputBytes,
+    request.outputByteLimit ?? limits.maxTotalOutputBytes,
+  );
+  if (outputByteLimit === 0) return failure("output-budget-exceeded");
   const startedAt = performance.now();
   report(
     onProgress,
@@ -263,23 +271,31 @@ export async function convertPdfRequest(
       outcome = failure("invalid-settings");
     } else {
       const pages: PdfPageConversionOutcome[] = [];
+      let retainedBytes = 0;
+      let outputBudgetExhausted = false;
       for (let pageIndex = 0; pageIndex < request.settings.pages.length; pageIndex += 1) {
         const pageNumber = request.settings.pages[pageIndex];
         if (pageNumber === undefined) continue;
+        if (outputBudgetExhausted || retainedBytes === outputByteLimit) {
+          pages.push(pageFailure(pageNumber, "output-budget-exceeded"));
+          continue;
+        }
         report(onProgress, "rendering", pageIndex, pageNumber, request.settings.pages.length, 0.08);
         try {
           const rendered = await document.renderPage(pageNumber, request.settings.dpi, limits);
-          pages.push(
-            await convertRenderedPage(
-              request,
-              rendered,
-              pageNumber,
-              codecs,
-              limits,
-              onProgress,
-              pageIndex,
-            ),
+          const page = await convertRenderedPage(
+            request,
+            rendered,
+            pageNumber,
+            codecs,
+            limits,
+            onProgress,
+            pageIndex,
+            outputByteLimit - retainedBytes,
           );
+          if (page.ok) retainedBytes += page.result.bytes.byteLength;
+          else if (page.failure.code === "output-budget-exceeded") outputBudgetExhausted = true;
+          pages.push(page);
         } catch (error) {
           pages.push(
             pageFailure(

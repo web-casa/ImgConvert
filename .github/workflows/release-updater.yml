@@ -12,11 +12,6 @@ on:
         required: true
         default: false
         type: boolean
-      draft_release:
-        description: Create the GitHub Release as draft when publishing.
-        required: true
-        default: true
-        type: boolean
       prerelease:
         description: Mark the GitHub Release as prerelease when publishing.
         required: true
@@ -27,13 +22,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: updater-release-${{ inputs.tag }}
+  group: release-draft-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
-  NODE_VERSION: "24"
 
 jobs:
   linux-updater:
@@ -49,7 +43,12 @@ jobs:
       - name: Verify release tag and source version
         env:
           IMGCONVERT_RELEASE_TAG: ${{ inputs.tag }}
-        run: node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          default_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.default_branch')"
+          test "$GITHUB_REF" = "refs/heads/$default_branch" || { echo "updater release must run from the default branch"; exit 1; }
+          node scripts/verify-release-tag.mjs --tag="$IMGCONVERT_RELEASE_TAG"
       - run: |
           scripts/ci-install-apt-packages.sh \
             build-essential \
@@ -74,7 +73,7 @@ jobs:
           run_install: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
@@ -146,7 +145,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -264,28 +263,45 @@ jobs:
           cargo +1.96.0 run --locked --quiet \
             --manifest-path tools/updater-signature-verifier/Cargo.toml \
             -- --bundle-root="$verifier_dir"
-      - name: Publish GitHub Release assets
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
-        with:
-          tag_name: ${{ inputs.tag }}
-          draft: ${{ inputs.draft_release }}
-          prerelease: ${{ inputs.prerelease }}
-          fail_on_unmatched_files: true
-          files: |
-            release-publish-assets/latest.json
-            release-publish-assets/*.AppImage
-            release-publish-assets/*.AppImage.sig
-            release-publish-assets/SHA256SUMS
-      - name: Refresh merged GitHub Release checksums
+      - name: Record final updater release evidence
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          checksum_assets='release-checksum-assets'
-          mkdir -p "$checksum_assets"
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_assets"
-          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets"
-          node scripts/refresh-github-release-checksums.mjs --assets-dir="$checksum_assets" --verify
-          gh release upload "$RELEASE_TAG" "$checksum_assets/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"
+          rm release-publish-assets/updater-artifact.txt release-publish-assets/SHA256SUMS
+          extension_version="$(git show "$RELEASE_TAG:browser-extension/package.json" | jq -er '.version | strings')"
+          node scripts/github-release-evidence.mjs --group=updater \
+            --assets-dir=release-publish-assets --release-tag="$RELEASE_TAG" \
+            --source-sha="$(git rev-parse HEAD)" --extension-version="$extension_version" --output-dir=release-evidence
+          cp release-evidence/release-evidence-updater.json release-publish-assets/
+          node scripts/refresh-github-release-checksums.mjs --assets-dir=release-publish-assets
+          node scripts/refresh-github-release-checksums.mjs --assets-dir=release-publish-assets --verify
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: imgconvert-release-evidence-updater-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          path: release-evidence/release-evidence-updater.json
+
+      - name: Create initial draft with verified updater assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Creation fails if the tag already has a Release. Never overwrite or
+          # rehash existing assets when rerunning the initial producer.
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" release-publish-assets/* \
+            --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "$RELEASE_TAG" \
+            --notes-file "docs/RELEASE_V${RELEASE_TAG#v}.md" "${flags[@]}"
+          mkdir release-checksum-assets
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir release-checksum-assets
+          node scripts/refresh-github-release-checksums.mjs --assets-dir=release-checksum-assets --verify
+          cmp release-publish-assets/SHA256SUMS release-checksum-assets/SHA256SUMS
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true

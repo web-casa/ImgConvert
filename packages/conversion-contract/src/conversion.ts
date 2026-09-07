@@ -6,7 +6,7 @@ import {
   type RasterizableInputFormat,
   type RasterOutputFormat,
 } from "./formats.js";
-import { WEB_V1_DESKTOP_LIMITS, type ResourceLimits } from "./limits.js";
+import { WEB_V1_DESKTOP_LIMITS, assertOutputByteLimit, type ResourceLimits } from "./limits.js";
 
 export type AlphaState = "absent" | "present" | "unknown";
 export type AnimationState = "animated" | "static" | "unknown";
@@ -51,6 +51,7 @@ export interface ConversionRequest {
     name: string;
     probe: ProbeResult;
   }>;
+  readonly outputByteLimit?: number;
   readonly jobId: string;
   readonly schemaVersion: 1;
   readonly settings: ConversionSettings;
@@ -198,6 +199,7 @@ export function assertConversionRequest(
   limits: ResourceLimits = WEB_V1_DESKTOP_LIMITS,
 ): asserts value is ConversionRequest {
   if (!isRecord(value)) throw new TypeError("Conversion request must be an object.");
+  assertOutputByteLimit(value.outputByteLimit, limits);
   if (value.schemaVersion !== 1) throw new TypeError("Conversion request schemaVersion must be 1.");
   if (typeof value.jobId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/u.test(value.jobId)) {
     throw new TypeError("Conversion request jobId is invalid.");

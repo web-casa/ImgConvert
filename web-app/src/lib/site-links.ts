@@ -22,7 +22,7 @@ export function localizedHomeSection(
 
 export function localizedContentPage(
   locale: Locale,
-  page: "blog" | "docs" | "legal" | "privacy",
+  page: "blog" | "docs" | "legal" | "privacy" | "environment",
 ): string {
   return locale === "zh" ? `/${page}/` : `/en/${page}/`;
 }

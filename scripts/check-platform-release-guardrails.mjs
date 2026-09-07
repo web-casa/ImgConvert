@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -54,6 +55,7 @@ checkImageQualityGuardrails();
 checkProbeMetadataGuardrails();
 checkFuzzCorpusGuardrails();
 checkTauriUpdaterGuardrails();
+checkGithubReleasePublicationGuardrails();
 checkFlatpakHeicExtensionGuardrails();
 checkFlathubReleaseGuardrails();
 
@@ -216,12 +218,148 @@ function checkReleaseReadinessGuardrails() {
   }
 }
 
+function checkGithubReleasePublicationGuardrails() {
+  const workflowsRoot = path.join(repoRoot, ".github", "workflows");
+  const workflowNames = [
+    "release-updater.yml",
+    "linux-release-assets-finalize.yml",
+    "macos-notarization-finalize.yml",
+    "windows-smoke.yml",
+    "windows-release-assets-finalize.yml",
+    "browser-extension-release-assets-finalize.yml",
+    "github-release-publish.yml",
+  ];
+  const workflows = new Map();
+  for (const name of workflowNames) {
+    const text = readWorkflowText(path.join(workflowsRoot, name));
+    if (!text) {
+      failures.push(`required GitHub Release workflow is missing: ${name}`);
+      continue;
+    }
+    try {
+      workflows.set(name, parseYaml(text));
+    } catch (error) {
+      failures.push(`${name} is invalid YAML: ${error.message}`);
+    }
+  }
+
+  const updater = workflows.get("release-updater.yml");
+  const updaterInputs = updater?.on?.workflow_dispatch?.inputs ?? {};
+  if (Object.hasOwn(updaterInputs, "draft_release")) {
+    failures.push(
+      "release-updater.yml must not expose a switch that can publish a partial Release",
+    );
+  }
+  const updaterAction = workflowSteps(updater).find(
+    (step) =>
+      typeof step?.run === "string" && step.run.includes('gh release create "$RELEASE_TAG"'),
+  );
+  if (!updaterAction?.run.includes("--draft --verify-tag")) {
+    failures.push("release-updater.yml must only create an initial draft for an existing tag");
+  }
+
+  const expectedConcurrencyGroups = new Map([
+    ["release-updater.yml", "release-draft-${{ inputs.tag }}"],
+    ["linux-release-assets-finalize.yml", "release-draft-${{ inputs.release_tag }}"],
+    [
+      "macos-notarization-finalize.yml",
+      "release-draft-${{ inputs.release_tag || inputs.source_run_id }}",
+    ],
+    ["windows-release-assets-finalize.yml", "release-draft-${{ inputs.release_tag }}"],
+    ["browser-extension-release-assets-finalize.yml", "release-draft-${{ inputs.release_tag }}"],
+    ["github-release-publish.yml", "release-draft-${{ inputs.release_tag }}"],
+  ]);
+  for (const [name, expectedGroup] of expectedConcurrencyGroups) {
+    if (workflows.get(name)?.concurrency?.group !== expectedGroup) {
+      failures.push(`${name} must share the per-tag Release draft concurrency lock`);
+    }
+  }
+
+  const macosFinalizeInputs =
+    workflows.get("macos-notarization-finalize.yml")?.on?.workflow_dispatch?.inputs ?? {};
+  if (macosFinalizeInputs.release_tag?.type !== "string") {
+    failures.push("macos-notarization-finalize.yml must accept the exact Release tag");
+  }
+
+  const allowedPublisher = "github-release-publish.yml";
+  for (const [name, workflow] of workflows) {
+    for (const step of workflowSteps(workflow)) {
+      if (typeof step?.run !== "string") continue;
+      if (step.run.includes("--draft=false") && name !== allowedPublisher) {
+        failures.push(`${name} must not clear GitHub Release draft mode`);
+      }
+    }
+  }
+
+  for (const name of [
+    "linux-release-assets-finalize.yml",
+    "macos-notarization-finalize.yml",
+    "windows-release-assets-finalize.yml",
+    "browser-extension-release-assets-finalize.yml",
+  ]) {
+    const runScripts = workflowSteps(workflows.get(name))
+      .map((step) => (typeof step?.run === "string" ? step.run : ""))
+      .join("\n");
+    if (!runScripts.includes(".isDraft") || !runScripts.includes('= "true"')) {
+      failures.push(`${name} must structurally guard uploads with an isDraft assertion`);
+    }
+  }
+
+  const publisherScripts = workflowSteps(workflows.get(allowedPublisher))
+    .map((step) => (typeof step?.run === "string" ? step.run : ""))
+    .join("\n");
+  for (const required of [
+    "verify-github-release-publication.mjs",
+    "--check-snapshot=",
+    "--draft=false",
+    ".isDraft",
+  ]) {
+    if (!publisherScripts.includes(required)) {
+      failures.push(
+        `github-release-publish.yml is missing executable publication gate: ${required}`,
+      );
+    }
+  }
+
+  const publicationGate = readText(
+    path.join(repoRoot, "scripts/verify-github-release-publication.mjs"),
+  );
+  for (const required of [
+    "await verifyGithubReleaseChecksums(",
+    "verifyCompleteGithubRelease(",
+    "await verifyReleaseEvidence(",
+    "verifyUnchangedRelease(",
+  ]) {
+    if (!publicationGate.includes(required))
+      failures.push(`publication gate is missing ${required}`);
+  }
+
+  const packageScripts = packageJson.scripts ?? {};
+  if (packageScripts["release:windows:sign"] || packageScripts["release:windows:signed"]) {
+    failures.push("GitHub direct Windows installers must not expose Authenticode signing scripts");
+  }
+  if (
+    !packageScripts["release:github:verify-complete"]?.includes(
+      "verify-complete-github-release.mjs",
+    )
+  ) {
+    failures.push("package.json must expose the complete GitHub Release verifier");
+  }
+}
+
+function workflowSteps(workflow) {
+  if (!workflow?.jobs || typeof workflow.jobs !== "object") return [];
+  return Object.values(workflow.jobs).flatMap((job) =>
+    Array.isArray(job?.steps) ? job.steps : [],
+  );
+}
+
 function checkReadmeStatusGuardrails() {
   const packageScripts = packageJson.scripts ?? {};
   const readmeScriptPath = path.join(repoRoot, "scripts", "check-readme-status.mjs");
   const readmeScript = readText(readmeScriptPath);
   const readme = readText(path.join(repoRoot, "README.md"));
-  const ci = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
+  const ci = readWorkflowText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
 
   if (!packageScripts["docs:check"]?.includes("check-readme-status.mjs")) {
     failures.push("package.json must expose docs:check");
@@ -350,8 +488,8 @@ function checkPlatformBenchmarkGuardrails() {
   if (!coreLib.includes("convert_best_of_with_color_policy_timeout")) {
     failures.push("imgconvert-core must expose a timed best-of conversion entry");
   }
-  if (!coreLib.includes("convert_auto_quality_with_color_policy_timeout")) {
-    failures.push("imgconvert-core must expose a timed auto-quality conversion entry");
+  if (/pub fn convert_(?:with_|best_of(?:\s|\())/u.test(coreLib)) {
+    failures.push("imgconvert-core must not re-expose unused conversion wrapper variants");
   }
   if (!tauriConvert.includes("IMGCONVERT_CONVERT_TIMEOUT_SECONDS")) {
     failures.push("Tauri convert path must support a wall-clock timeout override");
@@ -760,7 +898,8 @@ function checkTauriUpdaterGuardrails() {
     "release:updater:signature:verify",
     "Cryptographically verify updater signatures",
     "IMGCONVERT_PACKAGE_CONVERT_SMOKE",
-    "softprops/action-gh-release",
+    'gh release create "$RELEASE_TAG"',
+    "--draft --verify-tag",
     "target/appimagehub/*.AppImage.sig",
     "target/appimagehub/SHA256SUMS",
     "release-publish-assets/SHA256SUMS",
@@ -774,7 +913,7 @@ function checkTauriUpdaterGuardrails() {
     "latest.json updater URL does not match this release",
     "persist-credentials: false",
     "refresh-github-release-checksums.mjs",
-    "Refresh merged GitHub Release checksums",
+    "github-release-evidence.mjs",
     "--verify",
   ]) {
     if (!updaterWorkflow.includes(expected)) {
@@ -1016,11 +1155,13 @@ function checkLinux() {
   );
   const toolchainCheck = readText(path.join(repoRoot, "scripts", "check-native-toolchain.mjs"));
   const matrixSmoke = readText(path.join(repoRoot, "scripts", "smoke-linux-package-matrix.mjs"));
-  const linuxWorkflow = readText(path.join(repoRoot, ".github", "workflows", "release-linux.yml"));
+  const linuxWorkflow = readWorkflowText(
+    path.join(repoRoot, ".github", "workflows", "release-linux.yml"),
+  );
   const linuxFinalizeWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "linux-release-assets-finalize.yml"),
   );
-  const ciWorkflow = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
+  const ciWorkflow = readWorkflowText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
   const releaseQa = readText(path.join(repoRoot, "docs", "RELEASE_QA.md"));
   const tauriLib = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));
   const access = readText(path.join(repoRoot, "src-tauri", "src", "access.rs"));
@@ -1088,7 +1229,7 @@ function checkLinux() {
     "Fedora 42",
     "every packaged ELF",
     "Ubuntu 22.04",
-    "tag-triggered `Linux Release` matrix succeeds",
+    "`Linux Release Assets Finalize` attaches verified amd64/arm64",
   ]) {
     if (!releaseQa.includes(expected)) {
       failures.push(`docs/RELEASE_QA.md must document Linux acceptance: ${expected}`);
@@ -1106,9 +1247,9 @@ function checkLinux() {
     "imgconvert-linux-arm64-release",
     "gh run download",
     "sha256sum --check --strict",
-    "gh release upload",
-    "refresh-github-release-checksums.mjs",
-    "Refresh merged GitHub Release checksums",
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
+    "github-release-evidence.mjs",
     "--verify",
     "release already has",
   ]) {
@@ -1116,8 +1257,12 @@ function checkLinux() {
       failures.push(`Linux Release Assets Finalize workflow must preserve ${expected}`);
     }
   }
-  if (!linuxFinalizeWorkflow.includes('"$checksum_assets/SHA256SUMS" --clobber')) {
-    failures.push("Linux Release Assets Finalize may clobber only the merged SHA256SUMS asset");
+  const appendScript = readText(path.join(repoRoot, "scripts/append-github-release-assets.mjs"));
+  if (
+    !/path\.join\(merged,\s*"SHA256SUMS"\),\s*"--clobber"/u.test(appendScript) ||
+    !appendScript.includes("await verifyAssetMerge(")
+  ) {
+    failures.push("Release append must verify old/new bytes and only replace SHA256SUMS");
   }
   if (!tauriLib.includes("file_access_runtime")) {
     failures.push("Linux file access policy must expose the file_access_runtime command");
@@ -1339,7 +1484,9 @@ function checkMacosRuntimeGuardrails() {
   if (!notarizationScript.includes("`--artifact=${dmg}`")) {
     failures.push("macOS notarization must verify the exact DMG submitted to Apple");
   }
-  const macosWorkflow = readText(path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"));
+  const macosWorkflow = readWorkflowText(
+    path.join(repoRoot, ".github", "workflows", "macos-smoke.yml"),
+  );
   const macosIntelWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "macos-intel-smoke.yml"),
   );
@@ -1404,7 +1551,7 @@ function checkMacosRuntimeGuardrails() {
     "source_run_id",
     "actions: read",
     "contents: write",
-    "runs-on: macos-15",
+    "runs-on: ${{ inputs.architecture == 'x64' && 'macos-15-intel' || 'macos-15' }}",
     "timeout-minutes: 15",
     "source run must use the default branch",
     "finalizer must run from the default branch",
@@ -1418,10 +1565,10 @@ function checkMacosRuntimeGuardrails() {
     "IMGCONVERT_NOTARY_EXPECTED_SOURCE_RUN_ID",
     "notarization_status == 'Accepted'",
     "gh release view",
-    "gh release upload",
-    "refresh-github-release-checksums.mjs",
-    "Refresh merged GitHub Release checksums",
-    "--verify",
+    "append-github-release-assets.mjs",
+    "github-release-evidence.mjs",
+    "github-release-evidence.mjs",
+    "--install-smoke",
   ]) {
     if (!macosNotarizationFinalizeWorkflow.includes(expected)) {
       failures.push(`macOS notarization finalizer must preserve ${expected}`);
@@ -2261,6 +2408,10 @@ function readText(file) {
   } catch {
     return "";
   }
+}
+
+function readWorkflowText(file) {
+  return readText(file).replace(/^[ \t]*#.*$/gmu, "");
 }
 
 function truthy(value) {

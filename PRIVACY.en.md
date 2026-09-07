@@ -1,24 +1,27 @@
 # ImgConvert Privacy Policy
 
-Effective date: September 3, 2026
+Effective date: September 5, 2026
 
 Chinese version: <https://imgconvert.web.casa/privacy/>
 
 ## Scope
 
-This policy covers the current official ImgConvert desktop releases and the Web
-app at `imgconvert.web.casa/convert/`. Where a
+This policy covers the current official ImgConvert desktop releases, the Web
+app at `imgconvert.web.casa/convert/`, and the extensions distributed through
+Chrome Web Store or Microsoft Edge Add-ons. Where a
 data practice differs by distribution channel, this policy identifies that
 channel specifically. It does not replace the privacy policies of Apple,
-Microsoft, GitHub, Cloudflare, or your operating-system or browser provider.
+Microsoft, Google, GitHub, Cloudflare, a selected image host, or your
+operating-system or browser provider.
 
-ImgConvert offers desktop releases and a Web app that processes files locally
-in the browser. We follow local-first operation and minimal collection.
+ImgConvert offers desktop releases, a Web app, and Chromium browser extensions.
+We follow local-first operation and minimal collection.
 
 ## Core commitments
 
 - Image conversion, compression, thumbnail generation, and processing run on
-  your device; the Web app performs this work in browser workers.
+  your device; the Web app and browser extensions perform this work in the
+  browser.
 - We do not upload or collect your images, file paths, clipboard content, or
   conversion results for us or a third party.
 - ImgConvert contains no advertising SDK, behavioral analytics SDK,
@@ -66,6 +69,48 @@ public application-shell, worker, WASM, icon, and manifest assets in Cache
 Storage. Those caches do not contain user files or results. The in-app Clear
 Local Data action removes only ImgConvert Web preferences and caches; it does
 not touch unrelated same-origin data or files that you have downloaded.
+
+## Chrome and Edge browser extensions
+
+Local files, thumbnails, previews, and conversion results are processed only in
+the memory of the current visible extension workspace, either the side panel or
+a full-screen tab. They are removed when you clear the queue or close that
+workspace, are not written to extension storage, and are not sent to ImgConvert.
+Side-panel and full-screen workspaces are independent, so opening Full screen
+does not copy the current queue. Language, theme, and conversion defaults are
+stored as one bounded record in local browser storage. The extension does not
+use synchronized storage, analytics, advertising, crash reporting, accounts, or
+remote configuration.
+
+When you explicitly choose “Convert with ImgConvert” for an HTTPS image on an
+ordinary HTTPS page, the browser provides that one image URL, its source, and a
+window identifier to the extension. The URL and source are kept in browser
+session storage only as a one-time handoff that expires after at most two
+minutes. The extension does not read the page DOM, title, cookies, general
+browsing history, or other tabs. To finish permission cleanup after an
+interruption or browser restart, restricted local extension storage holds a
+temporary lease containing no image URL—only a random identifier, window
+identifier, and exact-host permission pattern—and deletes it after cleanup. The
+visible workbench shows the exact source and, only after you confirm again,
+requests that HTTPS host and port. The request contains no Cookie, Authorization
+information, or referrer; redirects are rejected, the response is limited to 32
+MB, and newly granted site access is removed after completion, panel closure,
+interruption, or background recovery without removing access that predates the
+import. Denying access sends no image request.
+
+The selected HTTPS image host necessarily receives a normal request for its own
+URL and may keep server logs under that website's policy. The ImgConvert operator
+does not receive the request, URL, or image content. Chrome Web Store disclosures
+conservatively mark Web history (only that selected URL/source) and Website
+content (local files and the selected image), even though processing remains on
+the user's device.
+
+ImgConvert's use of information received from browser extension APIs complies
+with the Chrome Web Store User Data Policy, including the Limited Use
+requirements. The extension uses this information only for the local image
+conversion the user requested. It does not sell it, use it for advertising or
+credit decisions, permit human reading, or transmit it to ImgConvert or a data
+broker.
 
 ## Apple platform access and HEIC decoding
 
@@ -116,8 +161,9 @@ delete the relevant local app-data or cache directory.
 
 The desktop app does not preserve source metadata by default. Only when you
 explicitly enable Preserve metadata does it write supported ICC, EXIF, XMP, or
-IPTC metadata to the output file. Web v1 always removes source EXIF, XMP, IPTC,
-and ICC data and does not offer a metadata-preservation setting.
+IPTC metadata to the output file. Web v1 and the browser extensions always
+remove source EXIF, XMP, IPTC, and ICC data and do not offer a
+metadata-preservation setting.
 
 ## Updates and third-party services
 
@@ -126,6 +172,10 @@ channel. A separately configured direct-distribution build can contact GitHub
 Releases only after you choose to check for or install an update; that connection
 is governed by GitHub's privacy practices and does not upload your images or
 conversion data.
+
+Extension updates for the Chrome Web Store and Microsoft Edge Add-ons editions
+are delivered by their respective browser stores. The extension does not contact
+an ImgConvert update service.
 
 Apart from that optional, user-initiated direct-update connection, ImgConvert
 does not call third-party network services for desktop app operation. It does

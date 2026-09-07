@@ -6,13 +6,16 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build && node ./scripts/generate-resource-pages.mjs",
+    "build": "pnpm run impact:build && pnpm run build:site",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json && pnpm run build"
+    "check": "pnpm run impact:build && svelte-check --tsconfig ./tsconfig.json && pnpm run build:site",
+    "impact:build": "pnpm --dir ../packages/environmental-impact build",
+    "build:site": "node scripts/generate-environment-pages.mjs && vite build && node ./scripts/generate-resource-pages.mjs"
   },
   "dependencies": {
     "@lucide/svelte": "^1.22.0",
-    "svelte": "^5.56.4"
+    "svelte": "^5.56.4",
+    "@imgconvert/environmental-impact": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",

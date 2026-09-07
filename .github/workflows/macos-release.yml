@@ -23,7 +23,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
-  NODE_VERSION: "24"
 
 jobs:
   macos-dmg-release:
@@ -68,22 +67,13 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           test -n "$APPLE_DIRECT_CERTIFICATE" || { echo "APPLE_DIRECT_CERTIFICATE secret is required"; exit 1; }
           test -n "$APPLE_DIRECT_CERTIFICATE_PASSWORD" || { echo "APPLE_DIRECT_CERTIFICATE_PASSWORD secret is required"; exit 1; }
           test -n "$KEYCHAIN_PASSWORD" || { echo "KEYCHAIN_PASSWORD secret is required"; exit 1; }
-          if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
-            test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required with API notarization"; exit 1; }
-            test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required with API notarization"; exit 1; }
-            test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required with API notarization"; exit 1; }
-          else
-            test -n "$APPLE_ID" || { echo "APPLE_ID secret is required without API notarization"; exit 1; }
-            test -n "$APPLE_PASSWORD" || { echo "APPLE_PASSWORD secret is required without API notarization"; exit 1; }
-            test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required without API notarization"; exit 1; }
-          fi
+          test -n "$APPLE_API_KEY" || { echo "APPLE_API_KEY secret is required for API notarization"; exit 1; }
+          test -n "$APPLE_API_ISSUER" || { echo "APPLE_API_ISSUER secret is required for API notarization"; exit 1; }
+          test -n "$APPLE_API_KEY_BASE64" || { echo "APPLE_API_KEY_BASE64 secret is required for API notarization"; exit 1; }
 
       - name: Install native codec build tools
         run: |
@@ -113,7 +103,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -209,9 +199,6 @@ jobs:
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           IMGCONVERT_NOTARY_RELEASE_TAG: ${{ inputs.tag }}
           IMGCONVERT_NOTARY_PUBLISH_RELEASE: ${{ inputs.publish_release }}
         run: |

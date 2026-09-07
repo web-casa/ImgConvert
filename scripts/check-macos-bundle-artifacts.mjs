@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { smokeInstalledMacApp } from "./macos-dmg-install-smoke.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const macosPrivacyManifest = "PrivacyInfo.xcprivacy";
@@ -28,6 +29,8 @@ const options = {
   requireMas: false,
   expectedArchitectures: [],
   artifacts: [],
+  installSmoke: false,
+  expectedVersion: "",
 };
 
 for (const arg of process.argv.slice(2)) {
@@ -49,6 +52,12 @@ for (const arg of process.argv.slice(2)) {
     options.requireNotarized = true;
   } else if (arg === "--require-mas") {
     options.requireMas = true;
+  } else if (arg === "--install-smoke") {
+    options.installSmoke = true;
+  } else if (arg.startsWith("--expected-version=")) {
+    options.expectedVersion = arg.slice("--expected-version=".length);
+    if (!/^\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.-]+)?$/u.test(options.expectedVersion))
+      fail("invalid expected DMG version");
   } else if (arg.startsWith("--expected-architectures=")) {
     const value = arg.slice("--expected-architectures=".length);
     if (!value.trim()) {
@@ -78,6 +87,16 @@ if (
 }
 if (new Set(options.expectedArchitectures).size !== options.expectedArchitectures.length) {
   fail("--expected-architectures must not contain duplicate architectures");
+}
+if (
+  options.installSmoke &&
+  (process.platform !== "darwin" ||
+    !options.requireSigned ||
+    !options.requireNotarized ||
+    options.requireMas ||
+    options.bundles.join(",") !== "dmg")
+) {
+  fail("--install-smoke requires a signed/notarized direct DMG on macOS");
 }
 
 for (const bundle of options.bundles) {
@@ -128,7 +147,7 @@ for (const bundle of options.bundles) {
       failures.push(`explicit artifact does not exist: ${artifact}`);
       continue;
     }
-    verifyArtifact(bundle, artifact, expectedName, packageJson.version);
+    verifyArtifact(bundle, artifact, expectedName, options.expectedVersion || packageJson.version);
   }
 }
 
@@ -266,6 +285,16 @@ function verifyAppsInsideMountedDmg(dmgPath, expectedName, expectedVersion) {
       verifyAppBundle(app, expectedName, expectedVersion);
       if (options.requireSigned) {
         verifyCodesign(app);
+      }
+      if (options.installSmoke && failures.length === 0) {
+        try {
+          smokeInstalledMacApp(
+            app,
+            readPlistValue(path.join(app, "Contents", "Info.plist"), "CFBundleExecutable"),
+          );
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : String(error));
+        }
       }
     }
   } finally {

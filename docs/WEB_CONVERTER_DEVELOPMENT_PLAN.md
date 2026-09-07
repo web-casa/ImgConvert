@@ -482,17 +482,21 @@ Web v1 只有同时满足以下条件才可公开：
 
 退出条件：第 11 节全部发布验收通过，preview 经人工 smoke 后再部署 production。
 
-### P5：浏览器扩展（Web v1 稳定后，6–8 人日）
+### P5：Chromium 浏览器扩展（独立执行，10–15 人日）
 
-- 使用 WXT + Svelte 构建 MV3 扩展，复用 `conversion-contract` 与 `web-image-engine`。
-- 所有 WASM/worker 随扩展打包，禁止远程代码。
-- 首版只提供 popup/独立转换页、右键导入当前图片和下载结果。
-- 默认不申请 `<all_urls>`；只有具体功能需要时申请最小 host permission。
-- 分别验证 Chromium、Firefox；Safari 扩展作为独立可行性项目。
+完整产品调研、权限模型、架构、工作项和复审修正见
+[Chromium 浏览器扩展开发方案](BROWSER_EXTENSION_DEVELOPMENT_PLAN.md)。关键边界为：
 
-退出条件：权限、CSP、包体、商店隐私声明和多浏览器转换测试通过。扩展失败不能阻塞已经稳定的 Web/PWA 发布。
+- 只支持 Chrome 与 Chromium Edge；使用 WXT + Svelte 构建 MV3 双 vendor 产物。
+- 工具栏 action 打开扩展内完整转换页，不使用 popup/offscreen/service-worker keepalive 承载作业。
+- 先抽出 `web-conversion-runtime`，让 Web 与扩展以薄 Worker 入口复用 codec；禁止跨 package 深导入 `web-app` 私有文件。
+- 所有 WASM/Worker 随扩展打包，禁止远程代码；本地文件转换版本只申请 `storage`。
+- 右键网页图片是独立安全 spike。只有精确 origin optional host permission、无凭据有界 fetch 和失败回退通过后才进入正式 manifest；不得退回 required `<all_urls>`。
+- Chrome/Edge 分别构建、sideload、smoke 和准备商店草稿；不开发 Firefox、Safari 或移动扩展。
 
-总计：Web v1 约 22–33 人日；浏览器扩展另计 6–8 人日。
+退出条件：权限、CSP、包体、隐私声明、Web 无回归、Chrome/Edge vendor 测试与两个可复现 ZIP 全部通过。扩展失败不能阻塞已经稳定的 Web/PWA 发布。
+
+总计：Web v1 约 22–33 人日；Chromium 浏览器扩展另计 10–15 人日。
 
 ## 13. 可直接建立的工作项
 
@@ -510,7 +514,10 @@ Web v1 只有同时满足以下条件才可公开：
 | WEB-009 | PWA 离线与更新（已完成并复审） | WEB-005/006/007 | 离线和 scope 测试 |
 | WEB-010 | 网站构建组装与 CF preview（实现、本地复审及真实 Preview smoke 已完成） | WEB-009 | 可部署静态产物 |
 | WEB-011 | 发布前综合 review 与修复（本地及 Pages Preview 门禁完成；移动真机待外部环境） | WEB-010 | [完整验收清单](WEB_CONVERTER_RELEASE_REVIEW.md) |
-| EXT-001 | WXT 扩展可行性与权限设计 | WEB-011 | 扩展 ADR |
+| EXT-001 | Chromium 扩展调研、项目级 Skills 与审定方案（已完成） | WEB-011 | [调研](BROWSER_EXTENSION_RESEARCH.md) + [开发方案](BROWSER_EXTENSION_DEVELOPMENT_PLAN.md) |
+| EXT-002 | WXT Chromium 壳与 manifest guardrail（已完成并复审） | EXT-001 | 双 vendor build/ZIP、最小权限与 Chromium sideload 门禁 |
+| EXT-003 | 共享 runtime 与双构建（已完成并复审） | EXT-002 | 双消费者 Worker、8 × 4 Chrome smoke 与 Web 全量回归 |
+| EXT-004～008 | 工作台、右键安全 spike、vendor 验收与商店草稿 | EXT-003 | 逐项定义见扩展开发方案 |
 
 ## 14. 风险与应对
 

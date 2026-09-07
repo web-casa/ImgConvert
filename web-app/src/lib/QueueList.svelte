@@ -1,6 +1,8 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Copyright (C) 2026 ImgConvert contributors -->
 <script lang="ts">
+  import ImpactDetails from "./ImpactDetails.svelte";
+  import { measureComparableEntryReduction } from "./impact";
   import Check from "@lucide/svelte/icons/check";
   import CircleStop from "@lucide/svelte/icons/circle-stop";
   import Download from "@lucide/svelte/icons/download";
@@ -170,14 +172,6 @@
                 {:else}
                   <span>{formatResultDimensions(entry, numberLocale)}</span>
                   <span>{formatBytes(entry.result.size, numberLocale)}</span>
-                  <span class:larger-result={entry.result.size > entry.size}
-                    >{resultDelta(
-                      entry,
-                      numberLocale,
-                      copy.preview.saved,
-                      copy.preview.larger,
-                    )}</span
-                  >
                 {/if}
               </p>
             {:else}
@@ -191,6 +185,25 @@
                   >{formatBytes(entry.size, numberLocale)}</span
                 >
               </p>
+            {/if}
+            {#if entry.result && entry.probe?.format !== "pdf"}
+              <p class:larger-result={entry.result.size > entry.size} class="result-reduction">
+                {resultDelta(
+                  entry,
+                  numberLocale,
+                  copy.preview.reduction,
+                  copy.preview.larger,
+                  copy.preview.sameSize,
+                )}
+              </p>
+            {/if}
+            {#if entry.state === "done" && entry.result}
+              {#key entry.result}
+                <ImpactDetails
+                  measurement={measureComparableEntryReduction(entry)}
+                  {numberLocale}
+                />
+              {/key}
             {/if}
             {#if entry.failure}
               <p class="file-message error-message" role="alert">

@@ -7,6 +7,7 @@
  */
 
 import type { RasterOutputFormat } from "@imgconvert/conversion-contract";
+import { measureByteReduction } from "@imgconvert/environmental-impact";
 
 import type { FormatMismatchWarning, QueueEntry } from "./queue";
 
@@ -44,14 +45,21 @@ export function formatDuration(durationMs: number, numberLocale: string): string
 export function resultDelta(
   entry: QueueEntry,
   numberLocale: string,
-  savedLabel: string,
-  largerLabel: string,
+  reductionTemplate: string,
+  largerTemplate: string,
+  sameSizeLabel: string,
 ): string {
   if (!entry.result || entry.size === 0) return "";
-  const percentage = Math.round(Math.abs(1 - entry.result.size / entry.size) * 100);
-  return entry.result.size <= entry.size
-    ? `${new Intl.NumberFormat(numberLocale).format(percentage)}% ${savedLabel}`
-    : largerLabel;
+  const measurement = measureByteReduction(entry.size, entry.result.size);
+  if (measurement.byteDifference === 0) return sameSizeLabel;
+  const percentage = new Intl.NumberFormat(numberLocale, {
+    maximumFractionDigits: 1,
+    style: "percent",
+  }).format(Math.abs(measurement.byteDifference) / entry.size);
+  const template = measurement.byteDifference > 0 ? reductionTemplate : largerTemplate;
+  return template
+    .replace("{percent}", percentage)
+    .replace("{size}", formatBytes(Math.abs(measurement.byteDifference), numberLocale));
 }
 
 export function warningText(warning: FormatMismatchWarning, mismatchTemplate: string): string {

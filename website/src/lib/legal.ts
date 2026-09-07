@@ -68,21 +68,21 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       eyebrow: "PRIVACY POLICY",
       title: "用清楚的话，\n说明隐私。",
       intro:
-        "ImgConvert 提供桌面版和浏览器内本地处理的 Web 版。我们默认按“本地优先、最小收集”的原则处理数据。",
-      effectiveDate: "生效日期：2026-09-03",
+        "ImgConvert 提供桌面版、Web 版和 Chromium 浏览器扩展。我们默认按“本地优先、最小收集”的原则处理数据。",
+      effectiveDate: "生效日期：2026-09-05",
       sourceNote: "以下内容与项目公开隐私政策保持一致。",
       sections: [
         {
           title: "适用范围",
           paragraphs: [
-            "本政策适用于当前 ImgConvert 的官方桌面版和位于 imgconvert.web.casa/convert/ 的 Web 版。若不同分发渠道的数据处理方式不同，本政策会明确标注对应渠道。",
-            "本政策不替代 Apple、Microsoft、GitHub、Cloudflare 或操作系统及浏览器提供方各自的隐私政策。",
+            "本政策适用于当前 ImgConvert 的官方桌面版、位于 imgconvert.web.casa/convert/ 的 Web 版，以及 Chrome Web Store / Microsoft Edge Add-ons 的浏览器扩展。若不同分发渠道的数据处理方式不同，本政策会明确标注对应渠道。",
+            "本政策不替代 Apple、Microsoft、Google、GitHub、Cloudflare、图片来源网站或操作系统及浏览器提供方各自的隐私政策。",
           ],
         },
         {
           title: "核心承诺",
           items: [
-            "图片转换、压缩、缩略图生成和处理均在你的设备上完成；Web 版在浏览器 Worker 中处理。",
+            "图片转换、压缩、缩略图生成和处理均在你的设备上完成；Web 版与浏览器扩展在浏览器内处理。",
             "不上传，也不会向我们或第三方收集你的图片、文件路径、剪贴板内容或转换结果。",
             "不包含广告 SDK、行为统计 SDK、第三方埋点或账号系统。",
             "Mac App Store 和 Microsoft Store 版本均不启用应用内更新，软件更新由各自的应用商店提供。",
@@ -118,6 +118,15 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           ],
         },
         {
+          title: "Chrome 与 Edge 浏览器扩展",
+          paragraphs: [
+            "浏览器扩展的本地文件、缩略图、预览和转换结果只在当前可见扩展工作台（侧栏或全屏标签页）的内存中处理；清空队列或关闭该工作台后即移除，不会写入扩展存储，也不会发送给 ImgConvert。侧栏与全屏工作台是独立会话，“全屏打开”不会复制当前队列。语言、主题和转换默认值以一个有界记录保存在浏览器本机存储中；扩展不使用同步存储、分析、广告、崩溃报告、账号或远程配置服务。",
+            "当你在普通 HTTPS 页面上通过“使用 ImgConvert 转换”右键命令明确选择一张 HTTPS 图片时，浏览器会向扩展提供这一个图片 URL、来源和窗口标识。扩展只把 URL 与来源作为最长两分钟的一次性交接保存在浏览器会话存储中，不读取页面 DOM、标题、Cookie、浏览历史或其他标签页。为在中断或浏览器重启后继续回收权限，扩展会在受限的本机扩展存储中保存一个不含图片 URL 的临时权限租约，其中只有随机标识、窗口标识和准确主机权限模式，清理完成后即删除。可见工作台先显示准确来源，并在你再次点击同意后只请求该 HTTPS 主机和端口；请求不携带 Cookie、Authorization 或来源页信息，不跟随跳转，响应上限为 32 MB，并在导入完成、侧栏关闭、流程中断或后台恢复时移除本次新增的站点访问权；导入前已经存在的访问权不会被移除。拒绝权限不会发出图片请求。",
+            "所选 HTTPS 图片的来源服务器必然会收到对其自身 URL 的普通网络请求，并可能按该网站自己的政策记录服务器日志；ImgConvert 的运营方不会收到该请求、URL 或图片内容。Chrome Web Store 数据披露会保守标记 Web history（仅这一次所选 URL/来源）和 Website content（本地文件与所选图片内容），即使处理仅发生在浏览器本机。",
+            "ImgConvert 对从浏览器扩展 API 获得的信息的使用遵守 Chrome Web Store 用户数据政策，包括 Limited Use 要求。扩展只把这些信息用于用户明确请求的本地图片转换，不出售、不用于广告或信用评估、不允许人工读取，也不向 ImgConvert 或数据经纪商传输。",
+          ],
+        },
+        {
           title: "本机设置、缓存与临时文件",
           paragraphs: [
             "应用会在本机保存转换偏好设置。若你主动选择自定义输出目录，其路径会保存在本机设置中，以便下次继续使用。在允许用户选择 HEIC helper 的版本中，所选 helper 的路径也可能保存在本机。",
@@ -142,7 +151,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "元数据处理",
           paragraphs: [
-            "桌面版默认不会自动保留原图元数据；只有在你明确开启“保留元数据”选项时，应用才会把受支持的 ICC、EXIF、XMP 等元数据写入输出文件。Web v1 固定移除源 EXIF、XMP、IPTC 与 ICC，不提供保留元数据选项。",
+            "桌面版默认不会自动保留原图元数据；只有在你明确开启“保留元数据”选项时，应用才会把受支持的 ICC、EXIF、XMP 等元数据写入输出文件。Web v1 与浏览器扩展固定移除源 EXIF、XMP、IPTC 与 ICC，不提供保留元数据选项。",
           ],
         },
         {
@@ -153,6 +162,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           title: "更新与第三方服务",
           paragraphs: [
             "Mac App Store 和 Microsoft Store 版本不使用应用内更新通道。单独配置的直发版本仅会在你主动检查或安装更新时连接 GitHub Releases；该连接受 GitHub 隐私政策约束，且不会上传你的图片或转换数据。",
+            "Chrome Web Store 与 Microsoft Edge Add-ons 版本的扩展更新由对应浏览器商店提供。扩展自身不连接 ImgConvert 更新服务。",
             "除上述可选、由用户主动触发的直发更新连接外，ImgConvert 不会为了桌面应用运行调用第三方网络服务，也不包含分析、广告、崩溃报告或远程配置服务。",
             "访问 Web 版需要从 imgconvert.web.casa 加载静态应用资源；检查 Web 版更新也会请求同一来源。图片转换本身不使用网络接口。网站由 Cloudflare Pages 托管，因此常规 HTTP 请求会经过 Cloudflare 基础设施并受其隐私政策约束，但 /convert/ 不启用 Cloudflare Web Analytics 或其他客户端行为统计脚本。",
           ],
@@ -212,21 +222,21 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
       eyebrow: "PRIVACY POLICY",
       title: "Privacy,\nin plain language.",
       intro:
-        "ImgConvert offers desktop releases and a Web app that processes files locally in the browser. We follow local-first operation and minimal collection.",
-      effectiveDate: "Effective date: September 3, 2026",
+        "ImgConvert offers desktop releases, a Web app, and Chromium browser extensions. We follow local-first operation and minimal collection.",
+      effectiveDate: "Effective date: September 5, 2026",
       sourceNote: "This page stays aligned with the public project privacy policy.",
       sections: [
         {
           title: "Scope",
           paragraphs: [
-            "This policy covers the current official ImgConvert desktop releases and the Web app at imgconvert.web.casa/convert/. Where a data practice differs by distribution channel, this policy identifies that channel specifically.",
-            "It does not replace the privacy policies of Apple, Microsoft, GitHub, Cloudflare, or your operating-system or browser provider.",
+            "This policy covers the current official ImgConvert desktop releases, the Web app at imgconvert.web.casa/convert/, and the extensions distributed through Chrome Web Store or Microsoft Edge Add-ons. Where a data practice differs by distribution channel, this policy identifies that channel specifically.",
+            "It does not replace the privacy policies of Apple, Microsoft, Google, GitHub, Cloudflare, a selected image host, or your operating-system or browser provider.",
           ],
         },
         {
           title: "Core commitments",
           items: [
-            "Image conversion, compression, thumbnail generation, and processing run on your device; the Web app performs this work in browser workers.",
+            "Image conversion, compression, thumbnail generation, and processing run on your device; the Web app and browser extensions perform this work in the browser.",
             "We do not upload or collect your images, file paths, clipboard content, or conversion results for us or a third party.",
             "ImgConvert contains no advertising SDK, behavioral analytics SDK, third-party tracking, or account system.",
             "The Mac App Store and Microsoft Store editions do not enable an in-app updater. Their software updates are delivered by the respective store.",
@@ -265,6 +275,15 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           ],
         },
         {
+          title: "Chrome and Edge browser extensions",
+          paragraphs: [
+            "Local files, thumbnails, previews, and conversion results are processed only in the memory of the current visible extension workspace, either the side panel or a full-screen tab. They are removed when you clear the queue or close that workspace, are not written to extension storage, and are not sent to ImgConvert. Side-panel and full-screen workspaces are independent, so opening Full screen does not copy the current queue. Language, theme, and conversion defaults are stored as one bounded record in local browser storage. The extension does not use synchronized storage, analytics, advertising, crash reporting, accounts, or remote configuration.",
+            "When you explicitly choose “Convert with ImgConvert” for an HTTPS image on an ordinary HTTPS page, the browser provides that one image URL, its source, and a window identifier to the extension. The URL and source are kept in browser session storage only as a one-time handoff that expires after at most two minutes. The extension does not read the page DOM, title, cookies, general browsing history, or other tabs. To finish permission cleanup after an interruption or browser restart, restricted local extension storage holds a temporary lease containing no image URL—only a random identifier, window identifier, and exact-host permission pattern—and deletes it after cleanup. The visible workbench shows the exact source and, only after you confirm again, requests that HTTPS host and port. The request contains no Cookie, Authorization information, or referrer; redirects are rejected, the response is limited to 32 MB, and newly granted site access is removed after completion, panel closure, interruption, or background recovery without removing access that predates the import. Denying access sends no image request.",
+            "The selected HTTPS image host necessarily receives a normal request for its own URL and may keep server logs under that website's policy. The ImgConvert operator does not receive the request, URL, or image content. Chrome Web Store disclosures conservatively mark Web history (only that selected URL/source) and Website content (local files and the selected image), even though processing remains on the user's device.",
+            "ImgConvert's use of information received from browser extension APIs complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. The extension uses this information only for the local image conversion the user requested. It does not sell it, use it for advertising or credit decisions, permit human reading, or transmit it to ImgConvert or a data broker.",
+          ],
+        },
+        {
           title: "Local settings, caches, and temporary files",
           paragraphs: [
             "ImgConvert stores conversion preferences locally. If you actively choose a custom output directory, its path is stored in local settings for your next use. On editions that allow a user-selected HEIC helper, that selected helper path may also be stored locally.",
@@ -289,7 +308,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
         {
           title: "Metadata handling",
           paragraphs: [
-            "The desktop app does not preserve source metadata by default. Only when you explicitly enable Preserve metadata does it write supported ICC, EXIF, XMP, or IPTC metadata to the output file. Web v1 always removes source EXIF, XMP, IPTC, and ICC data and does not offer a metadata-preservation setting.",
+            "The desktop app does not preserve source metadata by default. Only when you explicitly enable Preserve metadata does it write supported ICC, EXIF, XMP, or IPTC metadata to the output file. Web v1 and the browser extensions always remove source EXIF, XMP, IPTC, and ICC data and do not offer a metadata-preservation setting.",
           ],
         },
         {
@@ -302,6 +321,7 @@ export const legalContent: Record<Locale, LegalLocaleContent> = {
           title: "Updates and third-party services",
           paragraphs: [
             "The Mac App Store and Microsoft Store editions do not use an in-app update channel. A separately configured direct-distribution build can contact GitHub Releases only after you choose to check for or install an update; that connection is governed by GitHub's privacy practices and does not upload your images or conversion data.",
+            "Extension updates for the Chrome Web Store and Microsoft Edge Add-ons editions are delivered by their respective browser stores. The extension does not contact an ImgConvert update service.",
             "Apart from that optional, user-initiated direct-update connection, ImgConvert does not call third-party network services for desktop app operation. It does not include analytics, advertising, crash reporting, or remote-configuration services.",
             "Visiting the Web app loads static application resources from imgconvert.web.casa; checking for a Web app update also requests that same origin. Image conversion itself uses no network endpoint. The site is hosted on Cloudflare Pages, so ordinary HTTP requests pass through Cloudflare infrastructure and are subject to Cloudflare's privacy practices, but /convert/ does not enable Cloudflare Web Analytics or another client-side behavioral analytics script.",
           ],

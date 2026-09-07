@@ -64,7 +64,7 @@
 </p>
 
 > [!NOTE]
-> 最新 GitHub Release 为 **v0.2.22**，提供已签名/公证的 macOS DMG、经校验和验证但未
+> 最新 GitHub Release 为 **v0.3.1**，提供已签名/公证的 macOS DMG、经校验和验证但未
 > 签名的 Windows x64/arm64 MSI 与 NSIS 安装包、Linux amd64/arm64 直装包，以及已签名的
 > Linux x86_64 updater 元数据。Snap Store 的 stable 渠道也独立提供 Linux amd64 与
 > arm64 版本。
@@ -77,13 +77,17 @@
 | Windows x64 / arm64 | NSIS EXE、中文/英文 MSI                                                         | 未签名直装包；已完成校验和验证              |
 | Linux amd64 / arm64 | [GitHub 安装包][latest-release] / [Snap Store](https://snapcraft.io/imgconvert) | `.deb`、RPM 和 AppImage 已发布；Snap stable |
 | Web                 | [浏览器中打开](https://imgconvert.web.casa/convert/)                            | 浏览器 Worker 本地处理；不上传原图          |
+| 浏览器扩展          | Chrome / Edge MV3                                                               | 尚未发布 ZIP                                |
 | Microsoft Store     | MSIX                                                                            | x64 已进 Partner Center，arm64 待提交       |
 | Mac App Store       | MAS 包                                                                          | 等待验证与审核                              |
 
+浏览器扩展尚未发布 ZIP。本地构建与安装步骤见 [browser-extension/README.md](browser-extension/README.md)。
+经过验证的 Chrome、Edge ZIP 随正式 Release 公开后，再开放下载入口。
+
 > [!WARNING]
-> Actions 生成的 Windows EXE/MSI 候选包当前没有 Authenticode 签名，可能触发
-> Microsoft Defender SmartScreen。在 Release 提供匹配的 `SHA256SUMS-windows.txt`
-> 之前，不应把这些候选包视为正式发布安装包。
+> GitHub Release 的 Windows EXE/MSI 按项目策略保持未签名，可能触发 Microsoft Defender
+> SmartScreen。请使用 Release 中合并后的 `SHA256SUMS` 校验。受信任签名分发仅由
+> Microsoft Store 接受后的 MSIX 提供。
 
 ## 界面预览
 
@@ -132,7 +136,7 @@
 
 ## 发布与项目状态
 
-- ✅ **GitHub Release v0.2.22**：提供 Linux amd64/arm64 直装包、已签名的 Linux
+- ✅ **GitHub Release v0.3.1**：提供 Linux amd64/arm64 直装包、已签名的 Linux
   x86_64 updater 元数据，以及已公证的 macOS arm64/x64 DMG。Snap Store stable 独立
   提供 amd64 与 arm64。
 - ✅ **Windows 直装包**：arm64/x64 EXE/MSI 按项目策略保持未签名，已纳入安装

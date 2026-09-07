@@ -9,6 +9,9 @@ lerna-debug.log*
 
 node_modules
 .codex/
+browser-extension/.output/
+web-app/.output/
+browser-extension/.wxt/
 dist
 dist-ssr
 target

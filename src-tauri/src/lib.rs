@@ -4,6 +4,7 @@
 mod access;
 mod command_error;
 mod convert;
+mod environment;
 mod external_codecs;
 #[cfg(feature = "fuzzing")]
 mod fuzzing;
@@ -28,7 +29,7 @@ use import::{
     ImportScanResult, ImportScanState, ScanImportOptions,
 };
 use preview::{PreviewOptions, PreviewState, WorkflowExecutionGate};
-use tauri::ipc::Channel;
+use tauri::ipc::{Channel, InvokeBody, Request};
 use tauri::State;
 use thumbnail::{ThumbnailOptions, ThumbnailResult};
 
@@ -56,7 +57,7 @@ pub fn run_path_conversion_smoke(
     format: String,
 ) -> Result<ConvertResult, String> {
     let options = convert::path_conversion_smoke_options(input, out_dir, format);
-    convert::convert(&options)
+    convert::convert(&options).map_err(|error| error.to_string())
 }
 
 /// 返回当前运行时的文件访问策略,供前端选择正确的系统文件选择器和输出目录流程。
@@ -171,9 +172,11 @@ fn cancel_import_scan(state: State<'_, ImportScanState>) -> bool {
 /// 把剪贴板图片写入受控临时文件,并作为普通导入文件返回给前端队列。
 #[tauri::command]
 async fn import_clipboard_image(
-    options: ClipboardImageImportOptions,
+    request: Request<'_>,
     state: State<'_, ClipboardImportState>,
 ) -> Result<ImportScanFile, CommandError> {
+    let options =
+        clipboard_import_options(&request).map_err(CommandError::clipboard_import_failed)?;
     let clipboard_import =
         tauri::async_runtime::spawn_blocking(move || import::import_clipboard_image(options))
             .await
@@ -189,6 +192,69 @@ async fn import_clipboard_image(
         return Err(CommandError::clipboard_import_failed(error));
     }
     Ok(file)
+}
+
+const CLIPBOARD_MIME_HEADER: &str = "x-imgconvert-clipboard-mime";
+const CLIPBOARD_NAME_HEADER: &str = "x-imgconvert-clipboard-name";
+const MAX_CLIPBOARD_METADATA_HEADER_BYTES: usize = 1_024;
+
+fn clipboard_import_options(request: &Request<'_>) -> Result<ClipboardImageImportOptions, String> {
+    let bytes = match request.body() {
+        InvokeBody::Raw(bytes) => bytes.clone(),
+        InvokeBody::Json(_) => {
+            return Err("剪贴板图片必须使用原始二进制 IPC 传输".to_string());
+        }
+    };
+    let mime_type = decoded_optional_header(request, CLIPBOARD_MIME_HEADER)?;
+    let suggested_name = decoded_optional_header(request, CLIPBOARD_NAME_HEADER)?;
+    Ok(ClipboardImageImportOptions {
+        bytes,
+        mime_type,
+        suggested_name,
+    })
+}
+
+fn decoded_optional_header(request: &Request<'_>, name: &str) -> Result<Option<String>, String> {
+    let Some(value) = request.headers().get(name) else {
+        return Ok(None);
+    };
+    let encoded = value
+        .to_str()
+        .map_err(|_| format!("剪贴板元数据头无效: {name}"))?;
+    if encoded.len() > MAX_CLIPBOARD_METADATA_HEADER_BYTES {
+        return Err(format!("剪贴板元数据头过长: {name}"));
+    }
+    let decoded = decode_uri_component(encoded)?;
+    if decoded.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(decoded))
+    }
+}
+
+fn decode_uri_component(value: &str) -> Result<String, String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let high = bytes
+                .get(index + 1)
+                .and_then(|byte| (*byte as char).to_digit(16));
+            let low = bytes
+                .get(index + 2)
+                .and_then(|byte| (*byte as char).to_digit(16));
+            let (Some(high), Some(low)) = (high, low) else {
+                return Err("剪贴板元数据包含无效百分号编码".to_string());
+            };
+            decoded.push(((high << 4) | low) as u8);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(decoded).map_err(|_| "剪贴板元数据不是有效 UTF-8".to_string())
 }
 
 /// 清理由剪贴板导入创建的临时文件。非本应用管理的路径会被忽略。
@@ -360,4 +426,24 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_uri_component;
+
+    #[test]
+    fn decodes_clipboard_header_components_without_form_semantics() {
+        assert_eq!(
+            decode_uri_component("screen%20shot%20%E4%B8%AD%E6%96%87.png").unwrap(),
+            "screen shot 中文.png"
+        );
+        assert_eq!(decode_uri_component("a+b.png").unwrap(), "a+b.png");
+    }
+
+    #[test]
+    fn rejects_malformed_clipboard_header_components() {
+        assert!(decode_uri_component("bad%2").is_err());
+        assert!(decode_uri_component("%FF").is_err());
+    }
 }

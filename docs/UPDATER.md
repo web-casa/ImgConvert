@@ -162,7 +162,7 @@ Run the manual workflow `Updater Release` with:
 - `tag`: the release tag, for example `v0.2.0`
 - `publish_release=false`: build and upload workflow artifacts only
 - `publish_release=true`: upload `latest.json`, AppImage, signature, and
-  checksums to the GitHub Release
+  checksums to the same-tag **draft** GitHub Release
 
 The workflow uses the same static endpoint:
 
@@ -175,12 +175,14 @@ Before uploading assets, the workflow executes the signed AppImage with
 already passed the same hidden conversion smoke used by Linux package tests.
 The signing build job has read-only repository access and does not persist its
 checkout credential. A separate job downloads the already-built artifact and
-receives the narrowly scoped `contents: write` permission only while creating
-the GitHub Release. Before that job can publish, it verifies the build-time
+receives narrowly scoped `contents: write` permission only while creating or
+extending the draft GitHub Release. Before that job can attach assets, it verifies the build-time
 checksums, checks that `latest.json` names the exact signed Linux AppImage for
 this repository and tag, re-verifies that staged updater artifact with the
 configured public key, and generates the merged checksum manifest over the
-staged release assets.
+staged release assets. It cannot expose a caller-controlled non-draft switch;
+only the separate `GitHub Release Publish` workflow can publish after validating
+the complete Linux/macOS/Windows direct-package matrix.
 
 ## Store channels
 

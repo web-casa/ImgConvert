@@ -59,6 +59,9 @@ converted to paths and all artwork embedded as static vector geometry.
   they must not create a second conversion scheduler or duplicate queue ownership.
 - `@imgconvert/conversion-contract` and `@imgconvert/web-image-engine` remain independent of Svelte
   and UI structure.
+- `@imgconvert/web-conversion-runtime` owns the concrete codec adapters, safe batch filename rules,
+  archive protocol/scheduler, and Worker execution functions shared by Web and the Chromium
+  extension. `web-app/src/lib/*worker.ts` must remain thin Vite entrypoints.
 - Raster, SVG and PDF conversion use separate, lazy serial schedulers. Format routing stays in
   `App.svelte`; presentation components must not import Worker implementations. PDF page results
   remain children of one queue entry. WEB-008 derives a read-only export plan from those existing
@@ -78,3 +81,13 @@ pnpm run web:release:review:local
 pnpm run web:release:memory
 pnpm run web:release:preview:smoke -- https://example.pages.dev
 ```
+
+## Retained conversion results
+
+The shared browser contract caps a PDF's retained encoded pages at 128 MiB and all queued
+results at 256 MiB. Both Web and extension pass the remaining queue allowance through the
+scheduler to raster/SVG/PDF Workers. A PDF stops rendering further pages when it exhausts
+its allowance, keeps successful pages, and reports the remaining pages as
+`output-budget-exceeded`. Removing results or clearing/restarting the completed queue restores
+capacity. These are retained-output limits, separate from the ZIP limit and from transient
+canvas, decoding, encoding and Blob memory; they do not claim a fixed total browser RSS.

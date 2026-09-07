@@ -1,4 +1,37 @@
 export const enUS = {
+  environment: {
+    title: "Storage and environmental scenario",
+    smaller: "Output smaller by {bytes}",
+    larger: "Output larger by {bytes}",
+    same: "Output size unchanged",
+    boundary:
+      "A smaller file does not establish freed disk space, electricity savings or avoided emissions.",
+    excluded:
+      "A comparable single static raster result has not been confirmed. Documents, animations, multiple outputs, AVIF/HEIC with unknown sequence status and legacy results are excluded.",
+    batch:
+      "Batch: {count} eligible results; {excluded} other completed results excluded. This shared scenario is independent of individual panels.",
+    storage: "Storage scenario",
+    local: "Local or unknown: bytes only",
+    cloud: "Explore cloud storage assumptions",
+    originals: "Original files",
+    hypothetical: "Assume outputs replace originals",
+    confirmed: "I replaced originals (self-reported)",
+    retained: "Originals are retained",
+    days: "Retention days (0–3650)",
+    copies: "Copies",
+    invalid: "Enter a whole number of days from 0 to 3650.",
+    estimate: "Cloud storage scenario estimate",
+    noReduction: "No net output reduction; no positive environmental benefit estimate.",
+    retainedNotice: "Retaining originals does not support a positive storage reduction estimate.",
+    limits:
+      "Average capacity allocation; an assumption range, not achieved or net reductions or a confidence interval. Self-reported replacement remains an estimate.",
+    method: "Method and sources (available offline)",
+    formula:
+      "Model v1.0.0: capacity (TB) × retention hours × 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × copies = energy (Wh). Energy ÷ 1000 × 473 g CO₂/kWh = grams CO₂. Grid intensity is the 2024 global average; historical factors do not describe a current provider or local device.",
+    privacy:
+      "Excludes conversion energy, networks, hardware manufacture, disposal and rebound effects. Parameters stay in panel memory, reset on close and are neither saved nor uploaded. File sizes use binary KiB/MiB; the model uses decimal TB.",
+  },
+
   app: {
     windowTitle: "ImgConvert · Batch Image and PDF Converter",
     loading: "Loading…",

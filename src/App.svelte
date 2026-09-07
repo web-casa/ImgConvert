@@ -17,6 +17,8 @@
   import Dropzone from "$lib/components/Dropzone.svelte";
   import ComparisonPreview from "$lib/components/ComparisonPreview.svelte";
   import ConversionPanel from "$lib/components/ConversionPanel.svelte";
+  import EnvironmentalImpact from "$lib/components/EnvironmentalImpact.svelte";
+  import { summarizeDesktopImpact } from "$lib/desktop-impact";
   import QueueItem from "$lib/components/QueueItem.svelte";
   import OutputDestinationControl from "$lib/components/OutputDestinationControl.svelte";
   import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
@@ -41,6 +43,7 @@
     ui,
   } from "$lib/state.svelte";
 
+  const environmentalSummary = $derived(summarizeDesktopImpact(queue));
   const doneCount = $derived(queue.filter((item) => item.status === "done").length);
   const skippedCount = $derived(queue.filter((item) => item.status === "skipped").length);
   const errorCount = $derived(queue.filter((item) => item.status === "error").length);
@@ -170,6 +173,14 @@
                 </li>
               {/each}
             </ul>
+            {#if environmentalSummary}
+              {#key environmentalSummary}<EnvironmentalImpact
+                  measurement={environmentalSummary.measurement}
+                  comparable
+                  batchCount={environmentalSummary.count}
+                  excluded={environmentalSummary.excluded}
+                />{/key}
+            {/if}
           </section>
         </section>
 

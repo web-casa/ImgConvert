@@ -1,0 +1,14 @@
+{
+  "actionTitle": {
+    "message": "打开 ImgConvert 本地转换工作台"
+  },
+  "contextMenuConvert": {
+    "message": "使用 ImgConvert 转换"
+  },
+  "extensionDescription": {
+    "message": "在浏览器本地转换图片，支持批量处理、结果预览和质量调整。"
+  },
+  "extensionName": {
+    "message": "ImgConvert"
+  }
+}

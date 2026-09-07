@@ -433,7 +433,6 @@ function macosDirectPrerequisite() {
   const notarizationModes = [
     ["IMGCONVERT_NOTARYTOOL_PROFILE"],
     ["APPLE_API_KEY", "APPLE_API_ISSUER", "APPLE_API_KEY_PATH"],
-    ["APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"],
   ];
   const hasNotarization = notarizationModes.some((mode) => envSet(mode));
   const hasSigningIdentity =
@@ -488,12 +487,13 @@ function windowsDirectPrerequisite() {
     label: "Windows unsigned direct installers",
     status: process.platform === "win32" ? "ready" : "external",
     description:
-      "Requires a Windows host for intentionally unsigned MSI/NSIS builds and install smoke.",
-    command: "pnpm run release:windows && pnpm run release:windows:install-smoke",
+      "Requires the Windows Smoke x64/arm64 release matrix, then the provenance-checking draft finalizer.",
+    command:
+      "gh workflow run windows-smoke.yml --ref v<version> -f build_direct=true -f install_smoke=true -f bundles=msi,nsis -f architecture=both -f release_tag=v<version>",
     detail:
       process.platform === "win32"
-        ? "no Authenticode certificate required; verify merged SHA256SUMS before publication"
-        : "requires Windows runner or real Windows machine",
+        ? "no Authenticode certificate required; finalizer attaches both architectures and refreshes SHA256SUMS"
+        : "requires Windows runners; the manual finalizer attaches their smoke-tested artifacts to the same draft",
   };
 }
 

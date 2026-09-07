@@ -35,6 +35,33 @@
       ],
       "ignore": ["src/lib/components/ui/**", "src/vite-env.d.ts", "docs-site/source.config.ts"]
     },
+    "browser-extension": {
+      "entry": [
+        "entrypoints/background.ts",
+        "entrypoints/converter/main.ts",
+        "scripts/*.mjs",
+        "src/**/*.test.ts",
+        "wxt.config.ts"
+      ],
+      "project": ["entrypoints/**/*.{ts,svelte}", "scripts/*.mjs", "src/**/*.ts", "wxt.config.ts"],
+      "ignore": [".wxt/**"]
+    },
+    "packages/environmental-impact": {
+      "entry": ["src/index.ts", "tests/**/*.test.ts", "vitest.config.ts"],
+      "project": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+    },
+    "packages/web-conversion-runtime": {
+      "entry": [
+        "src/index.ts",
+        "src/workers/archive.ts",
+        "src/workers/pdf.ts",
+        "src/workers/raster.ts",
+        "src/workers/svg.ts",
+        "tests/**/*.test.ts",
+        "vitest.config.ts"
+      ],
+      "project": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+    },
     "web-app": {
       "entry": [
         "pwa/service-worker.js",

@@ -106,10 +106,18 @@ async function finalizeSavedSubmission(dmg, options, credentials) {
     credentials,
     options.profile,
     options.expectedArchitectures,
+    receipt.source.releaseTag?.slice(1),
   );
 }
 
-function finalizeAcceptedDmg(dmg, submissionId, credentials, profile, expectedArchitectures) {
+function finalizeAcceptedDmg(
+  dmg,
+  submissionId,
+  credentials,
+  profile,
+  expectedArchitectures,
+  expectedVersion,
+) {
   printNotarizationLog(submissionId, credentials);
   run("xcrun", ["stapler", "staple", dmg], "stapler staple");
   run(
@@ -126,6 +134,7 @@ function finalizeAcceptedDmg(dmg, submissionId, credentials, profile, expectedAr
       `--artifact=${dmg}`,
       "--require-signed",
       "--require-notarized",
+      ...(expectedVersion ? [`--expected-version=${expectedVersion}`] : []),
       ...expectedArchitectureArgument(expectedArchitectures),
     ],
     "signed/notarized DMG artifact verification",
@@ -395,18 +404,8 @@ function notaryCredentials(options) {
     requireFile(options.apiKeyPath, "APPLE_API_KEY_PATH");
     return ["--key", options.apiKeyPath, "--key-id", options.apiKey, "--issuer", options.apiIssuer];
   }
-  if (options.appleId && options.password && options.teamId) {
-    return [
-      "--apple-id",
-      options.appleId,
-      "--password",
-      options.password,
-      "--team-id",
-      options.teamId,
-    ];
-  }
   throw new Error(
-    "notarization requires IMGCONVERT_NOTARYTOOL_PROFILE, or APPLE_API_KEY/APPLE_API_ISSUER/APPLE_API_KEY_PATH, or APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID",
+    "notarization requires IMGCONVERT_NOTARYTOOL_PROFILE or APPLE_API_KEY/APPLE_API_ISSUER/APPLE_API_KEY_PATH",
   );
 }
 
@@ -419,9 +418,6 @@ export function parseOptions(argv, env = process.env) {
     dmg: env.IMGCONVERT_MACOS_DMG ?? null,
     receipt: env.IMGCONVERT_NOTARY_RECEIPT ?? null,
     keychainProfile: env.IMGCONVERT_NOTARYTOOL_PROFILE ?? null,
-    appleId: env.APPLE_ID ?? null,
-    password: env.APPLE_PASSWORD ?? null,
-    teamId: env.APPLE_TEAM_ID ?? null,
     apiKey: env.APPLE_API_KEY ?? null,
     apiIssuer: env.APPLE_API_ISSUER ?? null,
     apiKeyPath: env.APPLE_API_KEY_PATH ?? null,
@@ -453,9 +449,6 @@ function parseArgument(arg, options) {
     ["--dmg=", "dmg"],
     ["--receipt=", "receipt"],
     ["--keychain-profile=", "keychainProfile"],
-    ["--apple-id=", "appleId"],
-    ["--password=", "password"],
-    ["--team-id=", "teamId"],
     ["--api-key=", "apiKey"],
     ["--api-issuer=", "apiIssuer"],
     ["--api-key-path=", "apiKeyPath"],
@@ -669,9 +662,6 @@ Options:
   --receipt=<path>                Receipt output for submit or input for finalize.
   --expected-architectures=<list> Expected DMG app architecture(s), e.g. arm64 or x86_64.
   --keychain-profile=<name>       notarytool keychain profile.
-  --apple-id=<id>                 Apple ID for notarytool.
-  --password=<password>           App-specific password for notarytool.
-  --team-id=<TEAMID>              Apple team ID for notarytool.
   --api-key=<KEYID>               App Store Connect API key ID.
   --api-issuer=<ISSUERID>         App Store Connect issuer ID.
   --api-key-path=<path>           App Store Connect private key path.

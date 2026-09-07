@@ -15,6 +15,7 @@ export const CONVERSION_ERROR_CODES = [
   "decode-failed",
   "encode-failed",
   "output-validation-failed",
+  "output-budget-exceeded",
   "worker-failed",
 ] as const;
 

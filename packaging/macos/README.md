@@ -31,9 +31,9 @@ Direct distribution signing/notarization checklist:
 
 ```bash
 export APPLE_SIGNING_IDENTITY="Developer ID Application: <name> (<TEAMID>)"
-export APPLE_ID="<apple-id>"
-export APPLE_PASSWORD="<app-specific-password>"
-export APPLE_TEAM_ID="<TEAMID>"
+export APPLE_API_KEY="<key-id>"
+export APPLE_API_ISSUER="<issuer-id>"
+export APPLE_API_KEY_PATH="/secure/path/to/AuthKey_<key-id>.p8"
 pnpm run release:macos
 pnpm run release:macos:notarize
 ```
@@ -82,12 +82,12 @@ GitHub Actions:
 - Manual `build_direct=true` builds and uploads an unsigned `.dmg`.
 - Manual `notarize_direct=true` imports Apple signing secrets, builds a signed `.dmg`, runs `notarytool`, staples it, then runs `codesign` and Gatekeeper checks.
 - Manual `build_mas_candidate=true` imports separate Apple Distribution and Mac Installer Distribution certificates, verifies the embedded provisioning profile and signed entitlements, builds a signed universal `.app`, and requires a signed `.pkg` artifact. Artifact checks verify `file`, `lipo -archs`, `otool -L`, the ImageIO linkage, and the absence of linked `libheif`/`libx265`.
-- The manual `macOS DMG Release` workflow is the direct-distribution publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, then builds, signs, and submits separate arm64 and Intel x64 DMGs on the free standard `macos-15` and `macos-15-intel` runners. Run `macOS Notarization Finalize` once per architecture after Apple accepts each submission. `publish_release=true` only attaches a verified DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
+- The manual `macOS DMG Release` workflow is the direct-distribution publication entrypoint. It checks out an exact `v<semver>` tag, verifies it against the app version, then builds, signs, and submits separate arm64 and Intel x64 DMGs on the free standard `macos-15` and `macos-15-intel` runners. Run `macOS Notarization Finalize` once per architecture after Apple accepts each submission and pass the same `release_tag` when the source run requested release attachment. `publish_release=true` only attaches a verified, architecture-normalized DMG to an already-existing same-tag GitHub Release; it never creates a Release, changes its draft state, or uploads an unsigned artifact.
 - The manual `macOS MAS Release` workflow checks out the same immutable tag, requires that commit to be on the default branch, builds a signed sandboxed universal `.app` and Installer-signed `.pkg`, and validates the package with App Store Connect. `upload_build=false` is the safe default; set it to true only after validation succeeds and the App Store Connect app record is ready.
 
 Required GitHub secrets:
 
-- Direct signed/notarized DMG: `APPLE_DIRECT_CERTIFICATE`, `APPLE_DIRECT_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, plus either `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or `APPLE_API_KEY`/`APPLE_API_ISSUER`/`APPLE_API_KEY_BASE64`.
+- Direct signed/notarized DMG: `APPLE_DIRECT_CERTIFICATE`, `APPLE_DIRECT_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, plus `APPLE_API_KEY`/`APPLE_API_ISSUER`/`APPLE_API_KEY_BASE64`. Apple ID passwords are deliberately not accepted by the notarization script because command-line arguments are observable to other processes on a runner; a pre-created local `IMGCONVERT_NOTARYTOOL_PROFILE` remains supported outside CI.
 - Optional direct overrides: `IMGCONVERT_DIRECT_SIGNING_IDENTITY` and `APPLE_PROVIDER_SHORT_NAME`.
 - MAS candidate/submission: `APPLE_MAS_CERTIFICATE`, `APPLE_MAS_CERTIFICATE_PASSWORD`, `APPLE_MAS_INSTALLER_CERTIFICATE`, `APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD`, `KEYCHAIN_PASSWORD`, `APPLE_TEAM_ID`, `IMGCONVERT_MAS_PROVISION_PROFILE_BASE64`, `APPLE_ID`, and `APPLE_PASSWORD`. The workflow auto-selects both MAS identities; `IMGCONVERT_MAS_SIGNING_IDENTITY`, `IMGCONVERT_MAS_INSTALLER_IDENTITY`, and `APPLE_PROVIDER_SHORT_NAME` are optional overrides.
 

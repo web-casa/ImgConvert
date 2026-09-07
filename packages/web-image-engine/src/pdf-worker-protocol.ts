@@ -44,7 +44,11 @@ function isPositiveSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0;
 }
 
-function isPdfOutcome(value: unknown, limits: ResourceLimits): value is PdfConversionOutcome {
+function isPdfOutcome(
+  value: unknown,
+  limits: ResourceLimits,
+  outputByteLimit: number,
+): value is PdfConversionOutcome {
   if (!isRecord(value) || typeof value.ok !== "boolean") return false;
   if (!value.ok) return isConversionFailure(value.failure);
   if (!isRecord(value.result)) return false;
@@ -62,6 +66,7 @@ function isPdfOutcome(value: unknown, limits: ResourceLimits): value is PdfConve
     return false;
   }
   const pageNumbers = new Set<number>();
+  let totalBytes = 0;
   for (const page of pages) {
     if (
       !isRecord(page) ||
@@ -92,6 +97,11 @@ function isPdfOutcome(value: unknown, limits: ResourceLimits): value is PdfConve
     ) {
       return false;
     }
+    totalBytes += bytes.byteLength;
+    if (
+      totalBytes > Math.min(limits.maxPdfOutputBytes, limits.maxTotalOutputBytes, outputByteLimit)
+    )
+      return false;
   }
   return true;
 }
@@ -122,6 +132,7 @@ export function isPdfConversionWorkerProgress(
 export function isPdfConversionWorkerResult(
   value: unknown,
   limits: ResourceLimits,
+  outputByteLimit: number = limits.maxPdfOutputBytes,
 ): value is PdfConversionWorkerResult {
   return (
     isRecord(value) &&
@@ -129,6 +140,6 @@ export function isPdfConversionWorkerResult(
     value.schemaVersion === 1 &&
     typeof value.executionId === "string" &&
     value.executionId.length > 0 &&
-    isPdfOutcome(value.outcome, limits)
+    isPdfOutcome(value.outcome, limits, outputByteLimit)
   );
 }

@@ -87,6 +87,8 @@
 #features,
 #formats,
 #download,
+#desktop-downloads,
+#browser-extension,
 #guides,
 #faq {
   scroll-margin-top: 112px;
@@ -230,6 +232,70 @@
   transform: translateY(-2px);
 }
 
+.home-nav-try {
+  position: relative;
+}
+
+.home-nav-try-toggle {
+  cursor: pointer;
+}
+
+.home-nav-try-toggle svg {
+  transition: transform 160ms ease;
+}
+
+.home-nav-try-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.home-nav-try-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  min-width: 252px;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--home-line);
+  border-radius: 18px;
+  padding: 8px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 22px 50px rgb(22 55 35 / 14%);
+  backdrop-filter: blur(18px);
+}
+
+.home-nav-try-menu a {
+  display: grid;
+  align-items: center;
+  border-radius: 12px;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 9px 11px;
+  color: var(--home-ink);
+}
+
+.home-nav-try-menu a:hover {
+  background: #eff8f2;
+}
+
+.home-nav-try-menu a > svg {
+  color: var(--home-accent-deep);
+}
+
+.home-nav-try-menu strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.home-nav-try-menu small {
+  display: block;
+  margin-top: 2px;
+  color: var(--home-muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
 .home-menu-toggle {
   display: none;
   width: 42px;
@@ -327,7 +393,7 @@
   width: min(100%, 770px);
   justify-content: center;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
   margin-top: 30px;
 }
 
@@ -400,7 +466,7 @@
   justify-content: center;
   gap: 7px;
   border-radius: 10px;
-  padding-inline: 10px;
+  padding-inline: 2px;
   color: var(--home-accent-deep);
   font-size: 12px;
   font-weight: 730;
@@ -413,10 +479,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 14px;
 }
 
-.home-page .home-web-launch {
+.home-page .home-web-launch,
+.home-page .home-extension-launch {
   display: grid;
   min-height: 50px;
   align-items: center;
@@ -434,13 +501,45 @@
     transform 160ms ease;
 }
 
-.home-page .home-web-launch:hover {
+.home-page .home-web-launch:hover,
+.home-page .home-extension-launch:hover {
   background: #285d31;
   transform: translateY(-2px);
 }
 
 .home-web-launch > svg {
   flex: 0 0 auto;
+}
+
+.home-page .home-extension-launch {
+  border-color: var(--home-line-strong);
+  background: #fffaf2;
+  box-shadow: 0 10px 24px rgb(62 77 61 / 7%);
+  color: var(--home-ink);
+}
+
+.home-page .home-extension-launch:hover {
+  border-color: rgb(100 162 87 / 48%);
+  background: #fff;
+}
+
+.home-extension-launch span,
+.home-extension-launch strong,
+.home-extension-launch small {
+  display: block;
+}
+
+.home-extension-launch strong {
+  color: inherit;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.home-extension-launch small {
+  margin-top: 2px;
+  color: var(--home-muted);
+  font-size: 9px;
+  white-space: nowrap;
 }
 
 .home-web-launch span,
@@ -608,6 +707,7 @@
 }
 
 .home-product,
+.home-platforms,
 .home-resources,
 .home-faq {
   padding-block: clamp(104px, 11vw, 164px);
@@ -1129,6 +1229,239 @@
   color: #aebbb3;
 }
 
+.home-platform-cards {
+  display: grid;
+  align-items: stretch;
+  margin-top: 64px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.home-platform-cards article {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--home-line);
+  border-radius: 22px;
+  padding: 30px 28px;
+  background: var(--home-surface-soft);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.home-platform-cards article:hover {
+  border-color: rgb(100 162 87 / 34%);
+  transform: translateY(-3px);
+}
+
+.home-platform-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-platform-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--home-accent-soft);
+  color: var(--home-accent-deep);
+}
+
+.home-platform-badge {
+  border: 1px solid rgb(100 162 87 / 30%);
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: var(--home-accent-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-platform-cards h3 {
+  margin-top: 22px;
+  font-size: 1.55rem;
+  line-height: 1.15;
+}
+
+.home-platform-tagline {
+  margin-top: 7px;
+  color: var(--home-accent-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.home-platform-body {
+  flex: 1;
+  margin-top: 12px;
+  color: var(--home-muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.home-platform-cards article > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 22px;
+  color: var(--home-accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.home-extension-card-actions {
+  display: grid;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.home-extension-card-actions a,
+.home-extension-card-actions button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--home-line-strong);
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #fff;
+  color: var(--home-accent-deep);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 720;
+  text-align: left;
+}
+
+.home-extension-card-actions button {
+  align-items: flex-start;
+  flex-direction: column;
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.home-extension-card-actions button small {
+  color: var(--home-muted);
+  font-size: 9px;
+  font-weight: 580;
+  line-height: 1.35;
+}
+
+.home-download-channels {
+  display: grid;
+  margin-top: 44px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-download-channels a {
+  display: grid;
+  min-height: 78px;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 13px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 17px;
+  padding: 13px 16px;
+  background: rgb(255 255 255 / 6%);
+  color: #f6fbf7;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.home-download-channels a:hover {
+  border-color: rgb(121 221 161 / 48%);
+  background: rgb(121 221 161 / 11%);
+  transform: translateY(-2px);
+}
+
+.home-download-channels span,
+.home-download-channels strong,
+.home-download-channels small {
+  display: block;
+}
+
+.home-download-channels strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.home-download-channels small {
+  margin-top: 4px;
+  color: #9eaca4;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.home-compare {
+  margin-top: clamp(72px, 8vw, 110px);
+}
+
+.home-compare .home-section-heading h3 {
+  margin-top: 14px;
+  font-size: clamp(1.8rem, 3.4vw, 3rem);
+  line-height: 1.08;
+}
+
+.home-compare-table {
+  margin-top: 40px;
+  overflow-x: auto;
+  border: 1px solid var(--home-line);
+  border-radius: 22px;
+  background: #fff;
+}
+
+.home-compare-table table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.home-compare-table th,
+.home-compare-table td {
+  border-top: 1px solid var(--home-line);
+  padding: 15px 20px;
+  vertical-align: top;
+}
+
+.home-compare-table thead th {
+  border-top: 0;
+  background: var(--home-surface-soft);
+  color: var(--home-accent-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.home-compare-table tbody th {
+  color: var(--home-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.home-compare-table td {
+  color: var(--home-muted);
+  line-height: 1.55;
+}
+
+.home-compare-note {
+  margin-top: 16px;
+  color: var(--home-muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+
 .home-downloads {
   padding-block: clamp(108px, 11vw, 166px);
   background-color: var(--home-dark);
@@ -1386,6 +1719,109 @@
   padding: 34px;
   background: rgb(255 255 255 / 4%);
   box-shadow: inset 0 1px rgb(255 255 255 / 5%);
+}
+
+.home-extension-install {
+  display: grid;
+  align-items: center;
+  margin-top: 26px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  gap: 42px;
+  border: 1px solid rgb(121 221 161 / 23%);
+  border-radius: 24px;
+  padding: 34px;
+  background:
+    radial-gradient(circle at 12% 20%, rgb(100 162 87 / 20%), transparent 38%),
+    rgb(255 255 255 / 5%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 7%);
+}
+
+.home-extension-install-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.home-extension-install-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(121 221 161 / 28%);
+  border-radius: 17px;
+  background: rgb(121 221 161 / 12%);
+  color: #a9d49c;
+}
+
+.home-extension-install-copy .home-eyebrow {
+  color: #a9d49c;
+}
+
+.home-extension-install-copy h3 {
+  margin-top: 9px;
+  color: #fff;
+  font-size: clamp(1.55rem, 2.6vw, 2.5rem);
+  line-height: 1.08;
+}
+
+.home-extension-install-copy div > p:last-child {
+  margin-top: 12px;
+  color: #aebbb3;
+  font-size: 12px;
+  line-height: 1.62;
+}
+
+.home-extension-install-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.home-extension-install-actions a,
+.home-extension-install-actions button {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  padding: 10px 15px;
+  background: rgb(255 255 255 / 7%);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+
+.home-extension-install-actions a:hover {
+  border-color: rgb(121 221 161 / 48%);
+  background: rgb(121 221 161 / 11%);
+}
+
+.home-extension-install-actions button {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.home-extension-install-actions span,
+.home-extension-install-actions strong,
+.home-extension-install-actions small {
+  display: block;
+}
+
+.home-extension-install-actions strong,
+.home-extension-install-actions button span {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.home-extension-install-actions small {
+  margin-top: 3px;
+  color: #9eaca4;
+  font-size: 9px;
+  font-weight: 560;
+  line-height: 1.35;
 }
 
 .home-linux-copy {
@@ -1747,6 +2183,10 @@
   margin-top: 28px;
 }
 
+.home-final-copy .home-channel-actions {
+  margin-top: 18px;
+}
+
 .home-final-orbit {
   position: absolute;
   inset: 0;
@@ -1859,10 +2299,15 @@
 .home-nav a:focus-visible,
 .home-language a:focus-visible,
 .home-nav-download:focus-visible,
+.home-nav-try-menu a:focus-visible,
 .home-menu-toggle:focus-visible,
 .home-platform-links a:focus-visible,
 .home-web-launch:focus-visible,
+.home-extension-launch:focus-visible,
 .home-all-downloads:focus-visible,
+.home-extension-card-actions a:focus-visible,
+.home-download-channels a:focus-visible,
+.home-extension-install-actions a:focus-visible,
 .home-download-actions a:focus-visible,
 .home-direct-downloads a:focus-visible,
 .home-download-trust a:focus-visible,
@@ -1914,7 +2359,7 @@
     gap: 18px;
   }
 
-  .home-nav a:nth-child(6) {
+  .home-nav a:nth-child(7) {
     display: none;
   }
 
@@ -2036,7 +2481,7 @@
     display: inline-flex;
   }
 
-  .home-page .home-nav-download {
+  .home-page .home-nav-try {
     display: none;
   }
 
@@ -2157,12 +2602,23 @@
     grid-template-columns: 1fr;
   }
 
+  .home-platform-cards {
+    max-width: 620px;
+    margin-inline: auto;
+    grid-template-columns: 1fr;
+  }
+
   .home-download-grid article,
   .home-download-grid article.recommended {
     min-height: 0;
   }
 
   .home-linux-support {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+
+  .home-extension-install {
     grid-template-columns: 1fr;
     gap: 30px;
   }
@@ -2257,6 +2713,10 @@
     gap: 6px;
   }
 
+  .home-download-channels {
+    grid-template-columns: 1fr;
+  }
+
   .home-platform-links a {
     min-height: 88px;
     justify-items: center;
@@ -2280,6 +2740,10 @@
   }
 
   .home-web-launch {
+    width: 100%;
+  }
+
+  .home-extension-launch {
     width: 100%;
   }
 
@@ -2461,6 +2925,15 @@
   .home-linux-support {
     border-radius: 20px;
     padding: 24px;
+  }
+
+  .home-extension-install {
+    border-radius: 20px;
+    padding: 24px;
+  }
+
+  .home-extension-install-copy {
+    flex-direction: column;
   }
 
   .home-linux-copy {
