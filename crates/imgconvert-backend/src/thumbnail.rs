@@ -12,8 +12,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::access;
-use crate::external_codecs;
 use crate::pdf;
+use imgconvert_platform::external_codecs;
 
 const DEFAULT_THUMBNAIL_EDGE: u32 = 180;
 const MIN_THUMBNAIL_EDGE: u32 = 32;

@@ -11,7 +11,7 @@ use std::fs::{self, File, TryLockError};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use imgconvert_core::{probe, Format, READABLE_FORMATS};
@@ -20,8 +20,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::access::{self, AuthorizedPath};
 use crate::command_error::CommandError;
-use crate::external_codecs;
 use crate::pdf;
+use imgconvert_platform::external_codecs;
 
 const DEFAULT_MAX_FILES: usize = 20_000;
 const DEFAULT_MAX_ENTRIES: usize = 100_000;
@@ -124,8 +124,13 @@ pub struct ClipboardImageImportOptions {
 
 #[derive(Default)]
 pub struct ImportScanState {
-    current: Mutex<Option<ImportScanHandle>>,
+    slot: Arc<ImportScanSlot>,
     next_id: AtomicU64,
+}
+
+#[derive(Default)]
+struct ImportScanSlot {
+    current: Mutex<Option<ImportScanHandle>>,
 }
 
 #[derive(Default)]
@@ -138,7 +143,10 @@ struct ImportScanHandle {
     token: CancellationToken,
 }
 
+/// Marks a scan as running until dropped; dropping clears the state slot on
+/// every exit path, including panics.
 pub struct ImportScanRegistration {
+    state: Arc<ImportScanSlot>,
     id: u64,
     token: CancellationToken,
 }
@@ -183,6 +191,7 @@ struct Scanner {
 impl ImportScanState {
     pub fn begin(&self) -> Result<ImportScanRegistration, String> {
         let mut current = self
+            .slot
             .current
             .lock()
             .map_err(|_| "导入扫描状态锁已损坏".to_string())?;
@@ -196,19 +205,23 @@ impl ImportScanState {
             id,
             token: token.clone(),
         });
-        Ok(ImportScanRegistration { id, token })
+        Ok(ImportScanRegistration {
+            state: Arc::clone(&self.slot),
+            id,
+            token,
+        })
     }
 
-    pub fn finish(&self, id: u64) {
-        if let Ok(mut current) = self.current.lock() {
-            if current.as_ref().is_some_and(|handle| handle.id == id) {
-                *current = None;
-            }
-        }
+    pub fn is_active(&self) -> bool {
+        self.slot
+            .current
+            .lock()
+            .map(|current| current.is_some())
+            .unwrap_or(true)
     }
 
     pub fn cancel_current(&self) -> bool {
-        if let Ok(current) = self.current.lock() {
+        if let Ok(current) = self.slot.current.lock() {
             if let Some(handle) = current.as_ref() {
                 handle.token.cancel();
                 return true;
@@ -228,8 +241,21 @@ impl ImportScanRegistration {
     }
 }
 
+impl Drop for ImportScanRegistration {
+    fn drop(&mut self) {
+        let mut current = self
+            .state
+            .current
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if current.as_ref().is_some_and(|handle| handle.id == self.id) {
+            *current = None;
+        }
+    }
+}
+
 impl ClipboardImportState {
-    pub(crate) fn register(&self, path: PathBuf, session_lock: File) -> Result<(), String> {
+    pub fn register(&self, path: PathBuf, session_lock: File) -> Result<(), String> {
         let mut managed_files = self
             .managed_files
             .lock()
@@ -974,7 +1000,7 @@ fn create_private_dir(path: &Path) -> std::io::Result<()> {
     fs::create_dir(path)
 }
 
-pub(crate) fn cleanup_clipboard_file_best_effort(path: &Path) {
+pub fn cleanup_clipboard_file_best_effort(path: &Path) {
     let _ = fs::remove_file(path);
     if let Some(parent) = path.parent() {
         cleanup_clipboard_temp_dir_best_effort(parent);
@@ -1021,7 +1047,7 @@ fn cleanup_clipboard_temp_dir_best_effort(path: &Path) {
     let _ = fs::remove_dir_all(path);
 }
 
-pub(crate) fn cleanup_stale_clipboard_temp_dirs_best_effort() {
+pub fn cleanup_stale_clipboard_temp_dirs_best_effort() {
     let _ = cleanup_stale_clipboard_temp_dirs_in(
         &std::env::temp_dir(),
         SystemTime::now(),
@@ -1531,6 +1557,44 @@ mod tests {
                 "{mime_type}"
             );
         }
+    }
+
+    #[test]
+    fn scan_registration_moved_into_a_worker_outlives_the_caller() {
+        // The IPC future that started a scan may be dropped while the blocking
+        // worker keeps running. The registration must travel with the worker
+        // so cancellation still reaches it and no second scan can start.
+        let state = ImportScanState::default();
+        let registration = state.begin().unwrap();
+        let token = registration.token();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let worker = std::thread::spawn(move || {
+            let _registration = registration;
+            let _ = release_rx.recv();
+        });
+
+        assert!(state.is_active());
+        assert!(state.begin().is_err());
+        assert!(state.cancel_current());
+        assert!(token.is_cancelled());
+
+        release_tx.send(()).unwrap();
+        worker.join().unwrap();
+        assert!(!state.is_active());
+        assert!(state.begin().is_ok());
+    }
+
+    #[test]
+    fn scan_registration_clears_state_when_the_worker_panics() {
+        let state = ImportScanState::default();
+        let registration = state.begin().unwrap();
+        let worker = std::thread::spawn(move || {
+            let _registration = registration;
+            panic!("scan worker exploded");
+        });
+        assert!(worker.join().is_err());
+        assert!(!state.is_active());
+        assert!(state.begin().is_ok());
     }
 
     #[test]

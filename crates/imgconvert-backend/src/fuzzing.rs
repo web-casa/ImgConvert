@@ -18,7 +18,7 @@ const MAX_PDF_BYTES: usize = 1024 * 1024;
 /// It is not a Tauri command and cannot mutate codec configuration.
 pub fn fuzz_external_codec_manifest(bytes: &[u8]) {
     if bytes.len() <= MAX_MANIFEST_BYTES {
-        crate::external_codecs::fuzz_manifest_bytes(bytes);
+        imgconvert_platform::external_codecs::fuzz_manifest_bytes(bytes);
     }
 }
 

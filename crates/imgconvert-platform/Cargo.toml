@@ -1,0 +1,31 @@
+[package]
+name = "imgconvert-platform"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "ImgConvert 的系统能力层:外部/系统 HEIC codec 发现与诊断、macOS 安全作用域、文件选择器接口。依赖 core,不依赖 tauri/gpui。"
+publish = false
+
+[features]
+# Exposes the manifest parser to cargo-fuzz and corpus replay. Never enabled in app builds.
+fuzzing = []
+
+[dependencies]
+imgconvert-core = { path = "../imgconvert-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Imaging",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+] }
+
+[dev-dependencies]
+tempfile = "3"

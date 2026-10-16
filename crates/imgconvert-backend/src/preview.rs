@@ -92,7 +92,8 @@ struct PreviewSummary<'a> {
     warnings: &'a [ConvertWarning],
 }
 
-fn encode_ipc_payload(result: PreviewResult) -> Result<Vec<u8>, String> {
+/// Encodes a preview as the `ICP1` binary IPC payload (header + summary JSON + two PNGs).
+pub fn encode_ipc_payload(result: PreviewResult) -> Result<Vec<u8>, String> {
     if result.before_bytes.len() > MAX_PREVIEW_IMAGE_BYTES
         || result.after_bytes.len() > MAX_PREVIEW_IMAGE_BYTES
     {
@@ -140,13 +141,9 @@ fn encode_ipc_payload(result: PreviewResult) -> Result<Vec<u8>, String> {
     Ok(payload)
 }
 
-pub fn into_ipc_response(result: PreviewResult) -> Result<tauri::ipc::Response, String> {
-    encode_ipc_payload(result).map(tauri::ipc::Response::new)
-}
-
 #[derive(Default)]
 pub struct PreviewState {
-    current: Mutex<Option<PreviewHandle>>,
+    slot: Arc<PreviewSlot>,
     next_id: AtomicU64,
 }
 
@@ -155,9 +152,17 @@ struct PreviewHandle {
     token: CancellationToken,
 }
 
+/// Marks a preview generation as current until dropped. Dropping it (normal
+/// return, error, cancellation or panic unwinding) clears the state slot.
 pub struct PreviewRegistration {
+    state: Arc<PreviewSlot>,
     id: u64,
     token: CancellationToken,
+}
+
+#[derive(Default)]
+struct PreviewSlot {
+    current: Mutex<Option<PreviewHandle>>,
 }
 
 impl PreviewState {
@@ -165,6 +170,7 @@ impl PreviewState {
     /// cancellation token prevents it from publishing at the next pipeline boundary.
     pub fn begin(&self) -> Result<PreviewRegistration, String> {
         let mut current = self
+            .slot
             .current
             .lock()
             .map_err(|_| "预览任务状态锁已损坏".to_string())?;
@@ -177,19 +183,23 @@ impl PreviewState {
             id,
             token: token.clone(),
         });
-        Ok(PreviewRegistration { id, token })
+        Ok(PreviewRegistration {
+            state: Arc::clone(&self.slot),
+            id,
+            token,
+        })
     }
 
-    pub fn finish(&self, id: u64) {
-        if let Ok(mut current) = self.current.lock() {
-            if current.as_ref().is_some_and(|handle| handle.id == id) {
-                *current = None;
-            }
-        }
+    pub fn is_active(&self) -> bool {
+        self.slot
+            .current
+            .lock()
+            .map(|current| current.is_some())
+            .unwrap_or(true)
     }
 
     pub fn cancel_current(&self) -> bool {
-        if let Ok(current) = self.current.lock() {
+        if let Ok(current) = self.slot.current.lock() {
             if let Some(handle) = current.as_ref() {
                 handle.token.cancel();
                 return true;
@@ -206,6 +216,19 @@ impl PreviewRegistration {
 
     pub fn token(&self) -> CancellationToken {
         self.token.clone()
+    }
+}
+
+impl Drop for PreviewRegistration {
+    fn drop(&mut self) {
+        let mut current = self
+            .state
+            .current
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if current.as_ref().is_some_and(|handle| handle.id == self.id) {
+            *current = None;
+        }
     }
 }
 
@@ -331,10 +354,44 @@ mod tests {
         assert!(first.token().is_cancelled());
         assert!(!second.token().is_cancelled());
         assert!(second.id() > first.id());
-        state.finish(first.id());
+        // Dropping a stale registration must not clear the newer generation.
+        drop(first);
+        assert!(state.is_active());
         assert!(state.cancel_current());
-        state.finish(second.id());
+        drop(second);
+        assert!(!state.is_active());
         assert!(!state.cancel_current());
+    }
+
+    #[test]
+    fn preview_registration_moved_into_a_worker_outlives_the_caller() {
+        let state = PreviewState::default();
+        let registration = state.begin().unwrap();
+        let token = registration.token();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let worker = std::thread::spawn(move || {
+            let _registration = registration;
+            let _ = release_rx.recv();
+        });
+
+        assert!(state.is_active());
+        assert!(state.cancel_current());
+        assert!(token.is_cancelled());
+
+        release_tx.send(()).unwrap();
+        worker.join().unwrap();
+        assert!(!state.is_active());
+    }
+
+    #[test]
+    fn preview_registration_clears_state_when_dropped_during_unwinding() {
+        let state = PreviewState::default();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _registration = state.begin().unwrap();
+            panic!("preview worker exploded");
+        }));
+        assert!(result.is_err());
+        assert!(!state.is_active());
     }
 
     #[test]

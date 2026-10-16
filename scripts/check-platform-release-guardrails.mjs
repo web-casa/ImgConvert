@@ -259,7 +259,9 @@ function checkReadmeStatusGuardrails() {
 function checkAvifLosslessGuardrails() {
   const coreCargo = readText(path.join(repoRoot, "crates", "imgconvert-core", "Cargo.toml"));
   const coreLib = readText(path.join(repoRoot, "crates", "imgconvert-core", "src", "lib.rs"));
-  const tauriConvert = readText(path.join(repoRoot, "src-tauri", "src", "convert.rs"));
+  const tauriConvert = readText(
+    path.join(repoRoot, "crates", "imgconvert-backend", "src", "convert.rs"),
+  );
   const stateTs = readText(path.join(repoRoot, "src", "lib", "state.svelte.ts"));
   const thirdParty = readText(path.join(repoRoot, "THIRD_PARTY_LICENSES.md"));
 
@@ -290,8 +292,12 @@ function checkAvifLosslessGuardrails() {
 
 function checkSemanticMetadataGuardrails() {
   const coreLib = readText(path.join(repoRoot, "crates", "imgconvert-core", "src", "lib.rs"));
-  const tauriConvert = readText(path.join(repoRoot, "src-tauri", "src", "convert.rs"));
-  const externalCodecs = readText(path.join(repoRoot, "src-tauri", "src", "external_codecs.rs"));
+  const tauriConvert = readText(
+    path.join(repoRoot, "crates", "imgconvert-backend", "src", "convert.rs"),
+  );
+  const externalCodecs = readText(
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "external_codecs.rs"),
+  );
 
   for (const expected of [
     "pub iptc: Option<Vec<u8>>",
@@ -327,7 +333,9 @@ function checkPlatformBenchmarkGuardrails() {
   const benchmarkScript = readText(path.join(repoRoot, "scripts", "benchmark-platform.mjs"));
   const macosBenchmarkScript = readText(path.join(repoRoot, "scripts", "benchmark-macos-avif.mjs"));
   const coreLib = readText(path.join(repoRoot, "crates", "imgconvert-core", "src", "lib.rs"));
-  const tauriConvert = readText(path.join(repoRoot, "src-tauri", "src", "convert.rs"));
+  const tauriConvert = readText(
+    path.join(repoRoot, "crates", "imgconvert-backend", "src", "convert.rs"),
+  );
 
   if (!packageScripts["bench:platform"]?.includes("benchmark-platform.mjs")) {
     failures.push("package.json must expose bench:platform for AVIF/WebP platform timing");
@@ -1533,7 +1541,9 @@ function checkMacosRuntimeGuardrails() {
     );
   }
 
-  const systemCodecs = readText(path.join(repoRoot, "src-tauri", "src", "macos_system_codecs.rs"));
+  const systemCodecs = readText(
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "macos_system_codecs.rs"),
+  );
   if (!systemCodecs.includes("ImageIO.framework")) {
     failures.push("macOS system codec bridge must use ImageIO.framework");
   }
@@ -1560,7 +1570,9 @@ function checkMacosRuntimeGuardrails() {
     }
   }
 
-  const security = readText(path.join(repoRoot, "src-tauri", "src", "macos_security.rs"));
+  const security = readText(
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "macos_security.rs"),
+  );
   for (const expected of [
     "CFURLStartAccessingSecurityScopedResource",
     "CFURLStopAccessingSecurityScopedResource",
@@ -1764,7 +1776,7 @@ function checkWindowsRuntimeGuardrails() {
     }
   }
   const windowsSystemCodecs = readText(
-    path.join(repoRoot, "src-tauri", "src", "windows_system_codecs.rs"),
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "windows_system_codecs.rs"),
   );
   for (const expected of [
     "system-wic",
@@ -1792,11 +1804,15 @@ function checkWindowsRuntimeGuardrails() {
 }
 
 function checkStoreCodecGuardrail() {
-  const buildRs = readText(path.join(repoRoot, "src-tauri", "build.rs"));
-  const externalCodecs = readText(path.join(repoRoot, "src-tauri", "src", "external_codecs.rs"));
+  const buildRs = readText(path.join(repoRoot, "crates", "imgconvert-platform", "build.rs"));
+  const externalCodecs = readText(
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "external_codecs.rs"),
+  );
 
   if (!buildRs.includes("rerun-if-env-changed=IMGCONVERT_DISABLE_EXTERNAL_CODECS")) {
-    failures.push("src-tauri/build.rs must rerun when IMGCONVERT_DISABLE_EXTERNAL_CODECS changes");
+    failures.push(
+      "crates/imgconvert-platform/build.rs must rerun when IMGCONVERT_DISABLE_EXTERNAL_CODECS changes",
+    );
   }
   if (!externalCodecs.includes('option_env!("IMGCONVERT_DISABLE_EXTERNAL_CODECS")')) {
     failures.push(
@@ -2099,8 +2115,10 @@ function checkWindowsStoreDocs() {
 }
 
 function storeCodecGuardrailStaticFilesPresent() {
-  const buildRs = readText(path.join(repoRoot, "src-tauri", "build.rs"));
-  const externalCodecs = readText(path.join(repoRoot, "src-tauri", "src", "external_codecs.rs"));
+  const buildRs = readText(path.join(repoRoot, "crates", "imgconvert-platform", "build.rs"));
+  const externalCodecs = readText(
+    path.join(repoRoot, "crates", "imgconvert-platform", "src", "external_codecs.rs"),
+  );
   return (
     buildRs.includes("rerun-if-env-changed=IMGCONVERT_DISABLE_EXTERNAL_CODECS") &&
     externalCodecs.includes('option_env!("IMGCONVERT_DISABLE_EXTERNAL_CODECS")')

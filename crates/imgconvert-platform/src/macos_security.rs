@@ -14,7 +14,6 @@ use std::path::Path;
 #[derive(Debug)]
 pub struct ScopedResource {
     #[cfg(target_os = "macos")]
-    #[allow(dead_code)]
     inner: Option<macos::SecurityScopedUrl>,
 }
 
@@ -34,9 +33,16 @@ impl ScopedResource {
         }
     }
 
-    #[cfg(all(test, not(target_os = "macos")))]
+    /// Whether a security-scoped access session is active for this resource.
     pub fn started(&self) -> bool {
-        false
+        #[cfg(target_os = "macos")]
+        {
+            self.inner.is_some()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            false
+        }
     }
 }
 

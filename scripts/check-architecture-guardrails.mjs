@@ -1,12 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
+
+// Modules that left src-tauri/src in the GPUI migration (plan §4 stage 1).
+// Scripts, workflows and packaging must read them from the new crates; a stale
+// path only fails at runtime (ENOENT), which CI noticed too late once.
+const MOVED_SHELL_SOURCES = [
+  "access",
+  "command_error",
+  "convert",
+  "environment",
+  "external_codecs",
+  "fuzzing",
+  "import",
+  "macos_security",
+  "macos_system_codecs",
+  "native_dialog",
+  "pdf",
+  "preview",
+  "result_cache",
+  "thumbnail",
+  "windows_system_codecs",
+];
 
 const packageJson = readJson("package.json");
 const coreCargo = readText("crates/imgconvert-core/Cargo.toml");
@@ -15,19 +36,24 @@ const workspaceCargo = readText("Cargo.toml");
 const denyToml = readText("src-tauri/deny.toml");
 const coreLib = readText("crates/imgconvert-core/src/lib.rs");
 const tauriLib = readText("src-tauri/src/lib.rs");
-const tauriConvert = readText("src-tauri/src/convert.rs");
-const tauriImport = readText("src-tauri/src/import.rs");
-const externalCodecs = readText("src-tauri/src/external_codecs.rs");
-const pdfAdapter = readText("src-tauri/src/pdf.rs");
-const tauriBuild = readText("src-tauri/build.rs");
-const macosSystemCodecs = readText("src-tauri/src/macos_system_codecs.rs");
-const windowsSystemCodecs = readText("src-tauri/src/windows_system_codecs.rs");
+const platformCargo = readText("crates/imgconvert-platform/Cargo.toml");
+const backendCargo = readText("crates/imgconvert-backend/Cargo.toml");
+const tauriConvert = readText("crates/imgconvert-backend/src/convert.rs");
+const tauriImport = readText("crates/imgconvert-backend/src/import.rs");
+const externalCodecs = readText("crates/imgconvert-platform/src/external_codecs.rs");
+const pdfAdapter = readText("crates/imgconvert-backend/src/pdf.rs");
+const platformBuild = readText("crates/imgconvert-platform/build.rs");
+const macosSystemCodecs = readText("crates/imgconvert-platform/src/macos_system_codecs.rs");
+const windowsSystemCodecs = readText("crates/imgconvert-platform/src/windows_system_codecs.rs");
 const flatpakManifest = readText("packaging/flatpak/io.github.yeagoo.imgconvert.yml");
 const coreDependencies = cargoDependencies("crates/imgconvert-core/Cargo.toml");
 const tauriDependencies = cargoDependencies("src-tauri/Cargo.toml");
+const platformDependencies = cargoDependencies("crates/imgconvert-platform/Cargo.toml");
+const backendDependencies = cargoDependencies("crates/imgconvert-backend/Cargo.toml");
 
 checkPackageManager();
 checkLicensingAndDependencies();
+checkCrateLayering();
 checkCoreFormatBoundary();
 checkPdfBoundary();
 checkTauriCommandSurface();
@@ -66,10 +92,12 @@ function checkPackageManager() {
 function checkLicensingAndDependencies() {
   requireText(coreCargo, 'license = "Apache-2.0"', "imgconvert-core must stay Apache-2.0");
   requireText(tauriCargo, 'license = "Apache-2.0"', "src-tauri must stay Apache-2.0");
+  requireText(platformCargo, 'license = "Apache-2.0"', "imgconvert-platform must stay Apache-2.0");
+  requireText(backendCargo, 'license = "Apache-2.0"', "imgconvert-backend must stay Apache-2.0");
   requireText(
     tauriCargo,
-    'imgconvert-core = { path = "../crates/imgconvert-core" }',
-    "Tauri backend must depend on the local imgconvert-core path crate",
+    'imgconvert-backend = { path = "../crates/imgconvert-backend" }',
+    "Tauri shell must depend on the local imgconvert-backend path crate",
   );
   requireText(
     workspaceCargo,
@@ -78,7 +106,11 @@ function checkLicensingAndDependencies() {
   );
 
   const coreDeps = dependencyNames(coreDependencies);
-  const tauriDeps = dependencyNames(tauriDependencies);
+  const tauriDeps = new Set([
+    ...dependencyNames(tauriDependencies),
+    ...dependencyNames(platformDependencies),
+    ...dependencyNames(backendDependencies),
+  ]);
   const forbiddenMainCrates = [
     "dssim",
     "dssim-core",
@@ -134,6 +166,87 @@ function checkLicensingAndDependencies() {
   }
 }
 
+/// Dependency direction (migration plan §2.1): shells → backend → platform → core.
+function checkCrateLayering() {
+  const coreDeps = dependencyNames(coreDependencies);
+  const platformDeps = dependencyNames(platformDependencies);
+  const backendDeps = dependencyNames(backendDependencies);
+  const uiCrates = ["tauri", "gpui", "gpui-kit", "gpui-component", "gpui-pre", "gpui-ce"];
+  for (const crateName of uiCrates) {
+    if (platformDeps.has(crateName)) {
+      failures.push(`imgconvert-platform must not depend on UI crate ${crateName}`);
+    }
+    if (backendDeps.has(crateName)) {
+      failures.push(`imgconvert-backend must not depend on UI crate ${crateName}`);
+    }
+  }
+  for (const crateName of ["imgconvert-platform", "imgconvert-backend"]) {
+    if (coreDeps.has(crateName)) {
+      failures.push(`imgconvert-core must not depend on ${crateName}`);
+    }
+  }
+  if (platformDeps.has("imgconvert-backend")) {
+    failures.push("imgconvert-platform must not depend on imgconvert-backend");
+  }
+  if (!platformDeps.has("imgconvert-core")) {
+    failures.push("imgconvert-platform must depend on imgconvert-core");
+  }
+  if (!backendDeps.has("imgconvert-platform") || !backendDeps.has("imgconvert-core")) {
+    failures.push("imgconvert-backend must depend on imgconvert-platform and imgconvert-core");
+  }
+  for (const [label, dir] of [
+    ["imgconvert-platform", "crates/imgconvert-platform/src"],
+    ["imgconvert-backend", "crates/imgconvert-backend/src"],
+  ]) {
+    const hits = rustFilesUnder(dir).filter((file) => readText(file).includes("tauri::"));
+    if (hits.length > 0) {
+      failures.push(`${label} must not reference tauri:: (${hits.join(", ")})`);
+    }
+  }
+  requireText(
+    workspaceCargo,
+    'members = ["crates/imgconvert-core", "crates/imgconvert-platform", "crates/imgconvert-backend"]',
+    "workspace must include core, platform and backend crates",
+  );
+  checkMovedSourcePaths();
+}
+
+function checkMovedSourcePaths() {
+  const modules = MOVED_SHELL_SOURCES.join("|");
+  // Literal paths and path-segment argument lists (resolve(root, "src-tauri", "src", "x.rs")).
+  const stale = new RegExp(
+    `src-tauri[\\/]src[\\/](?:${modules})\\.rs|"src-tauri",\\s*"src",\\s*"(?:${modules})\\.rs"`,
+  );
+  const files = [];
+  const walk = (dir, accept) => {
+    for (const entry of readdirSync(path.join(repoRoot, dir), { withFileTypes: true })) {
+      const relativePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === "target") continue;
+        walk(relativePath, accept);
+      } else if (accept(entry.name)) {
+        files.push(relativePath);
+      }
+    }
+  };
+  walk("scripts", (name) => /\.(mjs|cjs|js|ts|mts|sh)$/.test(name));
+  walk(".github", (name) => /\.(yml|yaml)$/.test(name));
+  walk("packaging", (name) => /\.(yml|yaml|json|sh|spec|desktop)$/.test(name));
+  walk("snap", (name) => /\.(yml|yaml)$/.test(name));
+  for (const file of files) {
+    const hit = readText(file).match(stale);
+    if (hit) {
+      failures.push(`${file} still reads a module that moved out of src-tauri/src: ${hit[0]}`);
+    }
+  }
+  const codecHarness = readText("scripts/test-external-codecs-ci.mjs");
+  requireText(
+    codecHarness,
+    '"crates", "imgconvert-platform", "src"',
+    "test-external-codecs-ci.mjs must read the codec sources from imgconvert-platform",
+  );
+}
+
 function checkCoreFormatBoundary() {
   for (const forbidden of ["Format::Heic", "Format::Heif", "Format::Hif"]) {
     if (coreLib.includes(forbidden)) {
@@ -167,15 +280,19 @@ function checkCoreFormatBoundary() {
 
 function checkPdfBoundary() {
   const coreDeps = dependencyNames(coreDependencies);
-  const tauriDeps = dependencyNames(tauriDependencies);
-  if (coreDeps.has("hayro")) {
-    failures.push("PDF rendering must stay at the Tauri adapter boundary, outside imgconvert-core");
+  const backendDeps = dependencyNames(backendDependencies);
+  const shellDeps = new Set([
+    ...dependencyNames(tauriDependencies),
+    ...dependencyNames(platformDependencies),
+  ]);
+  if (coreDeps.has("hayro") || dependencyNames(platformDependencies).has("hayro")) {
+    failures.push("PDF rendering must stay in imgconvert-backend, outside core and platform");
   }
-  if (!tauriDeps.has("hayro")) {
-    failures.push("Tauri PDF adapter must retain the pure-Rust hayro renderer dependency");
+  if (!backendDeps.has("hayro")) {
+    failures.push("backend PDF adapter must retain the pure-Rust hayro renderer dependency");
   }
   for (const forbidden of ["pdfium-render", "pdfium-sys", "poppler", "poppler-sys"]) {
-    if (coreDeps.has(forbidden) || tauriDeps.has(forbidden)) {
+    if (coreDeps.has(forbidden) || backendDeps.has(forbidden) || shellDeps.has(forbidden)) {
       failures.push(`PDF conversion must not add a runtime native PDF dependency: ${forbidden}`);
     }
   }
@@ -222,24 +339,36 @@ function checkTauriCommandSurface() {
   if (/\bconvert_image\b/u.test(tauriLib)) {
     failures.push("unused convert_image must not be exposed as a second conversion IPC command");
   }
+  for (const marker of ["enum ConversionErrorKind", "fn command_error_for_conversion("]) {
+    requireText(
+      tauriConvert,
+      marker,
+      `desktop conversion errors must retain their structured boundary: ${marker}`,
+    );
+  }
+  for (const forbidden of [
+    "INPUT_FILE_NOT_FOUND_PREFIX",
+    "INPUT_PERMISSION_DENIED_PREFIX",
+    "OUTPUT_PERMISSION_DENIED_PREFIX",
+    "impl From<String> for ConversionError",
+    "impl From<&str> for ConversionError",
+  ]) {
+    if (tauriConvert.includes(forbidden)) {
+      failures.push(`desktop conversion errors must not restore string inference: ${forbidden}`);
+    }
+  }
 }
 
 function checkHeicBoundary() {
-  requireText(
-    tauriConvert,
-    'const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";',
-    "Tauri output parser must keep a stable HEIC/HEIF rejection prefix",
-  );
-  requireText(
-    tauriConvert,
-    '"heic" | "heif" => Err(format!(',
-    "Tauri output parser must reject HEIC/HEIF targets",
-  );
-  requireText(
-    tauriConvert,
-    '"{HEIC_OUTPUT_DISABLED_PREFIX};当前仅作为可选导入格式"',
-    "Tauri output parser must reject HEIC/HEIF targets",
-  );
+  if (
+    !/"heic"\s*\|\s*"heif"\s*=>\s*Err\(ConversionError::new\(\s*ConversionErrorKind::UnsupportedFormat,/su.test(
+      tauriConvert,
+    )
+  ) {
+    failures.push(
+      "Tauri output parser must reject HEIC/HEIF targets with the structured UnsupportedFormat kind",
+    );
+  }
   requireText(
     tauriConvert,
     "writable: format_ids(WRITABLE_FORMATS)",
@@ -287,9 +416,9 @@ function checkHeicBoundary() {
 
 function checkStoreExternalCodecBoundary() {
   requireText(
-    tauriBuild,
+    platformBuild,
     "rerun-if-env-changed=IMGCONVERT_DISABLE_EXTERNAL_CODECS",
-    "Tauri build script must rerun when external codec disable flag changes",
+    "imgconvert-platform build script must rerun when external codec disable flag changes",
   );
   requireText(
     externalCodecs,
@@ -329,7 +458,7 @@ function checkStoreExternalCodecBoundary() {
 }
 
 function checkExplicitFileAccessBoundary() {
-  const access = readText("src-tauri/src/access.rs");
+  const access = readText("crates/imgconvert-backend/src/access.rs");
   requireText(access, "pub struct AuthorizedPath", "file access must stay behind AuthorizedPath");
   requireText(access, "pub fn user_selected_paths", "imports must go through user-selected grants");
   requireText(access, "pub fn output_directory", "output dirs must go through access grants");
@@ -370,6 +499,19 @@ function checkPlatformCheckWiring() {
     "checkArchitectureGuardrailWiring",
     "platform release guardrail must verify architecture guardrail wiring",
   );
+}
+
+function rustFilesUnder(relativeDir) {
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(path.join(repoRoot, dir), { withFileTypes: true })) {
+      const relativePath = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(relativePath);
+      else if (entry.name.endsWith(".rs")) files.push(relativePath);
+    }
+  };
+  walk(relativeDir);
+  return files;
 }
 
 function requireScriptIncludes(scriptName, needle) {

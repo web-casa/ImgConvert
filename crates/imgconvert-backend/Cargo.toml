@@ -1,0 +1,33 @@
+[package]
+name = "imgconvert-backend"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "ImgConvert 的桌面业务服务层:转换、导入、预览、缩略图、结果缓存、批次生命周期与进度契约。依赖 platform 与 core,不依赖 tauri/gpui。"
+publish = false
+
+[features]
+fuzzing = ["dep:tempfile", "imgconvert-platform/fuzzing"]
+
+[dependencies]
+imgconvert-core = { path = "../imgconvert-core" }
+imgconvert-platform = { path = "../imgconvert-platform" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["sync"] }
+tokio-util = "0.7"
+thiserror = "2"
+blake3 = "1.8"
+unicode-normalization = "0.1"
+url = "2"
+tempfile = { version = "3", optional = true }
+# Pure-Rust, CPU-only PDF rasterization. Keeping this at the backend boundary
+# avoids making PDF a fake image format in imgconvert-core and adds no runtime
+# system library/download requirement to packaged desktop builds.
+hayro = "0.7.1"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61.3", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+tempfile = "3"

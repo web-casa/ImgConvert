@@ -128,7 +128,7 @@ fn write_record_file(path: &Path, record: &str) -> bool {
         .is_ok()
 }
 
-pub(crate) fn cleanup_best_effort() {
+pub fn cleanup_best_effort() {
     let Some(dir) = cache_dir() else {
         return;
     };
@@ -140,7 +140,7 @@ pub(crate) fn cleanup_best_effort() {
     );
 }
 
-pub(crate) fn clear() -> Result<usize, String> {
+pub fn clear() -> Result<usize, String> {
     let Some(dir) = cache_dir() else {
         return Ok(0);
     };
