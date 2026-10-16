@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.targets == 'linux' && '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux"}]' || inputs.targets == 'macos' && '[{"target":"macos-arm64","runner":"macos-15","os":"macos"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos"}]' || inputs.targets == 'windows' && '[{"target":"windows-x64","runner":"windows-latest","os":"windows"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows"}]' || '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux"},{"target":"macos-arm64","runner":"macos-15","os":"macos"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos"},{"target":"windows-x64","runner":"windows-latest","os":"windows"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows"}]') }}
+        include: ${{ fromJSON(inputs.targets == 'linux' && '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux","target_dir":"apps/gpui/target","cache_target":"target"}]' || inputs.targets == 'macos' && '[{"target":"macos-arm64","runner":"macos-15","os":"macos","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos","target_dir":"apps/gpui/target","cache_target":"target"}]' || inputs.targets == 'windows' && '[{"target":"windows-x64","runner":"windows-latest","os":"windows","target_dir":"C:\\imgconvert-gpui-target","cache_target":"C:\\imgconvert-gpui-target"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows","target_dir":"C:\\imgconvert-gpui-target","cache_target":"C:\\imgconvert-gpui-target"}]' || '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"macos-arm64","runner":"macos-15","os":"macos","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos","target_dir":"apps/gpui/target","cache_target":"target"},{"target":"windows-x64","runner":"windows-latest","os":"windows","target_dir":"C:\\imgconvert-gpui-target","cache_target":"C:\\imgconvert-gpui-target"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows","target_dir":"C:\\imgconvert-gpui-target","cache_target":"C:\\imgconvert-gpui-target"}]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -204,26 +204,63 @@ jobs:
           $linkerValue = (Get-Item -Path "Env:$linkerEnvironment").Value
           Write-Host "Using Rust MSVC linker: $linkerValue"
 
+      - name: Select native codec compiler
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          if ("${{ matrix.target == 'windows-arm64' && 'arm64' || 'x64' }}" -eq "arm64") {
+            $compilerVersion = & clang-cl --version
+            if ($LASTEXITCODE -ne 0) {
+              throw "The Windows ARM64 runner does not provide a working clang-cl compiler"
+            }
+            $compilerVersion | Write-Host
+            $nativeTargetLine = $compilerVersion |
+              Where-Object { $_ -match "^Target:\s*" } |
+              Select-Object -First 1
+            $nativeTarget = $nativeTargetLine -replace "^Target:\s*", ""
+            if ($nativeTarget -notmatch "^aarch64-.*-windows-msvc$") {
+              throw "Expected native Windows ARM64 clang-cl, got target $nativeTarget"
+            }
+            # clang-cl keeps MSVC-compatible flags while its integrated assembler handles
+            # the AArch64 .S files used by rav1e and dav1d.
+            $cc = "clang-cl"
+            $cxx = "clang-cl"
+            # mozjpeg-sys enables the MSVC bit-scan intrinsic without defining the
+            # corresponding header probe that upstream CMake normally supplies. Use
+            # Clang's -D spelling because other native crates invoke clang directly.
+            $arm64CFlags = "-DHAVE_INTRIN_H=1"
+            Add-Content -Path $env:GITHUB_ENV -Value "CFLAGS_aarch64_pc_windows_msvc=$arm64CFlags"
+          } else {
+            $cc = "cl"
+            $cxx = "cl"
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "CC=$cc"
+          Add-Content -Path $env:GITHUB_ENV -Value "CXX=$cxx"
+          Set-Item -Path Env:CC -Value $cc
+          Set-Item -Path Env:CXX -Value $cxx
+          Write-Host "Native codec compiler: CC=$cc CXX=$cxx"
+
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: gpui-probe-${{ matrix.target }}
-          workspaces: apps/gpui -> target
+          workspaces: apps/gpui -> ${{ matrix.cache_target }}
 
+      # Windows builds use a short target directory: meson names dav1d objects
+      # after their full source path, which overflows MAX_PATH under apps/gpui/target.
       - name: Build the GPUI shell
         env:
-          CC: ${{ matrix.os == 'windows' && 'cl' || '' }}
-          CXX: ${{ matrix.os == 'windows' && 'cl' || '' }}
+          CARGO_TARGET_DIR: ${{ matrix.target_dir }}
         run: cargo build --release --locked --manifest-path apps/gpui/Cargo.toml -p imgconvert-gpui
 
       - name: Launch with the perf probe (Linux, Xvfb + lavapipe)
         if: matrix.os == 'linux'
         run: |
           set -o pipefail
-          binary=apps/gpui/target/release/imgconvert-gpui
+          binary="${{ matrix.target_dir }}/release/imgconvert-gpui"
           # Software Vulkan (lavapipe): point the loader at the one ICD file this
           # architecture ships; a list with a missing entry makes it give up.
           ls /usr/share/vulkan/icd.d/
-          lvp=$(ls /usr/share/vulkan/icd.d/lvp_icd.*.json | head -n 1)
+          lvp=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1)
           test -n "$lvp"
           export VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp"
           xvfb-run -a -s "-screen 0 1280x800x24" vulkaninfo --summary | head -40 || true
@@ -234,7 +271,7 @@ jobs:
       - name: Launch with the perf probe (macOS)
         if: matrix.os == 'macos'
         run: |
-          binary=apps/gpui/target/release/imgconvert-gpui
+          binary="${{ matrix.target_dir }}/release/imgconvert-gpui"
           file "$binary"
           nm -u "$binary" | grep -E '^_CGS|^_SLS' > private-symbols.txt || true
           otool -L "$binary" | grep -i PrivateFrameworks >> private-symbols.txt || true
@@ -251,7 +288,7 @@ jobs:
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
-          $binary = "apps/gpui/target/release/imgconvert-gpui.exe"
+          $binary = "${{ matrix.target_dir }}\release\imgconvert-gpui.exe"
           $env:IMGCONVERT_PERF_PROBE = "1"
           $process = Start-Process -FilePath $binary -RedirectStandardError probe.log -PassThru
           Start-Sleep -Seconds 30
@@ -268,7 +305,7 @@ jobs:
           path: |
             probe.log
             private-symbols.txt
-            apps/gpui/target/release/imgconvert-gpui
-            apps/gpui/target/release/imgconvert-gpui.exe
+            ${{ matrix.target_dir }}/release/imgconvert-gpui
+            ${{ matrix.target_dir }}/release/imgconvert-gpui.exe
           if-no-files-found: ignore
           retention-days: 14
