@@ -212,14 +212,15 @@ function checkAutomaticLinuxCiWorkflow() {
   }
   const rustCacheAction = "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6";
   const rustCacheCount = ci.split(rustCacheAction).length - 1;
-  if (rustCacheCount !== 2) {
+  if (rustCacheCount !== 3) {
     failures.push(
-      `ci.yml must cache the fuzz and Tauri desktop jobs with pinned rust-cache (found ${rustCacheCount})`,
+      `ci.yml must cache the fuzz, Tauri desktop and GPUI shell jobs with pinned rust-cache (found ${rustCacheCount})`,
     );
   }
   for (const marker of [
     "shared-key: ubuntu-fuzz-corpus",
     "shared-key: ubuntu-tauri-backend-e2e",
+    "shared-key: ubuntu-gpui-shell",
     "src-tauri/fuzz -> target",
     "cache-bin: true",
   ]) {
@@ -266,7 +267,7 @@ function checkUbuntuAptBootstrap() {
   }
   const invocation = "scripts/ci-install-apt-packages.sh";
   for (const [name, workflow, expectedCount] of [
-    ["ci.yml", ci, 4],
+    ["ci.yml", ci, 5],
     ["release-linux.yml", linuxRelease, 1],
     ["release-updater.yml", updaterRelease, 1],
     ["updater-upgrade-smoke.yml", updaterUpgradeSmoke, 1],

@@ -1,0 +1,5 @@
+# 钉定 Rust 版本以保证跨平台 / CI 构建可复现(Rust 无 LTS,用当前 stable)。
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]

@@ -1,0 +1,25 @@
+[package]
+name = "imgconvert-gpui-shared"
+description = "Shared capability crate of the GPUI shell: domain models, service globals, the progress bridge, file prompts, i18n and the perf probe. Depends on backend, never on a feature crate."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+gpui-kit.workspace = true
+imgconvert-backend.workspace = true
+rust-i18n.workspace = true
+async-channel.workspace = true
+thiserror.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

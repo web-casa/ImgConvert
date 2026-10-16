@@ -325,6 +325,25 @@ macOS 功能范围严格限定：拖放/选择导入、虚拟队列、缩略图 
 - Linux 探针加入 lavapipe 下的 Kit 渲染目标与中英混排字体检查。
 - 对照阶段 0 基线跑同一套测量。
 
+进度（2026-10-17，首批，未经 Codex 评审）：
+
+- 已搭建 `apps/gpui` 独立 workspace（Edition 2024，`gpui-kit = "=0.7.1"`，lockfile 把 gpui-component/gpui-base/gpui-kit-assets/gpui-component-macros 全部钉在 0.7.1，`gpui-pre 0.3.8`）。按 §2 拆为 `crates/shell`（窗口、菜单、`Quit`/`OpenFiles`/`ToggleLanguage` action、探针驱动）、`crates/shared`（`QueueModel`/`BatchModel`、`Services`/`AppModels` Global、`ProgressChannel` → 转发线程 → async-channel → 前台任务的进度桥接、`prompt_for_paths` 封装、rust-i18n 文案、探针协议）、`crates/queue`（拖放与选择器导入、`v_virtual_list` 队列、缩略图按视口附近行有界并发解码为 `ImageSource::Render`、CPU 字节预算 LRU 并在淘汰时 `cx.drop_image`）、`crates/workflow`（`Select` 输出格式、输出目录、开始/取消、`Progress`）。功能范围严格按本阶段清单：导入、虚拟队列、缩略图、格式选择、开始/取消、进度、中英文切换；没有设置面板、对比预览、更新器。
+- 与方案的偏差：GPU 侧没有自建 `ImageCache`，改为"模型持有 `Arc<RenderImage>` + 淘汰时 `drop_image`"，因为 `ImageSource::Render` 不经过 GPUI 的 asset 缓存，纹理生命周期由我们直接控制，容量含义更清楚；`FilePicker` 没有做成 trait 实现，直接用 GPUI 的 `prompt_for_paths`（macOS 上即 `NSOpenPanel`），trait 适配留到 Tauri 线退役时再统一。
+- 探针：shell 实现了 §7 契约（`ready` 在能力检查后等两次重绘；导入、静默、刷新率估计、三角波滚动、帧看门狗、批次标记），标记名与 Svelte 版一致，`measure-desktop-baseline.mjs --app <binary>` 可直接测。
+- 护栏与 CI：`check-architecture-guardrails.mjs` 新增 `checkGpuiShellLayering`（只允许 gpui-kit、精确钉版、功能 crate 不依赖 shell 与彼此、不依赖 Tauri）；`ci.yml` 新增 `rust-gpui` Linux job（fmt、clippy `--locked -D warnings`、无头 Kit UI 测试）并纳入 CI 成本守卫；`cargo deny`/`cargo audit` 覆盖 `apps/gpui/Cargo.lock`（新增 0BSD、bzip2-1.0.6 两个宽松许可证；GPUI 0.3.8 的 4 条 unmaintained 公告按 ID 豁免并注明随 gpui-kit 升级复查）。
+- macOS 构建不需要完整 Xcode：gpui-kit 0.7.1 默认开启 `runtime_shaders`，Command Line Tools 即可；代价是首次启动时编译 Metal shader，冷启动数字会含这部分。
+- 首批测量（同一台 Parallels 虚拟机、同一语料、同一脚本，详见 `docs/GPUI_BASELINE.md` §6.1 的"GPUI PoC"列与采集记录）：startup 热就绪 404 ms（Tauri 1164 ms）、冷 1432 ms（3673 ms），空闲 49.5 MiB（159.3 MiB，−69%）；import 1k 97 ms（96 ms），整段三角波滚动的回调 p99 52 ms（402 ms），空闲 163 MiB（862.5 MiB，−81%）；import 10k 1.55 s、滚动 p99 53 ms、空闲 258 MiB（Tauri 在虚拟机上不可测）；AVIF 批量 1k 30.7 s（33.4 s），峰值 155.3 MiB（1123 MiB）。按 G2 口径 startup、import 1k、batch 1k 都达标，10k 有数据。尚未采集：Windows/Linux 探针、私有 API 扫描、VoiceOver/IME/沙盒冒烟。
+- 过程中修掉的两个 GPUI 用法错误值得记入 §2.4：`Window::request_animation_frame` 只能在渲染中调用（渲染外用 `window.refresh()` 驱动下一帧）；`ScrollHandle::max_offset` 是正的滚动范围而 `set_offset` 取负值。
+- 自动批次：`IMGCONVERT_PERF_PROBE_BATCH_OUT` / `IMGCONVERT_PERF_PROBE_BATCH_FORMAT`（脚本 `--batch-out` / `--batch-format`）让 GPUI 壳在 `probe_done` 后自行开始转换，manual-batch 场景不再需要操作者；为此把 backend 的 `path_conversion_smoke_options` 拆成产品默认值 `default_conversion_options`（质量 80、`%name%`、skip）加 smoke 覆盖（后缀、覆盖写、AVIF speed 10），GPUI 工作流只用前者。
+
+Codex 只读评审（2026-10-17，结论"修后可合并"，8 项 P1、7 项 P2，记录在 `artifacts/reviews/codex-stage2-review-2026-10-17.md`）与处置：
+
+- 已修（P1 1、2）：进度桥接改为"先建接收端（通道 + 转发线程）再启动后端、最后标记模型运行"；转发线程或后端启动失败时直接返回错误并补发 `batch_failed`，模型不会停在 Running；桥接任务带 `settled` 标志，`progress_bridge::is_busy` 在收尾完成前一直为真，`start_batch` 拒绝新批次（`StartError::Settling`），面板的 Start 与队列的 Clear 都按它门控，旧批次的终态标记不会再被第二批次替换掉。
+- 已修（P1 3、4）：缩略图请求改为带队列代次的 `ThumbnailTicket`；结果先经应用级 `AsyncApp` 写回 Global 模型再更新视图，窗口关闭也不会留下 Loading；清空/重导后的旧结果被拒绝并交回释放，替换 Ready 图时扣账并释放旧图；LRU 改为"最近展示 tick + 淘汰时扫描"（touch O(1)）。
+- 已修（P1 5、6、7、8）：滚动改为按 `elapsed/duration` 的一次完整三角波，距离从句柄实际偏移累计，无滚动范围发 `probe_error_scroll_range`；各帧阶段由帧回调自行判定完成，墙钟只做 `nominal + 60 s` 看门狗，不再有同步伪首帧；`ready` 在两次强制重绘之后发出，静默判定加入视图的在途/待调度缩略图工作并经一次帧屏障复核（§7 的"设置已读取"在 PoC 中没有设置可读，注释已改为如实描述）；Clear 改按 `BatchModel::is_active() || is_busy()` 门控并在命令入口复查。
+- 已修（P2）：渲染闭包只在 `(revision, range)` 变化时调度一次 deferred 缩略图扫描并带单一 pending 标记；扫描时提供"停止"按钮；菜单 `File` 入 YAML；面板提示改存语义键（`Notice` 枚举）随 locale 重译；未选目录时 Start 文案带省略号；`ProbeConfig`/`IntervalSummary` 加 `#[non_exhaustive]`，`QueueItem` 加 `#[non_exhaustive]`；行高回退不再用 `px(56.)`；i18n 单测用互斥锁串行；UI 测试改为等桥接 `settled` 并连续跑第二批次验证交接（第二批次对已存在输出应为 Skipped）。
+- 未做、记入后续：GPUI workspace 的 cargo-about 归属生成（阶段 5 与 Tauri 一起处理许可证文本）；拖放/取消/淘汰路径的无头 Kit 测试（阶段 3 的 Kit UI 测试计划）；真机 GPU 纹理回收、透明 PNG/HiDPI、VoiceOver/IME、MAS 沙盒写权限（本阶段平台事项，需要裸机或签名构建）。
+
 门槛 G2：只比较 PoC 已覆盖的同等功能（导入、队列、缩略图、转换、取消）与相同数据集，统一"可交互"就绪点、缓存状态与进程树内存口径；在此口径下不劣于基线且空闲内存降低 ≥ 25%（PoC 结论，完整功能性能结论只由 G3/G4 给出）；六平台探针全部启动成功；私有 API 扫描为空；VoiceOver、IME、沙盒授权冒烟通过。未达标则停止迁移，回到 Tauri 并反向移植虚拟列表与缩略图 LRU。
 
 ### 阶段 3：macOS 功能对等（8–10 周）

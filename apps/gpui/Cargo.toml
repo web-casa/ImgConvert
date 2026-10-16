@@ -1,0 +1,64 @@
+# GPUI shell workspace (migration plan §2). Separate from the root workspace so
+# the Tauri line and the core/platform/backend crates never pull GPUI in.
+[workspace]
+resolver = "2"
+members = ["crates/shell", "crates/shared", "crates/queue", "crates/workflow"]
+
+[workspace.package]
+version = "0.4.0-poc.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+rust-version = "1.96"
+
+[workspace.dependencies]
+# The only UI dependency (plan §2.1): GPUI is `use gpui_kit::*`.
+gpui-kit = "=0.7.1"
+imgconvert-backend = { path = "../../crates/imgconvert-backend" }
+imgconvert-platform = { path = "../../crates/imgconvert-platform" }
+imgconvert-gpui-shared = { path = "crates/shared" }
+imgconvert-gpui-queue = { path = "crates/queue" }
+imgconvert-gpui-workflow = { path = "crates/workflow" }
+# Same major as gpui-component so one global locale drives Kit and app strings.
+rust-i18n = "4.2"
+async-channel = "2"
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "allow"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Pedantic lints that fight GPUI's builder style or add noise without value.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+needless_pass_by_value = "allow"
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
+# Doc prose mentions identifiers like IMGCONVERT_PERF_PROBE without code spans.
+doc_markdown = "allow"
+# Value-returning helpers on small enums (Locale::next) are not builders.
+return_self_not_must_use = "allow"
+map_unwrap_or = "allow"
+# View render helpers take &self for symmetry even when they only read globals.
+unused_self = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[profile.dev]
+# The backend's codecs are unusable at opt-level 0 for thumbnails of real images.
+[profile.dev.package."*"]
+opt-level = 2

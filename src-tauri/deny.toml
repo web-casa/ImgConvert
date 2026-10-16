@@ -26,6 +26,8 @@ allow = [
   "CDLA-Permissive-2.0", # webpki-root-certs root store data, permissive data license
   "Unlicense",
   "BSL-1.0",
+  "0BSD",        # enum-iterator (GPUI Kit), BSD zero-clause
+  "bzip2-1.0.6", # libbz2-rs-sys via GPUI's http client stack, BSD-style
 ]
 
 # ⛔ 故意**不**放行任何 GPL / AGPL / LGPL:
@@ -69,6 +71,13 @@ ignore = [
   # bincode 1.x 由 tauri-plugin-persisted-scope 引入,上游已停止开发且无安全升级;
   # 该依赖只服务持久化 scope 配置,不在用户图片解码路径上。
   "RUSTSEC-2025-0141",
+  # GPUI 0.3.8(gpui-kit 0.7.1 锁定线)的传递依赖 instant、rustls-pemfile、
+  # rustybuzz、ttf-parser 为 unmaintained-only 公告,应用层无法替换;
+  # 随 gpui-kit 升级 PR 复查(docs/GPUI_MIGRATION_PLAN.md §3.1)。
+  "RUSTSEC-2024-0384",
+  "RUSTSEC-2025-0134",
+  "RUSTSEC-2026-0192",
+  "RUSTSEC-2026-0206",
 ]
 yanked = "deny"
 

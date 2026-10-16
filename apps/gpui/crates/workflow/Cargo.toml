@@ -1,0 +1,16 @@
+[package]
+name = "imgconvert-gpui-workflow"
+description = "Workflow feature of the GPUI shell: target format, output folder, start/cancel and batch progress."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+imgconvert-backend.workspace = true
+imgconvert-gpui-shared.workspace = true
+
+[lints]
+workspace = true

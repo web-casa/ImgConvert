@@ -469,7 +469,7 @@ pub struct ConversionPlanEntry {
     pub error: Option<CommandError>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchSummary {
     pub total: usize,
@@ -2341,7 +2341,11 @@ fn read_core_source_file(input: &Path) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-pub fn path_conversion_smoke_options(
+/// Product defaults for converting `input` into `out_dir` as `format`: the
+/// values a fresh desktop install uses before the person changes anything
+/// (quality 80, `%name%` output, skip existing files, metadata dropped).
+/// Shells build their batches from this and override what the UI exposes.
+pub fn default_conversion_options(
     input: String,
     out_dir: Option<String>,
     format: String,
@@ -2353,7 +2357,7 @@ pub fn path_conversion_smoke_options(
         source_width: None,
         source_height: None,
         format,
-        quality: 82,
+        quality: 80,
         quality_floor: 0,
         lossless: false,
         jpeg_progressive: default_jpeg_progressive(),
@@ -2361,7 +2365,7 @@ pub fn path_conversion_smoke_options(
         png_lossy_quantize: false,
         png_quant_colors: default_png_quant_colors(),
         webp_method: default_webp_method(),
-        avif_speed: 10,
+        avif_speed: default_avif_speed(),
         avif_subsample: default_avif_subsample(),
         webp_near_lossless: default_webp_near_lossless(),
         webp_sharp_yuv: false,
@@ -2372,9 +2376,9 @@ pub fn path_conversion_smoke_options(
         result_cache: false,
         skip_if_larger: false,
         multi_candidate: false,
-        overwrite: true,
-        overwrite_mode: Some("overwrite".to_string()),
-        file_name_template: Some("%name%-imgconvert-smoke".to_string()),
+        overwrite: false,
+        overwrite_mode: Some("skip".to_string()),
+        file_name_template: Some("%name%".to_string()),
         output_suffix: None,
         allow_source_overwrite: false,
         preserve_metadata: Some(false),
@@ -2383,6 +2387,24 @@ pub fn path_conversion_smoke_options(
         target_size_bytes: None,
         color_management_policy: None,
         pdf: None,
+    }
+}
+
+/// Options for the packaging smoke runs: product defaults with a fast AVIF
+/// speed, overwrite enabled and a `-imgconvert-smoke` name suffix so smoke
+/// output never collides with real files.
+pub fn path_conversion_smoke_options(
+    input: String,
+    out_dir: Option<String>,
+    format: String,
+) -> ConvertOptions {
+    ConvertOptions {
+        quality: 82,
+        avif_speed: 10,
+        overwrite: true,
+        overwrite_mode: Some("overwrite".to_string()),
+        file_name_template: Some("%name%-imgconvert-smoke".to_string()),
+        ..default_conversion_options(input, out_dir, format)
     }
 }
 

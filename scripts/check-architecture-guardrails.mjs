@@ -61,6 +61,7 @@ checkHeicBoundary();
 checkStoreExternalCodecBoundary();
 checkExplicitFileAccessBoundary();
 checkPlatformCheckWiring();
+checkGpuiShellLayering();
 
 if (failures.length > 0) {
   console.error("architecture guardrail check failed:");
@@ -499,6 +500,75 @@ function checkPlatformCheckWiring() {
     "checkArchitectureGuardrailWiring",
     "platform release guardrail must verify architecture guardrail wiring",
   );
+}
+
+/// GPUI shell workspace (migration plan §2.1, §2.4): one UI dependency,
+/// exact gpui-kit pin, feature crates that never depend on the shell or on a
+/// sibling feature, and no direct dependency on the Tauri shell.
+function checkGpuiShellLayering() {
+  const workspaceManifest = "apps/gpui/Cargo.toml";
+  if (!existsSync(path.join(repoRoot, workspaceManifest))) return;
+  const workspaceToml = readText(workspaceManifest);
+  requireText(
+    workspaceToml,
+    'gpui-kit = "=0.7.1"',
+    "apps/gpui must pin gpui-kit to the exact release line chosen in the migration plan",
+  );
+  const forbiddenUiCrates = [
+    "gpui",
+    "gpui-pre",
+    "gpui-component",
+    "gpui-base",
+    "gpui-ce",
+    "gpui-unofficial",
+    "gpui-fast",
+    "gpui_platform",
+  ];
+  for (const crateName of forbiddenUiCrates) {
+    const direct = new RegExp(`^${crateName.replaceAll("-", "[-_]")}\\s*=`, "mu");
+    if (direct.test(workspaceToml)) {
+      failures.push(
+        `apps/gpui must reach ${crateName} through gpui-kit, not as a direct dependency`,
+      );
+    }
+  }
+  const crates = {
+    shared: "apps/gpui/crates/shared/Cargo.toml",
+    queue: "apps/gpui/crates/queue/Cargo.toml",
+    workflow: "apps/gpui/crates/workflow/Cargo.toml",
+    shell: "apps/gpui/crates/shell/Cargo.toml",
+  };
+  const deps = Object.fromEntries(
+    Object.entries(crates).map(([name, manifest]) => [
+      name,
+      dependencyNames(cargoDependencies(manifest)),
+    ]),
+  );
+  for (const [name, names] of Object.entries(deps)) {
+    for (const crateName of forbiddenUiCrates) {
+      if (names.has(crateName)) {
+        failures.push(`apps/gpui ${name} must depend on gpui-kit only, not ${crateName}`);
+      }
+    }
+    if (!names.has("gpui-kit")) {
+      failures.push(`apps/gpui ${name} must depend on gpui-kit`);
+    }
+    if (names.has("tauri") || names.has("tauri-app-lib")) {
+      failures.push(`apps/gpui ${name} must not depend on the Tauri shell`);
+    }
+  }
+  const shellCrate = "imgconvert-gpui";
+  for (const feature of ["shared", "queue", "workflow"]) {
+    if (deps[feature].has(shellCrate)) {
+      failures.push(`apps/gpui ${feature} must not depend on the shell crate`);
+    }
+  }
+  if (deps.shared.has("imgconvert-gpui-queue") || deps.shared.has("imgconvert-gpui-workflow")) {
+    failures.push("apps/gpui shared must not depend on a feature crate");
+  }
+  if (deps.queue.has("imgconvert-gpui-workflow") || deps.workflow.has("imgconvert-gpui-queue")) {
+    failures.push("apps/gpui feature crates must not depend on each other");
+  }
 }
 
 function rustFilesUnder(relativeDir) {
