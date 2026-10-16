@@ -2,6 +2,7 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 import { Channel, invoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
+import { perfMark } from "$lib/perf-probe";
 import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { load, type Store } from "@tauri-apps/plugin-store";
@@ -1364,6 +1365,7 @@ async function importPathList(paths: string[], messageKey: string) {
   ui.importCancelRequested = false;
   setImportMessage(messageKey);
   ui.importErrors = [];
+  perfMark("import_start", paths.length);
   try {
     if (!isTauriRuntime()) {
       const added = addPaths(paths);
@@ -1387,9 +1389,11 @@ async function importPathList(paths: string[], messageKey: string) {
 
     const added = addPaths(scan.files);
     setUiImportMessage(importSummaryMessage(added, scan));
+    perfMark("import_done", queue.length);
   } catch (e) {
     setImportCommandError(e, "state.importFailed");
     ui.importErrors = [];
+    perfMark("import_failed");
   } finally {
     ui.importing = false;
     ui.importMode = null;
@@ -2101,6 +2105,7 @@ export async function cancelConversion() {
 async function convertAllWithBatch() {
   const jobs = prepareBatchJobs();
   if (jobs.length === 0) return;
+  let batchMarked = false;
 
   for (const job of jobs) {
     job.item.status = "pending";
@@ -2131,14 +2136,22 @@ async function convertAllWithBatch() {
       options: jobs.map((job) => job.options),
       concurrency: batchConcurrency(),
     };
+    // Perf probe: the batch starts here, after every user-facing decision.
+    batchMarked = true;
+    perfMark("batch_start", jobs.length);
     const summary = await invoke<BatchSummary>("convert_batch", {
       ...request,
       progress,
     });
     if (summary.cancelled) {
       finalizeCancelledJobs(jobs);
+      perfMark("batch_cancelled", batchDoneCount(jobs));
+    } else {
+      const done = batchDoneCount(jobs);
+      perfMark(done === jobs.length ? "batch_done" : "batch_failed", done);
     }
   } catch (e) {
+    if (batchMarked) perfMark("batch_failed", batchDoneCount(jobs));
     for (const job of jobs) {
       if (job.item.status === "pending" || job.item.status === "running") {
         job.item.status = "error";
@@ -2148,6 +2161,10 @@ async function convertAllWithBatch() {
       }
     }
   }
+}
+
+function batchDoneCount(jobs: BatchJob[]): number {
+  return jobs.filter((job) => job.item.status === "done").length;
 }
 
 function batchConcurrency(): number | null {

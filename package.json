@@ -103,6 +103,8 @@
     "release:macos:direct:check": "node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=direct",
     "release:macos:store:check": "node scripts/check-pages-privacy.mjs && node scripts/check-platform-release-guardrails.mjs --platform=macos --channel=store --require-store-env",
     "bench:platform": "node scripts/benchmark-platform.mjs",
+    "bench:desktop:corpus": "node scripts/generate-baseline-corpus.mjs",
+    "bench:desktop:baseline": "node scripts/measure-desktop-baseline.mjs",
     "bench:avif:macos": "node scripts/benchmark-macos-avif.mjs",
     "release:macos:smoke": "node scripts/smoke-macos-runtime.mjs",
     "release:macos": "pnpm run toolchain:check && node scripts/clean-macos-bundles.mjs --profile=release --bundles=dmg && pnpm tauri build --ci --bundles dmg && node scripts/check-macos-bundle-artifacts.mjs --profile=release --bundles=dmg",
