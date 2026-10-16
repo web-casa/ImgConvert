@@ -13871,7 +13871,7 @@ still covered by `pnpm run license:npm` policy checks.
 - @jridgewell/trace-mapping@0.3.31 — MIT — https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
 - @lucide/svelte@1.22.0 — ISC — https://lucide.dev
 - @mdx-js/mdx@3.1.1 — MIT — https://mdxjs.com
-- @next/env@16.3.1 — MIT — https://github.com/vercel/next.js#readme
+- @next/env@16.3.8 — MIT — https://github.com/vercel/next.js#readme
 - @nodable/entities@3.0.0 — MIT — https://github.com/nodable/val-parsers#readme
 - @oxc-project/types@0.137.0 — MIT — https://oxc.rs
 - @pkgjs/parseargs@0.11.0 — MIT — https://github.com/pkgjs/parseargs#readme
@@ -14134,7 +14134,7 @@ still covered by `pnpm run license:npm` policy checks.
 - dequal@2.0.3 — MIT — https://github.com/lukeed/dequal#readme
 - detect-libc@2.1.2 — Apache-2.0 — https://github.com/lovell/detect-libc#readme
 - detect-node-es@1.1.0 — MIT — https://github.com/thekashey/detect-node
-- devalue@5.8.1 — MIT — https://github.com/sveltejs/devalue#readme
+- devalue@5.9.4 — MIT — https://github.com/sveltejs/devalue#readme
 - devlop@1.1.0 — MIT — https://github.com/wooorm/devlop#readme
 - diff@5.2.2 — BSD-3-Clause — https://github.com/kpdecker/jsdiff#readme
 - diff@8.0.4 — BSD-3-Clause — https://github.com/kpdecker/jsdiff#readme
@@ -14436,7 +14436,7 @@ still covered by `pnpm run license:npm` policy checks.
 - netmask@2.1.1 — MIT — https://github.com/rs/node-netmask
 - next-themes@0.4.6 — MIT — https://github.com/pacocoursey/next-themes#readme
 - next-tick@1.1.0 — ISC — https://github.com/medikoo/next-tick#readme
-- next@16.3.1 — MIT — https://nextjs.org
+- next@16.3.8 — MIT — https://nextjs.org
 - normalize-package-data@6.0.2 — BSD-2-Clause — https://github.com/npm/normalize-package-data#readme
 - normalize-package-data@7.0.1 — BSD-2-Clause — https://github.com/npm/normalize-package-data#readme
 - normalize-path@3.0.0 — MIT — https://github.com/jonschlinkert/normalize-path
@@ -14569,7 +14569,7 @@ still covered by `pnpm run license:npm` policy checks.
 - smol-toml@1.7.0 — BSD-3-Clause — https://github.com/squirrelchat/smol-toml#readme
 - socks-proxy-agent@8.0.5 — MIT — https://github.com/TooTallNate/proxy-agents#readme
 - socks@2.8.9 — MIT — https://github.com/JoshGlazebrook/socks/
-- source-map-js@1.2.1 — BSD-3-Clause — https://github.com/7rulnik/source-map-js
+- source-map-js@1.2.2 — BSD-3-Clause — https://github.com/7rulnik/source-map-js
 - source-map@0.6.1 — BSD-3-Clause — https://github.com/mozilla/source-map
 - source-map@0.7.6 — BSD-3-Clause — https://github.com/mozilla/source-map
 - space-separated-tokens@2.0.2 — MIT — https://github.com/wooorm/space-separated-tokens#readme
@@ -18864,10 +18864,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @next/env@16.3.1
+### @next/env@16.3.8
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@next+env@16.3.1/node_modules/@next/env`
+- Package path: `node_modules/.pnpm/@next+env@16.3.8/node_modules/@next/env`
 - Homepage: https://github.com/vercel/next.js#readme
 
 _No LICENSE/NOTICE file found in the installed package; see package metadata above._
@@ -30667,10 +30667,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### devalue@5.8.1
+### devalue@5.9.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/devalue@5.8.1/node_modules/devalue`
+- Package path: `node_modules/.pnpm/devalue@5.9.4/node_modules/devalue`
 - Homepage: https://github.com/sveltejs/devalue#readme
 
 #### LICENSE
@@ -34493,7 +34493,7 @@ the licensed code:
 ### fumadocs-core@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_327476dd4b8cecbfbbc8c0a77e80ed44/node_modules/fumadocs-core`
+- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_6e54758ff39a6b98179d3a5fc1f3bc31/node_modules/fumadocs-core`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34525,7 +34525,7 @@ SOFTWARE.
 ### fumadocs-mdx@15.2.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_9e766c655b0b8b2a9ace0f5a742dafba/node_modules/fumadocs-mdx`
+- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_68f77d09cd1b5b55042ac325d7aa1f0a/node_modules/fumadocs-mdx`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34557,7 +34557,7 @@ SOFTWARE.
 ### fumadocs-ui@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_2a89375309f241b2254949b6c89ae475/node_modules/fumadocs-ui`
+- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_5995b6e0757e36e6244ff84d601e0763/node_modules/fumadocs-ui`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -42332,10 +42332,10 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### next@16.3.1
+### next@16.3.8
 
 - License: MIT
-- Package path: `node_modules/.pnpm/next@16.3.1_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
+- Package path: `node_modules/.pnpm/next@16.3.8_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
 - Homepage: https://nextjs.org
 
 #### license.md
@@ -47153,10 +47153,10 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### source-map-js@1.2.1
+### source-map-js@1.2.2
 
 - License: BSD-3-Clause
-- Package path: `node_modules/.pnpm/source-map-js@1.2.1/node_modules/source-map-js`
+- Package path: `node_modules/.pnpm/source-map-js@1.2.2/node_modules/source-map-js`
 - Homepage: https://github.com/7rulnik/source-map-js
 
 #### LICENSE
