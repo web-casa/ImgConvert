@@ -3,23 +3,25 @@
 
 //! Moves backend batch progress onto the GPUI foreground (plan §2.3).
 //!
-//! The backend coordinator writes into a bounded [`ProgressChannel`]; a
-//! forwarding thread drains it into an async channel; one foreground task per
-//! batch applies the events to the models and notifies once per drained
-//! burst. Backend threads never touch an entity.
+//! The backend coordinator writes into a bounded [`ProgressChannel`]; one
+//! foreground task per batch polls its receiver on a short timer, applies
+//! each drained burst to the models and notifies once per burst. Polling
+//! instead of a wake-up channel keeps every GPUI interaction on the
+//! foreground: backend threads never touch an entity or a GPUI waker, which
+//! also keeps the deterministic test scheduler happy.
 //!
-//! Start order matters: the receiving side (channel + forwarding thread) is
-//! set up first, the backend batch second, the model is marked running last.
-//! A batch is "over" only once its bridge has settled and emitted the final
-//! probe mark; until then no second batch may start.
+//! Start order matters: the receiver exists before the backend batch starts,
+//! and the model is marked running last. A batch is "over" only once its
+//! bridge has settled and emitted the final probe mark; until then no second
+//! batch may start.
 
 use std::cell::Cell;
 use std::rc::Rc;
-use std::thread;
+use std::time::Duration;
 
 use gpui_kit::{App, AsyncApp, Entity, SharedString, Task};
 use imgconvert_backend::convert::{BatchProgressEvent, ConvertOptions};
-use imgconvert_backend::progress::{BatchId, ProgressChannel};
+use imgconvert_backend::progress::{BatchId, ProgressChannel, ProgressReceiver};
 use imgconvert_backend::service::{BatchError, RunningBatch};
 use thiserror::Error;
 
@@ -62,22 +64,10 @@ pub fn start_batch(
     let services = Services::global(cx).clone();
     let models = AppModels::global(cx).clone();
 
-    // 1. Receiving side first: bounded backend channel → forwarding thread →
-    //    async channel. If the forwarder cannot start, nothing else did.
+    // 1. Receiving side first: the bounded backend channel.
     let (sink, receiver) = ProgressChannel::new();
-    let (tx, rx) = async_channel::unbounded::<(BatchId, BatchProgressEvent)>();
-    thread::Builder::new()
-        .name("imgconvert-progress-forwarder".to_string())
-        .spawn(move || {
-            while let Some(item) = receiver.recv() {
-                if tx.send_blocking(item).is_err() {
-                    break;
-                }
-            }
-        })
-        .map_err(|error| StartError::Batch(BatchError::Spawn(error.to_string())))?;
 
-    // 2. The backend batch. Dropping `sink` on failure ends the forwarder.
+    // 2. The backend batch. Dropping `sink` on failure closes the channel.
     perf_probe::mark_count("batch_start", jobs.len());
     let running = match services.batch().start(options, sink, concurrency) {
         Ok(running) => running,
@@ -99,8 +89,8 @@ pub fn start_batch(
     let queue = models.queue().clone();
     let batch = models.batch().clone();
     let task = cx.spawn(async move |cx: &mut AsyncApp| {
-        pump_events(&rx, &queue, &batch, id, &jobs, cx).await;
-        settle(running, &queue, &batch, &jobs, cx).await;
+        let result = pump_events(receiver, running, &queue, &batch, id, &jobs, cx).await;
+        settle(result, &queue, &batch, &jobs, cx);
         settled_in_task.set(true);
     });
     cx.set_global(ActiveBridge {
@@ -133,56 +123,81 @@ struct ActiveBridge {
 
 impl gpui_kit::Global for ActiveBridge {}
 
+/// Interval between polls of the backend channel while a batch runs. Events
+/// are coalesced per poll, so this bounds latency, not throughput.
+const POLL_INTERVAL: Duration = Duration::from_millis(16);
+
+/// Drains the backend channel until the coordinator reports its result.
 async fn pump_events(
-    rx: &async_channel::Receiver<(BatchId, BatchProgressEvent)>,
+    receiver: ProgressReceiver,
+    mut running: RunningBatch,
+    queue: &Entity<QueueModel>,
+    batch: &Entity<BatchModel>,
+    id: BatchId,
+    jobs: &[SharedString],
+    cx: &mut AsyncApp,
+) -> Result<imgconvert_backend::convert::BatchSummary, BatchError> {
+    loop {
+        let mut burst = Vec::new();
+        while let Some(item) = receiver.try_recv() {
+            burst.push(item);
+            if burst.len() >= 512 {
+                break;
+            }
+        }
+        if !burst.is_empty() {
+            apply_burst(&burst, queue, batch, id, jobs, cx);
+            continue;
+        }
+        // The coordinator sends its last event before it returns, so an empty
+        // queue plus a result means everything has been applied.
+        if let Some(result) = running.try_wait() {
+            return result;
+        }
+        cx.background_executor().timer(POLL_INTERVAL).await;
+    }
+}
+
+fn apply_burst(
+    burst: &[(BatchId, BatchProgressEvent)],
     queue: &Entity<QueueModel>,
     batch: &Entity<BatchModel>,
     id: BatchId,
     jobs: &[SharedString],
     cx: &mut AsyncApp,
 ) {
-    while let Ok(first) = rx.recv().await {
-        let mut burst = vec![first];
-        while let Ok(next) = rx.try_recv() {
-            burst.push(next);
-            if burst.len() >= 512 {
-                break;
+    cx.update(|cx| {
+        // Events of another batch are dropped (plan §2.2).
+        let mut queue_changed = false;
+        queue.update(cx, |queue, _| {
+            for (event_id, event) in burst {
+                if *event_id == id {
+                    queue_changed |= queue.apply_batch_event(event, jobs);
+                }
             }
-        }
-        cx.update(|cx| {
-            // Events of another batch are dropped (plan §2.2).
-            let mut queue_changed = false;
-            queue.update(cx, |queue, _| {
-                for (event_id, event) in &burst {
-                    if *event_id == id {
-                        queue_changed |= queue.apply_batch_event(event, jobs);
-                    }
-                }
-            });
-            if queue_changed {
-                queue.update(cx, |_, cx| cx.notify());
-            }
-            batch.update(cx, |batch, cx| {
-                let mut changed = false;
-                for (event_id, event) in &burst {
-                    changed |= batch.apply(*event_id, event);
-                }
-                if changed {
-                    cx.notify();
-                }
-            });
         });
-    }
+        if queue_changed {
+            queue.update(cx, |_, cx| cx.notify());
+        }
+        batch.update(cx, |batch, cx| {
+            let mut changed = false;
+            for (event_id, event) in burst {
+                changed |= batch.apply(*event_id, event);
+            }
+            if changed {
+                cx.notify();
+            }
+        });
+    });
 }
 
-async fn settle(
-    running: RunningBatch,
+fn settle(
+    result: Result<imgconvert_backend::convert::BatchSummary, BatchError>,
     queue: &Entity<QueueModel>,
     batch: &Entity<BatchModel>,
     jobs: &[SharedString],
     cx: &mut AsyncApp,
 ) {
-    let result = running.wait().await;
     cx.update(|cx| match result {
         Ok(summary) => {
             let mark = if summary.cancelled {

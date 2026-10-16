@@ -175,6 +175,17 @@ impl RunningBatch {
     pub fn wait_blocking(self) -> Result<BatchSummary, BatchError> {
         self.done.blocking_recv().unwrap_or(Err(BatchError::Lost))
     }
+
+    /// Non-blocking check for shells that poll from their own event loop.
+    /// Returns `None` while the coordinator is still running; afterwards the
+    /// result is returned once and later calls report [`BatchError::Lost`].
+    pub fn try_wait(&mut self) -> Option<Result<BatchSummary, BatchError>> {
+        match self.done.try_recv() {
+            Ok(result) => Some(result),
+            Err(oneshot::error::TryRecvError::Empty) => None,
+            Err(oneshot::error::TryRecvError::Closed) => Some(Err(BatchError::Lost)),
+        }
+    }
 }
 
 /// Result of [`BatchService::shutdown`].

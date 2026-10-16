@@ -3744,7 +3744,6 @@ dependencies = [
 name = "imgconvert-gpui-shared"
 version = "0.4.0-poc.1"
 dependencies = [
- "async-channel",
  "gpui-kit",
  "image",
  "imgconvert-backend",
