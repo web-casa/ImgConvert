@@ -1024,14 +1024,16 @@ function checkLinux() {
   );
   const toolchainCheck = readText(path.join(repoRoot, "scripts", "check-native-toolchain.mjs"));
   const matrixSmoke = readText(path.join(repoRoot, "scripts", "smoke-linux-package-matrix.mjs"));
-  const linuxWorkflow = readText(path.join(repoRoot, ".github", "workflows", "release-linux.yml"));
+  const linuxWorkflow = readWorkflowText(
+    path.join(repoRoot, ".github", "workflows", "release-linux.yml"),
+  );
   const linuxFinalizeWorkflow = readText(
     path.join(repoRoot, ".github", "workflows", "linux-release-assets-finalize.yml"),
   );
-  const ciWorkflow = readText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
+  const ciWorkflow = readWorkflowText(path.join(repoRoot, ".github", "workflows", "ci.yml"));
   const releaseQa = readText(path.join(repoRoot, "docs", "RELEASE_QA.md"));
   const tauriLib = readText(path.join(repoRoot, "src-tauri", "src", "lib.rs"));
-  const access = readText(path.join(repoRoot, "src-tauri", "src", "access.rs"));
+  const access = readText(path.join(repoRoot, "crates", "imgconvert-backend", "src", "access.rs"));
   const state = readText(path.join(repoRoot, "src", "lib", "state.svelte.ts"));
 
   for (const scriptName of [
