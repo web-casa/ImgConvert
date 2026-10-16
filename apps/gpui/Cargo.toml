@@ -21,7 +21,6 @@ imgconvert-gpui-queue = { path = "crates/queue" }
 imgconvert-gpui-workflow = { path = "crates/workflow" }
 # Same major as gpui-component so one global locale drives Kit and app strings.
 rust-i18n = "4.2"
-async-channel = "2"
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

@@ -145,6 +145,9 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
 fn wait_for_batch_to_settle(cx: &mut TestAppContext) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
     loop {
+        // The bridge polls on a timer; the test clock only moves when advanced.
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
         cx.run_until_parked();
         let (started, busy) = cx.update(|cx| {
             let batch = AppModels::global(cx).batch().read(cx);
