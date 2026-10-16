@@ -105,6 +105,105 @@ jobs:
           }
 
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+
+      - name: Configure MSVC build environment
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $buildArch = "${{ matrix.target == 'windows-arm64' && 'arm64' || 'x64' }}"
+          if ($buildArch -eq "arm64") {
+            $msvcComponent = "Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+            $linkerRelativePath = "bin/Hostarm64/arm64/link.exe"
+            $linkerEnvironment = "CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER"
+          } else {
+            $msvcComponent = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+            $linkerRelativePath = "bin/Hostx64/x64/link.exe"
+            $linkerEnvironment = "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER"
+          }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires $msvcComponent -property installationPath
+          if (-not $vsPath) {
+            throw "Visual Studio Build Tools with $msvcComponent were not found"
+          }
+          $vsDevCmd = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+          if (-not (Test-Path $vsDevCmd)) {
+            throw "VsDevCmd.bat was not found at $vsDevCmd"
+          }
+          $envNames = @(
+            "DevEnvDir",
+            "ExtensionSdkDir",
+            "Framework40Version",
+            "FrameworkDir",
+            "FrameworkDIR64",
+            "FrameworkVersion",
+            "FrameworkVersion64",
+            "INCLUDE",
+            "LIB",
+            "LIBPATH",
+            "Path",
+            "UCRTVersion",
+            "UniversalCRTSdkDir",
+            "VCIDEInstallDir",
+            "VCINSTALLDIR",
+            "VCToolsInstallDir",
+            "VCToolsRedistDir",
+            "VCToolsVersion",
+            "VisualStudioVersion",
+            "VSINSTALLDIR",
+            "WindowsLibPath",
+            "WindowsSdkBinPath",
+            "WindowsSdkDir",
+            "WindowsSDKLibVersion",
+            "WindowsSDKVersion",
+            "WindowsSdkVerBinPath"
+          )
+          cmd /c "`"$vsDevCmd`" -arch=$buildArch -host_arch=$buildArch && set" | ForEach-Object {
+            if ($_ -match "^(.*?)=(.*)$") {
+              $name = $matches[1]
+              $value = $matches[2]
+              if ($name -and $envNames -contains $name) {
+                Set-Item -Path "Env:$name" -Value $value
+                if ($name -ieq "Path") {
+                  $pathEntries = @()
+                  $pathEntries += $value -split ";"
+                  $pathEntries += $env:Path -split ";"
+                  $seen = @{}
+                  $sanitizedPath = $pathEntries |
+                    Where-Object {
+                      $_ -and
+                      (Test-Path $_) -and
+                      $_ -notlike "*\WindowsApps" -and
+                      $_ -notlike "*\Git\usr\bin" -and
+                      $_ -notlike "*\Git\mingw64\bin"
+                    } |
+                    ForEach-Object {
+                      $resolvedPath = [System.IO.Path]::GetFullPath($_).TrimEnd("\")
+                      $key = $resolvedPath.ToLowerInvariant()
+                      if (-not $seen.ContainsKey($key)) {
+                        $seen[$key] = $true
+                        $resolvedPath
+                      }
+                    }
+                  $env:Path = ($sanitizedPath -join ";")
+                  Add-Content -Path $env:GITHUB_ENV -Value "Path=$env:Path"
+                } else {
+                  Add-Content -Path $env:GITHUB_ENV -Value "$name=$value"
+                }
+                if ($name -ieq "VCToolsInstallDir") {
+                  $linker = Join-Path $value $linkerRelativePath
+                  if (-not (Test-Path $linker)) {
+                    throw "MSVC linker was not found at $linker"
+                  }
+                  Add-Content -Path $env:GITHUB_ENV -Value "$linkerEnvironment=$linker"
+                  Set-Item -Path "Env:$linkerEnvironment" -Value $linker
+                }
+              }
+            }
+          }
+          cl
+          $linkerValue = (Get-Item -Path "Env:$linkerEnvironment").Value
+          Write-Host "Using Rust MSVC linker: $linkerValue"
+
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: gpui-probe-${{ matrix.target }}
@@ -121,7 +220,12 @@ jobs:
         run: |
           set -o pipefail
           binary=apps/gpui/target/release/imgconvert-gpui
-          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json:/usr/share/vulkan/icd.d/lvp_icd.aarch64.json
+          # Software Vulkan (lavapipe): point the loader at the one ICD file this
+          # architecture ships; a list with a missing entry makes it give up.
+          ls /usr/share/vulkan/icd.d/
+          lvp=$(ls /usr/share/vulkan/icd.d/lvp_icd.*.json | head -n 1)
+          test -n "$lvp"
+          export VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp"
           xvfb-run -a -s "-screen 0 1280x800x24" vulkaninfo --summary | head -40 || true
           IMGCONVERT_PERF_PROBE=1 timeout --signal=TERM 45 xvfb-run -a -s "-screen 0 1280x800x24" "$binary" 2> probe.log || true
           cat probe.log
