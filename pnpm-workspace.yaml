@@ -5,3 +5,7 @@ packages:
 
 overrides:
   svelte-i18n>esbuild: ^0.25.0
+  # Advisory floors (2026-10): svelte still resolves devalue 5.8.x and the
+  # docs-site toolchain source-map-js 1.2.1; both patched lines are drop-in.
+  devalue: "^5.9.3"
+  source-map-js: ">=1.2.2"
