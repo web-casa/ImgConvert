@@ -17,6 +17,7 @@
   import Dropzone from "$lib/components/Dropzone.svelte";
   import ComparisonPreview from "$lib/components/ComparisonPreview.svelte";
   import ConversionPanel from "$lib/components/ConversionPanel.svelte";
+  import { loadPerfProbe, markReady, runPerfProbe } from "$lib/perf-probe";
   import QueueItem from "$lib/components/QueueItem.svelte";
   import OutputDestinationControl from "$lib/components/OutputDestinationControl.svelte";
   import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
@@ -66,6 +67,17 @@
       }
       await checkEngine();
       if (!runningInTauri) addDemoItems();
+      const probe = await loadPerfProbe();
+      if (probe) {
+        await markReady(queue.length);
+        await runPerfProbe(probe, {
+          importPaths,
+          queueLength: () => queue.length,
+          isImporting: () => ui.importing,
+          pendingThumbnails: () =>
+            queue.filter((item) => item.thumbnailStatus === "loading").length,
+        });
+      }
     });
 
     if (!runningInTauri) return;
