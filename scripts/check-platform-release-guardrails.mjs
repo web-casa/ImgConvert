@@ -358,8 +358,8 @@ function checkPlatformBenchmarkGuardrails() {
   if (!coreLib.includes("convert_best_of_with_color_policy_timeout")) {
     failures.push("imgconvert-core must expose a timed best-of conversion entry");
   }
-  if (!coreLib.includes("convert_auto_quality_with_color_policy_timeout")) {
-    failures.push("imgconvert-core must expose a timed auto-quality conversion entry");
+  if (/pub fn convert_(?:with_|best_of(?:\s|\())/u.test(coreLib)) {
+    failures.push("imgconvert-core must not re-expose unused conversion wrapper variants");
   }
   if (!tauriConvert.includes("IMGCONVERT_CONVERT_TIMEOUT_SECONDS")) {
     failures.push("Tauri convert path must support a wall-clock timeout override");
@@ -2281,6 +2281,12 @@ function readText(file) {
   } catch {
     return "";
   }
+}
+
+// Workflow text with YAML comments removed, so commented-out steps cannot
+// satisfy or trip a marker check.
+function readWorkflowText(file) {
+  return readText(file).replace(/^[ \t]*#.*$/gmu, "");
 }
 
 function truthy(value) {
