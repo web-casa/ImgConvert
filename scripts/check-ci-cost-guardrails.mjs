@@ -17,6 +17,7 @@ const updaterUpgradeSmoke = readWorkflow("updater-upgrade-smoke.yml");
 const macosSmoke = readWorkflow("macos-smoke.yml");
 const macosIntelSmoke = readWorkflow("macos-intel-smoke.yml");
 const macosRelease = readWorkflow("macos-release.yml");
+const gpuiProbe = readWorkflow("gpui-probe.yml");
 const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
@@ -32,6 +33,7 @@ const allWorkflows = [
   ["release-updater.yml", updaterRelease],
   ["updater-upgrade-smoke.yml", updaterUpgradeSmoke],
   ["macos-smoke.yml", macosSmoke],
+  ["gpui-probe.yml", gpuiProbe],
   ["macos-intel-smoke.yml", macosIntelSmoke],
   ["macos-release.yml", macosRelease],
   ["macos-mas-release.yml", macosMasRelease],
@@ -60,6 +62,7 @@ checkManualWorkflow("linux-release-assets-finalize.yml", linuxReleaseAssetsFinal
 checkManualWorkflow("release-updater.yml", updaterRelease);
 checkManualWorkflow("updater-upgrade-smoke.yml", updaterUpgradeSmoke);
 checkManualWorkflow("macos-smoke.yml", macosSmoke);
+checkManualWorkflow("gpui-probe.yml", gpuiProbe);
 checkManualWorkflow("macos-intel-smoke.yml", macosIntelSmoke);
 checkManualWorkflow("macos-release.yml", macosRelease);
 checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
