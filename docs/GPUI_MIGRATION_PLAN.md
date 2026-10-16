@@ -344,6 +344,13 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，8 项 P1、7 项 P2�
 - 已修（P2）：渲染闭包只在 `(revision, range)` 变化时调度一次 deferred 缩略图扫描并带单一 pending 标记；扫描时提供"停止"按钮；菜单 `File` 入 YAML；面板提示改存语义键（`Notice` 枚举）随 locale 重译；未选目录时 Start 文案带省略号；`ProbeConfig`/`IntervalSummary` 加 `#[non_exhaustive]`，`QueueItem` 加 `#[non_exhaustive]`；行高回退不再用 `px(56.)`；i18n 单测用互斥锁串行；UI 测试改为等桥接 `settled` 并连续跑第二批次验证交接（第二批次对已存在输出应为 Skipped）。
 - 未做、记入后续：GPUI workspace 的 cargo-about 归属生成（阶段 5 与 Tauri 一起处理许可证文本）；拖放/取消/淘汰路径的无头 Kit 测试（阶段 3 的 Kit UI 测试计划）；真机 GPU 纹理回收、透明 PNG/HiDPI、VoiceOver/IME、MAS 沙盒写权限（本阶段平台事项，需要裸机或签名构建）。
 
+平台事项进度（2026-10-17）：
+
+- 私有 API 扫描（macOS arm64 发布构建，虚拟机上 `nm -u` + `otool -L`）：`_CGS`/`_SLS` 符号 0 个，无 PrivateFrameworks 链接；链接的系统框架为 AppKit、Metal、CoreText、ImageIO、QuartzCore 等公开框架（GPUI 还带入 CoreLocation、CloudKit、UserNotifications，MAS 审核时要确认用途说明）。x64 构建待 `GPUI Probe` 工作流的 `macos-15-intel` job 产出后扫描。
+- Linux aarch64 探针（本机 OrbStack Debian，Xvfb + lavapipe，debug 构建）：启动、导入 200 张、缩略图、整段三角波滚动、`probe_done` 全部完成；刷新周期估计 46 ms（软件渲染）。其余五个目标由手动工作流 `.github/workflows/gpui-probe.yml` 覆盖（build + 探针启动 + macOS 私有符号扫描），但 `workflow_dispatch` 要求工作流已在默认分支上，PR #10 合并后才能触发。
+- VoiceOver/辅助功能树：虚拟机里通过 `osascript` 读取 System Events 的 UI 元素被 TCC 拒绝（"osascript 不允许辅助访问"），需要有人在虚拟机的"隐私与安全性 → 辅助功能"里给终端/`sshd` 授权一次，之后可以无人值守地校验按钮名称与角色；IME 候选框定位同样需要人工。
+- 代码已作为 PR #10（分支 `feat/gpui-stage1-2`，基于 `main` 的 7 个提交）提交评审。
+
 门槛 G2：只比较 PoC 已覆盖的同等功能（导入、队列、缩略图、转换、取消）与相同数据集，统一"可交互"就绪点、缓存状态与进程树内存口径；在此口径下不劣于基线且空闲内存降低 ≥ 25%（PoC 结论，完整功能性能结论只由 G3/G4 给出）；六平台探针全部启动成功；私有 API 扫描为空；VoiceOver、IME、沙盒授权冒烟通过。未达标则停止迁移，回到 Tauri 并反向移植虚拟列表与缩略图 LRU。
 
 ### 阶段 3：macOS 功能对等（8–10 周）
