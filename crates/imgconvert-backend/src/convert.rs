@@ -22,15 +22,16 @@ use imgconvert_core::{
     MIN_TARGET_SIZE_BYTES, READABLE_FORMATS, WRITABLE_FORMATS,
 };
 use serde::{Deserialize, Serialize};
-use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::access;
 use crate::command_error::CommandError;
-use crate::external_codecs;
-use crate::pdf::{self, PdfConvertOptions};
+use crate::pdf;
+pub use crate::pdf::PdfConvertOptions;
+use crate::progress::{BatchId, ProgressSink};
 use crate::result_cache;
+use imgconvert_platform::external_codecs;
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 const MAX_BATCH_CONCURRENCY: usize = 8;
@@ -41,19 +42,6 @@ const CONVERT_WALL_CLOCK_TIMEOUT_ENV: &str = "IMGCONVERT_CONVERT_TIMEOUT_SECONDS
 const DEFAULT_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 180;
 const MIN_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 5;
 const MAX_CONVERT_WALL_CLOCK_TIMEOUT_SECONDS: u64 = 900;
-const INPUT_FILE_NOT_FOUND_PREFIX: &str = "输入文件不存在:";
-const INPUT_PERMISSION_DENIED_PREFIX: &str = "没有权限访问输入文件:";
-const OUTPUT_PERMISSION_DENIED_PREFIX: &str = "没有权限写入输出目录:";
-const UNSUPPORTED_TARGET_FORMAT_PREFIX: &str = "不支持的目标格式:";
-const HEIC_OUTPUT_DISABLED_PREFIX: &str = "HEIC 输出暂未启用";
-const TIFF_OUTPUT_UNSUPPORTED_PREFIX: &str = "TIFF 暂未纳入";
-const OUTPUT_EXISTS_PREFIX: &str = "输出已存在";
-const INVALID_OUTPUT_SUFFIX_PREFIX: &str = "输出后缀无效:";
-const SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX: &str = "覆盖源文件需要明确确认:";
-const OUTPUT_CONFLICTS_WITH_INPUT_PREFIX: &str = "输出路径与批次输入冲突:";
-const OUTPUT_SAFETY_CHECK_PREFIX: &str = "无法安全验证输出路径:";
-const OUTPUT_NOT_SMALLER_PREFIX: &str = "候选输出不小于源文件";
-const GENERATION_LOSS_GUARD_PREFIX: &str = "代际损失防护:";
 const MAX_OUTPUT_SUFFIX_CHARS: usize = 48;
 const MAX_OUTPUT_SUFFIX_BYTES: usize = 128;
 // Core decoders receive byte slices, so do not use `fs::read` on an arbitrary
@@ -69,6 +57,57 @@ enum WriteMode {
     Replace,
     CreateNew,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConversionErrorKind {
+    ConversionFailed,
+    FileNotFound,
+    GenerationLossGuard,
+    InputPermissionDenied,
+    InvalidOutputSuffix,
+    OutputExists,
+    OutputNotSmaller,
+    OutputPermissionDenied,
+    OutputSafetyCheckFailed,
+    PdfInvalid,
+    PdfPasswordProtected,
+    PdfResourceLimit,
+    PdfSettingsInvalid,
+    SourceOverwriteConfirmationRequired,
+    UnsupportedFormat,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConversionError {
+    kind: ConversionErrorKind,
+    detail: String,
+}
+
+impl ConversionError {
+    fn new(kind: ConversionErrorKind, detail: impl Into<String>) -> Self {
+        Self {
+            kind,
+            detail: detail.into(),
+        }
+    }
+
+    fn conversion_failed(detail: impl Into<String>) -> Self {
+        Self::new(ConversionErrorKind::ConversionFailed, detail)
+    }
+
+    fn append(mut self, suffix: &str) -> Self {
+        self.detail.push_str(suffix);
+        self
+    }
+}
+
+impl std::fmt::Display for ConversionError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.detail)
+    }
+}
+
+impl std::error::Error for ConversionError {}
 
 struct IndexedConvertOptions {
     index: usize,
@@ -366,6 +405,8 @@ pub struct ConvertResult {
     pub output: String,
     /// 输入文件大小(字节)。
     pub in_size: u64,
+    /// Static, single raster source confirmed from the bytes used by this conversion.
+    pub environment_comparable: bool,
     /// 输出文件大小(字节)。
     pub out_size: u64,
     /// 转换已完成但用户仍应知晓的非致命文件系统状态。
@@ -485,77 +526,6 @@ pub enum BatchProgressEvent {
     },
 }
 
-#[derive(Default)]
-pub struct BatchState {
-    current: Mutex<Option<BatchHandle>>,
-    next_id: AtomicU64,
-}
-
-struct BatchHandle {
-    id: u64,
-    token: CancellationToken,
-}
-
-pub struct BatchRegistration {
-    id: u64,
-    token: CancellationToken,
-}
-
-impl BatchState {
-    pub fn begin(&self) -> Result<BatchRegistration, String> {
-        let mut current = self
-            .current
-            .lock()
-            .map_err(|_| "批量任务状态锁已损坏".to_string())?;
-        if current.is_some() {
-            return Err("已有批量任务正在运行".to_string());
-        }
-
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let token = CancellationToken::new();
-        *current = Some(BatchHandle {
-            id,
-            token: token.clone(),
-        });
-        Ok(BatchRegistration { id, token })
-    }
-
-    pub fn finish(&self, id: u64) {
-        if let Ok(mut current) = self.current.lock() {
-            if current.as_ref().is_some_and(|handle| handle.id == id) {
-                *current = None;
-            }
-        }
-    }
-
-    pub fn cancel_current(&self) -> bool {
-        if let Ok(current) = self.current.lock() {
-            if let Some(handle) = current.as_ref() {
-                handle.token.cancel();
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.current
-            .lock()
-            .map(|current| current.is_some())
-            .unwrap_or(true)
-    }
-}
-
-impl BatchRegistration {
-    pub fn id(&self) -> u64 {
-        self.id
-    }
-
-    pub fn token(&self) -> CancellationToken {
-        self.token.clone()
-    }
-}
-
 /// 返回当前平台/core 支持的格式能力。
 pub fn capabilities() -> Capabilities {
     capabilities_with_heic_provider(external_codecs::heic_provider_info())
@@ -621,22 +591,29 @@ fn format_ids(formats: &[Format]) -> Vec<&'static str> {
     formats.iter().map(|format| format.id()).collect()
 }
 
-fn parse_format(format: &str) -> Result<Format, String> {
+fn parse_format(format: &str) -> Result<Format, ConversionError> {
     match format.to_ascii_lowercase().as_str() {
         "jpeg" | "jpg" => Ok(Format::Jpeg),
         "png" => Ok(Format::Png),
         "webp" => Ok(Format::WebP),
         "avif" => Ok(Format::Avif),
-        "heic" | "heif" => Err(format!(
-            "{HEIC_OUTPUT_DISABLED_PREFIX};当前仅作为可选导入格式"
+        "heic" | "heif" => Err(ConversionError::new(
+            ConversionErrorKind::UnsupportedFormat,
+            "HEIC 输出暂未启用；当前仅作为可选导入格式",
         )),
-        "tiff" | "tif" => Err(format!("{TIFF_OUTPUT_UNSUPPORTED_PREFIX} v1 可写格式")),
-        other => Err(format!("{UNSUPPORTED_TARGET_FORMAT_PREFIX} {other}")),
+        "tiff" | "tif" => Err(ConversionError::new(
+            ConversionErrorKind::UnsupportedFormat,
+            "TIFF 暂未纳入 v1 可写格式",
+        )),
+        other => Err(ConversionError::new(
+            ConversionErrorKind::UnsupportedFormat,
+            format!("不支持的目标格式: {other}"),
+        )),
     }
 }
 
 /// 计算目标格式对应的文件扩展名。
-fn ext_for_format(format: &str) -> Result<&'static str, String> {
+fn ext_for_format(format: &str) -> Result<&'static str, ConversionError> {
     parse_format(format).map(Format::default_extension)
 }
 
@@ -695,21 +672,26 @@ fn is_windows_reserved_file_stem(stem: &str) -> bool {
             })
 }
 
-fn validated_output_suffix(raw: &str) -> Result<String, String> {
+fn validated_output_suffix(raw: &str) -> Result<String, ConversionError> {
     let suffix = raw.trim();
     if suffix.is_empty() {
-        return Err(format!("{INVALID_OUTPUT_SUFFIX_PREFIX}不能为空"));
+        return Err(ConversionError::new(
+            ConversionErrorKind::InvalidOutputSuffix,
+            "输出后缀不能为空",
+        ));
     }
     if suffix.chars().count() > MAX_OUTPUT_SUFFIX_CHARS || suffix.len() > MAX_OUTPUT_SUFFIX_BYTES {
-        return Err(format!(
-            "{INVALID_OUTPUT_SUFFIX_PREFIX}最多 {MAX_OUTPUT_SUFFIX_CHARS} 个字符"
+        return Err(ConversionError::new(
+            ConversionErrorKind::InvalidOutputSuffix,
+            format!("输出后缀最多 {MAX_OUTPUT_SUFFIX_CHARS} 个字符"),
         ));
     }
     if suffix.chars().any(|ch| {
         ch.is_control() || matches!(ch, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
     }) {
-        return Err(format!(
-            "{INVALID_OUTPUT_SUFFIX_PREFIX}不能包含路径分隔符或系统保留字符"
+        return Err(ConversionError::new(
+            ConversionErrorKind::InvalidOutputSuffix,
+            "输出后缀不能包含路径分隔符或系统保留字符",
         ));
     }
     Ok(suffix.to_string())
@@ -805,14 +787,19 @@ fn output_file_name_with_suffix(
     source_stem: &str,
     raw_suffix: &str,
     ext: &str,
-) -> Result<String, String> {
+) -> Result<String, ConversionError> {
     let suffix = validated_output_suffix(raw_suffix)?;
     let source_stem = sanitize_file_stem(source_stem);
     let extension = format!(".{ext}");
     let reserved_bytes = suffix.len() + extension.len();
     let max_source_bytes = MAX_OUTPUT_FILE_NAME_BYTES
         .checked_sub(reserved_bytes)
-        .ok_or_else(|| format!("{INVALID_OUTPUT_SUFFIX_PREFIX}与目标扩展名组合后过长"))?;
+        .ok_or_else(|| {
+            ConversionError::new(
+                ConversionErrorKind::InvalidOutputSuffix,
+                "输出后缀与目标扩展名组合后过长",
+            )
+        })?;
     let source_prefix = truncate_utf8_prefix(&source_stem, max_source_bytes);
     // `source_stem` is always non-empty after sanitizing and the suffix limit
     // leaves ample room for at least one source character. Keep a defensive
@@ -828,11 +815,11 @@ fn output_file_name_with_suffix(
 }
 
 /// 根据输入路径与目标格式计算输出路径。
-fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
+fn output_path(opts: &ConvertOptions) -> Result<PathBuf, ConversionError> {
     let input = Path::new(&opts.input);
-    let stem = input
-        .file_stem()
-        .ok_or_else(|| format!("无法解析文件名: {}", opts.input))?;
+    let stem = input.file_stem().ok_or_else(|| {
+        ConversionError::conversion_failed(format!("无法解析文件名: {}", opts.input))
+    })?;
     let ext = ext_for_format(&opts.format)?;
     let stem = stem.to_string_lossy();
     let output_name = match opts.output_suffix.as_deref() {
@@ -840,7 +827,9 @@ fn output_path(opts: &ConvertOptions) -> Result<PathBuf, String> {
         None => output_file_name(output_stem(opts, &stem, ext), ext),
     };
 
-    let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref())? {
+    let dir: PathBuf = match access::output_directory(opts.out_dir.as_deref())
+        .map_err(ConversionError::conversion_failed)?
+    {
         Some(grant) => {
             let mut dir = grant.into_path_buf();
             if let Some(relative_dir) = safe_relative_dir(opts.relative_dir.as_deref())? {
@@ -862,10 +851,15 @@ fn pdf_output_path(
     ext: &str,
     page_index: usize,
     document_page_count: usize,
-) -> Result<PathBuf, String> {
+) -> Result<PathBuf, ConversionError> {
     let base_stem = base
         .file_stem()
-        .ok_or_else(|| format!("无法解析 PDF 输出文件名: {}", base.display()))?
+        .ok_or_else(|| {
+            ConversionError::conversion_failed(format!(
+                "无法解析 PDF 输出文件名: {}",
+                base.display()
+            ))
+        })?
         .to_string_lossy();
     let digits = document_page_count.to_string().len().max(3);
     let page_number = page_index.saturating_add(1);
@@ -877,7 +871,7 @@ fn pdf_output_path(
 fn pdf_output_paths(
     opts: &ConvertOptions,
     selection: &pdf::PdfSelection,
-) -> Result<Vec<PathBuf>, String> {
+) -> Result<Vec<PathBuf>, ConversionError> {
     let base = output_path(opts)?;
     let ext = ext_for_format(&opts.format)?;
     selection
@@ -887,18 +881,20 @@ fn pdf_output_paths(
         .collect()
 }
 
-fn planned_output_paths(opts: &ConvertOptions) -> Result<Vec<PathBuf>, String> {
+fn planned_output_paths(opts: &ConvertOptions) -> Result<Vec<PathBuf>, ConversionError> {
     let input = Path::new(&opts.input);
     if !pdf::is_pdf_path(input) {
         return output_path(opts).map(|path| vec![path]);
     }
-    let bytes = pdf::read_pdf_file(input)?;
-    let document = pdf::PdfDocument::load(bytes)?;
-    let selection = document.selection(opts.pdf.as_ref())?;
+    let bytes = pdf::read_pdf_file(input).map_err(conversion_error_for_pdf_detail)?;
+    let document = pdf::PdfDocument::load(bytes).map_err(conversion_error_for_pdf_detail)?;
+    let selection = document
+        .selection(opts.pdf.as_ref())
+        .map_err(conversion_error_for_pdf_detail)?;
     pdf_output_paths(opts, &selection)
 }
 
-fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, String> {
+fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, ConversionError> {
     let Some(relative_dir) = relative_dir
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -908,7 +904,9 @@ fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, Stri
 
     let path = Path::new(relative_dir);
     if path.is_absolute() {
-        return Err(format!("输出相对目录不能是绝对路径: {relative_dir}"));
+        return Err(ConversionError::conversion_failed(format!(
+            "输出相对目录不能是绝对路径: {relative_dir}"
+        )));
     }
 
     let mut safe = PathBuf::new();
@@ -921,7 +919,11 @@ fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, Stri
                 }
             }
             std::path::Component::CurDir => {}
-            _ => return Err(format!("输出相对目录包含非法路径片段: {relative_dir}")),
+            _ => {
+                return Err(ConversionError::conversion_failed(format!(
+                    "输出相对目录包含非法路径片段: {relative_dir}"
+                )))
+            }
         }
     }
 
@@ -976,7 +978,10 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
                         conflicts_with_queued_input: false,
                         output_count: 0,
                         existing_output_count: 0,
-                        error: Some(command_error_for_conversion(options, error)),
+                        error: Some(command_error_for_conversion(
+                            options,
+                            ConversionError::conversion_failed(error),
+                        )),
                     };
                 }
             };
@@ -1049,14 +1054,13 @@ pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
         .collect()
 }
 
-/// Converts the legacy, internal conversion error text into the stable IPC
-/// contract at the command boundary. The strings remain internal diagnostics;
-/// frontend code never renders them.
+/// Converts the typed conversion failure into the stable IPC contract. Human-readable
+/// diagnostics are payload only and never participate in error-code selection.
 pub fn command_error_for_conversion(
     options: &ConvertOptions,
-    detail: impl Into<String>,
+    error: ConversionError,
 ) -> CommandError {
-    let detail = detail.into();
+    let detail = error.detail;
     let output = || {
         output_path(options)
             .map(|path| path.to_string_lossy().to_string())
@@ -1077,49 +1081,47 @@ pub fn command_error_for_conversion(
             })
     };
 
-    if detail.starts_with(INPUT_FILE_NOT_FOUND_PREFIX) {
-        return CommandError::file_not_found(options.input.clone(), detail);
+    match error.kind {
+        ConversionErrorKind::FileNotFound => {
+            CommandError::file_not_found(options.input.clone(), detail)
+        }
+        ConversionErrorKind::InputPermissionDenied => {
+            CommandError::permission_denied(options.input.clone(), detail)
+        }
+        ConversionErrorKind::OutputPermissionDenied => {
+            CommandError::output_permission_denied(output_directory(), detail)
+        }
+        ConversionErrorKind::UnsupportedFormat => {
+            CommandError::unsupported_format(options.format.clone(), detail)
+        }
+        ConversionErrorKind::OutputExists => CommandError::output_exists(output(), detail),
+        ConversionErrorKind::InvalidOutputSuffix => CommandError::invalid_output_suffix(detail),
+        ConversionErrorKind::SourceOverwriteConfirmationRequired => {
+            CommandError::source_overwrite_confirmation_required(output(), detail)
+        }
+        ConversionErrorKind::OutputSafetyCheckFailed => {
+            CommandError::output_safety_check_failed(output(), detail)
+        }
+        ConversionErrorKind::OutputNotSmaller | ConversionErrorKind::GenerationLossGuard => {
+            CommandError::output_not_smaller(output(), detail)
+        }
+        ConversionErrorKind::PdfPasswordProtected => {
+            CommandError::pdf_password_protected(options.input.clone(), detail)
+        }
+        ConversionErrorKind::PdfSettingsInvalid => {
+            CommandError::pdf_settings_invalid(options.input.clone(), detail)
+        }
+        ConversionErrorKind::PdfResourceLimit => {
+            CommandError::pdf_resource_limit(options.input.clone(), detail)
+        }
+        ConversionErrorKind::PdfInvalid => CommandError::pdf_invalid(options.input.clone(), detail),
+        ConversionErrorKind::ConversionFailed => {
+            CommandError::conversion_failed(options.input.clone(), detail)
+        }
     }
-    if detail.starts_with(INPUT_PERMISSION_DENIED_PREFIX) {
-        return CommandError::permission_denied(options.input.clone(), detail);
-    }
-    if detail.starts_with(OUTPUT_PERMISSION_DENIED_PREFIX) {
-        return CommandError::output_permission_denied(output_directory(), detail);
-    }
-    if detail.starts_with(UNSUPPORTED_TARGET_FORMAT_PREFIX)
-        || detail.starts_with(HEIC_OUTPUT_DISABLED_PREFIX)
-        || detail.starts_with(TIFF_OUTPUT_UNSUPPORTED_PREFIX)
-    {
-        return CommandError::unsupported_format(options.format.clone(), detail);
-    }
-    if detail.starts_with(OUTPUT_EXISTS_PREFIX) {
-        return CommandError::output_exists(output(), detail);
-    }
-    if detail.starts_with(INVALID_OUTPUT_SUFFIX_PREFIX) {
-        return CommandError::invalid_output_suffix(detail);
-    }
-    if detail.starts_with(SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX) {
-        return CommandError::source_overwrite_confirmation_required(output(), detail);
-    }
-    if detail.starts_with(OUTPUT_CONFLICTS_WITH_INPUT_PREFIX) {
-        return CommandError::output_conflicts_with_input(output(), detail);
-    }
-    if detail.starts_with(OUTPUT_SAFETY_CHECK_PREFIX) {
-        return CommandError::output_safety_check_failed(output(), detail);
-    }
-    if detail.starts_with(OUTPUT_NOT_SMALLER_PREFIX)
-        || detail.starts_with(GENERATION_LOSS_GUARD_PREFIX)
-    {
-        return CommandError::output_not_smaller(output(), detail);
-    }
-    if let Some(error) = command_error_for_pdf(&options.input, &detail) {
-        return error;
-    }
-
-    CommandError::conversion_failed(options.input.clone(), detail)
 }
 
-pub(crate) fn command_error_for_pdf(input: &str, detail: &str) -> Option<CommandError> {
+pub fn command_error_for_pdf(input: &str, detail: &str) -> Option<CommandError> {
     if detail.starts_with(pdf::PDF_PASSWORD_PROTECTED_PREFIX) {
         Some(CommandError::pdf_password_protected(input, detail))
     } else if detail.starts_with(pdf::PDF_SETTINGS_INVALID_PREFIX) {
@@ -1133,19 +1135,35 @@ pub(crate) fn command_error_for_pdf(input: &str, detail: &str) -> Option<Command
     }
 }
 
-fn output_io_error(operation: &str, out: &Path, error: &std::io::Error) -> String {
+fn conversion_error_for_pdf_detail(detail: String) -> ConversionError {
+    let (kind, detail) =
+        if let Some(detail) = detail.strip_prefix(pdf::PDF_PASSWORD_PROTECTED_PREFIX) {
+            (ConversionErrorKind::PdfPasswordProtected, detail)
+        } else if let Some(detail) = detail.strip_prefix(pdf::PDF_SETTINGS_INVALID_PREFIX) {
+            (ConversionErrorKind::PdfSettingsInvalid, detail)
+        } else if let Some(detail) = detail.strip_prefix(pdf::PDF_RESOURCE_LIMIT_PREFIX) {
+            (ConversionErrorKind::PdfResourceLimit, detail)
+        } else if let Some(detail) = detail.strip_prefix(pdf::PDF_INVALID_PREFIX) {
+            (ConversionErrorKind::PdfInvalid, detail)
+        } else {
+            return ConversionError::conversion_failed(detail);
+        };
+    ConversionError::new(kind, detail.trim_start())
+}
+
+fn output_io_error(operation: &str, out: &Path, error: &std::io::Error) -> ConversionError {
     if error.kind() == std::io::ErrorKind::PermissionDenied {
         let directory = out.parent().unwrap_or_else(|| Path::new("."));
-        return format!(
-            "{OUTPUT_PERMISSION_DENIED_PREFIX} {}: {error}",
-            directory.display()
+        return ConversionError::new(
+            ConversionErrorKind::OutputPermissionDenied,
+            format!("没有权限写入输出目录 {}: {error}", directory.display()),
         );
     }
 
-    format!("{operation} {}: {error}", out.display())
+    ConversionError::conversion_failed(format!("{operation} {}: {error}", out.display()))
 }
 
-fn temp_file(out: &Path) -> Result<(PathBuf, File), String> {
+fn temp_file(out: &Path) -> Result<(PathBuf, File), ConversionError> {
     let parent = out.parent().unwrap_or_else(|| Path::new("."));
     let pid = std::process::id();
 
@@ -1163,14 +1181,14 @@ fn temp_file(out: &Path) -> Result<(PathBuf, File), String> {
         }
     }
 
-    Err("无法创建唯一临时文件".to_string())
+    Err(ConversionError::conversion_failed("无法创建唯一临时文件"))
 }
 
 fn write_output(
     out: &Path,
     bytes: &[u8],
     mode: WriteMode,
-) -> Result<Option<ConvertWarning>, String> {
+) -> Result<Option<ConvertWarning>, ConversionError> {
     if let Some(parent) = out.parent() {
         fs::create_dir_all(parent).map_err(|e| output_io_error("无法创建输出目录", out, &e))?;
     }
@@ -1181,19 +1199,19 @@ fn write_output(
     }
 }
 
-fn write_temp_output(out: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
+fn write_temp_output(out: &Path, bytes: &[u8]) -> Result<PathBuf, ConversionError> {
     let (tmp, mut tmp_file) = temp_file(out)?;
-    if let Err(e) = tmp_file.write_all(bytes).and_then(|_| tmp_file.flush()) {
+    if let Err(e) = tmp_file.write_all(bytes).and_then(|_| tmp_file.sync_all()) {
         drop(tmp_file);
         let cleanup = cleanup_partial_note(&tmp);
         let detail = output_io_error("无法写入临时文件", out, &e);
-        return Err(format!("{detail}{cleanup}"));
+        return Err(detail.append(&cleanup));
     }
     drop(tmp_file);
     Ok(tmp)
 }
 
-fn replace_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, String> {
+fn replace_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, ConversionError> {
     let tmp = write_temp_output(out, bytes)?;
 
     match fs::rename(&tmp, out) {
@@ -1204,7 +1222,7 @@ fn replace_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, St
         Err(e) => {
             let cleanup = cleanup_partial_note(&tmp);
             let detail = output_io_error("无法写入输出文件", out, &e);
-            Err(format!("{detail}{cleanup}"))
+            Err(detail.append(&cleanup))
         }
     }
 }
@@ -1212,7 +1230,10 @@ fn replace_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, St
 /// Windows cannot always replace an existing destination with `rename`. Stage the old output in
 /// the same directory first, so a failure while placing the new file can be rolled back without
 /// deleting the user's previous conversion result.
-fn replace_existing_output(tmp: &Path, out: &Path) -> Result<Option<ConvertWarning>, String> {
+fn replace_existing_output(
+    tmp: &Path,
+    out: &Path,
+) -> Result<Option<ConvertWarning>, ConversionError> {
     let mut rename = |from: &Path, to: &Path| fs::rename(from, to);
     replace_existing_output_with_rename(tmp, out, &mut rename)
 }
@@ -1221,18 +1242,18 @@ fn replace_existing_output_with_rename<F>(
     tmp: &Path,
     out: &Path,
     rename: &mut F,
-) -> Result<Option<ConvertWarning>, String>
+) -> Result<Option<ConvertWarning>, ConversionError>
 where
     F: FnMut(&Path, &Path) -> std::io::Result<()>,
 {
     if let Err(error) = ensure_replaceable_output_entry(out) {
         let cleanup = cleanup_partial_note(tmp);
-        return Err(format!("{error}{cleanup}"));
+        return Err(error.append(&cleanup));
     }
 
     let backup = backup_path(out).map_err(|error| {
         let cleanup = cleanup_partial_note(tmp);
-        format!("{error}{cleanup}")
+        error.append(&cleanup)
     })?;
     if let Err(error) = rename(out, &backup) {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -1243,14 +1264,14 @@ where
                 Err(rename_error) => {
                     let cleanup = cleanup_partial_note(tmp);
                     let detail = output_io_error("无法写入输出文件", out, &rename_error);
-                    Err(format!("{detail}{cleanup}"))
+                    Err(detail.append(&cleanup))
                 }
             };
         }
 
         let cleanup = cleanup_partial_note(tmp);
         let detail = output_io_error("无法暂存已存在的输出文件", out, &error);
-        return Err(format!("{detail}{cleanup}"));
+        return Err(detail.append(&cleanup));
     }
 
     match rename(tmp, out) {
@@ -1259,11 +1280,11 @@ where
             let cleanup = cleanup_partial_note(tmp);
             let detail = output_io_error("无法写入输出文件", out, &rename_error);
             match rename(&backup, out) {
-                Ok(()) => Err(format!("{detail}; 原文件已恢复{cleanup}")),
-                Err(restore_error) => Err(format!(
-                    "{detail}; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
+                Ok(()) => Err(detail.append(&format!("; 原文件已恢复{cleanup}"))),
+                Err(restore_error) => Err(detail.append(&format!(
+                    "; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
                     backup.display()
-                )),
+                ))),
             }
         }
     }
@@ -1296,7 +1317,7 @@ fn cleanup_output_backup(backup: &Path) -> Option<ConvertWarning> {
     }
 }
 
-fn backup_path(out: &Path) -> Result<PathBuf, String> {
+fn backup_path(out: &Path) -> Result<PathBuf, ConversionError> {
     let parent = out.parent().unwrap_or_else(|| Path::new("."));
     let pid = std::process::id();
 
@@ -1317,7 +1338,9 @@ fn backup_path(out: &Path) -> Result<PathBuf, String> {
         }
     }
 
-    Err("无法创建唯一输出备份路径".to_string())
+    Err(ConversionError::conversion_failed(
+        "无法创建唯一输出备份路径",
+    ))
 }
 
 fn output_entry_exists(path: &Path) -> bool {
@@ -1327,41 +1350,47 @@ fn output_entry_exists(path: &Path) -> bool {
     fs::symlink_metadata(path).is_ok()
 }
 
-fn ensure_replaceable_output_entry(out: &Path) -> Result<(), String> {
+fn ensure_replaceable_output_entry(out: &Path) -> Result<(), ConversionError> {
     match fs::symlink_metadata(out) {
-        Ok(metadata) if metadata.file_type().is_dir() => {
-            Err(format!("无法覆盖目录输出路径 {}", out.display()))
-        }
+        Ok(metadata) if metadata.file_type().is_dir() => Err(ConversionError::conversion_failed(
+            format!("无法覆盖目录输出路径 {}", out.display()),
+        )),
         // Renaming a symlink stages or replaces the link itself; it never follows the link to
         // remove its target. That preserves the previous behavior for linked output locations
         // while still preventing the backup dance from moving a directory.
         Ok(metadata) if metadata.file_type().is_file() || metadata.file_type().is_symlink() => {
             Ok(())
         }
-        Ok(_) => Err(format!("无法覆盖非普通输出路径 {}", out.display())),
+        Ok(_) => Err(ConversionError::conversion_failed(format!(
+            "无法覆盖非普通输出路径 {}",
+            out.display()
+        ))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(output_io_error("无法读取已有输出路径", out, &error)),
     }
 }
 
-fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), String> {
+fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), ConversionError> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(out)
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
-                format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {}", out.display())
+                ConversionError::new(
+                    ConversionErrorKind::OutputExists,
+                    format!("输出已存在（未开启覆盖）: {}", out.display()),
+                )
             } else {
                 output_io_error("无法创建输出文件", out, &e)
             }
         })?;
 
-    if let Err(e) = file.write_all(bytes).and_then(|_| file.flush()) {
+    if let Err(e) = file.write_all(bytes).and_then(|_| file.sync_all()) {
         drop(file);
         let cleanup = cleanup_partial_note(out);
         let detail = output_io_error("无法写入输出文件", out, &e);
-        return Err(format!("{detail}{cleanup}"));
+        return Err(detail.append(&cleanup));
     }
 
     Ok(())
@@ -1378,7 +1407,7 @@ fn cleanup_partial_note(path: &Path) -> String {
 }
 
 /// 执行一次转换。
-pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, String> {
+pub fn convert(opts: &ConvertOptions) -> Result<ConvertResult, ConversionError> {
     convert_with_control(opts, None, None)
 }
 
@@ -1386,34 +1415,44 @@ fn convert_with_control(
     opts: &ConvertOptions,
     cancel: Option<&CancellationToken>,
     pdf_progress: Option<&dyn Fn(usize, usize)>,
-) -> Result<ConvertResult, String> {
+) -> Result<ConvertResult, ConversionError> {
     let input = Path::new(&opts.input);
     let _input_scope = access::scoped_path_access(input);
-    let input_metadata = fs::metadata(input).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => {
-            format!("{INPUT_FILE_NOT_FOUND_PREFIX} {}", input.display())
-        }
-        std::io::ErrorKind::PermissionDenied => {
-            format!("{INPUT_PERMISSION_DENIED_PREFIX} {}", input.display())
-        }
-        _ => format!("无法访问输入文件 {}: {error}", input.display()),
+    let input_metadata = fs::metadata(input).map_err(|error| {
+        let kind = match error.kind() {
+            std::io::ErrorKind::NotFound => ConversionErrorKind::FileNotFound,
+            std::io::ErrorKind::PermissionDenied => ConversionErrorKind::InputPermissionDenied,
+            _ => ConversionErrorKind::ConversionFailed,
+        };
+        ConversionError::new(
+            kind,
+            format!("无法访问输入文件 {}: {error}", input.display()),
+        )
     })?;
     if !input_metadata.is_file() {
-        return Err(format!("输入路径不是文件: {}", input.display()));
+        return Err(ConversionError::conversion_failed(format!(
+            "输入路径不是文件: {}",
+            input.display()
+        )));
     }
 
     if pdf::is_pdf_path(input) {
         return convert_pdf(opts, input, &input_metadata, cancel, pdf_progress);
     }
 
-    let _output_dir_scope =
-        access::output_directory(opts.out_dir.as_deref())?.map(|grant| grant.scoped_access());
+    let _output_dir_scope = access::output_directory(opts.out_dir.as_deref())
+        .map_err(ConversionError::conversion_failed)?
+        .map(|grant| grant.scoped_access());
     let out = output_path(opts)?;
     let _output_scope = out.parent().map(access::scoped_path_access);
     let source_modified = input_metadata.modified().ok();
     let overwrite_mode = match opts.overwrite_mode.as_deref() {
         Some(mode @ ("ask" | "skip" | "overwrite")) => mode,
-        Some(other) => return Err(format!("不支持的覆盖策略: {other}")),
+        Some(other) => {
+            return Err(ConversionError::conversion_failed(format!(
+                "不支持的覆盖策略: {other}"
+            )))
+        }
         None if opts.overwrite => "overwrite",
         None => "skip",
     };
@@ -1422,50 +1461,64 @@ fn convert_with_control(
         // non-conflicting, but returns an error for an existing path whose
         // identity cannot be read. Never fail open here: this check guards the
         // explicit authorization boundary for source replacement.
-        if let Some(output_identity) = existing_file_identity(&out)? {
-            let input_identity = existing_file_identity(input)?.ok_or_else(|| {
-                format!(
-                    "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取输入文件身份: {}",
-                    input.display()
-                )
-            })?;
+        if let Some(output_identity) = existing_file_identity(&out).map_err(|detail| {
+            ConversionError::new(ConversionErrorKind::OutputSafetyCheckFailed, detail)
+        })? {
+            let input_identity = existing_file_identity(input)
+                .map_err(|detail| {
+                    ConversionError::new(ConversionErrorKind::OutputSafetyCheckFailed, detail)
+                })?
+                .ok_or_else(|| {
+                    ConversionError::new(
+                        ConversionErrorKind::OutputSafetyCheckFailed,
+                        format!("无法读取输入文件身份: {}", input.display()),
+                    )
+                })?;
             if output_identity == input_identity && !opts.allow_source_overwrite {
-                return Err(format!(
-                    "{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} {}",
-                    out.display()
+                return Err(ConversionError::new(
+                    ConversionErrorKind::SourceOverwriteConfirmationRequired,
+                    format!("覆盖源文件需要明确确认: {}", out.display()),
                 ));
             }
         }
     }
     if output_entry_exists(&out) && overwrite_mode != "overwrite" {
         if overwrite_mode == "ask" {
-            return Err(format!(
-                "{OUTPUT_EXISTS_PREFIX}(需要确认覆盖): {}",
-                out.display()
+            return Err(ConversionError::new(
+                ConversionErrorKind::OutputExists,
+                format!("输出已存在（需要确认覆盖）: {}", out.display()),
             ));
         }
-        return Err(format!(
-            "{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {}",
-            out.display()
+        return Err(ConversionError::new(
+            ConversionErrorKind::OutputExists,
+            format!("输出已存在（未开启覆盖）: {}", out.display()),
         ));
     }
 
     let target = parse_format(&opts.format)?;
-    let source_for_core = read_source_for_core(input)?;
+    let source_for_core =
+        read_source_for_core(input).map_err(ConversionError::conversion_failed)?;
     let source = &source_for_core.bytes;
     let metadata_override = source_for_core.metadata_override.as_ref();
     let source_format = Format::from_magic(source);
     let source_probe = imgconvert_core::probe(source).ok();
+    let environment_comparable = !external_codecs::is_heic_path(input)
+        && source.len() as u64 == input_metadata.len()
+        && source_probe.is_some()
+        && crate::environment::comparable_static_source(source);
     let encode_options = encode_options_for(opts, target);
-    let color_policy = color_management_policy_for(opts)?;
-    let workflow_options = workflow_options_for(opts, target, encode_options)?;
+    let color_policy =
+        color_management_policy_for(opts).map_err(ConversionError::conversion_failed)?;
+    let workflow_options = workflow_options_for(opts, target, encode_options)
+        .map_err(ConversionError::conversion_failed)?;
     if let Some(probe) = source_probe.as_ref() {
         workflow_options
             .resize
             .dimensions(probe.width, probe.height)
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
     }
-    let wall_clock_timeout = convert_wall_clock_timeout()?;
+    let wall_clock_timeout =
+        convert_wall_clock_timeout().map_err(ConversionError::conversion_failed)?;
     let cache_key = opts.result_cache.then(|| {
         result_cache_key(
             opts,
@@ -1508,6 +1561,7 @@ fn convert_with_control(
                 input: opts.input.clone(),
                 output: out.to_string_lossy().to_string(),
                 in_size: input_metadata.len(),
+                environment_comparable,
                 out_size,
                 warning,
                 warnings,
@@ -1527,7 +1581,7 @@ fn convert_with_control(
     } else {
         imgconvert_core::convert_workflow(source, target, &workflow_options, metadata_override)
     }
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
     let dimensions_changed = source_probe.as_ref().is_some_and(|probe| {
         (workflow_result.width, workflow_result.height) != (probe.width, probe.height)
     });
@@ -1594,6 +1648,7 @@ fn convert_with_control(
         input: opts.input.clone(),
         output: out.to_string_lossy().to_string(),
         in_size,
+        environment_comparable,
         out_size,
         warning,
         warnings,
@@ -1608,20 +1663,28 @@ fn convert_pdf(
     input_metadata: &fs::Metadata,
     cancel: Option<&CancellationToken>,
     progress: Option<&dyn Fn(usize, usize)>,
-) -> Result<ConvertResult, String> {
-    let _output_dir_scope =
-        access::output_directory(opts.out_dir.as_deref())?.map(|grant| grant.scoped_access());
+) -> Result<ConvertResult, ConversionError> {
+    let _output_dir_scope = access::output_directory(opts.out_dir.as_deref())
+        .map_err(ConversionError::conversion_failed)?
+        .map(|grant| grant.scoped_access());
     let source_modified = input_metadata.modified().ok();
-    let bytes = pdf::read_pdf_file(input)?;
-    let document = pdf::PdfDocument::load(bytes)?;
-    let selection = document.selection(opts.pdf.as_ref())?;
+    let bytes = pdf::read_pdf_file(input).map_err(conversion_error_for_pdf_detail)?;
+    let document = pdf::PdfDocument::load(bytes).map_err(conversion_error_for_pdf_detail)?;
+    let selection = document
+        .selection(opts.pdf.as_ref())
+        .map_err(conversion_error_for_pdf_detail)?;
     let outputs = pdf_output_paths(opts, &selection)?;
     let target = parse_format(&opts.format)?;
     let encode_options = encode_options_for(opts, target);
-    let workflow_options = workflow_options_for(opts, target, encode_options)?;
+    let workflow_options = workflow_options_for(opts, target, encode_options)
+        .map_err(ConversionError::conversion_failed)?;
     let overwrite_mode = match opts.overwrite_mode.as_deref() {
         Some(mode @ ("ask" | "skip" | "overwrite")) => mode,
-        Some(other) => return Err(format!("不支持的覆盖策略: {other}")),
+        Some(other) => {
+            return Err(ConversionError::conversion_failed(format!(
+                "不支持的覆盖策略: {other}"
+            )))
+        }
         None if opts.overwrite => "overwrite",
         None => "skip",
     };
@@ -1630,20 +1693,33 @@ fn convert_pdf(
     // late page can still fail while interpreting malformed content, but predictable resource or
     // settings failures must not leave an avoidable partial document conversion.
     for page_index in &selection.pages {
-        let dimensions = document.page_dimensions(*page_index, selection.dpi)?;
+        let dimensions = document
+            .page_dimensions(*page_index, selection.dpi)
+            .map_err(conversion_error_for_pdf_detail)?;
         workflow_options
             .resize
             .dimensions(dimensions.width, dimensions.height)
-            .map_err(|error| format!("PDF 第 {} 页尺寸规则无效: {error}", page_index + 1))?;
+            .map_err(|error| {
+                ConversionError::conversion_failed(format!(
+                    "PDF 第 {} 页尺寸规则无效: {error}",
+                    page_index + 1
+                ))
+            })?;
     }
 
     let input_identity = if overwrite_mode == "overwrite" {
-        Some(existing_file_identity(input)?.ok_or_else(|| {
-            format!(
-                "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取输入文件身份: {}",
-                input.display()
-            )
-        })?)
+        Some(
+            existing_file_identity(input)
+                .map_err(|detail| {
+                    ConversionError::new(ConversionErrorKind::OutputSafetyCheckFailed, detail)
+                })?
+                .ok_or_else(|| {
+                    ConversionError::new(
+                        ConversionErrorKind::OutputSafetyCheckFailed,
+                        format!("无法读取输入文件身份: {}", input.display()),
+                    )
+                })?,
+        )
     } else {
         None
     };
@@ -1652,23 +1728,27 @@ fn convert_pdf(
     for (position, output) in outputs.iter().enumerate() {
         let _output_scope = output.parent().map(access::scoped_path_access);
         if overwrite_mode == "overwrite"
-            && existing_file_identity(output)?.is_some_and(|identity| {
-                input_identity
-                    .as_ref()
-                    .is_some_and(|input_identity| &identity == input_identity)
-            })
+            && existing_file_identity(output)
+                .map_err(|detail| {
+                    ConversionError::new(ConversionErrorKind::OutputSafetyCheckFailed, detail)
+                })?
+                .is_some_and(|identity| {
+                    input_identity
+                        .as_ref()
+                        .is_some_and(|input_identity| &identity == input_identity)
+                })
             && !opts.allow_source_overwrite
         {
-            return Err(format!(
-                "{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} {}",
-                output.display()
+            return Err(ConversionError::new(
+                ConversionErrorKind::SourceOverwriteConfirmationRequired,
+                format!("覆盖源文件需要明确确认: {}", output.display()),
             ));
         }
         if output_entry_exists(output) && overwrite_mode != "overwrite" {
             if overwrite_mode == "ask" {
-                return Err(format!(
-                    "{OUTPUT_EXISTS_PREFIX}(需要确认覆盖): {}",
-                    output.display()
+                return Err(ConversionError::new(
+                    ConversionErrorKind::OutputExists,
+                    format!("输出已存在（需要确认覆盖）: {}", output.display()),
                 ));
             }
             skipped[position] = true;
@@ -1680,10 +1760,13 @@ fn convert_pdf(
             || opts.input.clone(),
             |output| output.to_string_lossy().to_string(),
         );
-        return Err(format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): {first}"));
+        return Err(ConversionError::new(
+            ConversionErrorKind::OutputExists,
+            format!("输出已存在（未开启覆盖）: {first}"),
+        ));
     }
 
-    let timeout = convert_wall_clock_timeout()?;
+    let timeout = convert_wall_clock_timeout().map_err(ConversionError::conversion_failed)?;
     let cache = document.new_render_cache();
     let mut output_size = 0u64;
     let mut converted_output_count = 0usize;
@@ -1754,8 +1837,9 @@ fn convert_pdf(
         let file_warning = preserve_source_modified_time(
             output,
             source_modified,
-            write_output(output, &workflow.bytes, write_mode)
-                .map_err(|error| pdf_partial_error(*page_index, converted_output_count, &error))?,
+            write_output(output, &workflow.bytes, write_mode).map_err(|error| {
+                pdf_partial_conversion_error(*page_index, converted_output_count, error)
+            })?,
         );
         output_size = output_size.saturating_add(
             fs::metadata(output)
@@ -1797,6 +1881,7 @@ fn convert_pdf(
         input: opts.input.clone(),
         output,
         in_size: input_metadata.len(),
+        environment_comparable: false,
         out_size: output_size,
         warning: compatibility_warning,
         warnings,
@@ -1810,7 +1895,7 @@ fn ensure_pdf_page_time_remaining(
     started: Instant,
     page_index: usize,
     completed: usize,
-) -> Result<(), String> {
+) -> Result<(), ConversionError> {
     if timeout.is_some_and(|limit| started.elapsed() >= limit) {
         return Err(pdf_partial_error(
             page_index,
@@ -1821,7 +1906,7 @@ fn ensure_pdf_page_time_remaining(
     Ok(())
 }
 
-fn pdf_partial_error(page_index: usize, completed: usize, detail: &str) -> String {
+fn pdf_partial_error(page_index: usize, completed: usize, detail: &str) -> ConversionError {
     let typed_prefix = [
         pdf::PDF_PASSWORD_PROTECTED_PREFIX,
         pdf::PDF_SETTINGS_INVALID_PREFIX,
@@ -1839,11 +1924,27 @@ fn pdf_partial_error(page_index: usize, completed: usize, detail: &str) -> Strin
             page_index + 1
         )
     };
-    if let Some(prefix) = typed_prefix {
-        format!("{prefix} {context}")
-    } else {
-        context
+    match typed_prefix {
+        Some(prefix) => conversion_error_for_pdf_detail(format!("{prefix} {context}")),
+        None => ConversionError::conversion_failed(context),
     }
+}
+
+fn pdf_partial_conversion_error(
+    page_index: usize,
+    completed: usize,
+    error: ConversionError,
+) -> ConversionError {
+    let context = if completed == 0 {
+        format!("PDF 第 {} 页转换失败: {}", page_index + 1, error.detail)
+    } else {
+        format!(
+            "PDF 第 {} 页转换失败: {}；此前已完成 {completed} 页，输出文件已保留",
+            page_index + 1,
+            error.detail
+        )
+    };
+    ConversionError::new(error.kind, context)
 }
 
 fn preserve_source_modified_time(
@@ -2053,7 +2154,7 @@ pub(crate) fn convert_source_workflow(
     preview_max_edge: Option<u32>,
     cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<WorkflowResult, String> {
-    let target = parse_format(&opts.format)?;
+    let target = parse_format(&opts.format).map_err(|error| error.to_string())?;
     let base = encode_options_for(opts, target);
     let mut workflow = workflow_options_for(opts, target, base)?;
     workflow.preview_max_edge = preview_max_edge;
@@ -2074,7 +2175,7 @@ pub(crate) fn convert_image_workflow(
     preview_max_edge: Option<u32>,
     cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<WorkflowResult, String> {
-    let target = parse_format(&opts.format)?;
+    let target = parse_format(&opts.format).map_err(|error| error.to_string())?;
     let base = encode_options_for(opts, target);
     let mut workflow = workflow_options_for(opts, target, base)?;
     workflow.preview_max_edge = preview_max_edge;
@@ -2294,12 +2395,16 @@ fn set_modified_time(path: &Path, modified: SystemTime) -> Result<(), String> {
         .map_err(|e| format!("无法保留源文件修改时间: {e}"))
 }
 
+/// Runs one batch on the calling thread with a scoped worker pool. Progress goes
+/// to `sink`; a failed send cancels the batch and ends it with an error.
 pub fn convert_batch(
     options: Vec<ConvertOptions>,
-    progress: Channel<BatchProgressEvent>,
+    sink: &dyn ProgressSink,
+    batch_id: BatchId,
     cancel: CancellationToken,
     concurrency: Option<usize>,
 ) -> Result<BatchSummary, String> {
+    let progress = BatchEmitter { sink, batch_id };
     let total = options.len();
     let mut summary = BatchSummary {
         total,
@@ -2426,7 +2531,10 @@ fn prepare_batch_work(
                 preflight_events.push(BatchProgressEvent::FileError {
                     index,
                     input: options.input.clone(),
-                    error: command_error_for_conversion(&options, error),
+                    error: command_error_for_conversion(
+                        &options,
+                        ConversionError::conversion_failed(error),
+                    ),
                 });
                 continue;
             }
@@ -2465,10 +2573,7 @@ fn prepare_batch_work(
                             input: options.input,
                             error: CommandError::output_conflicts_with_input(
                                 output.to_string_lossy().to_string(),
-                                format!(
-                                    "{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} {}",
-                                    output.display()
-                                ),
+                                format!("输出路径与批次输入冲突: {}", output.display()),
                             ),
                         });
                         continue 'jobs;
@@ -2590,7 +2695,7 @@ fn existing_file_identity(path: &Path) -> Result<Option<FileIdentity>, String> {
 
 fn file_identity_error(path: &Path, error: impl std::fmt::Display) -> String {
     format!(
-        "{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取 {} 的文件身份: {error}",
+        "无法安全验证输出路径 {} 的文件身份: {error}",
         path.display()
     )
 }
@@ -2770,7 +2875,7 @@ fn send_worker_event(
 }
 
 fn apply_batch_event(
-    progress: &Channel<BatchProgressEvent>,
+    progress: &BatchEmitter<'_>,
     summary: &mut BatchSummary,
     event: BatchProgressEvent,
 ) -> Result<(), String> {
@@ -2916,17 +3021,21 @@ fn estimate_from_dimensions(width: Option<u32>, height: Option<u32>) -> Option<u
         .checked_mul(RGBA_WORKING_SET_MULTIPLIER)
 }
 
-fn send_progress(
-    progress: &Channel<BatchProgressEvent>,
-    event: BatchProgressEvent,
-) -> Result<(), String> {
+/// Binds a sink to the batch it is reporting for.
+struct BatchEmitter<'a> {
+    sink: &'a dyn ProgressSink,
+    batch_id: BatchId,
+}
+
+fn send_progress(progress: &BatchEmitter<'_>, event: BatchProgressEvent) -> Result<(), String> {
     progress
-        .send(event)
+        .sink
+        .send(progress.batch_id, event)
         .map_err(|e| format!("无法发送批量进度事件: {e}"))
 }
 
 fn send_cancelled_progress(
-    progress: &Channel<BatchProgressEvent>,
+    progress: &BatchEmitter<'_>,
     summary: &BatchSummary,
 ) -> Result<(), String> {
     send_progress(
@@ -2980,7 +3089,7 @@ struct CandidatePolicyCheck<'a> {
 fn candidate_policy_error(
     opts: &ConvertOptions,
     check: CandidatePolicyCheck<'_>,
-) -> Option<String> {
+) -> Option<ConversionError> {
     // SVG is a vector source, whereas every supported target is raster. Comparing the
     // compact SVG markup with raster bytes makes "skip if larger" reject legitimate
     // conversions almost every time, so size-based compression policy is not applicable.
@@ -3115,14 +3224,20 @@ fn generation_loss_message(
     source_size: u64,
     candidate_size: u64,
     dimensions: Option<(u32, u32)>,
-) -> String {
+) -> ConversionError {
     let required = required_generation_savings_basis_points(source_size, dimensions) as f64 / 100.0;
     let actual = savings_basis_points(source_size, candidate_size) as f64 / 100.0;
-    format!("{GENERATION_LOSS_GUARD_PREFIX}有损源再次压缩收益不足(需 {required:.1}%, 实际 {actual:.1}%)")
+    ConversionError::new(
+        ConversionErrorKind::GenerationLossGuard,
+        format!("代际损失防护: 有损源再次压缩收益不足(需 {required:.1}%, 实际 {actual:.1}%)"),
+    )
 }
 
-fn skip_larger_message(source_size: u64, candidate_size: u64) -> String {
-    format!("{OUTPUT_NOT_SMALLER_PREFIX}(源 {source_size} B, 输出 {candidate_size} B)")
+fn skip_larger_message(source_size: u64, candidate_size: u64) -> ConversionError {
+    ConversionError::new(
+        ConversionErrorKind::OutputNotSmaller,
+        format!("候选输出不小于源文件（源 {source_size} B，输出 {candidate_size} B）"),
+    )
 }
 
 fn result_cache_key(
@@ -3250,19 +3365,20 @@ fn hash_optional_metadata_blob(hasher: &mut blake3::Hasher, label: &[u8], bytes:
     hasher.update(b"\0");
 }
 
-fn should_count_as_skipped(opts: &ConvertOptions, message: &str) -> bool {
+fn should_count_as_skipped(opts: &ConvertOptions, error: &ConversionError) -> bool {
     let skip_mode = match opts.overwrite_mode.as_deref() {
         Some("skip") => true,
         None => !opts.overwrite,
         _ => false,
     };
-    (skip_mode && message.starts_with(OUTPUT_EXISTS_PREFIX))
-        || (opts.skip_if_larger && message.starts_with(OUTPUT_NOT_SMALLER_PREFIX))
-        || (opts.generation_loss_protection && message.starts_with(GENERATION_LOSS_GUARD_PREFIX))
+    (skip_mode && error.kind == ConversionErrorKind::OutputExists)
+        || (opts.skip_if_larger && error.kind == ConversionErrorKind::OutputNotSmaller)
+        || (opts.generation_loss_protection
+            && error.kind == ConversionErrorKind::GenerationLossGuard)
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -3358,7 +3474,7 @@ mod tests {
         png.extend_from_slice(&crc32(&crc_input).to_be_bytes());
     }
 
-    fn one_by_one_png() -> Vec<u8> {
+    pub(crate) fn one_by_one_png() -> Vec<u8> {
         let scanline = [0, 255, 255, 255, 255]; // filter byte + opaque white RGBA pixel
         let mut zlib = vec![0x78, 0x01, 0x01, 5, 0, 0xfa, 0xff];
         zlib.extend_from_slice(&scanline);
@@ -3424,7 +3540,10 @@ mod tests {
 
         let missing = command_error_for_conversion(
             &options,
-            format!("{INPUT_FILE_NOT_FOUND_PREFIX} /images/source.png"),
+            ConversionError::new(
+                ConversionErrorKind::FileNotFound,
+                "无法访问输入文件 /images/source.png",
+            ),
         );
         assert_eq!(missing.code, crate::command_error::ErrorCode::FileNotFound);
         assert_eq!(
@@ -3435,7 +3554,10 @@ mod tests {
         options.format = "tiff".to_string();
         let unsupported = command_error_for_conversion(
             &options,
-            format!("{TIFF_OUTPUT_UNSUPPORTED_PREFIX} v1 可写格式"),
+            ConversionError::new(
+                ConversionErrorKind::UnsupportedFormat,
+                "TIFF 暂未纳入 v1 可写格式",
+            ),
         );
         assert_eq!(
             unsupported.code,
@@ -3452,7 +3574,10 @@ mod tests {
 
         let denied = command_error_for_conversion(
             &options,
-            format!("{INPUT_PERMISSION_DENIED_PREFIX} /images/source.png"),
+            ConversionError::new(
+                ConversionErrorKind::InputPermissionDenied,
+                "没有权限访问输入文件 /images/source.png",
+            ),
         );
         assert_eq!(
             denied.code,
@@ -3462,7 +3587,10 @@ mod tests {
         options.format = "jpeg".to_string();
         let output_denied = command_error_for_conversion(
             &options,
-            format!("{OUTPUT_PERMISSION_DENIED_PREFIX} /images: Permission denied"),
+            ConversionError::new(
+                ConversionErrorKind::OutputPermissionDenied,
+                "没有权限写入输出目录 /images: Permission denied",
+            ),
         );
         assert_eq!(
             output_denied.code,
@@ -3476,7 +3604,7 @@ mod tests {
         options.input = "/documents/protected.pdf".to_string();
         let protected = command_error_for_conversion(
             &options,
-            format!("{} encrypted", pdf::PDF_PASSWORD_PROTECTED_PREFIX),
+            ConversionError::new(ConversionErrorKind::PdfPasswordProtected, "encrypted"),
         );
         assert_eq!(
             protected.code,
@@ -3489,7 +3617,7 @@ mod tests {
 
         let limited = command_error_for_conversion(
             &options,
-            format!("{} too many pixels", pdf::PDF_RESOURCE_LIMIT_PREFIX),
+            ConversionError::new(ConversionErrorKind::PdfResourceLimit, "too many pixels"),
         );
         assert_eq!(
             limited.code,
@@ -3499,7 +3627,10 @@ mod tests {
 
         let output_exists = command_error_for_conversion(
             &options,
-            format!("{OUTPUT_EXISTS_PREFIX}(未开启覆盖): /images/source.jpg"),
+            ConversionError::new(
+                ConversionErrorKind::OutputExists,
+                "输出已存在（未开启覆盖）: /images/source.jpg",
+            ),
         );
         assert_eq!(
             output_exists.code,
@@ -3508,7 +3639,10 @@ mod tests {
 
         let invalid_suffix = command_error_for_conversion(
             &options,
-            format!("{INVALID_OUTPUT_SUFFIX_PREFIX}不能包含路径分隔符或系统保留字符"),
+            ConversionError::new(
+                ConversionErrorKind::InvalidOutputSuffix,
+                "输出后缀不能包含路径分隔符或系统保留字符",
+            ),
         );
         assert_eq!(
             invalid_suffix.code,
@@ -3517,16 +3651,19 @@ mod tests {
 
         let source_confirmation = command_error_for_conversion(
             &options,
-            format!("{SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX} /images/source.jpg"),
+            ConversionError::new(
+                ConversionErrorKind::SourceOverwriteConfirmationRequired,
+                "覆盖源文件需要明确确认: /images/source.jpg",
+            ),
         );
         assert_eq!(
             source_confirmation.code,
             crate::command_error::ErrorCode::SourceOverwriteConfirmationRequired
         );
 
-        let queued_input_conflict = command_error_for_conversion(
-            &options,
-            format!("{OUTPUT_CONFLICTS_WITH_INPUT_PREFIX} /images/source.jpg"),
+        let queued_input_conflict = CommandError::output_conflicts_with_input(
+            "/images/source.jpg",
+            "输出路径与批次输入冲突: /images/source.jpg",
         );
         assert_eq!(
             queued_input_conflict.code,
@@ -3535,7 +3672,10 @@ mod tests {
 
         let safety_check = command_error_for_conversion(
             &options,
-            format!("{OUTPUT_SAFETY_CHECK_PREFIX} 无法读取 /images/source.jpg 的文件身份"),
+            ConversionError::new(
+                ConversionErrorKind::OutputSafetyCheckFailed,
+                "无法读取 /images/source.jpg 的文件身份",
+            ),
         );
         assert_eq!(
             safety_check.code,
@@ -3544,14 +3684,20 @@ mod tests {
 
         let not_smaller = command_error_for_conversion(
             &options,
-            format!("{OUTPUT_NOT_SMALLER_PREFIX}(源 10 B, 输出 11 B)"),
+            ConversionError::new(
+                ConversionErrorKind::OutputNotSmaller,
+                "候选输出不小于源文件（源 10 B，输出 11 B）",
+            ),
         );
         assert_eq!(
             not_smaller.code,
             crate::command_error::ErrorCode::OutputNotSmaller
         );
 
-        let fallback = command_error_for_conversion(&options, "codec backend failed");
+        let fallback = command_error_for_conversion(
+            &options,
+            ConversionError::conversion_failed("codec backend failed"),
+        );
         assert_eq!(
             fallback.code,
             crate::command_error::ErrorCode::ConversionFailed
@@ -3585,13 +3731,11 @@ mod tests {
 
         for (prefix, expected_code) in cases {
             let wrapped = pdf_partial_error(2, 1, &format!("{prefix} renderer detail"));
-            assert!(wrapped.starts_with(prefix));
-            assert!(wrapped.contains("PDF 第 3 页转换失败"));
-            assert!(wrapped.contains("此前已完成 1 页"));
+            assert!(wrapped.detail.contains("PDF 第 3 页转换失败"));
+            assert!(wrapped.detail.contains("此前已完成 1 页"));
+            let options = test_convert_options("/documents/input.pdf".to_string());
             assert_eq!(
-                command_error_for_pdf("/documents/input.pdf", &wrapped)
-                    .expect("typed PDF error should still map")
-                    .code,
+                command_error_for_conversion(&options, wrapped).code,
                 expected_code
             );
         }
@@ -3605,7 +3749,7 @@ mod tests {
         fs::write(&out, b"old").unwrap();
 
         let err = write_output(&out, b"new", WriteMode::CreateNew).unwrap_err();
-        assert!(err.contains("输出已存在"));
+        assert!(err.detail.contains("输出已存在"));
         assert_eq!(fs::read(&out).unwrap(), b"old");
 
         fs::remove_dir_all(dir).unwrap();
@@ -3621,8 +3765,8 @@ mod tests {
 
         let err = write_output(&out, b"new", WriteMode::CreateNew).unwrap_err();
 
-        assert!(err.contains("无法创建输出目录"));
-        assert!(err.contains(&blocked.to_string_lossy().to_string()));
+        assert!(err.detail.contains("无法创建输出目录"));
+        assert!(err.detail.contains(&blocked.to_string_lossy().to_string()));
 
         fs::remove_dir_all(dir).unwrap();
     }
@@ -3636,8 +3780,8 @@ mod tests {
             &error,
         );
 
-        assert!(detail.starts_with(OUTPUT_PERMISSION_DENIED_PREFIX));
-        assert!(detail.contains("/images/output"));
+        assert_eq!(detail.kind, ConversionErrorKind::OutputPermissionDenied);
+        assert!(detail.detail.contains("/images/output"));
     }
 
     #[test]
@@ -3665,8 +3809,10 @@ mod tests {
 
         let err = convert(&options).unwrap_err();
 
-        assert!(err.contains("输入路径不是文件"));
-        assert!(err.contains(&input_dir.to_string_lossy().to_string()));
+        assert!(err.detail.contains("输入路径不是文件"));
+        assert!(err
+            .detail
+            .contains(&input_dir.to_string_lossy().to_string()));
 
         fs::remove_dir_all(dir).unwrap();
     }
@@ -3684,6 +3830,7 @@ mod tests {
         options.preserve_metadata = Some(true);
 
         let result = convert(&options).unwrap();
+        assert!(result.environment_comparable);
 
         assert!(Path::new(&result.output).exists());
         assert!(result.out_size > 0);
@@ -3708,6 +3855,7 @@ mod tests {
         options.format = "webp".to_string();
 
         let result = convert(&options).unwrap();
+        assert!(!result.environment_comparable);
         let encoded = fs::read(&result.output).unwrap();
 
         assert_eq!(Format::from_magic(&encoded), Some(Format::WebP));
@@ -4346,7 +4494,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(message.contains("不小于源文件"));
+        assert!(message.detail.contains("不小于源文件"));
     }
 
     #[test]
@@ -4416,7 +4564,7 @@ mod tests {
         })
         .unwrap_err();
 
-        assert!(error.contains("原文件已恢复"));
+        assert!(error.detail.contains("原文件已恢复"));
         assert_eq!(fs::read(&out).unwrap(), b"old");
         assert!(!tmp.exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
@@ -4436,7 +4584,7 @@ mod tests {
 
         let error = replace_existing_output(&tmp, &out).unwrap_err();
 
-        assert!(error.contains("目录输出路径"));
+        assert!(error.detail.contains("目录输出路径"));
         assert!(out.is_dir());
         assert_eq!(fs::read(&nested).unwrap(), b"keep");
         assert!(!tmp.exists());
@@ -4535,8 +4683,8 @@ mod tests {
         .unwrap_err();
 
         let backup = backup.unwrap();
-        assert!(error.contains("无法恢复原文件"));
-        assert!(error.contains(&backup.to_string_lossy().to_string()));
+        assert!(error.detail.contains("无法恢复原文件"));
+        assert!(error.detail.contains(&backup.to_string_lossy().to_string()));
         assert!(!out.exists());
         assert!(!tmp.exists());
         assert_eq!(fs::read(&backup).unwrap(), b"old");
@@ -4595,6 +4743,100 @@ mod tests {
         assert_eq!(serialized["code"], "pdfRenderWarnings");
         assert_eq!(serialized["page"], 3);
         assert_eq!(serialized["count"], 2);
+    }
+
+    // Run with isolated process environment; never mutate global cache settings in parallel tests.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn environmental_evidence_survives_cache_hits_and_invalidations() {
+        use std::os::unix::fs::MetadataExt;
+        const CHILD_ROOT: &str = "IMGCONVERT_ENVIRONMENT_CACHE_TEST_ROOT";
+        let Some(root) = std::env::var_os(CHILD_ROOT) else {
+            let root = unique_test_dir("environment-cache");
+            fs::create_dir_all(&root).unwrap();
+            let child = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "convert::tests::environmental_evidence_survives_cache_hits_and_invalidations",
+                    "--nocapture",
+                ])
+                .env(CHILD_ROOT, &root)
+                .env("XDG_CACHE_HOME", root.join("cache"))
+                .output();
+            fs::remove_dir_all(&root).unwrap();
+            let child = child.unwrap();
+            assert!(
+                child.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&child.stdout),
+                String::from_utf8_lossy(&child.stderr)
+            );
+            return;
+        };
+        let root = PathBuf::from(root);
+        let input = root.join("source.png");
+        let mut source = one_by_one_png();
+        fs::write(&input, &source).unwrap();
+        let mut options = test_convert_options(input.to_string_lossy().into_owned());
+        options.out_dir = Some(root.join("output").to_string_lossy().into_owned());
+        options.result_cache = true;
+        options.overwrite_mode = Some("overwrite".into());
+        let first = convert(&options).unwrap();
+        let output = Path::new(&first.output);
+        let first_file = fs::File::open(output).unwrap();
+        let encoded = fs::read(output).unwrap();
+        let cached = convert(&options).unwrap();
+        // An atomic re-encode replaces the inode. Holding the old file prevents inode reuse.
+        assert_eq!(
+            first_file.metadata().unwrap().ino(),
+            fs::metadata(output).unwrap().ino()
+        );
+        assert!(cached.environment_comparable);
+        assert_eq!(cached.in_size, source.len() as u64);
+        assert_eq!(cached.out_size, encoded.len() as u64);
+        let json = serde_json::to_value(&cached).unwrap();
+        assert_eq!(json["environmentComparable"], true);
+        assert_eq!(json["outputCount"], 1);
+
+        let mut corrupted = encoded.clone();
+        corrupted[0] ^= 1;
+        fs::write(output, &corrupted).unwrap();
+        let repaired = convert(&options).unwrap();
+        assert_ne!(
+            first_file.metadata().unwrap().ino(),
+            fs::metadata(output).unwrap().ino()
+        );
+        assert_eq!(fs::read(output).unwrap(), encoded);
+        assert!(repaired.environment_comparable);
+        assert_eq!(repaired.out_size, encoded.len() as u64);
+
+        let repaired_file = fs::File::open(output).unwrap();
+        source.truncate(source.len() - 12); // Insert a valid ancillary chunk before IEND.
+        append_png_chunk(&mut source, b"tEXt", b"Comment\0changed input");
+        append_png_chunk(&mut source, b"IEND", &[]);
+        fs::write(&input, &source).unwrap();
+        let changed = convert(&options).unwrap();
+        assert_ne!(
+            repaired_file.metadata().unwrap().ino(),
+            fs::metadata(output).unwrap().ino()
+        );
+        assert_eq!(changed.in_size, source.len() as u64);
+        assert_ne!(changed.in_size, cached.in_size);
+        assert!(changed.environment_comparable);
+
+        // SVG can be cached as a raster output but must remain ineligible for this model.
+        let svg = root.join("source.svg");
+        fs::write(&svg, br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>"#).unwrap();
+        options.input = svg.to_string_lossy().into_owned();
+        let vector = convert(&options).unwrap();
+        let vector_file = fs::File::open(&vector.output).unwrap();
+        let cached_vector = convert(&options).unwrap();
+        assert_eq!(
+            vector_file.metadata().unwrap().ino(),
+            fs::metadata(&cached_vector.output).unwrap().ino()
+        );
+        assert!(!cached_vector.environment_comparable);
+        assert_eq!(cached_vector.in_size, fs::metadata(svg).unwrap().len());
     }
 
     #[test]
@@ -4671,22 +4913,16 @@ mod tests {
     }
 
     #[test]
-    fn batch_state_allows_one_active_task_and_cancels_it() {
-        let state = BatchState::default();
-        let batch = state.begin().unwrap();
-
-        assert!(state.begin().is_err());
-        assert!(state.cancel_current());
-        assert!(batch.token.is_cancelled());
-
-        state.finish(batch.id());
-        assert!(state.begin().is_ok());
-    }
-
-    #[test]
     fn batch_empty_options_finishes_cleanly() {
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary = convert_batch(Vec::new(), progress, CancellationToken::new(), None).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary = convert_batch(
+            Vec::new(),
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            None,
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 0);
         assert_eq!(summary.completed, 0);
@@ -4741,9 +4977,15 @@ mod tests {
             color_management_policy: None,
             pdf: None,
         };
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary =
-            convert_batch(vec![options], progress, CancellationToken::new(), Some(2)).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary = convert_batch(
+            vec![options],
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            Some(2),
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 1);
         assert_eq!(summary.completed, 1);
@@ -4769,7 +5011,7 @@ mod tests {
 
         let err = convert(&options).unwrap_err();
 
-        assert!(err.contains("不小于源文件"));
+        assert!(err.detail.contains("不小于源文件"));
         assert!(!out_dir.join("sample.jpg").exists());
 
         fs::remove_dir_all(dir).unwrap();
@@ -4812,10 +5054,16 @@ mod tests {
         options.overwrite_mode = Some("overwrite".to_string());
         options.skip_if_larger = true;
         options.multi_candidate = false;
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
+        let progress = crate::progress::NullSink;
 
-        let summary =
-            convert_batch(vec![options], progress, CancellationToken::new(), Some(2)).unwrap();
+        let summary = convert_batch(
+            vec![options],
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            Some(2),
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 1);
         assert_eq!(summary.completed, 0);
@@ -4925,7 +5173,10 @@ mod tests {
         options.overwrite_mode = Some("overwrite".to_string());
 
         let error = convert(&options).unwrap_err();
-        assert!(error.starts_with(SOURCE_OVERWRITE_CONFIRMATION_REQUIRED_PREFIX));
+        assert_eq!(
+            error.kind,
+            ConversionErrorKind::SourceOverwriteConfirmationRequired
+        );
         assert_eq!(fs::read(&input).unwrap(), original);
 
         options.allow_source_overwrite = true;
@@ -4947,9 +5198,10 @@ mod tests {
         );
 
         options.output_suffix = Some("_bad/path".to_string());
-        assert!(output_path(&options)
-            .unwrap_err()
-            .starts_with(INVALID_OUTPUT_SUFFIX_PREFIX));
+        assert_eq!(
+            output_path(&options).unwrap_err().kind,
+            ConversionErrorKind::InvalidOutputSuffix
+        );
 
         options.output_suffix = Some(".jpg".to_string());
         assert_eq!(
@@ -4958,9 +5210,10 @@ mod tests {
         );
 
         options.output_suffix = Some("x".repeat(MAX_OUTPUT_SUFFIX_CHARS + 1));
-        assert!(output_path(&options)
-            .unwrap_err()
-            .starts_with(INVALID_OUTPUT_SUFFIX_PREFIX));
+        assert_eq!(
+            output_path(&options).unwrap_err().kind,
+            ConversionErrorKind::InvalidOutputSuffix
+        );
 
         options.input = format!("{}.png", "a".repeat(300));
         options.output_suffix = Some("_done".to_string());
@@ -4991,7 +5244,7 @@ mod tests {
         options.out_dir = Some("https://example.com/output".to_string());
 
         let error = output_path(&options).unwrap_err();
-        assert!(error.contains("不支持的路径 URL scheme"));
+        assert!(error.detail.contains("不支持的路径 URL scheme"));
     }
 
     #[test]
@@ -5204,7 +5457,7 @@ mod tests {
 
         let err = output_path(&options).unwrap_err();
 
-        assert!(err.contains("非法路径片段"));
+        assert!(err.detail.contains("非法路径片段"));
     }
 
     #[test]
@@ -5258,8 +5511,15 @@ mod tests {
                 pdf: None,
             })
             .collect();
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary = convert_batch(options, progress, CancellationToken::new(), Some(2)).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary = convert_batch(
+            options,
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            Some(2),
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 2);
         assert_eq!(summary.completed, 2);
@@ -5325,8 +5585,15 @@ mod tests {
                 pdf: None,
             })
             .collect();
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary = convert_batch(options, progress, CancellationToken::new(), Some(2)).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary = convert_batch(
+            options,
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            Some(2),
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 2);
         assert_eq!(summary.completed, 1);
@@ -5649,8 +5916,9 @@ mod tests {
         };
         let token = CancellationToken::new();
         token.cancel();
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary = convert_batch(vec![options], progress, token, Some(2)).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary =
+            convert_batch(vec![options], &progress, BatchId::new(1), token, Some(2)).unwrap();
 
         assert_eq!(summary.total, 1);
         assert_eq!(summary.completed, 0);
@@ -5710,9 +5978,15 @@ mod tests {
             color_management_policy: None,
             pdf: None,
         };
-        let progress = Channel::<BatchProgressEvent>::new(|_| Ok(()));
-        let summary =
-            convert_batch(vec![options], progress, CancellationToken::new(), Some(2)).unwrap();
+        let progress = crate::progress::NullSink;
+        let summary = convert_batch(
+            vec![options],
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            Some(2),
+        )
+        .unwrap();
 
         assert_eq!(summary.total, 1);
         assert_eq!(summary.completed, 0);
@@ -5756,6 +6030,7 @@ mod tests {
         );
 
         let result = convert(&options).unwrap();
+        assert!(!result.environment_comparable);
         assert_eq!(result.output_count, 2);
         assert_eq!(result.skipped_output_count, 0);
         assert!(out_dir.join("document_done-page-001.png").exists());
@@ -5806,11 +6081,77 @@ mod tests {
 
     #[test]
     fn batch_progress_send_failure_aborts_batch() {
-        let progress = Channel::<BatchProgressEvent>::new(|_| {
-            Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "closed").into())
-        });
-        let err = convert_batch(Vec::new(), progress, CancellationToken::new(), None).unwrap_err();
+        let progress = crate::progress::FnSink::new(|_, _| Err(crate::progress::SinkClosed));
+        let err = convert_batch(
+            Vec::new(),
+            &progress,
+            BatchId::new(1),
+            CancellationToken::new(),
+            None,
+        )
+        .unwrap_err();
 
         assert!(err.contains("无法发送批量进度事件"));
+    }
+
+    #[test]
+    fn batch_progress_send_failure_mid_run_cancels_workers_and_stops_output() {
+        let dir = unique_test_dir("batch-send-failure");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let mut options = Vec::new();
+        for index in 0..4 {
+            let input = dir.join(format!("in-{index}.png"));
+            fs::write(&input, one_by_one_png()).unwrap();
+            options.push(path_conversion_smoke_options(
+                input.to_string_lossy().into_owned(),
+                Some(out_dir.to_string_lossy().into_owned()),
+                "png".into(),
+            ));
+        }
+        let seen = Mutex::new(Vec::<String>::new());
+        let failing = crate::progress::FnSink::new(|_, event| {
+            let mut seen = seen.lock().unwrap();
+            let name = match &event {
+                BatchProgressEvent::Started { .. } => "started",
+                BatchProgressEvent::FileStarted { .. } => "file_started",
+                BatchProgressEvent::FileProgress { .. } => "file_progress",
+                BatchProgressEvent::FileFinished { .. } => "file_finished",
+                BatchProgressEvent::FileSkipped { .. } => "file_skipped",
+                BatchProgressEvent::FileError { .. } => "file_error",
+                BatchProgressEvent::Cancelled { .. } => "cancelled",
+                BatchProgressEvent::Finished { .. } => "finished",
+            };
+            seen.push(name.to_string());
+            if matches!(event, BatchProgressEvent::FileStarted { .. }) {
+                return Err(crate::progress::SinkClosed);
+            }
+            Ok(())
+        });
+        let cancel = CancellationToken::new();
+        let err =
+            convert_batch(options, &failing, BatchId::new(1), cancel.clone(), Some(1)).unwrap_err();
+
+        assert!(err.contains("无法发送批量进度事件"));
+        // The coordinator cancelled the shared token so workers stop early…
+        assert!(cancel.is_cancelled());
+        // …and nothing is sent after the failed event: no terminal events at all.
+        let seen = seen.into_inner().unwrap();
+        assert_eq!(seen.first().map(String::as_str), Some("started"));
+        assert_eq!(seen.last().map(String::as_str), Some("file_started"));
+        assert!(!seen
+            .iter()
+            .any(|name| name == "finished" || name == "cancelled"));
+        assert!(!seen.iter().any(|name| name == "file_finished"));
+        // With concurrency 1 the cancelled queue leaves most inputs unconverted.
+        let written = fs::read_dir(&out_dir)
+            .map(|entries| entries.count())
+            .unwrap_or(0);
+        assert!(
+            written < 4,
+            "workers kept writing after the sink failed: {written}"
+        );
+
+        fs::remove_dir_all(dir).unwrap();
     }
 }

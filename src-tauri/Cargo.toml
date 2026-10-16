@@ -25,13 +25,15 @@ required-features = ["fuzzing"]
 default = ["updater"]
 updater = ["dep:tauri-plugin-updater"]
 desktop-e2e = []
-fuzzing = ["dep:tempfile"]
+fuzzing = ["imgconvert-backend/fuzzing"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 imgconvert-core = { path = "../crates/imgconvert-core" }
+imgconvert-platform = { path = "../crates/imgconvert-platform" }
+imgconvert-backend = { path = "../crates/imgconvert-backend" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
@@ -41,25 +43,6 @@ tauri-plugin-persisted-scope = "2"
 tauri-plugin-updater = { version = "2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio-util = "0.7"
-blake3 = "1.8"
-unicode-normalization = "0.1"
-tempfile = { version = "3", optional = true }
-# Pure-Rust, CPU-only PDF rasterization. Keeping this at the Tauri boundary
-# avoids making PDF a fake image format in imgconvert-core and adds no runtime
-# system library/download requirement to packaged desktop builds.
-hayro = "0.7.1"
 tauri-plugin-process = "2"
 tauri-plugin-os = "2.3.2"
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.61.3", features = [
-  "Win32_Foundation",
-  "Win32_Graphics_Imaging",
-  "Win32_Storage_FileSystem",
-  "Win32_System_Com",
-  "Win32_System_Com_StructuredStorage",
-] }

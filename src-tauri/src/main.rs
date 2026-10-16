@@ -5,6 +5,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    tauri_app_lib::perf_probe_init();
+    tauri_app_lib::perf_probe_mark_native("main_start", None);
     if std::env::var_os("IMGCONVERT_PATH_CONVERT_SMOKE").is_some() {
         if let Err(error) = run_path_conversion_smoke() {
             eprintln!("imgconvert path conversion smoke failed: {error}");
@@ -28,6 +30,7 @@ fn main() {
         }
         return;
     }
+    tauri_app_lib::perf_probe_mark_native("rust_run", None);
     tauri_app_lib::run()
 }
 

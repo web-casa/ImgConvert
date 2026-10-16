@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
-use crate::{access, external_codecs};
+use crate::access;
+use imgconvert_platform::external_codecs;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

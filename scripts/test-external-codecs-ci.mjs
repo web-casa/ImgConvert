@@ -9,8 +9,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const tempParent = join(root, "target");
 mkdirSync(tempParent, { recursive: true });
 const tempRoot = mkdtempSync(join(tempParent, "external-codecs-ci-"));
-const externalCodecsPath = resolve(root, "src-tauri", "src", "external_codecs.rs");
-const windowsSystemCodecsPath = resolve(root, "src-tauri", "src", "windows_system_codecs.rs");
+const platformSrc = resolve(root, "crates", "imgconvert-platform", "src");
+const externalCodecsPath = join(platformSrc, "external_codecs.rs");
+const windowsSystemCodecsPath = join(platformSrc, "windows_system_codecs.rs");
 
 function run(command, args, options = {}) {
   execFileSync(command, args, {

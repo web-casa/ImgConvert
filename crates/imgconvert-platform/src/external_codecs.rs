@@ -8,10 +8,14 @@
 
 use std::env;
 use std::ffi::OsStr;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::Read;
 #[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::os::windows::fs::OpenOptionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1177,7 +1181,7 @@ fn parse_and_validate_manifest(bytes: &[u8], source: &str) -> Result<CodecManife
 }
 
 #[cfg(feature = "fuzzing")]
-pub(crate) fn fuzz_manifest_bytes(bytes: &[u8]) {
+pub fn fuzz_manifest_bytes(bytes: &[u8]) {
     if bytes.len() > MAX_PLUGIN_MANIFEST_BYTES {
         return;
     }
@@ -1457,7 +1461,7 @@ fn find_heic_helper_in_path(paths: &OsStr) -> Option<Helper> {
     None
 }
 
-pub(crate) fn find_trusted_executable_in_path(command: &str, paths: &OsStr) -> Option<PathBuf> {
+pub fn find_trusted_executable_in_path(command: &str, paths: &OsStr) -> Option<PathBuf> {
     for dir in env::split_paths(paths) {
         if !is_trusted_path_dir(&dir) {
             continue;
@@ -1795,6 +1799,33 @@ fn run_decode_helper(
     let stderr_reader = spawn_capped_reader(stderr, MAX_HEIC_HELPER_STDERR_BYTES);
 
     let started = std::time::Instant::now();
+    #[cfg(unix)]
+    let status = loop {
+        if helper_exited_without_reaping(child.id())
+            .map_err(|error| format!("等待 HEIC helper 失败: {error}"))?
+        {
+            // Keep the exited group leader as a zombie until the group has
+            // been terminated. Its PID therefore cannot be reused between
+            // observing completion and sending SIGKILL to the process group.
+            terminate_remaining_helper_process_group(child.id());
+            break child
+                .wait()
+                .map_err(|error| format!("回收 HEIC helper 失败: {error}"))?;
+        }
+        if started.elapsed() >= HEIC_DECODE_TIMEOUT {
+            terminate_helper_process_tree(&mut child);
+            let stderr = join_capped_reader(stderr_reader);
+            return Err(format!(
+                "HEIC helper {} 解码超时({}s){}",
+                helper.command,
+                HEIC_DECODE_TIMEOUT.as_secs(),
+                stderr_suffix(&stderr)
+            ));
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+
+    #[cfg(not(unix))]
     let status = loop {
         if let Some(status) = child
             .try_wait()
@@ -1815,8 +1846,6 @@ fn run_decode_helper(
         thread::sleep(Duration::from_millis(50));
     };
 
-    #[cfg(unix)]
-    terminate_remaining_helper_process_group(child.id());
     let stderr = join_capped_reader(stderr_reader);
     if status.success() {
         Ok(stderr)
@@ -1861,32 +1890,41 @@ fn terminate_remaining_helper_process_group(pid: u32) {
 }
 
 #[cfg(unix)]
+fn helper_exited_without_reaping(pid: u32) -> std::io::Result<bool> {
+    let pid = libc::id_t::try_from(pid)
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid child PID"))?;
+    let mut info = std::mem::MaybeUninit::<libc::siginfo_t>::zeroed();
+    let result = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            pid,
+            info.as_mut_ptr(),
+            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let info = unsafe { info.assume_init() };
+    Ok(unsafe { info.si_pid() } != 0)
+}
+
+#[cfg(unix)]
 fn kill_helper_process_group(pid: u32) -> bool {
     i32::try_from(pid)
         .ok()
         .is_some_and(|pid| unsafe { libc::kill(-pid, libc::SIGKILL) == 0 })
 }
 
-fn read_decoded_png(workdir: &Path, output: &Path) -> Result<Vec<u8>, String> {
+fn read_decoded_png(_workdir: &Path, output: &Path) -> Result<Vec<u8>, String> {
     if output.exists() {
         return read_limited_file(output, MAX_HEIC_DECODED_PNG_BYTES);
     }
 
-    let mut candidates = fs::read_dir(workdir)
-        .map_err(|error| format!("无法读取 HEIC 临时目录 {}: {error}", workdir.display()))?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|path| {
-            path.extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("png"))
-        })
-        .collect::<Vec<_>>();
-    candidates.sort();
-
-    let Some(first) = candidates.first() else {
-        return Err(format!("HEIC helper 未生成 PNG 输出: {}", output.display()));
-    };
-    read_limited_file(first, MAX_HEIC_DECODED_PNG_BYTES)
+    Err(format!(
+        "HEIC helper 未生成约定的 PNG 输出: {}",
+        output.display()
+    ))
 }
 
 fn read_metadata_sidecar(workdir: &Path, sidecar: &Path) -> Result<Option<RawMetadata>, String> {
@@ -1939,8 +1977,22 @@ fn sidecar_blob_path(workdir: &Path, name: &str) -> Result<PathBuf, String> {
 }
 
 fn read_limited_file(path: &Path, max_bytes: usize) -> Result<Vec<u8>, String> {
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|error| format!("无法读取 HEIC helper 输出 {}: {error}", path.display()))?;
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NOFOLLOW);
+    #[cfg(windows)]
+    // FILE_FLAG_OPEN_REPARSE_POINT: inspect the link/junction itself rather
+    // than following a helper-controlled reparse point outside the workdir.
+    options.custom_flags(0x0020_0000);
+    let file = options
+        .open(path)
+        .map_err(|error| format!("无法安全打开 HEIC helper 输出 {}: {error}", path.display()))?;
+    // Inspect the already-opened handle so a helper cannot swap the path
+    // between a metadata check and the subsequent read.
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("无法读取 HEIC helper 输出属性 {}: {error}", path.display()))?;
     if !metadata.is_file() {
         return Err(format!("HEIC helper 输出不是普通文件: {}", path.display()));
     }
@@ -1952,8 +2004,6 @@ fn read_limited_file(path: &Path, max_bytes: usize) -> Result<Vec<u8>, String> {
         ));
     }
 
-    let file = File::open(path)
-        .map_err(|error| format!("无法读取 HEIC helper 输出 {}: {error}", path.display()))?;
     let mut reader = file.take(max_bytes as u64 + 1);
     let mut bytes = Vec::with_capacity(metadata.len().min(max_bytes as u64) as usize);
     reader
@@ -2097,9 +2147,16 @@ mod tests {
         let mut child = command.spawn().unwrap();
         let pid = child.id();
         let mut stderr = child.stderr.take().unwrap();
-        assert!(child.wait().unwrap().success());
-
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while !helper_exited_without_reaping(pid).unwrap() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "shell helper did not exit"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
         terminate_remaining_helper_process_group(pid);
+        assert!(child.wait().unwrap().success());
 
         let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
@@ -2448,6 +2505,35 @@ mod tests {
 
         assert!(err.contains("HEIC helper 输出超过上限"));
 
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn read_decoded_png_rejects_an_unexpected_png_name() {
+        let dir = unique_test_dir("unexpected-output");
+        fs::create_dir_all(&dir).unwrap();
+        let expected = dir.join("decoded.png");
+        fs::write(dir.join("attacker.png"), b"not the protocol output").unwrap();
+
+        let err = read_decoded_png(&dir, &expected).unwrap_err();
+
+        assert!(err.contains("未生成约定的 PNG 输出"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_limited_file_rejects_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let dir = unique_test_dir("symlink-output");
+        fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("target.bin");
+        let link = dir.join("output.bin");
+        fs::write(&target, b"bytes").unwrap();
+        symlink(&target, &link).unwrap();
+
+        assert!(read_limited_file(&link, 32).is_err());
         fs::remove_dir_all(dir).unwrap();
     }
 

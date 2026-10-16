@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::macos_security::ScopedResource;
+use imgconvert_platform::macos_security::ScopedResource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorizedPath {
@@ -174,7 +174,7 @@ fn selected_path_to_path_buf(path: &str) -> Result<PathBuf, String> {
     if trimmed.is_empty() {
         return Err("路径为空".to_string());
     }
-    if let Ok(url) = tauri::Url::parse(trimmed) {
+    if let Ok(url) = url::Url::parse(trimmed) {
         if url.scheme() == "file" {
             return url
                 .to_file_path()

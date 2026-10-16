@@ -77,8 +77,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --check
-      - run: cargo clippy -p imgconvert-core --all-targets -- -D warnings
-      - run: cargo test -p imgconvert-core
+      # The root workspace holds core, platform and backend; the Tauri shell has its own workspace below.
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
 
   fuzz-corpus:
     name: Fuzz Corpus Replay

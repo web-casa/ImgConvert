@@ -1,6 +1,6 @@
-# 工作区根。P0.5 阶段只含 imgconvert-core(纯库,与 Tauri/webkit 解耦,可在容器内编译测试)。
-# src-tauri 暂排除(其 webkit2gtk 依赖在 Linux 容器内无法 cargo check);P1 再把它纳入并以 path 依赖 core。
+# 工作区根只纳入可独立测试和发布的 imgconvert-core 纯 Rust 库。
+# Tauri 应用与 fuzz harness 各自维护独立 Cargo workspace/lockfile，避免桌面系统依赖污染核心库检查。
 [workspace]
 resolver = "2"
-members = ["crates/imgconvert-core"]
+members = ["crates/imgconvert-core", "crates/imgconvert-platform", "crates/imgconvert-backend"]
 exclude = ["src-tauri", "fuzz"]

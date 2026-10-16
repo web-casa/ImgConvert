@@ -998,7 +998,8 @@ pub fn convert(input: &[u8], target: Format, opts: &EncodeOptions) -> Result<Vec
 }
 
 /// 顶层管线,允许调用侧为外部 helper 解码路径补充 sidecar 元数据。
-pub fn convert_with_metadata(
+#[cfg(test)]
+fn convert_with_metadata(
     input: &[u8],
     target: Format,
     opts: &EncodeOptions,
@@ -1008,7 +1009,8 @@ pub fn convert_with_metadata(
 }
 
 /// 顶层管线,允许调用侧显式选择色彩管理策略。
-pub fn convert_with_color_policy(
+#[cfg(test)]
+fn convert_with_color_policy(
     input: &[u8],
     target: Format,
     opts: &EncodeOptions,
@@ -1019,11 +1021,11 @@ pub fn convert_with_color_policy(
 }
 
 /// 多候选管线:输入只解码一次,然后用多个编码参数竞争,返回体积最小的候选。
-pub fn convert_best_of(input: &[u8], target: Format, options: &[EncodeOptions]) -> Result<Vec<u8>> {
+fn convert_best_of(input: &[u8], target: Format, options: &[EncodeOptions]) -> Result<Vec<u8>> {
     convert_best_of_with_metadata(input, target, options, None)
 }
 
-pub fn convert_best_of_with_metadata(
+fn convert_best_of_with_metadata(
     input: &[u8],
     target: Format,
     options: &[EncodeOptions],
@@ -1038,7 +1040,7 @@ pub fn convert_best_of_with_metadata(
     )
 }
 
-pub fn convert_best_of_with_color_policy(
+fn convert_best_of_with_color_policy(
     input: &[u8],
     target: Format,
     options: &[EncodeOptions],
@@ -1055,6 +1057,7 @@ pub fn convert_best_of_with_color_policy(
     )
 }
 
+#[doc(hidden)]
 pub fn convert_best_of_with_color_policy_timeout(
     input: &[u8],
     target: Format,
@@ -1108,7 +1111,8 @@ fn convert_best_of_with_color_policy_deadline_inner(
 }
 
 /// 自动质量管线:仅 JPEG/WebP。输入只解码一次,按 SSIMULACRA2 找到达目标分的最低质量。
-pub fn convert_auto_quality(
+#[cfg(test)]
+fn convert_auto_quality(
     input: &[u8],
     target: Format,
     options: &[EncodeOptions],
@@ -1117,7 +1121,8 @@ pub fn convert_auto_quality(
     convert_auto_quality_with_metadata(input, target, options, auto, None)
 }
 
-pub fn convert_auto_quality_with_metadata(
+#[cfg(test)]
+fn convert_auto_quality_with_metadata(
     input: &[u8],
     target: Format,
     options: &[EncodeOptions],
@@ -1134,7 +1139,8 @@ pub fn convert_auto_quality_with_metadata(
     )
 }
 
-pub fn convert_auto_quality_with_color_policy(
+#[cfg(test)]
+fn convert_auto_quality_with_color_policy(
     input: &[u8],
     target: Format,
     options: &[EncodeOptions],
@@ -1153,27 +1159,7 @@ pub fn convert_auto_quality_with_color_policy(
     )
 }
 
-pub fn convert_auto_quality_with_color_policy_timeout(
-    input: &[u8],
-    target: Format,
-    options: &[EncodeOptions],
-    auto: &AutoQualityOptions,
-    metadata_override: Option<&RawMetadata>,
-    color_policy: ColorManagementPolicy,
-    timeout: Duration,
-) -> Result<AutoQualityResult> {
-    let deadline = EncodeDeadline::from_timeout(timeout);
-    convert_auto_quality_with_color_policy_deadline(
-        input,
-        target,
-        options,
-        auto,
-        metadata_override,
-        color_policy,
-        Some(&deadline),
-    )
-}
-
+#[cfg(test)]
 fn convert_auto_quality_with_color_policy_deadline(
     input: &[u8],
     target: Format,
@@ -1196,6 +1182,7 @@ fn convert_auto_quality_with_color_policy_deadline(
     })
 }
 
+#[cfg(test)]
 fn convert_auto_quality_with_color_policy_deadline_inner(
     input: &[u8],
     target: Format,
@@ -1743,6 +1730,7 @@ fn encode_best_candidate_with_control(
     best.ok_or_else(|| Error::Invalid("没有可用编码候选".into()))
 }
 
+#[cfg(test)]
 fn encode_auto_quality_with_deadline(
     img: &ImageData,
     target: Format,
