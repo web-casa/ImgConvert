@@ -1,0 +1,127 @@
+_version: 2
+app.title:
+  en: ImgConvert
+  zh-CN: ImgConvert
+app.language_toggle:
+  en: 中文
+  zh-CN: English
+app.language_toggle_tooltip:
+  en: Switch the interface to Chinese
+  zh-CN: 切换为英文界面
+app.quit:
+  en: Quit ImgConvert
+  zh-CN: 退出 ImgConvert
+app.open_files:
+  en: Open…
+  zh-CN: 打开…
+menu.file:
+  en: File
+  zh-CN: 文件
+queue.title:
+  en: Queue
+  zh-CN: 队列
+queue.add_files:
+  en: Add files…
+  zh-CN: 添加文件…
+queue.clear:
+  en: Clear
+  zh-CN: 清空
+queue.cancel_import:
+  en: Stop
+  zh-CN: 停止
+queue.empty_title:
+  en: No images yet
+  zh-CN: 还没有图片
+queue.empty_description:
+  en: Drop images or folders here, or add them with the button above.
+  zh-CN: 把图片或文件夹拖到这里，或用上方按钮添加。
+queue.drop_hint:
+  en: Drop to add to the queue
+  zh-CN: 松开即可加入队列
+queue.importing:
+  en: Scanning…
+  zh-CN: 正在扫描…
+queue.item_count:
+  en: "%{count} items"
+  zh-CN: "%{count} 个文件"
+queue.import_added:
+  en: "Added %{added} files"
+  zh-CN: "已添加 %{added} 个文件"
+queue.import_added_skipped:
+  en: "Added %{added} files, skipped %{skipped}"
+  zh-CN: "已添加 %{added} 个文件，跳过 %{skipped} 个"
+queue.import_nothing:
+  en: No supported images found
+  zh-CN: 没有找到支持的图片
+queue.import_failed:
+  en: "Couldn’t scan the selection: %{detail}"
+  zh-CN: "无法扫描所选内容：%{detail}"
+queue.import_cancelled:
+  en: Scan cancelled
+  zh-CN: 扫描已取消
+queue.thumbnail_unavailable:
+  en: No preview
+  zh-CN: 无预览
+status.pending:
+  en: Pending
+  zh-CN: 等待中
+status.running:
+  en: Converting…
+  zh-CN: 转换中…
+status.done:
+  en: Done
+  zh-CN: 完成
+status.skipped:
+  en: Skipped
+  zh-CN: 已跳过
+status.error:
+  en: Failed
+  zh-CN: 失败
+status.saved:
+  en: "%{before} → %{after}"
+  zh-CN: "%{before} → %{after}"
+workflow.title:
+  en: Convert
+  zh-CN: 转换
+workflow.format:
+  en: Output format
+  zh-CN: 输出格式
+workflow.output_dir:
+  en: Output folder
+  zh-CN: 输出文件夹
+workflow.choose_output:
+  en: Choose folder…
+  zh-CN: 选择文件夹…
+workflow.output_not_chosen:
+  en: Chosen when you start
+  zh-CN: 开始时选择
+workflow.start:
+  en: Start
+  zh-CN: 开始转换
+workflow.start_choose:
+  en: Start…
+  zh-CN: 开始转换…
+workflow.cancel:
+  en: Cancel
+  zh-CN: 取消
+workflow.cancelling:
+  en: Cancelling…
+  zh-CN: 正在取消…
+workflow.progress:
+  en: "%{done} of %{total} done"
+  zh-CN: "已完成 %{done} / %{total}"
+workflow.summary:
+  en: "%{done} done · %{skipped} skipped · %{failed} failed"
+  zh-CN: "完成 %{done} · 跳过 %{skipped} · 失败 %{failed}"
+workflow.summary_cancelled:
+  en: "Cancelled after %{done} of %{total}"
+  zh-CN: "已取消，完成 %{done} / %{total}"
+workflow.failed:
+  en: "Batch failed: %{detail}"
+  zh-CN: "批量转换失败：%{detail}"
+workflow.already_running:
+  en: A batch is already running
+  zh-CN: 已有批量任务正在运行
+workflow.nothing_to_convert:
+  en: Add images to the queue first
+  zh-CN: 请先把图片加入队列

@@ -37,11 +37,18 @@ const ignoredAdvisories = [
   "RUSTSEC-2026-0194",
   "RUSTSEC-2026-0195",
   "RUSTSEC-2025-0141",
+  // GPUI 0.3.8 (the gpui-kit 0.7.1 line) carries unmaintained-only advisories for
+  // instant, rustls-pemfile, rustybuzz and ttf-parser; revisit on each gpui-kit upgrade.
+  "RUSTSEC-2024-0384",
+  "RUSTSEC-2025-0134",
+  "RUSTSEC-2026-0192",
+  "RUSTSEC-2026-0206",
 ];
 
 const auditTargets = [
   ["core workspace", path.join(repoRoot, "Cargo.lock")],
   ["Tauri desktop", path.join(tauriDir, "Cargo.lock")],
+  ["GPUI shell", path.join(repoRoot, "apps", "gpui", "Cargo.lock")],
 ];
 
 for (const [label, lockfile] of auditTargets) {

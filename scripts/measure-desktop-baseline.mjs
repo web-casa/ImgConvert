@@ -57,6 +57,8 @@ const options = {
   out: undefined,
   purge: false,
   note: "",
+  batchOut: undefined,
+  batchFormat: undefined,
   readyTimeoutMs: 60_000,
   importTimeoutMs: 15 * 60_000,
   batchTimeoutMs: 60 * 60_000,
@@ -82,6 +84,9 @@ for (const arg of process.argv.slice(2).filter((value) => value !== "--")) {
       .filter(Boolean);
   else if (arg.startsWith("--out=")) options.out = arg.slice("--out=".length);
   else if (arg.startsWith("--note=")) options.note = arg.slice("--note=".length);
+  else if (arg.startsWith("--batch-out=")) options.batchOut = arg.slice("--batch-out=".length);
+  else if (arg.startsWith("--batch-format="))
+    options.batchFormat = arg.slice("--batch-format=".length);
   else if (arg.startsWith("--batch-timeout-min="))
     options.batchTimeoutMs = Number.parseInt(arg.slice("--batch-timeout-min=".length), 10) * 60_000;
   else if (arg === "--purge") options.purge = true;
@@ -95,7 +100,7 @@ const KNOWN_SCENARIOS = new Set(["startup", "import", "manual-batch"]);
 function usageError(message) {
   console.error(message);
   console.error(
-    "usage: measure-desktop-baseline.mjs --app=<binary|.app> --label=<tauri|gpui> [--corpus=<dir>] [--runs=N] [--settle=S] [--scroll-ms=MS] [--sample-ms=MS] [--scenarios=startup,import,manual-batch] [--out=<file.json>] [--note=<text>] [--batch-timeout-min=M] [--purge]",
+    "usage: measure-desktop-baseline.mjs --app=<binary|.app> --label=<tauri|gpui> [--corpus=<dir>] [--runs=N] [--settle=S] [--scroll-ms=MS] [--sample-ms=MS] [--scenarios=startup,import,manual-batch] [--out=<file.json>] [--note=<text>] [--batch-timeout-min=M] [--batch-out=<dir>] [--batch-format=<fmt>] [--purge]",
   );
   process.exit(2);
 }
@@ -456,6 +461,14 @@ async function runOnce(scenario, runIndex) {
     env.IMGCONVERT_PERF_PROBE_SCROLL = "1";
     env.IMGCONVERT_PERF_PROBE_SCROLL_MS = String(options.scrollMs);
   }
+  // With --batch-out the shell starts the batch itself into a fresh folder per
+  // run (the GPUI shell honours this; the Tauri shell still needs the operator).
+  if (scenario === "manual-batch" && options.batchOut) {
+    const runDir = path.join(path.resolve(options.batchOut), `run-${runIndex + 1}-${Date.now()}`);
+    mkdirSync(runDir, { recursive: true });
+    env.IMGCONVERT_PERF_PROBE_BATCH_OUT = runDir;
+    if (options.batchFormat) env.IMGCONVERT_PERF_PROBE_BATCH_FORMAT = options.batchFormat;
+  }
 
   const preexistingHelpers =
     process.platform === "darwin" ? helperPidsDarwin(listProcessesDarwin()) : new Set();
@@ -561,7 +574,9 @@ async function runOnce(scenario, runIndex) {
         if (scenario === "manual-batch") {
           console.error(
             `\n[run ${runIndex + 1}] Queue is loaded (${markValue(marks, "probe_done") ?? "?"} items). ` +
-              "In the app: choose an output directory and click Start. " +
+              (options.batchOut
+                ? "The shell starts the batch into the --batch-out folder. "
+                : "In the app: choose an output directory and click Start. ") +
               `Waiting up to ${Math.round(options.batchTimeoutMs / 60_000)} min for the batch to finish.`,
           );
           const started = await waitForMark(["batch_start"], options.batchTimeoutMs);

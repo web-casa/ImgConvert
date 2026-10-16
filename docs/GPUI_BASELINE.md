@@ -30,6 +30,8 @@
 | `IMGCONVERT_PERF_PROBE_IMPORT=<dir>` | UI 就绪后自动导入该目录（递归） |
 | `IMGCONVERT_PERF_PROBE_SCROLL=1` | 静默后自动滚动队列并统计回调间隔 |
 | `IMGCONVERT_PERF_PROBE_SCROLL_MS=<ms>` | 滚动时长，默认 10000，范围 1000–120000 |
+| `IMGCONVERT_PERF_PROBE_BATCH_OUT=<dir>` | `probe_done` 之后自动以默认参数把整个队列转换到该目录（仅 GPUI 壳实现；Tauri 壳忽略，仍需人工点击）。脚本的 `--batch-out=<dir>` 会为每次运行建一个空子目录并设置它 |
+| `IMGCONVERT_PERF_PROBE_BATCH_FORMAT=<fmt>` | 自动批次的输出格式（如 `avif`），不设则用面板当前选择；脚本参数 `--batch-format=<fmt>`。与 Tauri 侧人工选择的格式对齐后数字才可比 |
 
 标记序列（Rust 侧只接受下表中前端标记的固定集合，每进程最多 10,000 条）：
 
@@ -129,6 +131,8 @@ pnpm run bench:desktop:baseline --app=/Applications/ImgConvert.app --label=tauri
 
 转换需要输出目录授权，脚本不代替用户点击。它在队列加载完成后提示你在应用里选择输出目录并点击开始，然后自动等待 `batch_start` 与 `batch_done`（默认最多 60 分钟，`--batch-timeout-min` 可调），不需要回到终端操作。
 
+GPUI 壳不需要人工点击：加 `--batch-out=<dir>` 后，脚本为每次运行创建 `<dir>/run-<n>-<时间戳>` 并通过 `IMGCONVERT_PERF_PROBE_BATCH_OUT` 传给应用，应用在 `probe_done` 后自动以当前格式（默认 WebP）开始转换。Tauri 壳没有实现该变量，比较两端的 `batchPeakRssBytes` 时要记住 Tauri 侧的数字来自人工触发、GPUI 侧来自自动触发，但两者的批次都始于全部用户决策完成之后。
+
 ```bash
 pnpm run bench:desktop:baseline --app=/Applications/ImgConvert.app --label=tauri \
   --corpus=/tmp/imgconvert-corpus-1k --scenarios=manual-batch --runs=3
@@ -166,16 +170,25 @@ WebKit XPC 归属：每次运行归属到 2 个新出现的 `com.apple.WebKit.*`
 
 | 指标 | Tauri 0.3.x | GPUI PoC | GPUI 完整候选 |
 |---|---|---|---|
-| readyMs（startup，中位数） | 1164 ms 热 / 3673 ms 冷 | | |
-| idleRssBytes（startup） | 159.3 MiB | | |
-| importMs（1k / 10k） | 96 ms / 虚拟机不可测 | | |
-| scrollIntervalP99Ms（1k） | 402 ms | | |
-| idleRssBytes（import 1k） | 862.5 MiB | | |
-| quiescenceMs（10k） | 虚拟机不可测 | 必须有数据 | 必须有数据 |
-| scrollIntervalP99Ms（10k） | 虚拟机不可测 | 必须有数据 | 必须有数据 |
-| scrollLongIntervals（10k） | 虚拟机不可测 | 必须有数据 | 必须有数据 |
-| idleRssBytes（import 10k） | 虚拟机不可测 | 必须有数据 | 必须有数据 |
-| batchPeakRssBytes（1k，AVIF） | 1123 MiB（batchMs 33.4 s，n=2） | | |
+| readyMs（startup，中位数） | 1164 ms 热 / 3673 ms 冷 | 404 ms 热（5/5 有效，p95 1093 ms；首次运行含 runtime shader 编译）/ 1432 ms 冷（3/3 有效，`--purge`） | |
+| idleRssBytes（startup） | 159.3 MiB | 49.5 MiB 热 / 42.1 MiB 冷（单进程，−69%） | |
+| importMs（1k / 10k） | 96 ms / 虚拟机不可测 | 97 ms（3/3 有效）/ 1550 ms（2/2 有效） | |
+| scrollIntervalP99Ms（1k） | 402 ms | 52 ms（刷新周期估计 49 ms，虚拟机软件渲染上限；p50 48 ms；整段 0→底→0 三角波，11 k px/s） | |
+| idleRssBytes（import 1k） | 862.5 MiB | 163.0 MiB（−81%；滚完全程后缩略图缓存占到 128 MiB 预算） | |
+| quiescenceMs（10k） | 虚拟机不可测 | 162 ms | 必须有数据 |
+| scrollIntervalP99Ms（10k） | 虚拟机不可测 | 53 ms（p50 46 ms，111 k px/s） | 必须有数据 |
+| scrollLongIntervals（10k） | 虚拟机不可测 | 237（刷新周期 49 ms，几乎每个间隔都 >33 ms；只有分位数可比） | 必须有数据 |
+| idleRssBytes（import 10k） | 虚拟机不可测 | 258.1 MiB | 必须有数据 |
+| batchPeakRssBytes（1k，AVIF） | 1123 MiB（batchMs 33.4 s，n=2，人工点击） | 155.3 MiB（batchMs 30.7 s，3/3 有效，`--batch-out --batch-format=avif` 自动触发；WebP 对照 76.5 MiB / 10.9 s） | |
+
+GPUI PoC 采集记录（2026-10-17，同一台 Parallels 虚拟机，`apps/gpui` 发布构建，二进制 SHA-256 前缀 `ebf787c8`，gpui-kit 0.7.1 默认 `runtime_shaders`，脚本 `measure-desktop-baseline.mjs --label=gpui`，原始文件 `artifacts/baseline/gpui-*.json`）：
+
+- startup 热 5/5 有效：readyMs 中位 404 ms、min 292 ms、p95 1093 ms（首次运行含 Metal shader 运行时编译），空闲 RSS 49.5 MiB，进程树只有 1 个进程。
+- import 1k 3/3 有效（Codex 评审后改为与 Svelte 相同的整段三角波）：importMs 97 ms，quiescenceMs 161 ms，刷新周期估计 49 ms，滚动回调间隔 p50 48 ms / p95 50 ms / p99 52 ms / max 53 ms，`long`（>33 ms）236 次——虚拟机软件渲染的刷新周期本身就超过 33 ms，所以 `long` 计数在两端都接近"全部"，只有分位数的相对值有意义；空闲 RSS 163.0 MiB（滚完全程后缩略图 CPU 缓存达到 128 MiB 预算；早先只滚前段时为 87 MiB）。
+- import 10k 2/2 有效：importMs 1.55 s，静默 162 ms，滚动 p99 53 ms，空闲 RSS 258 MiB；10k 在这台虚拟机上 Tauri 版无法完成，此处只记录 GPUI 有数据。
+- startup 冷 3/3 有效（`--purge`）：readyMs 1432 ms（Tauri 3673 ms），空闲 RSS 42.1 MiB。
+- manual-batch 1k：AVIF 3/3 有效，batchMs 30.7 s，峰值 RSS 155.3 MiB，1000 项全部完成；WebP 对照 10.9 s / 76.5 MiB。Tauri 侧的 1123 MiB 含 WebKit 进程树（队列缩略图与页面），GPUI 侧是单进程，口径按 §3 都是进程树求和。
+- 在该口径下 G2 的"不劣于基线且空闲内存降低 ≥ 25%"在 startup（热/冷）、import 1k、batch 1k 上都满足，import 10k 有数据；还没有的：Windows/Linux 探针、私有 API 扫描、VoiceOver/IME/沙盒冒烟（§4 阶段 2 其余事项）。
 
 ### 6.2 Windows x64
 

@@ -21,13 +21,21 @@ shape.
 Default behavior:
 
 - `CI` runs automatically on `main` pushes and pull requests. The Ubuntu
-  frontend, Rust core, Tauri backend plus desktop E2E, security/license, fuzz
-  corpus replay, and web preview E2E jobs run on `ubuntu-24.04`. The Windows HEIC check runs on
+  frontend, Rust core, GPUI shell, Tauri backend plus desktop E2E,
+  security/license, fuzz corpus replay, and web preview E2E jobs run on
+  `ubuntu-24.04`. The Windows HEIC check runs on
   `windows-latest` for `main` pushes. The Linux package build/install smoke
   runs on both `ubuntu-22.04` and `ubuntu-22.04-arm` for `main` pushes so the
   compatibility check is performed on the same baseline as release builds.
   Manual dispatch keeps the Windows check, package smoke, fuzz replay, and
   arm64 package smoke optional with `false` defaults.
+
+The GPUI shell job (`rust-gpui`) checks the separate `apps/gpui` workspace on
+Linux only: format, Clippy with `--locked`, and the headless Kit UI tests. It
+has its own 45-minute budget and a commit-pinned Rust cache because GPUI and
+its renderer are compiled from source. The six-target probe builds planned for
+migration stage 2 (macOS, Windows and Linux on both architectures) are manual
+packaging work, not part of this automatic run.
 
 The fuzz replay job compiles and deterministically replays all six targets: the
 three core decode/convert/metadata targets plus the Tauri external codec

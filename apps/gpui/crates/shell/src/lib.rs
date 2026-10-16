@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (C) 2026 ImgConvert contributors
+
+//! ImgConvert GPUI shell: initialization, the main window, menus, global
+//! actions and the perf-probe driver. Feature logic lives in the queue and
+//! workflow crates; this crate only composes them.
+
+pub mod probe_driver;
+pub mod workspace;
+
+use std::time::Duration;
+
+use gpui_kit::{App, KeyBinding, Menu, MenuItem, actions};
+use imgconvert_gpui_shared::i18n::{self, Locale, tr};
+use imgconvert_gpui_shared::{Services, services};
+
+pub use workspace::{Workspace, open_main_window};
+
+actions!(imgconvert, [Quit, OpenFiles, ToggleLanguage]);
+
+/// How long quitting waits for in-flight atomic writes.
+pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Initializes Kit, services, locale, key bindings, menus and global actions.
+/// Call once inside `Application::run`, before opening a window.
+pub fn init_app(cx: &mut App) {
+    gpui_kit::init(cx);
+    services::init(cx);
+    i18n::set_locale(Locale::from_environment());
+
+    cx.on_action(|_: &Quit, cx| {
+        let _ = Services::shutdown(cx, SHUTDOWN_TIMEOUT);
+        cx.quit();
+    });
+    cx.on_action(|_: &OpenFiles, cx| imgconvert_gpui_queue::import::pick_and_import(cx));
+    cx.on_action(|_: &ToggleLanguage, cx| toggle_language(cx));
+
+    // Bind before building the menus so shortcuts show next to their items.
+    cx.bind_keys([
+        KeyBinding::new("secondary-q", Quit, None),
+        KeyBinding::new("secondary-o", OpenFiles, None),
+    ]);
+    install_menus(cx);
+}
+
+/// Switches between English and Simplified Chinese and rebuilds every window
+/// and the native menus, which cache their labels.
+pub fn toggle_language(cx: &mut App) {
+    i18n::set_locale(Locale::current().next());
+    install_menus(cx);
+    cx.refresh_windows();
+}
+
+fn install_menus(cx: &mut App) {
+    cx.set_menus(vec![
+        Menu {
+            name: tr("app.title"),
+            items: vec![MenuItem::action(tr("app.quit"), Quit)],
+            disabled: false,
+        },
+        Menu {
+            name: tr("menu.file"),
+            items: vec![MenuItem::action(tr("app.open_files"), OpenFiles)],
+            disabled: false,
+        },
+    ]);
+}

@@ -80,6 +80,38 @@ jobs:
       # The root workspace holds core, platform and backend; the Tauri shell has its own workspace below.
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
+  rust-gpui:
+    name: GPUI Shell (Linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: |
+          scripts/ci-install-apt-packages.sh \
+            build-essential \
+            cmake \
+            meson \
+            nasm \
+            ninja-build \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libfontconfig1-dev \
+            libvulkan-dev \
+            libssl-dev
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: ubuntu-gpui-shell
+          workspaces: apps/gpui -> target
+      # apps/gpui is its own workspace with its own lockfile (migration plan §3.1).
+      - run: cargo fmt --manifest-path apps/gpui/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path apps/gpui/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path apps/gpui/Cargo.toml --workspace --locked
 
   fuzz-corpus:
     name: Fuzz Corpus Replay
@@ -212,6 +244,8 @@ jobs:
       # both that pinned CI version and newer local cargo-deny releases.
       - run: cd src-tauri && cargo deny --manifest-path ../Cargo.toml check bans sources advisories
       - run: cd src-tauri && cargo deny check bans sources advisories
+      # The GPUI shell workspace shares the same policy file (migration plan §2.1).
+      - run: cd src-tauri && cargo deny --manifest-path ../apps/gpui/Cargo.toml check bans sources advisories licenses
       - run: pnpm run audit:rust
       - run: pnpm audit --prod
 
