@@ -346,8 +346,8 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，8 项 P1、7 项 P2�
 
 平台事项进度（2026-10-17）：
 
-- 私有 API 扫描（macOS arm64 发布构建，虚拟机上 `nm -u` + `otool -L`）：`_CGS`/`_SLS` 符号 0 个，无 PrivateFrameworks 链接；链接的系统框架为 AppKit、Metal、CoreText、ImageIO、QuartzCore 等公开框架（GPUI 还带入 CoreLocation、CloudKit、UserNotifications，MAS 审核时要确认用途说明）。x64 构建待 `GPUI Probe` 工作流的 `macos-15-intel` job 产出后扫描。
-- Linux aarch64 探针（本机 OrbStack Debian，Xvfb + lavapipe，debug 构建）：启动、导入 200 张、缩略图、整段三角波滚动、`probe_done` 全部完成；刷新周期估计 46 ms（软件渲染）。其余五个目标由手动工作流 `.github/workflows/gpui-probe.yml` 覆盖（build + 探针启动 + macOS 私有符号扫描），但 `workflow_dispatch` 要求工作流已在默认分支上，PR #10 合并后才能触发。
+- 私有 API 扫描（macOS arm64 发布构建，虚拟机上 `nm -u` + `otool -L`）：`_CGS`/`_SLS` 符号 0 个，无 PrivateFrameworks 链接；链接的系统框架为 AppKit、Metal、CoreText、ImageIO、QuartzCore 等公开框架（GPUI 还带入 CoreLocation、CloudKit、UserNotifications，MAS 审核时要确认用途说明）。x64 构建已由 `GPUI Probe` 首次运行（main，run 38957214119）在 `macos-15-intel` 上完成：构建、`ready`（2.37 s，冷缓存 runner）、私有符号 0 个；arm64 runner 同样通过（`ready` 3.03 s）。
+- Linux aarch64 探针（本机 OrbStack Debian，Xvfb + lavapipe，debug 构建）：启动、导入 200 张、缩略图、整段三角波滚动、`probe_done` 全部完成；刷新周期估计 46 ms（软件渲染）。其余目标由手动工作流 `.github/workflows/gpui-probe.yml` 覆盖（build + 探针启动 + macOS 私有符号扫描）。PR #10 合并后的首次运行：macOS 两个架构通过；Windows x64/ARM64 编译 `vswhom-sys` 时找不到 `cl`（缺 VS 开发环境导入步骤）；Linux x86_64/aarch64 构建通过但 lavapipe ICD 路径列表含不存在的文件导致 `vkCreateInstance` 失败。两处都是工作流问题而非应用问题，修复见 PR #11，之后重跑。
 - VoiceOver/辅助功能树：虚拟机里通过 `osascript` 读取 System Events 的 UI 元素被 TCC 拒绝（"osascript 不允许辅助访问"），需要有人在虚拟机的"隐私与安全性 → 辅助功能"里给终端/`sshd` 授权一次，之后可以无人值守地校验按钮名称与角色；IME 候选框定位同样需要人工。
 - 代码已作为 PR #10（分支 `feat/gpui-stage1-2`，基于 `main` 的 7 个提交）提交评审。
 
