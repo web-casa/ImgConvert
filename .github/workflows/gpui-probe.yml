@@ -1,0 +1,170 @@
+# Migration plan §4 stage 2: builds the GPUI shell on the six desktop targets
+# and proves each binary starts, presents frames and reports `ready` through
+# the perf probe. Manual only; it is a feasibility probe, not a release job.
+name: GPUI Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: Which targets to probe
+        type: choice
+        default: all
+        options:
+          - all
+          - linux
+          - macos
+          - windows
+
+concurrency:
+  group: gpui-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  probe:
+    name: GPUI Probe (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.targets == 'linux' && '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux"}]' || inputs.targets == 'macos' && '[{"target":"macos-arm64","runner":"macos-15","os":"macos"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos"}]' || inputs.targets == 'windows' && '[{"target":"windows-x64","runner":"windows-latest","os":"windows"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows"}]' || '[{"target":"linux-x86_64","runner":"ubuntu-24.04","os":"linux"},{"target":"linux-aarch64","runner":"ubuntu-24.04-arm","os":"linux"},{"target":"macos-arm64","runner":"macos-15","os":"macos"},{"target":"macos-x64","runner":"macos-15-intel","os":"macos"},{"target":"windows-x64","runner":"windows-latest","os":"windows"},{"target":"windows-arm64","runner":"windows-11-arm","os":"windows"}]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Linux build and runtime dependencies
+        if: matrix.os == 'linux'
+        run: |
+          scripts/ci-install-apt-packages.sh \
+            build-essential \
+            cmake \
+            meson \
+            nasm \
+            ninja-build \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libfontconfig1-dev \
+            libvulkan-dev \
+            libssl-dev \
+            mesa-vulkan-drivers \
+            vulkan-tools \
+            xvfb
+
+      - name: Install macOS codec build tools
+        if: matrix.os == 'macos'
+        run: |
+          brew install cmake meson ninja
+          nasm_version="2.16.03"
+          nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+          nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+          curl --fail --location --silent --show-error \
+            "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+            --output "$nasm_archive"
+          echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+            | shasum -a 256 --check
+          mkdir "$nasm_root"
+          unzip -q "$nasm_archive" -d "$nasm_root"
+          echo "$nasm_root/nasm-$nasm_version" >> "$GITHUB_PATH"
+
+      # libdav1d-sys 0.7.1 passes --prefix=/, which Python 3.13 no longer treats as absolute on Windows.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        if: matrix.os == 'windows'
+        with:
+          python-version: "3.12.10"
+          architecture: ${{ matrix.target == 'windows-arm64' && 'arm64' || 'x64' }}
+
+      - name: Install Windows codec build tools
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          cmake --version
+          ninja --version
+          python -m pip install --disable-pip-version-check meson==1.10.1
+          meson --version
+          if ("${{ matrix.target }}" -eq "windows-x64") {
+            # libaom 3.11 checks NASM help using a flag that changed in NASM 3.
+            $nasmVersion = "2.16.03"
+            $nasmArchive = Join-Path $env:RUNNER_TEMP "nasm-$nasmVersion-win64.zip"
+            $nasmRoot = Join-Path $env:RUNNER_TEMP "imgconvert-nasm-$nasmVersion"
+            Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip" -OutFile $nasmArchive
+            $actualHash = (Get-FileHash -Algorithm SHA256 $nasmArchive).Hash.ToLowerInvariant()
+            $expectedHash = "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6"
+            if ($actualHash -ne $expectedHash) {
+              throw "NASM archive checksum mismatch: expected $expectedHash, got $actualHash"
+            }
+            New-Item -ItemType Directory -Path $nasmRoot | Out-Null
+            Expand-Archive -LiteralPath $nasmArchive -DestinationPath $nasmRoot
+            Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $nasmRoot "nasm-$nasmVersion")
+          }
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: gpui-probe-${{ matrix.target }}
+          workspaces: apps/gpui -> target
+
+      - name: Build the GPUI shell
+        env:
+          CC: ${{ matrix.os == 'windows' && 'cl' || '' }}
+          CXX: ${{ matrix.os == 'windows' && 'cl' || '' }}
+        run: cargo build --release --locked --manifest-path apps/gpui/Cargo.toml -p imgconvert-gpui
+
+      - name: Launch with the perf probe (Linux, Xvfb + lavapipe)
+        if: matrix.os == 'linux'
+        run: |
+          set -o pipefail
+          binary=apps/gpui/target/release/imgconvert-gpui
+          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json:/usr/share/vulkan/icd.d/lvp_icd.aarch64.json
+          xvfb-run -a -s "-screen 0 1280x800x24" vulkaninfo --summary | head -40 || true
+          IMGCONVERT_PERF_PROBE=1 timeout --signal=TERM 45 xvfb-run -a -s "-screen 0 1280x800x24" "$binary" 2> probe.log || true
+          cat probe.log
+          grep -q '"mark":"ready"' probe.log
+
+      - name: Launch with the perf probe (macOS)
+        if: matrix.os == 'macos'
+        run: |
+          binary=apps/gpui/target/release/imgconvert-gpui
+          file "$binary"
+          nm -u "$binary" | grep -E '^_CGS|^_SLS' > private-symbols.txt || true
+          otool -L "$binary" | grep -i PrivateFrameworks >> private-symbols.txt || true
+          echo "private API hits: $(wc -l < private-symbols.txt)"
+          IMGCONVERT_PERF_PROBE=1 "$binary" 2> probe.log &
+          pid=$!
+          sleep 30
+          kill "$pid" || true
+          cat probe.log
+          grep -q '"mark":"ready"' probe.log
+          test ! -s private-symbols.txt
+
+      - name: Launch with the perf probe (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $binary = "apps/gpui/target/release/imgconvert-gpui.exe"
+          $env:IMGCONVERT_PERF_PROBE = "1"
+          $process = Start-Process -FilePath $binary -RedirectStandardError probe.log -PassThru
+          Start-Sleep -Seconds 30
+          if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          Get-Content probe.log
+          if (-not (Select-String -Path probe.log -Pattern '"mark":"ready"' -Quiet)) {
+            throw "the GPUI shell never reported ready"
+          }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: gpui-probe-${{ matrix.target }}
+          path: |
+            probe.log
+            private-symbols.txt
+            apps/gpui/target/release/imgconvert-gpui
+            apps/gpui/target/release/imgconvert-gpui.exe
+          if-no-files-found: ignore
+          retention-days: 14

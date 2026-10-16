@@ -35,7 +35,13 @@ Linux only: format, Clippy with `--locked`, and the headless Kit UI tests. It
 has its own 45-minute budget and a commit-pinned Rust cache because GPUI and
 its renderer are compiled from source. The six-target probe builds planned for
 migration stage 2 (macOS, Windows and Linux on both architectures) are manual
-packaging work, not part of this automatic run.
+packaging work, not part of this automatic run. The manual `GPUI Probe`
+workflow covers that probe: it builds `apps/gpui` on the six free standard
+runners (Ubuntu x86_64/arm64, macOS arm64/Intel, Windows x64/ARM64), launches
+each binary with the perf probe, requires the `ready` mark, scans the macOS
+binaries for private symbols and uploads the logs and binaries for 14 days.
+Dispatch it only when the GPUI shell changed in a way that can affect startup
+or rendering; each run costs about six platform builds from a cold cache.
 
 The fuzz replay job compiles and deterministically replays all six targets: the
 three core decode/convert/metadata targets plus the Tauri external codec
