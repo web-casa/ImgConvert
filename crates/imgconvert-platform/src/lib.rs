@@ -9,8 +9,11 @@
 
 pub mod dialogs;
 pub mod external_codecs;
+pub mod instance_lock;
 pub mod macos_security;
 #[cfg(target_os = "macos")]
 pub mod macos_system_codecs;
+pub mod paths;
+pub mod settings;
 #[cfg(target_os = "windows")]
 pub mod windows_system_codecs;

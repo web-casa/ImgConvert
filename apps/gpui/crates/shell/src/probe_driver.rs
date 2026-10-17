@@ -29,8 +29,9 @@ pub fn start(window: AnyWindowHandle, workspace: Entity<Workspace>, cx: &mut App
     let Some(config) = perf_probe::config().cloned() else {
         return;
     };
-    // `ready` (§7): the capability check ran in WorkflowPanel::new, there are
-    // no persisted settings yet, and two frames have been presented. A redraw
+    // `ready` (§7): the persisted settings were loaded in `init_app`, the
+    // capability check ran in WorkflowPanel::new, and two frames have been
+    // presented. A redraw
     // is forced between the callbacks so each one follows a real frame
     // instead of the same frame-loop iteration.
     let _ = cx.update_window(window, |_, win, _| {

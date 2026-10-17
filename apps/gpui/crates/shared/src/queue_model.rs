@@ -59,6 +59,10 @@ pub struct QueueItem {
     pub path: SharedString,
     pub name: SharedString,
     pub relative_dir: Option<SharedString>,
+    /// Import-time metadata when the scan probed the file.
+    pub source_format: Option<SharedString>,
+    pub source_width: Option<u32>,
+    pub source_height: Option<u32>,
     pub status: ItemStatus,
     pub thumbnail: ThumbnailState,
 }
@@ -74,6 +78,12 @@ impl QueueItem {
             path: SharedString::from(file.path),
             name: SharedString::from(name),
             relative_dir: file.relative_dir.map(SharedString::from),
+            source_format: file
+                .metadata
+                .as_ref()
+                .map(|metadata| SharedString::from(metadata.format.clone())),
+            source_width: file.metadata.as_ref().map(|metadata| metadata.width),
+            source_height: file.metadata.as_ref().map(|metadata| metadata.height),
             status: ItemStatus::Pending,
             thumbnail: ThumbnailState::NotRequested,
         }

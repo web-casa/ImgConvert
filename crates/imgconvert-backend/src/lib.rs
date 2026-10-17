@@ -9,6 +9,7 @@
 
 pub mod access;
 pub mod command_error;
+pub mod conversion_request;
 pub mod convert;
 pub mod environment;
 #[cfg(feature = "fuzzing")]
@@ -23,3 +24,7 @@ pub mod progress;
 pub mod result_cache;
 pub mod service;
 pub mod thumbnail;
+
+/// Settings persistence, per-channel paths and the single-instance marker
+/// live in the platform crate; shells reach them through this facade.
+pub use imgconvert_platform::{external_codecs, instance_lock, paths, settings};
