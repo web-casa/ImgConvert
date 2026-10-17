@@ -14,11 +14,12 @@ use gpui_kit::{
     Window, WindowBounds, WindowOptions, div, img, px, size,
 };
 use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
+use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
 use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
-use imgconvert_gpui_workflow::{ActionBar, WorkflowPanel};
+use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, WorkflowPanel};
 
 use crate::toggle_language;
 
@@ -30,6 +31,7 @@ pub struct Workspace {
     /// The dialog owns the preview; this only lets tests and menus find it.
     comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
     plugin_diagnostics: Option<gpui_kit::WeakEntity<PluginDiagnostics>>,
+    environmental_impact: Option<gpui_kit::WeakEntity<ImpactView>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -47,6 +49,22 @@ impl Workspace {
                     QueueViewEvent::ComparePreview(key) => {
                         this.open_comparison_preview(key.clone(), window, cx);
                     }
+                    QueueViewEvent::EnvironmentalImpact(key) => {
+                        this.open_environmental_impact(
+                            ImpactSubject::Item(key.clone()),
+                            window,
+                            cx,
+                        );
+                    }
+                },
+            ),
+            cx.subscribe_in(
+                &action_bar,
+                window,
+                |this, _, event: &ActionBarEvent, window, cx| match event {
+                    ActionBarEvent::BatchImpact => {
+                        this.open_environmental_impact(ImpactSubject::Batch, window, cx);
+                    }
                 },
             ),
             // "Follow system" needs the window's appearance, which only the
@@ -61,6 +79,7 @@ impl Workspace {
             focus_handle: cx.focus_handle(),
             comparison_preview: None,
             plugin_diagnostics: None,
+            environmental_impact: None,
             _subscriptions: subscriptions,
         }
     }
@@ -99,6 +118,26 @@ impl Workspace {
     /// The diagnostics view currently shown, if its dialog is still open.
     pub fn plugin_diagnostics(&self) -> Option<Entity<PluginDiagnostics>> {
         self.plugin_diagnostics
+            .as_ref()
+            .and_then(gpui_kit::WeakEntity::upgrade)
+    }
+
+    /// Opens the storage and environmental scenario dialog (a row's
+    /// Scenario button or the action bar's batch command).
+    pub fn open_environmental_impact(
+        &mut self,
+        subject: ImpactSubject,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<ImpactView> {
+        let view = open_environmental_impact(subject, window, cx);
+        self.environmental_impact = Some(view.downgrade());
+        view
+    }
+
+    /// The scenario view currently shown, if its dialog is still open.
+    pub fn environmental_impact(&self) -> Option<Entity<ImpactView>> {
+        self.environmental_impact
             .as_ref()
             .and_then(gpui_kit::WeakEntity::upgrade)
     }

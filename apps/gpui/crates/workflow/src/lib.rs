@@ -11,6 +11,6 @@ pub mod output_safety;
 pub mod settings_form;
 mod workflow_panel;
 
-pub use action_bar::ActionBar;
+pub use action_bar::{ActionBar, ActionBarEvent};
 pub use settings_form::{NumberField, Section, SettingsForm, SliderKind};
 pub use workflow_panel::WorkflowPanel;

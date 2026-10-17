@@ -20,13 +20,12 @@
 use gpui_kit::component::button::{Button, ButtonVariant, ButtonVariants as _};
 use gpui_kit::component::collapsible::Collapsible;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
-use gpui_kit::component::searchable_list::SearchableListItem;
-use gpui_kit::component::select::{Select, SelectEvent, SelectState};
+use gpui_kit::component::select::{Select, SelectEvent};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, IconName, IndexPath, Sizable as _, WindowExt as _,
-    h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, Icon, IconName, Sizable as _, WindowExt as _, h_flex,
+    v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -49,6 +48,7 @@ use imgconvert_backend::settings::{
 use imgconvert_backend::workflow_presets::{
     self, CUSTOM_PRESET_ID_PREFIX, builtin_workflow_presets,
 };
+use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, SettingsModel};
 
@@ -267,76 +267,6 @@ struct FormatCapabilities {
     icc_transform: bool,
 }
 
-/// One option of a [`Choice`]: a stable id as the value, a translated label
-/// as the text. Ids stay unique when two labels collide (two presets with
-/// the same name), which is what the select resolves a confirmation by.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ChoiceItem {
-    id: String,
-    label: SharedString,
-}
-
-impl ChoiceItem {
-    fn new(id: impl Into<String>, label: impl Into<SharedString>) -> Self {
-        Self {
-            id: id.into(),
-            label: label.into(),
-        }
-    }
-}
-
-impl SearchableListItem for ChoiceItem {
-    type Value = String;
-
-    fn title(&self) -> SharedString {
-        self.label.clone()
-    }
-
-    fn value(&self) -> &Self::Value {
-        &self.id
-    }
-}
-
-/// A `Select` over fixed ids with translated labels.
-struct Choice {
-    state: Entity<SelectState<Vec<ChoiceItem>>>,
-    items: Vec<ChoiceItem>,
-}
-
-impl Choice {
-    fn new(items: Vec<ChoiceItem>, selected: &str, window: &mut Window, cx: &mut App) -> Self {
-        let selected_ix = items.iter().position(|item| item.id == selected);
-        let state = cx.new(|cx| {
-            SelectState::new(
-                items.clone(),
-                selected_ix.map(|ix| IndexPath::default().row(ix)),
-                window,
-                cx,
-            )
-        });
-        Self { state, items }
-    }
-
-    /// Replaces the items when ids or labels changed (the committed
-    /// selection is rebuilt too, so a locale switch updates the accessible
-    /// value) and moves the selection to `selected`. Idempotent.
-    fn sync(&mut self, items: Vec<ChoiceItem>, selected: &str, window: &mut Window, cx: &mut App) {
-        let replaced = items != self.items;
-        if replaced {
-            self.items.clone_from(&items);
-            self.state
-                .update(cx, |state, cx| state.set_items(items, window, cx));
-        }
-        let wanted = self.items.iter().position(|item| item.id == selected);
-        let current = self.state.read(cx).selected_index(cx).map(|ix| ix.row);
-        if replaced || wanted != current {
-            self.state.update(cx, |state, cx| {
-                state.set_selected_index(wanted.map(|ix| IndexPath::default().row(ix)), window, cx);
-            });
-        }
-    }
-}
-
 /// A slider plus the focus handle that makes it a Tab stop with arrow-key
 /// operation.
 struct SliderControl {
@@ -492,7 +422,7 @@ impl SettingsForm {
 
         // Selects: the confirmed value is the option id.
         subscriptions.push(cx.subscribe(
-            &format.state,
+            format.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(format) = value.clone() {
@@ -501,7 +431,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &preset.state,
+            preset.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(id) = value.clone() {
@@ -510,7 +440,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &overwrite.state,
+            overwrite.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(mode) = value.as_deref().and_then(OverwriteMode::parse) {
@@ -519,7 +449,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &resize_mode.state,
+            resize_mode.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(mode) = value.as_deref().and_then(ResizeMode::parse) {
@@ -528,7 +458,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &metadata_policy.state,
+            metadata_policy.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(policy) = value.as_deref().and_then(MetadataPolicy::parse) {
@@ -540,7 +470,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &avif_subsample.state,
+            avif_subsample.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(subsample) = value.as_deref().and_then(AvifSubsample::parse) {
@@ -549,7 +479,7 @@ impl SettingsForm {
             },
         ));
         subscriptions.push(cx.subscribe(
-            &theme.state,
+            theme.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(theme) = value.as_deref().and_then(ThemePreference::parse) {
@@ -1277,7 +1207,7 @@ impl SettingsForm {
                     .gap_1()
                     .child(Self::field_label(tr("settings.target_format"), cx))
                     .child(
-                        Select::new(&self.format.state)
+                        Select::new(self.format.state())
                             .id("workflow-format")
                             .small()
                             .accessibility_label(tr("settings.target_format"))
@@ -1561,7 +1491,7 @@ impl SettingsForm {
                     .gap_1()
                     .child(Self::field_label(tr("settings.existing_files"), cx))
                     .child(
-                        Select::new(&self.overwrite.state)
+                        Select::new(self.overwrite.state())
                             .id("settings-overwrite")
                             .small()
                             .accessibility_label(tr("settings.existing_files"))
@@ -1900,7 +1830,7 @@ impl SettingsForm {
                                 cx,
                             ))
                             .child(
-                                Select::new(&self.avif_subsample.state)
+                                Select::new(self.avif_subsample.state())
                                     .id("settings-avif-subsample")
                                     .small()
                                     .accessibility_label(tr("settings.avif_chroma_subsampling"))
@@ -1949,7 +1879,7 @@ impl SettingsForm {
                 v_flex()
                     .gap_1()
                     .child(
-                        Select::new(&self.preset.state)
+                        Select::new(self.preset.state())
                             .id("workflow-preset")
                             .small()
                             .accessibility_label(tr("workflow.preset"))
@@ -2117,7 +2047,7 @@ impl SettingsForm {
                     .gap_1()
                     .child(Self::field_label(tr("workflow.resize_mode"), cx))
                     .child(
-                        Select::new(&self.resize_mode.state)
+                        Select::new(self.resize_mode.state())
                             .id("workflow-resize-mode")
                             .small()
                             .accessibility_label(tr("workflow.resize_mode"))
@@ -2197,7 +2127,7 @@ impl SettingsForm {
             .gap_1()
             .child(Self::field_label(tr("workflow.metadata_policy"), cx))
             .child(
-                Select::new(&self.metadata_policy.state)
+                Select::new(self.metadata_policy.state())
                     .id("workflow-metadata-policy")
                     .small()
                     .accessibility_label(tr("workflow.metadata_policy"))
@@ -2218,7 +2148,7 @@ impl SettingsForm {
                     .gap_1()
                     .child(Self::field_label(tr("settings.theme"), cx))
                     .child(
-                        Select::new(&self.theme.state)
+                        Select::new(self.theme.state())
                             .id("workflow-theme")
                             .small()
                             .accessibility_label(tr("settings.theme"))
