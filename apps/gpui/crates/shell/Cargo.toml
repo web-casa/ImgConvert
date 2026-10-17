@@ -21,6 +21,7 @@ imgconvert-gpui-shared.workspace = true
 imgconvert-gpui-queue.workspace = true
 imgconvert-gpui-workflow.workspace = true
 imgconvert-gpui-preview.workspace = true
+imgconvert-gpui-diagnostics.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]

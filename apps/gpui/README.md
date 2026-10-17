@@ -15,6 +15,7 @@ the root workspace ever compiles GPUI.
 | `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                                                                                                |
 | `crates/workflow`                  | The conversion settings form (`SettingsForm`: format, quality, output, policies, format parameters, presets, PDF, resize, target size, metadata), output folder, start/cancel, batch progress |
 | `crates/preview`                   | Before/after comparison dialog for one queue item (backend preview workflow, reveal slider, stats, warnings)                                                                                  |
+| `crates/diagnostics`               | Plugin diagnostics dialog: HEIC providers, system codecs and helpers, manifest search, manual helper selection                                                                                |
 
 Feature crates depend on `shared`; nothing depends on `shell`. Every crate
 reaches GPUI through `gpui_kit` only. `scripts/check-architecture-guardrails.mjs`
@@ -70,7 +71,8 @@ Stage 2 proof plus the first three stage 3 slices: import by drop or picker,
 virtual queue with thumbnails, the full conversion settings form with scenario
 presets (every field the Tauri shell persists), the before/after comparison
 preview, the output-safety prompts before Start (queued-source conflicts,
-overwrite "ask", source replacement), start/cancel with progress, and the
-English/Chinese switch. No HEIC
-helper picker, plugin diagnostics, updater or store packaging yet; those are
-the remaining stage 3 work and keep shipping through the Tauri line meanwhile.
+overwrite "ask", source replacement), start/cancel with progress, the plugin
+diagnostics dialog with the manual HEIC helper selection, and the
+English/Chinese switch. No environment panel, updater or store packaging yet;
+those are the remaining stage 3 work and keep shipping through the Tauri line
+meanwhile.

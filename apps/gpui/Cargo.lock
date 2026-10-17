@@ -3736,11 +3736,21 @@ dependencies = [
  "anyhow",
  "gpui-kit",
  "imgconvert-backend",
+ "imgconvert-gpui-diagnostics",
  "imgconvert-gpui-preview",
  "imgconvert-gpui-queue",
  "imgconvert-gpui-shared",
  "imgconvert-gpui-workflow",
  "serde_json",
+]
+
+[[package]]
+name = "imgconvert-gpui-diagnostics"
+version = "0.4.0-poc.1"
+dependencies = [
+ "gpui-kit",
+ "imgconvert-backend",
+ "imgconvert-gpui-shared",
 ]
 
 [[package]]
