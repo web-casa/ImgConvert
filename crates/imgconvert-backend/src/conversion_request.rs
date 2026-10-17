@@ -79,6 +79,130 @@ pub fn target_size_supported(settings: &Settings, format: &str) -> bool {
     matches!(format, "jpeg" | "webp") && !settings.lossless
 }
 
+/// The quality the encoder will actually use once the per-format floor is
+/// applied (`effectiveQualityFor`): floors below 30 are off.
+pub fn effective_quality_for(settings: &Settings, format: &str, lossless_supported: bool) -> u8 {
+    let requested = settings.quality.clamp(1, 100);
+    if format == "png" || (settings.lossless && lossless_supported) {
+        return requested;
+    }
+    let floor = quality_floor_for(settings, format);
+    if floor >= 30 {
+        requested.max(floor)
+    } else {
+        requested
+    }
+}
+
+/// Target size is on but cannot apply: auto quality or lossless is also on,
+/// or the output format is not lossy JPEG/WebP. Start must refuse this.
+pub fn has_invalid_target_size_configuration(settings: &Settings, formats: &[&str]) -> bool {
+    if !settings.target_size_enabled {
+        return false;
+    }
+    if settings.auto_quality || settings.lossless {
+        return true;
+    }
+    formats
+        .iter()
+        .any(|format| !target_size_supported(settings, format))
+}
+
+/// Most pages one job may rasterize.
+pub const MAX_PDF_PAGES_PER_JOB: usize = 500;
+
+/// Why a page range is rejected. The shells translate these.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PdfPageRangeError {
+    /// A large document needs an explicit selection of at most `limit` pages.
+    SelectionRequired {
+        limit: usize,
+    },
+    TooLong,
+    Invalid,
+    OutOfBounds {
+        page_count: usize,
+    },
+    TooManyPages {
+        limit: usize,
+    },
+}
+
+/// Validates a page-range expression such as `1-3, 5, 8-10` the way the
+/// Svelte shell does (`validatePdfPageRange`). `page_count` is the
+/// document's page count when known.
+pub fn validate_pdf_page_range(
+    value: &str,
+    page_count: Option<usize>,
+) -> Result<(), PdfPageRangeError> {
+    use imgconvert_platform::settings::MAX_PDF_PAGE_RANGE_CHARS;
+    let range = js_trim(value);
+    if range.is_empty() {
+        return match page_count {
+            Some(count) if count > MAX_PDF_PAGES_PER_JOB => {
+                Err(PdfPageRangeError::SelectionRequired {
+                    limit: MAX_PDF_PAGES_PER_JOB,
+                })
+            }
+            _ => Ok(()),
+        };
+    }
+    if range.encode_utf16().count() > MAX_PDF_PAGE_RANGE_CHARS {
+        return Err(PdfPageRangeError::TooLong);
+    }
+    let mut selected = std::collections::HashSet::new();
+    for raw_token in range.split(',') {
+        let token = js_trim(raw_token);
+        if token.is_empty() {
+            return Err(PdfPageRangeError::Invalid);
+        }
+        let (start, end) = parse_page_token(token).ok_or(PdfPageRangeError::Invalid)?;
+        if start < 1 || start > end {
+            return Err(PdfPageRangeError::Invalid);
+        }
+        if let Some(count) = page_count {
+            if end > count {
+                return Err(PdfPageRangeError::OutOfBounds { page_count: count });
+            }
+        }
+        if end - start + 1 > MAX_PDF_PAGES_PER_JOB {
+            return Err(PdfPageRangeError::TooManyPages {
+                limit: MAX_PDF_PAGES_PER_JOB,
+            });
+        }
+        for page in start..=end {
+            selected.insert(page);
+            if selected.len() > MAX_PDF_PAGES_PER_JOB {
+                return Err(PdfPageRangeError::TooManyPages {
+                    limit: MAX_PDF_PAGES_PER_JOB,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `^(\d+)(?:\s*-\s*(\d+))?$` with JavaScript safe-integer bounds.
+fn parse_page_token(token: &str) -> Option<(usize, usize)> {
+    const MAX_SAFE: u64 = 9_007_199_254_740_991;
+    let digits = |text: &str| -> Option<u64> {
+        if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let value: u64 = text.parse().ok()?;
+        (value <= MAX_SAFE).then_some(value)
+    };
+    let (start, end) = match token.split_once('-') {
+        Some((start, end)) => (digits(js_trim(start))?, digits(js_trim(end))?),
+        None => {
+            let page = digits(token)?;
+            (page, page)
+        }
+    };
+    Some((usize::try_from(start).ok()?, usize::try_from(end).ok()?))
+}
+
 /// The suffix sent with a request: only while the switch is on.
 pub fn output_suffix_for_request(settings: &Settings) -> Option<String> {
     settings
@@ -287,6 +411,77 @@ mod tests {
         assert!(!options.result_cache);
         // Extension alone also marks a PDF.
         assert!(ConversionItem::new("/x/scan.PDF").is_pdf());
+    }
+
+    #[test]
+    fn effective_quality_applies_floors_only_to_lossy_output() {
+        let mut s = Settings::default();
+        s.quality = 20;
+        s.jpeg_quality_floor = 40;
+        assert_eq!(effective_quality_for(&s, "jpeg", false), 40);
+        assert_eq!(effective_quality_for(&s, "png", false), 20);
+        s.lossless = true;
+        assert_eq!(effective_quality_for(&s, "webp", true), 20);
+        // Lossless requested but unsupported for this format: the default
+        // WebP floor (30) still applies.
+        assert_eq!(effective_quality_for(&s, "webp", false), 30);
+    }
+
+    #[test]
+    fn target_size_configuration_validity() {
+        let mut s = Settings::default();
+        assert!(!has_invalid_target_size_configuration(&s, &["avif"]));
+        s.target_size_enabled = true;
+        assert!(has_invalid_target_size_configuration(&s, &["avif"]));
+        assert!(!has_invalid_target_size_configuration(
+            &s,
+            &["jpeg", "webp"]
+        ));
+        s.auto_quality = true;
+        assert!(has_invalid_target_size_configuration(&s, &["jpeg"]));
+    }
+
+    #[test]
+    fn pdf_page_ranges_are_validated_like_the_svelte_shell() {
+        assert_eq!(validate_pdf_page_range("", None), Ok(()));
+        assert_eq!(validate_pdf_page_range("  ", Some(12)), Ok(()));
+        assert_eq!(
+            validate_pdf_page_range("", Some(501)),
+            Err(PdfPageRangeError::SelectionRequired { limit: 500 })
+        );
+        assert_eq!(validate_pdf_page_range("1-3, 5, 8 - 10", Some(10)), Ok(()));
+        assert_eq!(
+            validate_pdf_page_range("1-3,,5", None),
+            Err(PdfPageRangeError::Invalid)
+        );
+        assert_eq!(
+            validate_pdf_page_range("3-1", None),
+            Err(PdfPageRangeError::Invalid)
+        );
+        assert_eq!(
+            validate_pdf_page_range("0", None),
+            Err(PdfPageRangeError::Invalid)
+        );
+        assert_eq!(
+            validate_pdf_page_range("a-b", None),
+            Err(PdfPageRangeError::Invalid)
+        );
+        assert_eq!(
+            validate_pdf_page_range("1-12", Some(10)),
+            Err(PdfPageRangeError::OutOfBounds { page_count: 10 })
+        );
+        assert_eq!(
+            validate_pdf_page_range("1-600", None),
+            Err(PdfPageRangeError::TooManyPages { limit: 500 })
+        );
+        assert_eq!(
+            validate_pdf_page_range("1-300, 301-600", None),
+            Err(PdfPageRangeError::TooManyPages { limit: 500 })
+        );
+        assert_eq!(
+            validate_pdf_page_range(&"1,".repeat(2000), None),
+            Err(PdfPageRangeError::TooLong)
+        );
     }
 
     #[test]

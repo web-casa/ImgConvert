@@ -379,6 +379,21 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，5 项 P1、9 项 P2�
 - 已修（P2/P3）：`conversionPolicyVersion` 数值相等；JS `trim` 空白集合、UTF-16 `slice`、`String(["webp"])`、`Math.round` 四处语义对齐（含单测）；`outDir: ""` 视为假值不传 `relativeDir`；残留 `.tmp` 只在"完整 JSON 且不早于主文件"时提升，否则删除；备份经 `.pre-gpui.tmp` rename 发布；隔离文件名同秒内加 `-n`；写锁最多等 500 ms；启动时把持久化的 `heicHelperPath` 经 `set_selected_heic_helper` 重新选中（后台执行）。
 - 未采纳：IO 错误（目录不可写等）导致无法建立标记时仍放行启动，原因是此时设置同样无法保存、面板已显示错误，而把应用挡在门外对用户没有额外保护；评审建议的"fail closed"记入阶段 5 打包验收时按渠道复核。
 
+进度（2026-10-17，第二片：工作流参数表单与预设，未经 Codex 评审）：
+
+- 平台层新增 `workflow_presets`（四个内置预设、`matching_workflow_preset_id`、`create_custom_workflow_preset`、`next_custom_preset_id`，id 生成与 Svelte 的 base36 时间戳一致）；backend `conversion_request` 新增 `effective_quality_for`、`has_invalid_target_size_configuration`、`validate_pdf_page_range`（`PdfPageRangeError` 枚举由壳翻译，`MAX_PDF_PAGES_PER_JOB = 500`），均带 TS 用例改写的单测。
+- GPUI `crates/workflow` 新增 `SettingsForm` 实体：顶部常驻"格式 + 质量"（含有效质量 `80 → 85` 与"质量上限"标题切换），其下一个 Kit `Accordion`（单开）承载 10 个分区：输出行为（并发、已存在文件、后缀开关与输入、文件名模板）、压缩策略（5 个开关，说明文字随控件）、色彩管理（按 `icc_transform` 能力禁用）、结果缓存（开关 + 后台清理按钮与结果）、格式参数（JPEG/PNG/WebP/AVIF 各自的开关与滑杆、自动质量目标分、最低质量）、场景预设（内置 + 自定义选择、保存、带 `AlertDialog` 确认的删除）、PDF（页面范围校验与 DPI）、尺寸规则（模式 + 按模式显示的数字输入 + 放大开关）、目标体积、隐私元数据。每个分区标题右侧显示摘要，错误分区以危险色加图标标出；忙碌（导入/转换中）时全部禁用。
+- 受控值：所有控件以 `SettingsModel` 为唯一事实来源，控件事件只报告请求值，`sync_controls` 把记录镜像回 Kit 的保留状态（`syncing` 标志防止镜像被当作编辑；获得焦点的文本框不被覆盖，后缀框例外以显示实时归一化）；语言切换时重建选择项标签与占位符。数字输入在 Enter/失焦时按 `setNumber` 语义解析、四舍五入并夹取；后缀输入实时归一化并给出"已调整/必填"反馈。
+- 工作流面板改为"设置滚动区 + 固定决策区"（输出目录、进度、状态、开始/取消），宽度 `w_96`；Start 在目标体积配置无效或 PDF 页面范围无效时拒绝并提示。
+- 测试：shell UI 测试新增"每种可写格式下 10 个分区都能在真实窗口渲染；开关点击写入记录；目标体积在 AVIF 下被拒、在 JPEG 下关闭自动质量与无损；应用/保存/删除预设；数字夹取与百分比上限；AVIF + 目标体积为无效配置"。
+- 未做、记入后续：Tauri 侧 `FormatSelect` 的来源格式提示与 HEIC helper 选择、插件诊断、环境影响面板（属于后续切片）；滑杆的无头指针拖动测试（Kit 滑杆无 `id`，键盘路径已测）；设置面板的无障碍清单人工过一遍（VoiceOver 仍待虚拟机授权）。
+
+Codex 只读评审（2026-10-17，结论"修后可合并"，0 项 P1、7 项 P2、2 项 P3，记录在 `artifacts/reviews/codex-stage3-settings-form-review-2026-10-17.md`）与处置：
+
+- 已修（P2）：选择项改为 `ChoiceItem { id, label }` 实现 `SearchableListItem`，`Select` 以稳定 id 为值，同名预设或与内置同名的自定义预设不再误应用；`edit` 统一在每次修改后清掉目标格式不支持的 `lossless`（覆盖格式选择与预设应用）；Start 的 PDF 页面范围校验改为与批次提交的同一集合（队列中全部 PDF 项），语法级反馈只在面板显示、不再阻止纯图片批次；数字输入在 Enter/失焦提交后显式回写该字段（即使仍有焦点）；后缀输入改为显式归一化草稿回写并对所有文本框一律跳过有焦点的同步；分区标题改为 Kit `Button`（Tab 可达、Enter/Space 切换）+ `Collapsible`，不再使用无焦点路径的 `Accordion`；滑杆外包一层带 `FocusHandle`（Tab stop）、`aria_label` 与可见焦点环的容器，支持方向键/PageUp/PageDown/Home/End；所有 `Input` 加 `aria_label`，所有 `Select` 加 `accessibility_label`。
+- 已修（P3）：空字符串按 `Number("") === 0` 处理后夹到最小值；语言切换时重建选择的已提交项，辅助技术读到新语言。
+- 测试补充：同名预设各自可应用；聚焦质量滑杆后按键改变记录；分区在每种格式下渲染。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）

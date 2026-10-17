@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! Workflow feature: output format, output folder, start/cancel and batch
-//! progress. The batch itself is owned by the backend `BatchService`; this
-//! crate only issues commands and renders `shared::BatchModel`.
+//! Workflow feature: the conversion settings form, output folder,
+//! start/cancel and batch progress. The batch itself is owned by the backend
+//! `BatchService`; this crate only issues commands and renders
+//! `shared::BatchModel`. Every setting lives in `shared::SettingsModel`.
 
+pub mod settings_form;
 pub mod workflow_panel;
 
+pub use settings_form::{NumberField, Section, SettingsForm, SliderKind};
 pub use workflow_panel::WorkflowPanel;

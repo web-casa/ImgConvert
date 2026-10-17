@@ -17,3 +17,4 @@ pub mod paths;
 pub mod settings;
 #[cfg(target_os = "windows")]
 pub mod windows_system_codecs;
+pub mod workflow_presets;
