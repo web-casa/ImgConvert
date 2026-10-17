@@ -137,3 +137,369 @@ workflow.already_running:
 workflow.nothing_to_convert:
   en: Add images to the queue first
   zh-CN: 请先把图片加入队列
+settings.title:
+  en: Conversion settings
+  zh-CN: 转换设置
+settings.core_section:
+  en: Format and quality
+  zh-CN: 格式与质量
+settings.target_format:
+  en: Target format
+  zh-CN: 目标格式
+settings.quality:
+  en: Quality
+  zh-CN: 质量
+settings.quality_upper_bound:
+  en: Quality upper bound
+  zh-CN: 质量上限
+settings.quality_effective:
+  en: "%{requested} → %{effective}"
+  zh-CN: "%{requested} → %{effective}"
+settings.output_section:
+  en: Output behavior
+  zh-CN: 输出行为
+settings.concurrency:
+  en: Concurrency
+  zh-CN: 并发
+settings.concurrency_auto:
+  en: Auto
+  zh-CN: 自动
+settings.existing_files:
+  en: Existing files
+  zh-CN: 已存在文件
+settings.overwrite_ask:
+  en: Ask
+  zh-CN: 询问
+settings.overwrite_skip:
+  en: Skip
+  zh-CN: 跳过
+settings.overwrite_overwrite:
+  en: Overwrite
+  zh-CN: 覆盖
+settings.output_suffix:
+  en: File-name suffix
+  zh-CN: 文件名后缀
+settings.add_output_suffix:
+  en: Add suffix
+  zh-CN: 添加后缀
+settings.output_suffix_hint:
+  en: Added before the extension. Unicode text is supported; maximum 48 characters and 128 bytes.
+  zh-CN: 会在扩展名之前添加；支持自定义 Unicode 文本，最长 48 个字符且不超过 128 字节。
+settings.output_suffix_adjusted:
+  en: Unsupported path characters were replaced and the safe length limit was applied.
+  zh-CN: 已替换不支持的路径字符，并按安全长度限制保存。
+settings.output_suffix_required:
+  en: Enter at least one character, or turn this switch off to omit the suffix.
+  zh-CN: 要使用后缀，请至少输入一个字符；不需要后缀可关闭此开关。
+settings.suffix_disabled_collision_hint:
+  en: With no suffix and the same target format, an output can match its source. Existing files follow the “Existing files” choice.
+  zh-CN: 关闭后缀且目标格式相同可能与原图同名；已存在文件按“已存在文件”的选择处理。
+settings.file_name_template:
+  en: File name template
+  zh-CN: 文件名模板
+settings.file_name_template_hint:
+  en: Used when “Add suffix” is off. Supports %name%, %extension%, and %date%.
+  zh-CN: 关闭“添加后缀”后使用。支持 %name%、%extension%、%date%。
+settings.compression_section:
+  en: Compression policies
+  zh-CN: 压缩策略
+settings.enabled_count:
+  en: "%{count} enabled"
+  zh-CN: "已启用 %{count} 项"
+settings.enabled:
+  en: Enabled
+  zh-CN: 已开启
+settings.disabled:
+  en: Disabled
+  zh-CN: 未开启
+settings.lossless_label:
+  en: Lossless
+  zh-CN: 无损压缩
+settings.lossless_description:
+  en: Prefer lossless pixels when the target format supports it; output size may not be minimal.
+  zh-CN: 优先保持像素不损失；仅在目标格式支持时可用，文件体积不一定最小。
+settings.skip_larger_label:
+  en: Keep smaller outputs only
+  zh-CN: 仅保留更小的输出
+settings.skip_larger_description:
+  en: Off by default. When enabled, write a bitmap result only when it is smaller than its source. Leave it off when a required format matters more than size. SVG rasterization is unaffected.
+  zh-CN: 默认关闭。启用后仅在位图输出小于源文件时写入；若需要指定格式兼容旧系统（例如 PNG），请保持关闭。SVG 栅格化不受此设置影响。
+settings.multi_candidate_label:
+  en: Try smallest candidate
+  zh-CN: 多候选取最小
+settings.multi_candidate_description:
+  en: Try equivalent encoding candidates and keep the smallest result; conversion may take slightly longer.
+  zh-CN: 尝试多个等价编码候选，并写入体积最小的结果，耗时会略有增加。
+settings.auto_quality_label:
+  en: Auto quality
+  zh-CN: 自动质量
+settings.auto_quality_description:
+  en: JPEG/WebP search for the lowest quality that reaches the target score to minimize size.
+  zh-CN: JPEG/WebP 会搜索达到目标评分的最低质量，尽量减少体积。
+settings.generation_protection_label:
+  en: Keep beneficial lossy re-encodes only
+  zh-CN: 仅保留有损重编码收益
+settings.generation_protection_description:
+  en: Off by default. When enabled, a lossy image is written to another lossy format only when it saves enough space. Leave it off when the requested format is required.
+  zh-CN: 默认关闭。启用后，有损图片再次输出有损格式时必须达到足够体积收益才写入；若需要指定格式，请保持关闭。
+settings.color_section:
+  en: Color management
+  zh-CN: 色彩管理
+settings.convert_to_srgb_label:
+  en: Convert to sRGB
+  zh-CN: 转为 sRGB
+settings.convert_to_srgb_description:
+  en: Use the embedded ICC profile to convert pixels to sRGB and remove the old profile for consistent display.
+  zh-CN: 使用嵌入 ICC 转换像素到 sRGB，并移除旧 ICC，适合统一网页和通用查看器显示。
+settings.result_cache_label:
+  en: Result cache
+  zh-CN: 结果缓存
+settings.result_cache_description:
+  en: Reuse existing outputs when the source and settings are unchanged; useful for repeat batches.
+  zh-CN: 源文件与设置未变时复用已有输出，适合重复处理同一批文件。
+settings.clear_result_cache:
+  en: Clear result cache
+  zh-CN: 清理结果缓存
+settings.clearing_result_cache:
+  en: Clearing cache…
+  zh-CN: 正在清理缓存…
+settings.result_cache_cleared:
+  en: "Cleared %{count} result-cache records."
+  zh-CN: "已清理 %{count} 条结果缓存记录。"
+settings.clear_result_cache_failed:
+  en: "Couldn’t clear the result cache: %{detail}"
+  zh-CN: "无法清理结果缓存：%{detail}"
+settings.format_parameters:
+  en: Format parameters
+  zh-CN: 格式参数
+settings.jpeg_progressive_mode:
+  en: Progressive
+  zh-CN: 渐进式
+settings.jpeg_baseline_mode:
+  en: Baseline
+  zh-CN: 基线式
+settings.progressive_jpeg:
+  en: Progressive JPEG
+  zh-CN: 渐进式 JPEG
+settings.trellis_scans:
+  en: Trellis scans
+  zh-CN: Trellis 扫描优化
+settings.png_optimization_level:
+  en: PNG optimization level
+  zh-CN: PNG 优化级别
+settings.experimental_quantize:
+  en: Experimental quantization
+  zh-CN: 实验性限色
+settings.color_count:
+  en: Color count
+  zh-CN: 颜色数
+settings.webp_method:
+  en: Method
+  zh-CN: 方法
+settings.near_lossless:
+  en: Near-lossless
+  zh-CN: 近无损
+settings.near_lossless_off:
+  en: Off
+  zh-CN: 关闭
+settings.sharp_yuv:
+  en: Sharp YUV
+  zh-CN: 锐化 YUV
+settings.avif_speed:
+  en: Speed
+  zh-CN: 速度
+settings.avif_chroma_subsampling:
+  en: Chroma subsampling
+  zh-CN: 色度抽样
+settings.target_score:
+  en: Target score
+  zh-CN: 目标分
+settings.minimum_quality:
+  en: Minimum quality
+  zh-CN: 最低质量
+settings.quality_floor_off:
+  en: Off
+  zh-CN: 关闭
+workflow.preset:
+  en: Scenario preset
+  zh-CN: 场景预设
+workflow.custom_settings:
+  en: Custom settings
+  zh-CN: 自定义设置
+workflow.save_preset:
+  en: Save current settings
+  zh-CN: 保存当前设置
+workflow.preset_name:
+  en: Preset name
+  zh-CN: 预设名称
+workflow.delete_preset:
+  en: Delete preset
+  zh-CN: 删除预设
+workflow.delete_preset_named:
+  en: "Delete preset “%{name}”"
+  zh-CN: "删除预设“%{name}”"
+workflow.delete_preset_title:
+  en: "Delete “%{name}”?"
+  zh-CN: "删除“%{name}”？"
+workflow.delete_preset_description:
+  en: This cannot be undone.
+  zh-CN: 此操作无法撤销。
+workflow.delete:
+  en: Delete
+  zh-CN: 删除
+workflow.preset_limit:
+  en: "Save up to %{count} custom presets."
+  zh-CN: "最多保存 %{count} 个自定义预设。"
+workflow.presets.web_sharing:
+  en: Web sharing
+  zh-CN: 网页分享
+workflow.presets.web_sharing_description:
+  en: WebP, 2048 px longest edge, with color metadata only.
+  zh-CN: WebP、最长边 2048 px，仅保留色彩配置。
+workflow.presets.email:
+  en: Email attachment
+  zh-CN: 邮件附件
+workflow.presets.email_description:
+  en: JPEG, 1600 px longest edge, targeting 1 MiB.
+  zh-CN: JPEG、最长边 1600 px，目标 1 MiB。
+workflow.presets.high_quality:
+  en: High-quality archive
+  zh-CN: 高质量归档
+workflow.presets.high_quality_description:
+  en: High-quality AVIF with all supported metadata preserved.
+  zh-CN: 高质量 AVIF，保留全部支持的元数据。
+workflow.presets.private_sharing:
+  en: Private sharing
+  zh-CN: 隐私分享
+workflow.presets.private_sharing_description:
+  en: JPEG, 2048 px longest edge, with all metadata removed.
+  zh-CN: JPEG、最长边 2048 px，并移除全部元数据。
+workflow.pdf_section:
+  en: PDF to images
+  zh-CN: PDF 转图片
+workflow.pdf_all_pages:
+  en: All pages
+  zh-CN: 全部页面
+workflow.pdf_selected_pages:
+  en: Selected pages
+  zh-CN: 指定页面
+workflow.pdf_pages:
+  en: Page range (leave empty for all)
+  zh-CN: 页面范围（留空表示全部）
+workflow.pdf_pages_placeholder:
+  en: "For example: 1-3, 5, 8-10"
+  zh-CN: "例如 1-3, 5, 8-10"
+workflow.pdf_pages_hint:
+  en: Pages start at 1. Combine pages and ranges; up to 500 pages per job.
+  zh-CN: 页码从 1 开始；可组合单页和范围，一次最多 500 页。
+workflow.pdf_dpi:
+  en: Render resolution (DPI)
+  zh-CN: 渲染分辨率（DPI）
+workflow.pdf_dpi_hint:
+  en: "Applies only to PDF inputs. Range: 72–600 DPI; default: 150."
+  zh-CN: 仅对 PDF 输入生效，范围 72–600 DPI，默认 150。
+workflow.pdf_dpi_hint_active:
+  en: PDF pages are rendered at this DPI first; an enabled batch resize rule is applied afterward.
+  zh-CN: 先按 DPI 渲染 PDF；如启用批量尺寸规则，再对渲染结果调整尺寸。
+workflow.pdf_range_invalid:
+  en: Invalid page range. Use a pattern such as 1-3, 5, 8-10.
+  zh-CN: 页面范围格式无效，请使用 1-3, 5, 8-10 这类写法。
+workflow.pdf_range_out_of_bounds:
+  en: "The page range exceeds this document's %{count} pages."
+  zh-CN: "页面范围超出文档总页数（%{count} 页）。"
+workflow.pdf_range_required:
+  en: "This document is large. Select pages explicitly; up to %{count} at a time."
+  zh-CN: "文档页数较多，请明确选择页面；一次最多 %{count} 页。"
+workflow.pdf_range_too_long:
+  en: The page range is too long.
+  zh-CN: 页面范围输入过长。
+workflow.pdf_too_many_pages:
+  en: "Up to %{count} PDF pages can be converted in one job."
+  zh-CN: "一次最多转换 %{count} 个 PDF 页面。"
+workflow.resize_section:
+  en: Batch resize rule
+  zh-CN: 批量尺寸规则
+workflow.resize_mode:
+  en: Resize mode
+  zh-CN: 调整方式
+workflow.resize_modes.none:
+  en: Keep original size
+  zh-CN: 保持原尺寸
+workflow.resize_modes.fit:
+  en: Fit within width and height
+  zh-CN: 限制在宽高内
+workflow.resize_modes.width:
+  en: Set width
+  zh-CN: 指定宽度
+workflow.resize_modes.height:
+  en: Set height
+  zh-CN: 指定高度
+workflow.resize_modes.longest_edge:
+  en: Set longest edge
+  zh-CN: 指定最长边
+workflow.resize_modes.percentage:
+  en: Scale by percentage
+  zh-CN: 按百分比
+workflow.width:
+  en: Width (px)
+  zh-CN: 宽度（px）
+workflow.height:
+  en: Height (px)
+  zh-CN: 高度（px）
+workflow.size:
+  en: Size (px)
+  zh-CN: 尺寸（px）
+workflow.percentage:
+  en: Scale (%)
+  zh-CN: 比例（%）
+workflow.allow_upscale:
+  en: Allow smaller images to be enlarged
+  zh-CN: 允许放大较小图片
+workflow.compression_policy_disabled:
+  en: “Keep smaller outputs only” and “Keep beneficial lossy re-encodes only” do not apply when resizing.
+  zh-CN: 调整尺寸时，“仅保留更小输出”和“仅保留有损重编码收益”不适用。
+workflow.target_section:
+  en: Target file size
+  zh-CN: 目标文件体积
+workflow.target_enable:
+  en: Try to stay under a target size
+  zh-CN: 尝试不超过指定体积
+workflow.target_kib:
+  en: Target size (KiB)
+  zh-CN: 目标体积（KiB）
+workflow.target_summary:
+  en: "%{kib} KiB"
+  zh-CN: "%{kib} KiB"
+workflow.target_hint:
+  en: Available for lossy JPEG/WebP. Current quality is the ceiling and minimum quality is respected.
+  zh-CN: 仅支持有损 JPEG/WebP；以当前质量作为上限，并遵守最低质量。
+workflow.target_unsupported:
+  en: Choose lossy JPEG or WebP before enabling target size.
+  zh-CN: 请选择有损 JPEG 或 WebP 后启用目标体积。
+workflow.metadata_section:
+  en: Privacy metadata
+  zh-CN: 隐私元数据
+workflow.metadata_policy:
+  en: Retention policy
+  zh-CN: 保留策略
+workflow.metadata.strip_all:
+  en: Remove all metadata
+  zh-CN: 移除全部元数据
+workflow.metadata.strip_all_description:
+  en: Convert profiled pixels to sRGB, then remove ICC, EXIF, XMP, and IPTC for public sharing.
+  zh-CN: 先将带配置的像素转为 sRGB，再移除 ICC、EXIF、XMP 与 IPTC。
+workflow.metadata.color_only:
+  en: Keep color profile only
+  zh-CN: 仅保留色彩配置
+workflow.metadata.color_only_description:
+  en: Keep the complete ICC profile for color rendering; profile or device identifiers may remain.
+  zh-CN: 保留完整 ICC 以维持色彩；其中仍可能包含配置或设备标识。
+workflow.metadata.preserve_all:
+  en: Keep all supported metadata
+  zh-CN: 保留全部支持项
+workflow.metadata.preserve_all_description:
+  en: Preserve ICC, EXIF, XMP, and IPTC where supported.
+  zh-CN: 尽量保留 ICC、EXIF、XMP 与 IPTC。
+workflow.invalid_configuration:
+  en: Fix the highlighted settings before starting
+  zh-CN: 开始前请先修正标红的设置

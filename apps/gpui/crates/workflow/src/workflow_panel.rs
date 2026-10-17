@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! Side panel with the conversion decision: format, folder, start/cancel.
-//! Primary styling goes to Start because it is the panel's one commit.
+//! Side panel with the conversion settings form above and the decision
+//! below: output folder, progress and Start/Cancel. Primary styling goes to
+//! Start because it is the panel's one commit.
 //!
-//! Format and output folder are read from and written to the persisted
-//! settings (`format`, `outDir`); every other conversion field comes from the
-//! same record through `conversion_request`, so a batch started here uses
-//! exactly what the Tauri shell would use.
+//! Every field is read from and written to the persisted settings; a batch
+//! started here builds its options from that record through
+//! `conversion_request`, so it uses exactly what the Tauri shell would use.
 
 use std::path::{Path, PathBuf};
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::form::{Field, Form};
 use gpui_kit::component::progress::Progress;
-use gpui_kit::component::select::{Select, SelectEvent, SelectState};
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, IconName, IndexPath, Sizable as _, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, IconName, Sizable as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -36,11 +35,14 @@ use imgconvert_gpui_shared::{
     AppModels, BatchModel, BatchPhase, QueueItem, QueueModel, SettingsModel,
 };
 
+use crate::settings_form::SettingsForm;
+
 /// Semantic notices, translated at render time so a locale switch re-renders them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Notice {
     NothingToConvert,
     AlreadyRunning,
+    InvalidConfiguration,
     Failed(String),
 }
 
@@ -49,6 +51,7 @@ impl Notice {
         match self {
             Self::NothingToConvert => tr("workflow.nothing_to_convert"),
             Self::AlreadyRunning => tr("workflow.already_running"),
+            Self::InvalidConfiguration => tr("workflow.invalid_configuration"),
             Self::Failed(detail) => tr_with("workflow.failed", &[("detail", detail)]),
         }
     }
@@ -58,7 +61,7 @@ pub struct WorkflowPanel {
     queue: Entity<QueueModel>,
     batch: Entity<BatchModel>,
     settings: Entity<SettingsModel>,
-    format: Entity<SelectState<Vec<SharedString>>>,
+    settings_form: Entity<SettingsForm>,
     formats: Vec<SharedString>,
     /// Formats the core can write losslessly, from the capability matrix.
     lossless_formats: Vec<String>,
@@ -80,47 +83,27 @@ impl WorkflowPanel {
             .iter()
             .map(|format| (*format).to_string())
             .collect();
-        let persisted = models.settings().read(cx).settings().format.clone();
-        let selected_ix = formats
-            .iter()
-            .position(|format| format.as_ref() == persisted)
-            .unwrap_or(0);
-        let format = cx.new(|cx| {
-            SelectState::new(
-                formats.clone(),
-                Some(IndexPath::default().row(selected_ix)),
-                window,
-                cx,
-            )
-        });
+        let settings_form = cx.new(|cx| SettingsForm::new(window, cx));
         let subscriptions = vec![
             cx.observe(models.queue(), |_, _, cx| cx.notify()),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
-            // Another writer (a preset, a future settings panel) changed the
-            // record: mirror the format into the control.
-            cx.observe_in(models.settings(), window, |this, _, window, cx| {
-                this.sync_format_from_settings(window, cx);
-                cx.notify();
-            }),
-            cx.subscribe(&format, |this, _, event: &SelectEvent<_>, cx| {
-                if let SelectEvent::Confirm(Some(value)) = event {
-                    let value = value.to_string();
-                    this.settings.update(cx, |settings, cx| {
-                        settings.update(cx, |settings| settings.format = value);
-                    });
-                }
-            }),
+            cx.observe(models.settings(), |_, _, cx| cx.notify()),
+            cx.observe(&settings_form, |_, _, cx| cx.notify()),
         ];
         Self {
             queue: models.queue().clone(),
             batch: models.batch().clone(),
             settings: models.settings().clone(),
-            format,
+            settings_form,
             formats,
             lossless_formats,
             notice: None,
             _subscriptions: subscriptions,
         }
+    }
+
+    pub fn settings_form(&self) -> &Entity<SettingsForm> {
+        &self.settings_form
     }
 
     /// The persisted output folder (`outDir`).
@@ -155,26 +138,10 @@ impl WorkflowPanel {
             .unwrap_or_else(|| SharedString::from("webp"))
     }
 
-    /// Persists `format` and mirrors it into the control; unknown formats
-    /// are ignored.
+    /// Persists `format` through the form; unknown formats are ignored.
     pub fn set_format(&mut self, format: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.formats.iter().any(|known| known.as_ref() == format) {
-            return;
-        }
-        let format = format.to_string();
-        self.settings.update(cx, |settings, cx| {
-            settings.update(cx, |settings| settings.format = format);
-        });
-        self.sync_format_from_settings(window, cx);
-    }
-
-    fn sync_format_from_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let wanted = self.selected_format(cx);
-        if self.format.read(cx).selected_value() != Some(&wanted) {
-            self.format.update(cx, |select, cx| {
-                select.set_selected_value(&wanted, window, cx);
-            });
-        }
+        self.settings_form
+            .update(cx, |form, cx| form.set_format(format, window, cx));
     }
 
     fn choose_output_dir(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -198,6 +165,11 @@ impl WorkflowPanel {
         }
         if progress_bridge::is_busy(cx) {
             self.notice = Some(Notice::AlreadyRunning);
+            cx.notify();
+            return;
+        }
+        if self.settings_form.read(cx).has_invalid_configuration(cx) {
+            self.notice = Some(Notice::InvalidConfiguration);
             cx.notify();
             return;
         }
@@ -355,86 +327,101 @@ impl Render for WorkflowPanel {
         v_flex()
             .id("workflow-panel")
             .test_support()
-            .w_80()
+            .w_96()
             .flex_none()
             .h_full()
-            .p_4()
-            .gap_4()
             .border_l_1()
             .border_color(cx.theme().border)
             .bg(cx.theme().sidebar)
             .child(
                 div()
+                    .px_4()
+                    .pt_4()
+                    .pb_2()
                     .text_sm()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child(tr("workflow.title")),
+                    .child(tr("settings.title")),
             )
             .child(
-                Form::new()
-                    .child(
-                        Field::new().label(tr("workflow.format")).child(
-                            Select::new(&self.format)
-                                .id("workflow-format")
-                                .disabled(active),
-                        ),
-                    )
-                    .child(
-                        Field::new().label(tr("workflow.output_dir")).child(
-                            v_flex()
-                                .gap_1()
-                                .child(
-                                    Button::new("workflow-choose-output")
-                                        .outline()
-                                        .small()
-                                        .icon(IconName::FolderOpen)
-                                        .label(tr("workflow.choose_output"))
-                                        .disabled(active)
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.choose_output_dir(window, cx);
-                                        })),
-                                )
-                                .child(
-                                    div()
-                                        .id("workflow-output-dir")
-                                        .test_support()
-                                        .aria_label(output_label.clone())
-                                        .text_xs()
-                                        .text_color(muted)
-                                        .truncate()
-                                        .child(output_label),
-                                ),
-                        ),
-                    ),
+                // The settings scroll; the decision below never moves.
+                v_flex()
+                    .id("workflow-scroll")
+                    .flex_1()
+                    .min_h_0()
+                    .px_4()
+                    .pb_4()
+                    .overflow_y_scrollbar()
+                    .child(self.settings_form.clone()),
             )
-            .child(div().flex_1())
-            .when(show_progress, |this| {
-                this.child(Progress::new("workflow-progress").value(percent))
-            })
-            .children(self.render_status(cx))
-            .child(if active {
-                h_flex().child(
-                    Button::new("workflow-cancel")
-                        .danger()
-                        .w_full()
-                        .label(if cancelling {
-                            tr("workflow.cancelling")
-                        } else {
-                            tr("workflow.cancel")
-                        })
-                        .disabled(cancelling)
-                        .loading(cancelling)
-                        .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
-                )
-            } else {
-                h_flex().child(
-                    Button::new("workflow-start")
-                        .primary()
-                        .w_full()
-                        .label(start_label)
-                        .disabled(!can_start)
-                        .on_click(cx.listener(|this, _, window, cx| this.start(window, cx))),
-                )
-            })
+            .child(
+                v_flex()
+                    .flex_none()
+                    .p_4()
+                    .gap_3()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        v_flex()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child(tr("workflow.output_dir")),
+                            )
+                            .child(
+                                Button::new("workflow-choose-output")
+                                    .outline()
+                                    .small()
+                                    .icon(IconName::FolderOpen)
+                                    .label(tr("workflow.choose_output"))
+                                    .disabled(active)
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.choose_output_dir(window, cx);
+                                    })),
+                            )
+                            .child(
+                                div()
+                                    .id("workflow-output-dir")
+                                    .test_support()
+                                    .aria_label(output_label.clone())
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .truncate()
+                                    .child(output_label),
+                            ),
+                    )
+                    .when(show_progress, |this| {
+                        this.child(Progress::new("workflow-progress").value(percent))
+                    })
+                    .children(self.render_status(cx))
+                    .child(if active {
+                        h_flex().child(
+                            Button::new("workflow-cancel")
+                                .danger()
+                                .w_full()
+                                .label(if cancelling {
+                                    tr("workflow.cancelling")
+                                } else {
+                                    tr("workflow.cancel")
+                                })
+                                .disabled(cancelling)
+                                .loading(cancelling)
+                                .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
+                        )
+                    } else {
+                        h_flex().child(
+                            Button::new("workflow-start")
+                                .primary()
+                                .w_full()
+                                .label(start_label)
+                                .disabled(!can_start)
+                                .on_click(
+                                    cx.listener(|this, _, window, cx| this.start(window, cx)),
+                                ),
+                        )
+                    }),
+            )
     }
 }
 

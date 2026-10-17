@@ -63,11 +63,26 @@ pub struct QueueItem {
     pub source_format: Option<SharedString>,
     pub source_width: Option<u32>,
     pub source_height: Option<u32>,
+    /// Page count of a document input (PDF); raster images keep `None`.
+    pub page_count: Option<usize>,
     pub status: ItemStatus,
     pub thumbnail: ThumbnailState,
 }
 
 impl QueueItem {
+    /// A document input: PDF by probed format or by extension.
+    pub fn is_pdf(&self) -> bool {
+        self.source_format.as_deref() == Some("pdf")
+            || std::path::Path::new(self.path.as_ref())
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+    }
+
+    /// Items a new batch would convert (everything not already done).
+    pub fn is_pending_conversion(&self) -> bool {
+        !matches!(self.status, ItemStatus::Done { .. })
+    }
+
     fn from_scan(file: ImportScanFile) -> Self {
         let name = std::path::Path::new(&file.path).file_name().map_or_else(
             || file.path.clone(),
@@ -84,6 +99,10 @@ impl QueueItem {
                 .map(|metadata| SharedString::from(metadata.format.clone())),
             source_width: file.metadata.as_ref().map(|metadata| metadata.width),
             source_height: file.metadata.as_ref().map(|metadata| metadata.height),
+            page_count: file
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.page_count),
             status: ItemStatus::Pending,
             thumbnail: ThumbnailState::NotRequested,
         }

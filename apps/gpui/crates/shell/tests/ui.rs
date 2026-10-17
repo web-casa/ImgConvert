@@ -121,6 +121,189 @@ fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut Tes
 }
 
 #[gpui_kit::test]
+fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
+    use imgconvert_backend::settings::ResizeMode;
+    use imgconvert_gpui_workflow::{NumberField, Section, SliderKind};
+
+    let (handle, workspace) = open_workspace(cx);
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+
+    // Every section renders in a real window, for every writable format.
+    for format in ["jpeg", "png", "webp", "avif"] {
+        cx.update_window(handle, |_, window, cx| {
+            form.update(cx, |form, cx| form.set_format(format, window, cx));
+            for section in Section::ALL {
+                form.update(cx, |form, cx| form.set_open_section(Some(section), cx));
+                window.render_frame(cx);
+            }
+        })
+        .unwrap();
+    }
+
+    // A switch in an open section writes through to the settings model. The
+    // accordion body springs open, so the clock advances until it settled.
+    cx.update(|cx| {
+        form.update(cx, |form, cx| {
+            form.set_open_section(Some(Section::Compression), cx);
+        });
+    });
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        // The first row of the section is inside the scroll viewport; AVIF
+        // supports lossless, so the switch is enabled.
+        assert!(window.find("switch-lossless").visible());
+        window.click("switch-lossless", cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        assert!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .lossless
+        );
+    });
+
+    // Target size on a lossless-capable AVIF target is refused; on JPEG it
+    // turns auto quality and lossless off.
+    cx.update_window(handle, |_, window, cx| {
+        form.update(cx, |form, cx| {
+            form.set_target_size_enabled(true, cx);
+            assert!(
+                !AppModels::global(cx)
+                    .settings()
+                    .read(cx)
+                    .settings()
+                    .target_size_enabled
+            );
+            form.set_format("jpeg", window, cx);
+            form.set_target_size_enabled(true, cx);
+        });
+        let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+        assert!(settings.target_size_enabled && !settings.auto_quality && !settings.lossless);
+    })
+    .unwrap();
+
+    // Presets: apply a built-in, save the current record, delete it again.
+    cx.update(|cx| {
+        form.update(cx, |form, cx| {
+            form.apply_preset("builtin:email", cx);
+            let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+            assert_eq!(settings.format, "jpeg");
+            assert_eq!(settings.resize_mode, ResizeMode::LongestEdge);
+            assert_eq!(settings.resize_value, 1600);
+            assert_eq!(
+                imgconvert_backend::workflow_presets::matching_workflow_preset_id(&settings)
+                    .as_deref(),
+                Some("builtin:email")
+            );
+            let id = form.save_preset("  Mine ", cx).expect("saved");
+            assert!(
+                form.save_preset("   ", cx).is_none(),
+                "empty names are refused"
+            );
+            let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+            assert_eq!(settings.custom_workflow_presets.len(), 1);
+            assert_eq!(settings.custom_workflow_presets[0].name, "Mine");
+            assert!(form.delete_preset(&id, cx));
+            assert!(!form.delete_preset("builtin:email", cx));
+            assert!(
+                AppModels::global(cx)
+                    .settings()
+                    .read(cx)
+                    .settings()
+                    .custom_workflow_presets
+                    .is_empty()
+            );
+        });
+    });
+
+    // Numeric fields clamp like the Svelte inputs; percentage caps at 400.
+    cx.update(|cx| {
+        form.update(cx, |form, cx| {
+            form.commit_number(NumberField::PdfDpi, "999", cx);
+            form.commit_number(NumberField::TargetSizeKib, "abc", cx);
+            form.set_resize_mode(ResizeMode::Percentage, cx);
+            let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+            assert_eq!(settings.pdf_dpi, 600);
+            assert_eq!(settings.target_size_kib, 1024);
+            assert_eq!(settings.resize_value, 400);
+            assert!(!form.has_invalid_configuration(cx));
+        });
+    });
+
+    // Two presets with the same name stay distinct by id.
+    cx.update(|cx| {
+        form.update(cx, |form, cx| {
+            let first = form.save_preset("Twin", cx).expect("first twin");
+            form.apply_slider(SliderKind::Quality, 42., cx);
+            let second = form.save_preset("Twin", cx).expect("second twin");
+            assert_ne!(first, second);
+            form.apply_slider(SliderKind::Quality, 77., cx);
+            form.apply_preset(&second, cx);
+            let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+            assert_eq!(settings.quality, 42);
+            form.apply_preset(&first, cx);
+            let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+            assert_eq!(settings.quality, 82, "the email preset's quality");
+            form.delete_preset(&first, cx);
+            form.delete_preset(&second, cx);
+        });
+    });
+
+    // Sliders are keyboard-operable: focus the quality wrapper, press keys.
+    cx.update_window(handle, |_, window, cx| {
+        form.update(cx, |form, cx| {
+            form.set_open_section(None, cx);
+            form.focus_slider(SliderKind::Quality, window, cx);
+        });
+        window.render_frame(cx);
+        assert!(window.find("settings-quality").visible());
+        window.press("right", cx);
+        window.press("right", cx);
+        window.press("pagedown", cx);
+        let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+        assert_eq!(settings.quality, 82 + 2 - 10);
+        window.press("end", cx);
+        assert_eq!(
+            AppModels::global(cx).settings().read(cx).settings().quality,
+            100
+        );
+    })
+    .unwrap();
+
+    // Target size left on while switching to AVIF is an invalid configuration
+    // that Start refuses and the section flags.
+    cx.update_window(handle, |_, window, cx| {
+        form.update(cx, |form, cx| form.set_format("avif", window, cx));
+        assert!(form.read(cx).has_invalid_configuration(cx));
+        form.update(cx, |form, cx| {
+            form.set_open_section(Some(Section::TargetSize), cx);
+        });
+        window.render_frame(cx);
+    })
+    .unwrap();
+}
+
+/// Renders frames while advancing the test clock past Kit's spring motions.
+fn settle_animations(cx: &mut TestAppContext, handle: gpui_kit::AnyWindowHandle) {
+    for _ in 0..40 {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
+        cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+    }
+}
+
+#[gpui_kit::test]
 fn settings_edits_coalesce_into_one_write_and_flush_on_demand(cx: &mut TestAppContext) {
     let dir = std::env::temp_dir().join(format!(
         "imgconvert-gpui-settings-{}-{}",
