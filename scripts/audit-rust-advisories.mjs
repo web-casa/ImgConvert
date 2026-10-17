@@ -43,6 +43,11 @@ const ignoredAdvisories = [
   "RUSTSEC-2025-0134",
   "RUSTSEC-2026-0192",
   "RUSTSEC-2026-0206",
+  // zip 4.x is pinned by tauri-plugin-updater 2.10 (fix needs zip >= 9); the updater
+  // only extracts signature-verified archives from our own endpoint, never user input.
+  "RUSTSEC-2026-0367",
+  "RUSTSEC-2026-0368",
+  "RUSTSEC-2026-0369",
 ];
 
 const auditTargets = [
