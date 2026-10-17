@@ -78,6 +78,12 @@ ignore = [
   "RUSTSEC-2025-0134",
   "RUSTSEC-2026-0192",
   "RUSTSEC-2026-0206",
+  # zip 4.x 由 tauri-plugin-updater 2.10 固定(需要 zip >=9 才修复),三条公告都
+  # 关于解压攻击者可控的 ZIP。更新器只解压经 minisign 签名校验通过的、我们自己
+  # 发布端点下发的更新包,不解压用户输入;随 updater 插件升级到 zip 9 后删除。
+  "RUSTSEC-2026-0367",
+  "RUSTSEC-2026-0368",
+  "RUSTSEC-2026-0369",
 ]
 yanked = "deny"
 
