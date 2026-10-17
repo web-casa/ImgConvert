@@ -8,6 +8,7 @@
 //! crate and `gpui-component` link the same `rust-i18n` major version.
 
 use gpui_kit::SharedString;
+use imgconvert_backend::settings::AppLocale;
 
 /// Locales the shell ships. Order is the toggle order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +53,21 @@ impl Locale {
 
     pub fn current() -> Self {
         Self::from_tag(&rust_i18n::locale())
+    }
+
+    /// The persisted settings value for this interface locale.
+    pub const fn app_locale(self) -> AppLocale {
+        match self {
+            Self::English => AppLocale::EnUs,
+            Self::SimplifiedChinese => AppLocale::ZhCn,
+        }
+    }
+
+    pub const fn from_app_locale(locale: AppLocale) -> Self {
+        match locale {
+            AppLocale::EnUs => Self::English,
+            AppLocale::ZhCn => Self::SimplifiedChinese,
+        }
     }
 }
 
@@ -111,5 +127,13 @@ mod tests {
         assert_eq!(Locale::from_tag("zh-Hant-TW"), Locale::SimplifiedChinese);
         assert_eq!(Locale::from_tag("en_US.UTF-8"), Locale::English);
         assert_eq!(Locale::English.next().next(), Locale::English);
+    }
+
+    #[test]
+    fn interface_locales_round_trip_through_the_settings_value() {
+        for locale in [Locale::English, Locale::SimplifiedChinese] {
+            assert_eq!(Locale::from_app_locale(locale.app_locale()), locale);
+        }
+        assert_eq!(Locale::English.app_locale().as_str(), "en-US");
     }
 }

@@ -3,8 +3,8 @@
 
 //! Shared capabilities of the GPUI shell (migration plan §2, "shared" crate).
 //!
-//! Owns the retained domain models ([`QueueModel`], [`BatchModel`]), the
-//! application-level service globals, the bridge that moves backend progress
+//! Owns the retained domain models ([`QueueModel`], [`BatchModel`],
+//! [`SettingsModel`]), the application-level service globals, the bridge that moves backend progress
 //! onto the GPUI foreground, native file prompts, interface strings and the
 //! performance probe. Feature crates depend on this crate; it depends on
 //! `imgconvert-backend` and `gpui-kit` only.
@@ -18,7 +18,9 @@ pub mod perf_probe;
 pub mod progress_bridge;
 pub mod queue_model;
 pub mod services;
+pub mod settings_model;
 
 pub use batch_model::{BatchModel, BatchPhase};
 pub use queue_model::{ItemStatus, QueueItem, QueueModel, ThumbnailState};
 pub use services::{AppModels, Services};
+pub use settings_model::SettingsModel;

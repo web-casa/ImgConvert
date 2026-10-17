@@ -8,12 +8,12 @@ the root workspace ever compiles GPUI.
 
 ## Layout
 
-| Crate                              | Role                                                                                                              |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `crates/shell` (`imgconvert-gpui`) | `main`, window, menus, key bindings, locale switch, perf-probe driver                                             |
-| `crates/shared`                    | Retained models (`QueueModel`, `BatchModel`), service globals, progress bridge, file prompts, strings, perf probe |
-| `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                    |
-| `crates/workflow`                  | Output format, output folder, start/cancel, batch progress                                                        |
+| Crate                              | Role                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `crates/shell` (`imgconvert-gpui`) | `main`, window, menus, key bindings, locale switch, perf-probe driver                                                              |
+| `crates/shared`                    | Retained models (`QueueModel`, `BatchModel`, `SettingsModel`), service globals, progress bridge, file prompts, strings, perf probe |
+| `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                                     |
+| `crates/workflow`                  | Output format and folder (persisted), start/cancel with the persisted conversion settings, batch progress                          |
 
 Feature crates depend on `shared`; nothing depends on `shell`. Every crate
 reaches GPUI through `gpui_kit` only. `scripts/check-architecture-guardrails.mjs`
@@ -54,9 +54,20 @@ the batch itself (`IMGCONVERT_PERF_PROBE_BATCH_OUT`), so the manual-batch
 scenario needs no operator; `--batch-format=avif` picks the format the Tauri
 baseline was measured with.
 
-## Scope of the proof
+## Settings
 
-Import by drop or picker, virtual queue with thumbnails, format selection,
-start/cancel with progress, and the English/Chinese switch. No settings panel,
-comparison preview, updater, PDF options or store packaging yet; those are
-stage 3 work and keep shipping through the Tauri line until gate G2 passes.
+The shell reads and writes the Tauri shell's `settings.json` (same file, same
+`settings` key, same normalization; see `docs/GPUI_SETTINGS_PATHS.md` for the
+per-platform path). Format, output folder and language changes are saved
+300 ms after the last edit and on quit; the first write keeps a
+`settings.json.pre-gpui` backup. An `instance.lock` next to it stops the Tauri
+and GPUI shells from running at the same time.
+
+## Scope
+
+Stage 2 proof plus the first stage 3 slice: import by drop or picker, virtual
+queue with thumbnails, persisted format and output folder, start/cancel with
+progress using the persisted conversion settings, and the English/Chinese
+switch. No settings panel, presets form, comparison preview, updater, PDF
+options or store packaging yet; those are the remaining stage 3 work and keep
+shipping through the Tauri line meanwhile.

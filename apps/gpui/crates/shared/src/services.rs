@@ -9,11 +9,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::{App, AppContext as _, Entity, Global};
+use imgconvert_backend::external_codecs;
 use imgconvert_backend::import::ImportScanState;
 use imgconvert_backend::service::{BatchService, ShutdownOutcome};
 
 use crate::batch_model::BatchModel;
+use crate::i18n::Locale;
 use crate::queue_model::QueueModel;
+use crate::settings_model::SettingsModel;
 
 /// Backend services shared by every window.
 #[derive(Clone)]
@@ -51,6 +54,7 @@ impl Services {
 pub struct AppModels {
     queue: Entity<QueueModel>,
     batch: Entity<BatchModel>,
+    settings: Entity<SettingsModel>,
 }
 
 impl Global for AppModels {}
@@ -64,13 +68,26 @@ impl AppModels {
         &self.batch
     }
 
+    pub fn settings(&self) -> &Entity<SettingsModel> {
+        &self.settings
+    }
+
     pub fn global(cx: &App) -> &Self {
         cx.global::<Self>()
     }
 }
 
-/// Registers services and models. Call once after `gpui_kit::init`.
+/// Registers services and models, loading the settings from the shared
+/// per-channel store. Call once after `gpui_kit::init`.
 pub fn init(cx: &mut App) {
+    init_with_settings(cx, || {
+        SettingsModel::from_data_dir(Locale::from_environment().app_locale())
+    });
+}
+
+/// Like [`init`], but with the settings model the caller provides (tests use
+/// an in-memory model). A second call is a no-op.
+pub fn init_with_settings(cx: &mut App, settings: impl FnOnce() -> SettingsModel) {
     if !cx.has_global::<Services>() {
         cx.set_global(Services {
             batch: BatchService::new(),
@@ -80,6 +97,29 @@ pub fn init(cx: &mut App) {
     if !cx.has_global::<AppModels>() {
         let queue = cx.new(|_| QueueModel::default());
         let batch = cx.new(|_| BatchModel::default());
-        cx.set_global(AppModels { queue, batch });
+        let settings = cx.new(|_| settings());
+        // A repaired or migrated record is written once, like the Tauri shell.
+        let heic_helper = settings.update(cx, |model, cx| {
+            if model.is_dirty() {
+                model.schedule_save(cx);
+            }
+            model.settings().heic_helper_path.clone()
+        });
+        // A manually chosen HEIC helper outside the discovery paths must be
+        // selected again in this process; the probe runs off the foreground.
+        if let Some(path) = heic_helper {
+            cx.background_executor()
+                .spawn(async move {
+                    if let Err(error) = external_codecs::set_selected_heic_helper(Some(path)) {
+                        eprintln!("imgconvert: persisted HEIC helper not usable: {error}");
+                    }
+                })
+                .detach();
+        }
+        cx.set_global(AppModels {
+            queue,
+            batch,
+            settings,
+        });
     }
 }

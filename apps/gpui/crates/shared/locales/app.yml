@@ -14,9 +14,21 @@ app.quit:
 app.open_files:
   en: Open…
   zh-CN: 打开…
+app.instance_blocked_title:
+  en: ImgConvert is already running
+  zh-CN: ImgConvert 已在运行
+app.instance_blocked:
+  en: "Another ImgConvert (version %{version}, process %{pid}) is open. The two versions share one settings file, so only one can run at a time. Quit the other ImgConvert, then open this one again."
+  zh-CN: "另一个 ImgConvert（版本 %{version}，进程 %{pid}）正在运行。两个版本共用同一份设置文件，因此同一时间只能运行一个。请先退出另一个 ImgConvert，再重新打开。"
+app.instance_blocked_unknown:
+  en: "Another ImgConvert is open. The two versions share one settings file, so only one can run at a time. Quit the other ImgConvert, then open this one again."
+  zh-CN: "另一个 ImgConvert 正在运行。两个版本共用同一份设置文件，因此同一时间只能运行一个。请先退出另一个 ImgConvert，再重新打开。"
 menu.file:
   en: File
   zh-CN: 文件
+settings.save_failed:
+  en: "Settings couldn’t be saved: %{detail}"
+  zh-CN: "设置无法保存：%{detail}"
 queue.title:
   en: Queue
   zh-CN: 队列

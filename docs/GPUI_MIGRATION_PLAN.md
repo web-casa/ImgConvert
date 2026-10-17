@@ -1,6 +1,6 @@
 # ImgConvert 桌面端 Tauri → GPUI 迁移方案
 
-状态：草案 v0.7（2026-10-17）。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
+状态：草案 v0.8（2026-10-17）。阶段 3 首片（设置持久化）已实现，见 §4 阶段 3 进度。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
 
 ## 0. 决策前提
 
@@ -162,15 +162,15 @@ Linux GPU 策略：在创建 GPUI 窗口之前，用独立的 `wgpu`/`ash` 探�
 
 ### 3.5 设置持久化
 
-- 物理路径表（阶段 1 核实并写入 `docs/GPUI_SETTINGS_PATHS.md`，当前未核实）：
+- 物理路径表（2026-10-17 按源码核实，写入 `docs/GPUI_SETTINGS_PATHS.md`；`tauri-plugin-store` 把 `settings.json` 解析到 `BaseDirectory::AppData` = `dirs::data_dir()/<identifier>`，v0.7 把 Linux 写成 `$XDG_CONFIG_HOME` 是错的）：
 
 | 渠道 | Tauri 版路径 | GPUI 版要求 |
 |---|---|---|
-| macOS 直发 | `~/Library/Application Support/com.ivmm.imgconvert/settings.json` | 同路径 |
+| macOS 直发 | `~/Library/Application Support/com.ivmm.imgconvert/settings.json` | 同路径（已实现） |
 | MAS | 沙盒容器内同相对路径 | 同 bundle id，容器自动一致 |
-| Windows 直发 | `%APPDATA%\com.ivmm.imgconvert\settings.json` | 同路径 |
+| Windows 直发 | `%APPDATA%\com.ivmm.imgconvert\settings.json` | 同路径（已实现） |
 | MSIX | 同上（runFullTrust，不虚拟化 AppData 的情况需核实） | 核实后决定 |
-| Linux deb/rpm/AppImage | `$XDG_CONFIG_HOME/com.ivmm.imgconvert/settings.json` | 同路径 |
+| Linux deb/rpm/AppImage | `$XDG_DATA_HOME/com.ivmm.imgconvert/settings.json`（默认 `~/.local/share/...`） | 同路径（已实现） |
 | Snap/Flatpak | 沙盒 home 内同相对路径 | 同 app id |
 
 - 读取：同文件、同 `settings` 键；移植 `normalizeSettings` 全部规则（版本迁移、类型归一化、数值约束、覆盖模式转换、metadata 策略、预设归一化）并用现有 TS 测试用例生成 Rust 测试。
@@ -178,6 +178,7 @@ Linux GPU 策略：在创建 GPUI 窗口之前，用独立的 `wgpu`/`ash` 探�
 - 跨进程互斥：旧 Tauri 版由 `tauri-plugin-store` 自动保存，无法参与文件锁协议。因此不承诺两版本并发安全，改为互斥运行：GPUI 版与 0.3.x 过渡版都在配置目录创建 `instance.lock`（含 pid 与版本），启动时发现另一版本正在运行则提示并退出。GPUI 版内部仍用文件锁（`fd-lock`）序列化自身多实例写入。
 - 损坏文件：解析失败时保留原文件为 `.corrupt-<ts>` 并用默认值启动。
 - 验收：旧版写 → 新版读 → 新版写 → 旧版读 的往返测试；崩溃注入（写到一半 kill）后可恢复；互斥启动测试（先启旧版再启新版、反之）通过。
+- 实现落点（2026-10-17）：`crates/imgconvert-platform/{paths,settings,instance_lock}.rs`（经 `imgconvert_backend` 导出）；`crates/imgconvert-backend/src/conversion_request.rs` 是 `buildConvertRequest` 的移植，GPUI 工作流只经它生成 `ConvertOptions`；GPUI 侧 `imgconvert_gpui_shared::SettingsModel`（`AppModels` 的第三个模型）负责合并写与退出 flush。
 
 ### 3.6 打包、安装身份与更新
 
@@ -363,6 +364,21 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，8 项 P1、7 项 P2�
 - 每个屏幕完成前过一遍 `gpui-kit-design-guides` 的无障碍清单（键盘可达、焦点可见且 overlay 后恢复、控件有可访问名称、状态不只靠颜色、长译文与大字号可用）与设计评审清单八问，并在 PR 中记录。
 - 对完整候选重跑阶段 0 测量。
 
+进度（2026-10-17，首片：设置持久化，未经 Codex 评审）：
+
+- 已实现 §3.5 的读写规则：`imgconvert-platform` 新增 `paths`（与 Tauri 同一 `dirs::data_dir()` 解析）、`settings`（`Settings`/`WorkflowPresetSnapshot`/`CustomWorkflowPreset` 类型，camelCase 序列化，`#[serde(flatten)]` 保留未知键；`normalize` 逐条移植 `normalizeSettings` 及后缀、转换策略迁移、预设归一化四个辅助函数，TS 用例改写为 Rust 单测；`load` 处理残留 `.tmp` 与 `.corrupt-<ts>` 隔离；`save` 走 `fd-lock` + 一次性 `settings.json.pre-gpui` 备份 + 临时文件 `fsync` + rename）、`instance_lock`（`{pid, flavor, version}` 标记，另一 flavor 存活即 `HeldByOther`，pid 存活用 `kill(0)`/`OpenProcess` 判定）。
+- 发现并纠正：Tauri 的 `settings.json` 在 Linux 上位于 `$XDG_DATA_HOME`（`~/.local/share`），不是 v0.7 表中的 `$XDG_CONFIG_HOME`；macOS/Windows 不受影响。详见 `docs/GPUI_SETTINGS_PATHS.md`。
+- backend 新增 `conversion_request`：`conversion_options_for(settings, item, format, quality_floor, lossless_supported, output_suffix)` 是 `buildConvertRequest` 的移植（含 PDF 输入禁用三项跳过策略、尺寸字段按模式清零、`webpNearLossless` 只随无损 WebP、`relativeDir` 只在有输出目录时传），`conversion-options.test.ts` 的用例改写为 Rust 单测。GPUI 工作流的 `build_options` 改为经它生成，批次因此使用持久化记录里的全部转换参数（质量、尺寸、元数据策略、并发数等），`default_conversion_options` 只剩探针/smoke 使用。
+- GPUI 壳：`SettingsModel`（`AppModels::settings()`）持有记录与文档，`update` 比较前后相等才通知与排程写入，300 ms 合并、最长 2 s 必写；`Quit` action 与 `on_app_quit` 都同步 flush；写失败在面板状态区以危险色显示并保留 dirty。启动 locale 取自 `settings.locale`，语言切换回写；工作流面板的格式 `Select` 与输出目录读写 `format`/`outDir`，`observe_in` 把外部修改镜像回控件。`main` 启动时写 `instance.lock`，被另一版本占用时只开一个"ImgConvert 已在运行"窗口（`Alert` + 退出按钮）。
+- 测试：`imgconvert-platform` 54 个单测（含往返、备份只做一次、损坏隔离、残留临时文件重试）；shell 的无头 Kit UI 测试新增"持久化的格式与目录驱动面板并随编辑回写"与"编辑合并为一次写入、按需 flush"；现有三条 UI 测试改用内存设置模型，不碰真实用户文件。
+- 未做、记入后续：0.3.x 过渡版写 `instance.lock`（Tauri 侧，随 G1 补丁；按同一协议对文件持 `File::try_lock` 独占锁）；崩溃注入与互斥启动的端到端演练（需两个安装件）；MSIX/Snap/Flatpak 路径实机核对；设置面板本身（下一片：工作流参数表单与预设）。
+
+Codex 只读评审（2026-10-17，结论"修后可合并"，5 项 P1、9 项 P2、1 项 P3，记录在 `artifacts/reviews/codex-stage3-settings-review-2026-10-17.md`）与处置：
+
+- 已修（P1）：`instance.lock` 改为操作系统独占文件锁（`File::try_lock`，进程退出即释放，获取原子，任何存活持有者都阻止启动，同 flavor 也算），同时消除"先查后写"竞争、pid 复用与多 GPUI 进程互相覆盖 `settings.json` 三个问题；被阻止的启动改为先于 `init_app` 判定，设置只建内存模型，不会排程写入共享文件；读取失败（非"不存在"）时本会话不持久化，不再可能用默认值覆盖原配置；两条 UI 测试的断言按实际行为修正（夹具补 `outputSuffixEnabled`，默认输出为 `one_done.avif`）。
+- 已修（P2/P3）：`conversionPolicyVersion` 数值相等；JS `trim` 空白集合、UTF-16 `slice`、`String(["webp"])`、`Math.round` 四处语义对齐（含单测）；`outDir: ""` 视为假值不传 `relativeDir`；残留 `.tmp` 只在"完整 JSON 且不早于主文件"时提升，否则删除；备份经 `.pre-gpui.tmp` rename 发布；隔离文件名同秒内加 `-n`；写锁最多等 500 ms；启动时把持久化的 `heicHelperPath` 经 `set_selected_heic_helper` 重新选中（后台执行）。
+- 未采纳：IO 错误（目录不可写等）导致无法建立标记时仍放行启动，原因是此时设置同样无法保存、面板已显示错误，而把应用挡在门外对用户没有额外保护；评审建议的"fail closed"记入阶段 5 打包验收时按渠道复核。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）
@@ -454,7 +470,7 @@ workflow 处置表：
 
 ## 8. 未核实事项
 
-- 各渠道设置文件物理路径是否与 Tauri 版一致（§3.5）。
+- 各渠道设置文件物理路径是否与 Tauri 版一致（§3.5）：源码层面已核实（见 `docs/GPUI_SETTINGS_PATHS.md`），MSIX/Snap/Flatpak 仍待实机。
 - 旧 Tauri updater 能否安装 cargo-packager 产物；minisign 密钥能否复用（§3.6）。
 - GPUI 在无 Vulkan 适配器时的失败行为（§3.2）。
 - 新依赖图是否满足许可证白名单（§5）。
@@ -465,6 +481,11 @@ workflow 处置表：
 - Kit 内置 zh-CN 组件文案的覆盖度（§3.4）。
 
 ## 9. 修订记录
+
+v0.8（2026-10-17，阶段 3 首片）：
+
+- 纠正：§3.5 路径表 Linux 行由 `$XDG_CONFIG_HOME` 改为 `$XDG_DATA_HOME`，依据 `tauri-plugin-store` 与 Tauri `app_data_dir` 源码；新增 `docs/GPUI_SETTINGS_PATHS.md`。
+- 新增：§3.5 实现落点；§4 阶段 3 的设置持久化进度与后续事项；§8 路径项改为"源码已核实、实机待核"。
 
 v0.7（2026-10-17，阶段 1 Codex 评审后）：
 

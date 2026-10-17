@@ -5,14 +5,17 @@
 
 use gpui_kit::test::TestWindowExt;
 use gpui_kit::{AppContext, Bounds, TestAppContext, WindowBounds, WindowOptions, px, size};
+use imgconvert_backend::settings::{AppLocale, Settings};
 use imgconvert_gpui::{Workspace, init_app, toggle_language};
 use imgconvert_gpui_shared::i18n::{Locale, set_locale};
-use imgconvert_gpui_shared::{AppModels, ItemStatus, progress_bridge};
+use imgconvert_gpui_shared::{AppModels, ItemStatus, SettingsModel, progress_bridge, services};
 
 fn open_workspace(
     cx: &mut TestAppContext,
 ) -> (gpui_kit::AnyWindowHandle, gpui_kit::Entity<Workspace>) {
     cx.update(|cx| {
+        // Tests never touch the real per-user store.
+        services::init_with_settings(cx, || SettingsModel::in_memory(Settings::default()));
         init_app(cx);
         set_locale(Locale::English);
         gpui_kit::open_window(
@@ -58,12 +61,127 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
         assert_eq!(window.find("queue-title").label(), Some("队列"));
     })
     .unwrap();
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().read(cx);
+        assert_eq!(
+            settings.settings().locale,
+            AppLocale::ZhCn,
+            "toggle persists"
+        );
+    });
     cx.update(toggle_language);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         assert_eq!(window.find("queue-title").label(), Some("Queue"));
     })
     .unwrap();
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().read(cx);
+        assert_eq!(settings.settings().locale, AppLocale::EnUs);
+    });
+}
+
+#[gpui_kit::test]
+fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut TestAppContext) {
+    // A record written by the Tauri shell: png output into a chosen folder.
+    cx.update(|cx| {
+        let mut settings = Settings::default();
+        settings.format = "png".into();
+        settings.out_dir = Some("/persisted/out".into());
+        services::init_with_settings(cx, || SettingsModel::in_memory(settings));
+    });
+    let (handle, workspace) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let workflow = workspace.read(cx).workflow().clone();
+        assert_eq!(workflow.read(cx).selected_format(cx).as_ref(), "png");
+        assert_eq!(
+            workflow.read(cx).output_dir(cx).as_deref(),
+            Some(std::path::Path::new("/persisted/out"))
+        );
+        assert_eq!(
+            window.find("workflow-output-dir").label(),
+            Some("/persisted/out")
+        );
+        // Start reads "Start", not "Start…": no folder prompt will open.
+        assert_eq!(window.find("workflow-start").label(), Some("Start"));
+
+        workflow.update(cx, |workflow, cx| {
+            workflow.set_format("jpeg", window, cx);
+            workflow.set_format("not-a-format", window, cx);
+            workflow.set_output_dir("/other/out".into(), cx);
+        });
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().read(cx);
+        assert_eq!(settings.settings().format, "jpeg");
+        assert_eq!(settings.settings().out_dir.as_deref(), Some("/other/out"));
+    });
+}
+
+#[gpui_kit::test]
+fn settings_edits_coalesce_into_one_write_and_flush_on_demand(cx: &mut TestAppContext) {
+    let dir = std::env::temp_dir().join(format!(
+        "imgconvert-gpui-settings-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("settings.json");
+    std::fs::write(
+        &path,
+        br#"{"other":{"keep":1},"settings":{"quality":70,"conversionPolicyVersion":2,"outputSuffixEnabled":true}}"#,
+    )
+    .unwrap();
+    let model = cx.new(|_| SettingsModel::from_disk(path.clone(), AppLocale::EnUs));
+    cx.update(|cx| {
+        model.update(cx, |model, cx| {
+            assert!(!model.is_dirty(), "a current record needs no startup write");
+            assert!(model.update(cx, |s| s.quality = 71));
+            assert!(model.update(cx, |s| s.quality = 72));
+            assert!(
+                !model.update(cx, |s| s.quality = 72),
+                "no-op edits are ignored"
+            );
+        });
+    });
+    // Both edits sit inside one 300 ms window.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(200));
+    cx.run_until_parked();
+    cx.update(|cx| assert_eq!(model.read(cx).save_count(), 0));
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(200));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert_eq!(model.read(cx).save_count(), 1);
+        assert!(!model.read(cx).is_dirty());
+    });
+    let written: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(written["settings"]["quality"], 72);
+    assert_eq!(
+        written["other"]["keep"], 1,
+        "foreign top-level keys survive"
+    );
+    assert!(dir.join("settings.json.pre-gpui").exists());
+
+    // Quit-time flush writes immediately without waiting for the timer.
+    cx.update(|cx| {
+        model.update(cx, |model, cx| {
+            model.update(cx, |s| s.quality = 73);
+            model.flush(cx).unwrap();
+            assert_eq!(model.save_count(), 2);
+        });
+    });
+    let written: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(written["settings"]["quality"], 73);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[gpui_kit::test]
@@ -132,9 +250,10 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
                 .collect()
         })
         .unwrap_or_default();
+    // The settings defaults decide the output: avif with the `_done` suffix.
     assert!(
-        dir.join("out").join("one.webp").exists(),
-        "expected one.webp in {:?}, found {produced:?}",
+        dir.join("out").join("one_done.avif").exists(),
+        "expected one_done.avif in {:?}, found {produced:?}",
         dir.join("out")
     );
     let _ = std::fs::remove_dir_all(&dir);
