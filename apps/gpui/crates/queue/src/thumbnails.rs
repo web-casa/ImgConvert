@@ -9,32 +9,16 @@
 //! system. The model keeps the decoded frames under a byte budget and hands
 //! evicted images back so the view can release their GPU textures.
 
-use std::io::Cursor;
 use std::sync::Arc;
 
 use gpui_kit::RenderImage;
-use image::{DynamicImage, Frame, ImageReader};
 use imgconvert_backend::thumbnail::{self, ThumbnailOptions};
 
 /// Longest edge requested from the backend. Rows show thumbnails at 2.5 rem,
 /// so 96 px covers 2x displays at the default base font.
 pub const THUMBNAIL_EDGE: u32 = 96;
 
-/// Decodes PNG bytes into a GPUI render image (BGRA, straight alpha).
-pub fn decode_png(bytes: &[u8]) -> Result<Arc<RenderImage>, String> {
-    let decoded = ImageReader::with_format(Cursor::new(bytes), image::ImageFormat::Png)
-        .decode()
-        .map_err(|error| format!("thumbnail decode failed: {error}"))?;
-    Ok(render_image_from(decoded))
-}
-
-fn render_image_from(image: DynamicImage) -> Arc<RenderImage> {
-    let mut data = image.into_rgba8();
-    for pixel in data.chunks_exact_mut(4) {
-        pixel.swap(0, 2);
-    }
-    Arc::new(RenderImage::new(vec![Frame::new(data)]))
-}
+pub use imgconvert_gpui_shared::images::decode_png;
 
 /// Generates and decodes the thumbnail for `input`. Runs on a background
 /// thread; `Ok(None)` means the backend has no raster preview for the file.
@@ -52,8 +36,10 @@ pub fn load_thumbnail(input: String) -> Result<Option<Arc<RenderImage>>, String>
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
-    use image::{ImageBuffer, Rgba};
+    use image::{DynamicImage, ImageBuffer, Rgba};
 
     #[test]
     fn decoded_thumbnails_are_bgra_frames_of_the_source_size() {

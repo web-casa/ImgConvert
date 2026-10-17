@@ -14,6 +14,7 @@ the root workspace ever compiles GPUI.
 | `crates/shared`                    | Retained models (`QueueModel`, `BatchModel`, `SettingsModel`), service globals, progress bridge, file prompts, strings, perf probe                                                            |
 | `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                                                                                                |
 | `crates/workflow`                  | The conversion settings form (`SettingsForm`: format, quality, output, policies, format parameters, presets, PDF, resize, target size, metadata), output folder, start/cancel, batch progress |
+| `crates/preview`                   | Before/after comparison dialog for one queue item (backend preview workflow, reveal slider, stats, warnings)                                                                                  |
 
 Feature crates depend on `shared`; nothing depends on `shell`. Every crate
 reaches GPUI through `gpui_kit` only. `scripts/check-architecture-guardrails.mjs`
@@ -65,9 +66,9 @@ and GPUI shells from running at the same time.
 
 ## Scope
 
-Stage 2 proof plus the first two stage 3 slices: import by drop or picker,
+Stage 2 proof plus the first three stage 3 slices: import by drop or picker,
 virtual queue with thumbnails, the full conversion settings form with scenario
-presets (every field the Tauri shell persists), start/cancel with progress,
-and the English/Chinese switch. No comparison preview, HEIC helper picker,
-plugin diagnostics, updater or store packaging yet; those are the remaining
-stage 3 work and keep shipping through the Tauri line meanwhile.
+presets (every field the Tauri shell persists), the before/after comparison
+preview, start/cancel with progress, and the English/Chinese switch. No HEIC
+helper picker, plugin diagnostics, updater or store packaging yet; those are
+the remaining stage 3 work and keep shipping through the Tauri line meanwhile.

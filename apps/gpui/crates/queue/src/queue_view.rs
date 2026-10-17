@@ -19,10 +19,10 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, AppContext as _, AsyncApp, Context, Entity, ExternalPaths, FontWeight, ImageSource,
-    InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _, Pixels, Render,
-    RenderImage, RenderOnce, SharedString, Size, StatefulInteractiveElement as _, Styled as _,
-    StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, size,
+    App, AppContext as _, AsyncApp, ClickEvent, Context, Entity, EventEmitter, ExternalPaths,
+    FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
+    Pixels, Render, RenderImage, RenderOnce, SharedString, Size, StatefulInteractiveElement as _,
+    Styled as _, StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, size,
 };
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
@@ -39,6 +39,19 @@ const ROW_HEIGHT_REM: f32 = 3.5;
 const MAX_INFLIGHT_THUMBNAILS: usize = 4;
 /// Rows beyond the viewport that get thumbnails ahead of scrolling.
 const THUMBNAIL_LOOKAHEAD: usize = 12;
+
+/// A row action handler shared with the row element.
+type RowClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// Commands a queue row issues that another feature fulfils; the shell
+/// subscribes and routes them (feature crates never depend on each other).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueueViewEvent {
+    /// Open the before/after comparison for the item with this key.
+    ComparePreview(SharedString),
+}
+
+impl EventEmitter<QueueViewEvent> for QueueView {}
 
 pub struct QueueView {
     queue: Entity<QueueModel>,
@@ -329,10 +342,27 @@ impl QueueView {
             Rc::clone(&self.item_sizes),
             move |this, range, window, cx| {
                 this.on_visible_range(range.clone(), window, cx);
-                let queue = queue.read(cx);
-                range
-                    .filter_map(|ix| queue.item_at(ix).cloned())
-                    .map(|item| QueueRow { item, row_height })
+                let busy = queue.read(cx).is_importing()
+                    || AppModels::global(cx).batch().read(cx).is_active();
+                let items: Vec<QueueItem> = {
+                    let queue = queue.read(cx);
+                    range.filter_map(|ix| queue.item_at(ix).cloned()).collect()
+                };
+                items
+                    .into_iter()
+                    .map(|item| {
+                        let key = item.key.clone();
+                        let on_compare: RowClickHandler =
+                            Rc::new(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                                cx.emit(QueueViewEvent::ComparePreview(key.clone()));
+                            }));
+                        QueueRow {
+                            item,
+                            row_height,
+                            busy,
+                            on_compare,
+                        }
+                    })
                     .collect()
             },
         )
@@ -402,12 +432,22 @@ fn release_images(images: Vec<Arc<RenderImage>>, mut window: Option<&mut Window>
 struct QueueRow {
     item: QueueItem,
     row_height: Pixels,
+    busy: bool,
+    on_compare: RowClickHandler,
 }
 
 impl RenderOnce for QueueRow {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
         let item = self.item;
+        let on_compare = self.on_compare;
+        let compare = Button::new(SharedString::from(format!("compare:{}", item.key)))
+            .ghost()
+            .small()
+            .label(tr("preview.open"))
+            .tooltip(tr("preview.title"))
+            .disabled(self.busy)
+            .on_click(move |event, window, cx| on_compare(event, window, cx));
         h_flex()
             .id(item.key.clone())
             .test_support()
@@ -433,6 +473,7 @@ impl RenderOnce for QueueRow {
                             .child(item.path.clone()),
                     ),
             )
+            .child(compare)
             .child(render_status(&item.status, cx))
     }
 }
@@ -504,21 +545,7 @@ fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
     }
 }
 
-/// Human-readable size with one decimal above 1 KB.
-pub fn format_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
-    let mut value = bytes as f64;
-    let mut unit = 0;
-    while value >= 1024.0 && unit < UNITS.len() - 1 {
-        value /= 1024.0;
-        unit += 1;
-    }
-    if unit == 0 {
-        format!("{bytes} B")
-    } else {
-        format!("{value:.1} {}", UNITS[unit])
-    }
-}
+pub use imgconvert_gpui_shared::images::format_bytes;
 
 #[cfg(test)]
 mod tests {

@@ -1212,19 +1212,20 @@ impl SettingsForm {
             .when(disabled, |this| this.opacity(0.6))
             .child(Self::labeled_value(label.clone(), value, cx))
             .child(
+                // Only an enabled slider is a Tab stop and takes keys.
                 div()
                     .id(kind.id())
                     .test_support()
-                    .track_focus(&control.focus)
                     .aria_label(label)
                     .rounded_md()
                     .border_1()
                     .border_color(transparent_black())
-                    .focus_visible(move |style| style.border_color(ring))
                     .when(!disabled, |this| {
-                        this.on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
-                            this.slider_key(kind, event, cx);
-                        }))
+                        this.track_focus(&control.focus)
+                            .focus_visible(move |style| style.border_color(ring))
+                            .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                this.slider_key(kind, event, cx);
+                            }))
                     })
                     .child(Slider::new(&control.state).disabled(disabled)),
             )

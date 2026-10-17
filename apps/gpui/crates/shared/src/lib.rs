@@ -12,8 +12,10 @@
 rust_i18n::i18n!("locales", fallback = "en");
 
 pub mod batch_model;
+pub mod conversion;
 pub mod file_prompt;
 pub mod i18n;
+pub mod images;
 pub mod perf_probe;
 pub mod progress_bridge;
 pub mod queue_model;

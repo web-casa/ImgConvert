@@ -16,9 +16,7 @@ imgconvert-backend.workspace = true
 rust-i18n.workspace = true
 thiserror.workspace = true
 serde_json.workspace = true
-
-[dev-dependencies]
-image = { version = "0.25", default-features = false, features = ["png"] }
+image.workspace = true
 
 [lints]
 workspace = true

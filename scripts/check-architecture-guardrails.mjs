@@ -536,8 +536,11 @@ function checkGpuiShellLayering() {
     shared: "apps/gpui/crates/shared/Cargo.toml",
     queue: "apps/gpui/crates/queue/Cargo.toml",
     workflow: "apps/gpui/crates/workflow/Cargo.toml",
+    preview: "apps/gpui/crates/preview/Cargo.toml",
     shell: "apps/gpui/crates/shell/Cargo.toml",
   };
+  const featureCrates = ["queue", "workflow", "preview"];
+  const featurePackages = featureCrates.map((name) => `imgconvert-gpui-${name}`);
   const deps = Object.fromEntries(
     Object.entries(crates).map(([name, manifest]) => [
       name,
@@ -558,16 +561,20 @@ function checkGpuiShellLayering() {
     }
   }
   const shellCrate = "imgconvert-gpui";
-  for (const feature of ["shared", "queue", "workflow"]) {
+  for (const feature of ["shared", ...featureCrates]) {
     if (deps[feature].has(shellCrate)) {
       failures.push(`apps/gpui ${feature} must not depend on the shell crate`);
     }
   }
-  if (deps.shared.has("imgconvert-gpui-queue") || deps.shared.has("imgconvert-gpui-workflow")) {
+  if (featurePackages.some((name) => deps.shared.has(name))) {
     failures.push("apps/gpui shared must not depend on a feature crate");
   }
-  if (deps.queue.has("imgconvert-gpui-workflow") || deps.workflow.has("imgconvert-gpui-queue")) {
-    failures.push("apps/gpui feature crates must not depend on each other");
+  for (const feature of featureCrates) {
+    for (const other of featurePackages) {
+      if (other !== `imgconvert-gpui-${feature}` && deps[feature].has(other)) {
+        failures.push(`apps/gpui feature crates must not depend on each other (${feature} → ${other})`);
+      }
+    }
   }
 }
 

@@ -11,6 +11,7 @@ use std::time::Duration;
 use gpui_kit::{App, AppContext as _, Entity, Global};
 use imgconvert_backend::external_codecs;
 use imgconvert_backend::import::ImportScanState;
+use imgconvert_backend::preview::PreviewState;
 use imgconvert_backend::service::{BatchService, ShutdownOutcome};
 
 use crate::batch_model::BatchModel;
@@ -23,6 +24,8 @@ use crate::settings_model::SettingsModel;
 pub struct Services {
     batch: BatchService,
     import_scan: Arc<ImportScanState>,
+    /// The one current comparison preview; a newer one cancels the previous.
+    preview: Arc<PreviewState>,
 }
 
 impl Global for Services {}
@@ -34,6 +37,10 @@ impl Services {
 
     pub fn import_scan(&self) -> &Arc<ImportScanState> {
         &self.import_scan
+    }
+
+    pub fn preview(&self) -> &Arc<PreviewState> {
+        &self.preview
     }
 
     pub fn global(cx: &App) -> &Self {
@@ -92,6 +99,7 @@ pub fn init_with_settings(cx: &mut App, settings: impl FnOnce() -> SettingsModel
         cx.set_global(Services {
             batch: BatchService::new(),
             import_scan: Arc::new(ImportScanState::default()),
+            preview: Arc::new(PreviewState::default()),
         });
     }
     if !cx.has_global::<AppModels>() {

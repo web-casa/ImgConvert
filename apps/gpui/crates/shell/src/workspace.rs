@@ -9,9 +9,11 @@ use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_fl
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
     FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
-    TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div, px, size,
+    Subscription, TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
+    px, size,
 };
-use imgconvert_gpui_queue::QueueView;
+use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
+use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_workflow::WorkflowPanel;
 
@@ -21,17 +23,52 @@ pub struct Workspace {
     queue_view: Entity<QueueView>,
     workflow: Entity<WorkflowPanel>,
     focus_handle: FocusHandle,
+    /// The dialog owns the preview; this only lets tests and menus find it.
+    comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl Workspace {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let queue_view = cx.new(QueueView::new);
         let workflow = cx.new(|cx| WorkflowPanel::new(window, cx));
+        // Queue rows issue commands other features fulfil; the shell routes them.
+        let subscriptions = vec![cx.subscribe_in(
+            &queue_view,
+            window,
+            |this, _, event: &QueueViewEvent, window, cx| match event {
+                QueueViewEvent::ComparePreview(key) => {
+                    this.open_comparison_preview(key.clone(), window, cx);
+                }
+            },
+        )];
         Self {
             queue_view,
             workflow,
             focus_handle: cx.focus_handle(),
+            comparison_preview: None,
+            _subscriptions: subscriptions,
         }
+    }
+
+    /// Opens the before/after dialog for a queue item (what the row's
+    /// Compare button does).
+    pub fn open_comparison_preview(
+        &mut self,
+        key: gpui_kit::SharedString,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<Entity<ComparisonPreview>> {
+        let preview = open_comparison_preview(key, window, cx)?;
+        self.comparison_preview = Some(preview.downgrade());
+        Some(preview)
+    }
+
+    /// The comparison preview currently shown, if its dialog is still open.
+    pub fn comparison_preview(&self) -> Option<Entity<ComparisonPreview>> {
+        self.comparison_preview
+            .as_ref()
+            .and_then(gpui_kit::WeakEntity::upgrade)
     }
 
     pub fn queue_view(&self) -> &Entity<QueueView> {
