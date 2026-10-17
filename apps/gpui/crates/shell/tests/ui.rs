@@ -10,6 +10,17 @@ use imgconvert_gpui::{Workspace, init_app, toggle_language};
 use imgconvert_gpui_shared::i18n::{Locale, set_locale};
 use imgconvert_gpui_shared::{AppModels, ItemStatus, SettingsModel, progress_bridge, services};
 
+/// The interface locale is process-wide (`rust_i18n`), and the test harness
+/// runs tests on parallel threads: every test that opens a workspace holds
+/// this lock so one test's locale switch cannot leak into another's labels.
+static LOCALE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn locale_guard() -> std::sync::MutexGuard<'static, ()> {
+    LOCALE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 fn open_workspace(
     cx: &mut TestAppContext,
 ) -> (gpui_kit::AnyWindowHandle, gpui_kit::Entity<Workspace>) {
@@ -35,6 +46,7 @@ fn open_workspace(
 
 #[gpui_kit::test]
 fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     let (handle, _workspace) = open_workspace(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
@@ -52,6 +64,7 @@ fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext)
 
 #[gpui_kit::test]
 fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     let (handle, _workspace) = open_workspace(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
@@ -83,6 +96,7 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     // A record written by the Tauri shell: png output into a chosen folder.
     cx.update(|cx| {
         let mut settings = Settings::default();
@@ -122,6 +136,7 @@ fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut Tes
 
 #[gpui_kit::test]
 fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     use imgconvert_backend::settings::ResizeMode;
     use imgconvert_gpui_workflow::{NumberField, Section, SliderKind};
 
@@ -305,6 +320,7 @@ fn settle_animations(cx: &mut TestAppContext, handle: gpui_kit::AnyWindowHandle)
 
 #[gpui_kit::test]
 fn settings_edits_coalesce_into_one_write_and_flush_on_demand(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     let dir = std::env::temp_dir().join(format!(
         "imgconvert-gpui-settings-{}-{}",
         std::process::id(),
@@ -369,6 +385,7 @@ fn settings_edits_coalesce_into_one_write_and_flush_on_demand(cx: &mut TestAppCo
 
 #[gpui_kit::test]
 fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
     let (handle, workspace) = open_workspace(cx);
     let dir = std::env::temp_dir().join(format!("imgconvert-gpui-ui-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
