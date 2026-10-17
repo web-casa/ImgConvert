@@ -16,6 +16,8 @@ pub enum PromptKind {
     ImportPaths,
     /// One output folder.
     OutputFolder,
+    /// One file, such as a helper executable.
+    SingleFile,
 }
 
 pub fn options_for(kind: PromptKind, prompt: SharedString) -> PathPromptOptions {
@@ -29,6 +31,12 @@ pub fn options_for(kind: PromptKind, prompt: SharedString) -> PathPromptOptions 
         PromptKind::OutputFolder => PathPromptOptions {
             files: false,
             directories: true,
+            multiple: false,
+            prompt: Some(prompt),
+        },
+        PromptKind::SingleFile => PathPromptOptions {
+            files: true,
+            directories: false,
             multiple: false,
             prompt: Some(prompt),
         },
@@ -61,5 +69,7 @@ mod tests {
         assert!(options.files && options.directories && options.multiple);
         let options = options_for(PromptKind::OutputFolder, "Choose".into());
         assert!(!options.files && options.directories && !options.multiple);
+        let options = options_for(PromptKind::SingleFile, "Choose".into());
+        assert!(options.files && !options.directories && !options.multiple);
     }
 }

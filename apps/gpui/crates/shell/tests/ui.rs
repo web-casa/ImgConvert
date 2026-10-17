@@ -569,6 +569,139 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[gpui_kit::test]
+fn plugin_diagnostics_dialog_probes_and_edits_the_helper(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("plugin-diagnostics", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let view = cx
+        .update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx));
+            assert!(window.find("plugin-diagnostics-view").visible());
+            workspace
+                .read(cx)
+                .plugin_diagnostics()
+                .expect("the toolbar opened the dialog")
+        })
+        .unwrap();
+    wait_until(cx, "diagnostics loaded", |cx| !view.read(cx).is_loading());
+    cx.update_window(handle, |_, window, cx| {
+        {
+            let view = view.read(cx);
+            assert_eq!(view.load_error(), None, "{:?}", view.load_error());
+            let heic = &view.diagnostics().expect("diagnostics").heic;
+            assert_eq!(
+                heic.enabled,
+                imgconvert_backend::external_codecs::heic_available()
+            );
+            assert_eq!(heic.extensions, vec!["heic", "heif", "hif"]);
+        }
+        window.render_frame(cx);
+        assert!(window.find("diagnostics-heic-state").visible());
+        assert!(window.find("diagnostics-summary").visible());
+    })
+    .unwrap();
+
+    // Selecting a path that is not a usable helper keeps the choice (so the
+    // diagnostic survives a restart) but reports it unavailable; clearing
+    // forgets it.
+    let bogus = std::env::temp_dir().join("imgconvert-no-such-helper");
+    cx.update(|cx| {
+        view.update(cx, |view, cx| {
+            view.set_helper_path(Some(bogus.to_string_lossy().into_owned()), cx);
+        });
+        assert!(view.read(cx).is_helper_busy());
+    });
+    wait_until(cx, "helper selected", |cx| {
+        !view.read(cx).is_helper_busy() && !view.read(cx).is_loading()
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+        assert_eq!(
+            settings.heic_helper_path.as_deref(),
+            Some(bogus.to_string_lossy().as_ref())
+        );
+        {
+            let heic = &view.read(cx).diagnostics().unwrap().heic;
+            assert!(heic.selected_helper.configured && !heic.selected_helper.available);
+        }
+        window.render_frame(cx);
+        // The manual-helper section sits below the fold of the 640 px test
+        // window; the notice exists in the tree even when clipped.
+        assert!(window.try_find("diagnostics-helper-notice").is_some());
+        view.update(cx, |view, cx| view.set_helper_path(None, cx));
+    })
+    .unwrap();
+    wait_until(cx, "helper cleared", |cx| {
+        !view.read(cx).is_helper_busy() && !view.read(cx).is_loading()
+    });
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().read(cx).settings().clone();
+        assert_eq!(settings.heic_helper_path, None);
+        assert!(
+            !view
+                .read(cx)
+                .diagnostics()
+                .unwrap()
+                .heic
+                .selected_helper
+                .configured
+        );
+    });
+
+    // A choice made right before the dialog closes is still persisted: the
+    // process-wide helper changed, so the record must follow it.
+    cx.update(|cx| {
+        view.update(cx, |view, cx| {
+            view.set_helper_path(Some(bogus.to_string_lossy().into_owned()), cx);
+        });
+    });
+    drop(view);
+    cx.update_window(handle, |_, window, cx| {
+        window.close_all_dialogs(cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    wait_until(cx, "helper persisted after close", |cx| {
+        AppModels::global(cx)
+            .settings()
+            .read(cx)
+            .settings()
+            .heic_helper_path
+            .is_some()
+    });
+    cx.update(|cx| {
+        assert!(workspace.read(cx).plugin_diagnostics().is_none());
+        // Leave the process-wide helper as the other tests expect it.
+        let _ = imgconvert_backend::external_codecs::set_selected_heic_helper(None);
+    });
+}
+
+/// Pumps the executor until `condition` holds (blocking work runs on its
+/// own thread; the timer wakes the foreground).
+fn wait_until(cx: &mut TestAppContext, what: &str, condition: impl Fn(&gpui_kit::App) -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
+    loop {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        if cx.update(|cx| condition(cx)) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "timed out waiting: {what}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
 /// Clicks Start and pumps until the planning worker has produced a prompt.
 fn click_start_and_wait_for_prompt(
     cx: &mut TestAppContext,

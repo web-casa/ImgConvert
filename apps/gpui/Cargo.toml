@@ -2,7 +2,14 @@
 # the Tauri line and the core/platform/backend crates never pull GPUI in.
 [workspace]
 resolver = "2"
-members = ["crates/shell", "crates/shared", "crates/queue", "crates/workflow", "crates/preview"]
+members = [
+    "crates/shell",
+    "crates/shared",
+    "crates/queue",
+    "crates/workflow",
+    "crates/preview",
+    "crates/diagnostics",
+]
 
 [workspace.package]
 version = "0.4.0-poc.1"
@@ -20,6 +27,7 @@ imgconvert-gpui-shared = { path = "crates/shared" }
 imgconvert-gpui-queue = { path = "crates/queue" }
 imgconvert-gpui-workflow = { path = "crates/workflow" }
 imgconvert-gpui-preview = { path = "crates/preview" }
+imgconvert-gpui-diagnostics = { path = "crates/diagnostics" }
 # Same crate and major as GPUI; decodes the backend's PNG previews into render frames.
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Same major as gpui-component so one global locale drives Kit and app strings.

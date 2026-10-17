@@ -537,9 +537,10 @@ function checkGpuiShellLayering() {
     queue: "apps/gpui/crates/queue/Cargo.toml",
     workflow: "apps/gpui/crates/workflow/Cargo.toml",
     preview: "apps/gpui/crates/preview/Cargo.toml",
+    diagnostics: "apps/gpui/crates/diagnostics/Cargo.toml",
     shell: "apps/gpui/crates/shell/Cargo.toml",
   };
-  const featureCrates = ["queue", "workflow", "preview"];
+  const featureCrates = ["queue", "workflow", "preview", "diagnostics"];
   const featurePackages = featureCrates.map((name) => `imgconvert-gpui-${name}`);
   const deps = Object.fromEntries(
     Object.entries(crates).map(([name, manifest]) => [

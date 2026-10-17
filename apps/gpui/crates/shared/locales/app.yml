@@ -629,3 +629,276 @@ safety.plan_failed:
 safety.restart_needed:
   en: The queue or the settings changed. Start again.
   zh-CN: 队列或设置已更改，请重新开始。
+diagnostics.title:
+  en: Plugin diagnostics
+  zh-CN: 插件诊断
+diagnostics.open:
+  en: Plugin diagnostics…
+  zh-CN: 插件诊断…
+diagnostics.description:
+  en: HEIC optional import providers, manifest search paths, and helper detection. macOS uses system ImageIO; Windows prefers WIC; Linux can use heif-convert.
+  zh-CN: HEIC 可选导入提供方、清单搜索路径与 辅助程序探测。macOS 使用系统 ImageIO；Windows 优先使用 WIC；Linux 可用 heif-convert。
+diagnostics.refresh:
+  en: Refresh
+  zh-CN: 刷新
+diagnostics.close:
+  en: Close
+  zh-CN: 关闭
+diagnostics.loading:
+  en: Reading plugin diagnostics…
+  zh-CN: 正在读取插件诊断…
+diagnostics.load_error:
+  en: "Unable to load plugin diagnostics: %{detail}"
+  zh-CN: "无法读取插件诊断：%{detail}"
+diagnostics.choose_heic_helper:
+  en: Choose HEIC helper
+  zh-CN: 选择 HEIC 辅助程序
+diagnostics.manual_helper_enabled:
+  en: Manual helper enabled
+  zh-CN: 手动指定的辅助程序 已启用
+diagnostics.manual_helper_unavailable:
+  en: Manual helper unavailable
+  zh-CN: 手动指定的辅助程序 不可用
+diagnostics.set_helper_failed:
+  en: "Failed to set manual helper: %{detail}"
+  zh-CN: "设置手动指定的辅助程序 失败：%{detail}"
+diagnostics.helper_cleared:
+  en: Manual helper cleared
+  zh-CN: 已清除手动指定的辅助程序
+diagnostics.clear_helper_failed:
+  en: "Failed to clear manual helper: %{detail}"
+  zh-CN: "清除手动指定的辅助程序 失败：%{detail}"
+diagnostics.heic_enabled:
+  en: HEIC optional import is enabled
+  zh-CN: HEIC 可选导入已启用
+diagnostics.heic_disabled:
+  en: HEIC optional import is disabled
+  zh-CN: HEIC 可选导入未启用
+diagnostics.extensions:
+  en: "Extensions: %{extensions}"
+  zh-CN: "扩展名：%{extensions}"
+diagnostics.type:
+  en: Type
+  zh-CN: 类型
+diagnostics.license:
+  en: License
+  zh-CN: 许可
+diagnostics.system_imageio:
+  en: System ImageIO
+  zh-CN: 系统 ImageIO
+diagnostics.windows_wic:
+  en: Windows WIC
+  zh-CN: Windows WIC
+diagnostics.system_helper:
+  en: System helper
+  zh-CN: 系统辅助程序
+diagnostics.executable:
+  en: Executable
+  zh-CN: 执行文件
+diagnostics.argv:
+  en: argv
+  zh-CN: argv
+diagnostics.no_external_args:
+  en: No external process arguments
+  zh-CN: 无外部进程参数
+diagnostics.no_provider:
+  en: No usable manifest provider or system helper was found.
+  zh-CN: 未发现可用 清单提供方 或系统辅助程序。
+diagnostics.summary_title:
+  en: Detection summary
+  zh-CN: 探测摘要
+diagnostics.external_codecs:
+  en: External codecs
+  zh-CN: 外部编解码器
+diagnostics.manual_helper:
+  en: Manual helper
+  zh-CN: 手动指定的辅助程序
+diagnostics.enabled:
+  en: Enabled
+  zh-CN: 启用
+diagnostics.disabled:
+  en: Disabled
+  zh-CN: 禁用
+diagnostics.available:
+  en: Available
+  zh-CN: 可用
+diagnostics.unavailable:
+  en: Unavailable
+  zh-CN: 不可用
+diagnostics.not_configured:
+  en: Not configured
+  zh-CN: 未配置
+diagnostics.accepted_manifests:
+  en: Accepted manifests
+  zh-CN: 可用清单
+diagnostics.rejected_manifests:
+  en: Rejected manifests
+  zh-CN: 拒绝的清单
+diagnostics.system_codecs:
+  en: System codecs
+  zh-CN: 系统编解码器
+diagnostics.system_helpers:
+  en: System helpers
+  zh-CN: 系统辅助程序
+diagnostics.license_boundary_title:
+  en: License and channel boundaries
+  zh-CN: 许可与渠道边界
+diagnostics.license_boundary_body:
+  en: The main app does not bundle HEIC codecs, does not link libheif, and does not distribute x265. HEIC import goes through optional decode-only helpers/providers in the user environment; plugin license, source/NOTICE, and patent risks remain the plugin distributor's responsibility. Store or Flatpak builds can disable external codec discovery to keep the main package boundary clean. Windows first probes the system WIC HEIF/HEVC extensions; when missing, follow the diagnostic hint to install system extensions or use a separate helper without bundling HEIC codecs.
+  zh-CN: 主程序不内置 HEIC 编解码器，不链接 libheif，不分发 x265。HEIC 仅通过用户环境中的可选 decode-only 辅助程序/提供方 导入；插件许可、源码/NOTICE 与专利风险需由插件分发方单独处理。商店或 Flatpak 构建可通过禁用外部编解码器 自动发现保持主包边界。Windows 优先探测系统 WIC HEIF/HEVC 扩展；缺失时可按诊断提示安装系统扩展，或使用单独的辅助程序，不把 HEIC 编解码器 打进主程序。
+diagnostics.system_codecs_title:
+  en: System codecs
+  zh-CN: 系统编解码器
+diagnostics.no_system_codecs:
+  en: This platform has no system codec probe entries.
+  zh-CN: 当前平台没有系统编解码器 探测项。
+diagnostics.manual_helper_title:
+  en: Manual helper
+  zh-CN: 手动指定的辅助程序
+diagnostics.choose:
+  en: Choose…
+  zh-CN: 选择…
+diagnostics.clear:
+  en: Clear
+  zh-CN: 清除
+diagnostics.selected:
+  en: Selected
+  zh-CN: 已选
+diagnostics.not_configured_helper:
+  en: No manual helper configured.
+  zh-CN: 未配置手动指定的辅助程序。
+diagnostics.system_helpers_title:
+  en: System helpers
+  zh-CN: 系统辅助程序
+diagnostics.no_system_helpers:
+  en: No system helper is probed on this platform.
+  zh-CN: 当前平台不探测系统辅助程序。
+diagnostics.manifest_search_title:
+  en: Manifest search
+  zh-CN: 清单搜索
+diagnostics.no_manifest_dirs:
+  en: No manifest directory is searched on this platform.
+  zh-CN: 当前平台不搜索 清单目录。
+diagnostics.no_license:
+  en: No license notice
+  zh-CN: 无许可声明
+diagnostics.status_accepted:
+  en: Available
+  zh-CN: 可用
+diagnostics.status_ready:
+  en: Ready
+  zh-CN: 就绪
+diagnostics.status_rejected:
+  en: Rejected
+  zh-CN: 拒绝
+diagnostics.status_missing:
+  en: Missing
+  zh-CN: 缺失
+diagnostics.status_empty:
+  en: Empty
+  zh-CN: 空
+diagnostics.status_untrusted:
+  en: Untrusted
+  zh-CN: 不受信任
+diagnostics.status_unreadable:
+  en: Unreadable
+  zh-CN: 不可读
+diagnostics.status_not_directory:
+  en: Not a directory
+  zh-CN: 非目录
+diagnostics.status_unsupported:
+  en: Not enabled
+  zh-CN: 未启用
+diagnostics.status_disabled:
+  en: Disabled
+  zh-CN: 已禁用
+diagnostics.found:
+  en: Found
+  zh-CN: 已找到
+diagnostics.missing:
+  en: Missing
+  zh-CN: 缺失
+diagnostics.active:
+  en: Active
+  zh-CN: 已激活
+diagnostics.inactive:
+  en: Inactive
+  zh-CN: 未激活
+diagnostics.provider_manifest:
+  en: Manifest plugin
+  zh-CN: 清单插件
+diagnostics.source_explicit:
+  en: Custom path
+  zh-CN: 自定义路径
+diagnostics.source_platform:
+  en: Current platform
+  zh-CN: 当前平台
+diagnostics.source_flatpak_extension:
+  en: Flatpak extension
+  zh-CN: Flatpak 扩展
+diagnostics.messages.details_hidden:
+  en: Details are available only in development builds.
+  zh-CN: 详细信息仅在开发构建中显示。
+diagnostics.messages.external_codecs_build_disabled:
+  en: External codec/helper discovery is disabled in this build.
+  zh-CN: 此构建已禁用外部编解码器/辅助程序自动发现。
+diagnostics.messages.external_codecs_build_disabled_flatpak_enabled:
+  en: External codec/helper discovery is disabled in this build; the Flatpak codec extension remains enabled.
+  zh-CN: 此构建已禁用外部编解码器/辅助程序自动发现；Flatpak 编解码器扩展仍然启用。
+diagnostics.messages.external_codecs_environment_disabled:
+  en: "%{detail} disables external codec/helper discovery."
+  zh-CN: "%{detail} 已禁用外部编解码器/辅助程序自动发现。"
+diagnostics.messages.external_codecs_environment_disabled_flatpak_enabled:
+  en: "%{detail} disables external codec/helper discovery; the Flatpak codec extension remains enabled."
+  zh-CN: "%{detail} 已禁用外部编解码器/辅助程序自动发现；Flatpak 编解码器扩展仍然启用。"
+diagnostics.messages.external_codec_trust_unsupported:
+  en: The external HEIC helper trust model is not enabled on this platform.
+  zh-CN: 当前平台尚未启用外部 HEIC 辅助程序 信任模型。
+diagnostics.messages.selected_helper_not_configured:
+  en: No manual helper is configured.
+  zh-CN: 尚未配置手动指定的辅助程序。
+diagnostics.messages.selected_helper_unavailable:
+  en: "The selected helper is unavailable: %{detail}"
+  zh-CN: "所选辅助程序 不可用：%{detail}"
+diagnostics.messages.directory_missing:
+  en: Directory not found.
+  zh-CN: 目录不存在。
+diagnostics.messages.path_not_directory:
+  en: The path is not a directory.
+  zh-CN: 该路径不是目录。
+diagnostics.messages.directory_untrusted:
+  en: The directory or one of its parents is writable by other users.
+  zh-CN: 目录或其父目录可被其他用户写入。
+diagnostics.messages.manifest_not_found:
+  en: No imgconvert-codec-*.json manifest was found.
+  zh-CN: 未发现 imgconvert-codec-*.json 清单。
+diagnostics.messages.directory_unreadable:
+  en: "Unable to read the directory: %{detail}"
+  zh-CN: "无法读取目录：%{detail}"
+diagnostics.messages.manifest_rejected:
+  en: "Manifest rejected: %{detail}"
+  zh-CN: "清单已拒绝：%{detail}"
+diagnostics.messages.path_environment_missing:
+  en: PATH is not set.
+  zh-CN: 未设置 PATH。
+diagnostics.messages.helper_not_found_in_trusted_path:
+  en: No executable was found in a trusted PATH directory.
+  zh-CN: 未在受信任的 PATH 目录中找到可执行文件。
+diagnostics.messages.wic_unsupported_platform:
+  en: Windows WIC HEIC decoding is available only on Windows.
+  zh-CN: Windows WIC HEIC 解码仅在 Windows 上可用。
+diagnostics.messages.wic_available:
+  en: "Windows WIC HEIC decoder detected: %{detail}"
+  zh-CN: "已检测到 Windows WIC HEIC 解码器：%{detail}"
+diagnostics.messages.wic_missing:
+  en: No Windows WIC HEIC decoder was detected.
+  zh-CN: 未检测到 Windows WIC HEIC 解码器。
+diagnostics.messages.wic_probe_failed:
+  en: "Windows WIC HEIC detection failed: %{detail}"
+  zh-CN: "Windows WIC HEIC 探测失败：%{detail}"
+diagnostics.messages.windows_heif_install_hint:
+  en: Install Microsoft HEIF Image Extensions and HEVC Video Extensions, then try again. Managed devices can deploy them through Microsoft Store, winget, or an offline app package.
+  zh-CN: 安装 Microsoft HEIF Image Extensions 和 HEVC Video Extensions 后重试；企业设备可通过 Microsoft Store、winget 或离线应用包下发。
+diagnostics.messages.unknown:
+  en: "Diagnostic %{code}: %{detail}"
+  zh-CN: "诊断 %{code}：%{detail}"

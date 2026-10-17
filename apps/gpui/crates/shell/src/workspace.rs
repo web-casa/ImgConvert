@@ -12,6 +12,7 @@ use gpui_kit::{
     Subscription, TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
     px, size,
 };
+use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
@@ -25,6 +26,7 @@ pub struct Workspace {
     focus_handle: FocusHandle,
     /// The dialog owns the preview; this only lets tests and menus find it.
     comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
+    plugin_diagnostics: Option<gpui_kit::WeakEntity<PluginDiagnostics>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -47,6 +49,7 @@ impl Workspace {
             workflow,
             focus_handle: cx.focus_handle(),
             comparison_preview: None,
+            plugin_diagnostics: None,
             _subscriptions: subscriptions,
         }
     }
@@ -67,6 +70,24 @@ impl Workspace {
     /// The comparison preview currently shown, if its dialog is still open.
     pub fn comparison_preview(&self) -> Option<Entity<ComparisonPreview>> {
         self.comparison_preview
+            .as_ref()
+            .and_then(gpui_kit::WeakEntity::upgrade)
+    }
+
+    /// Opens the plugin diagnostics dialog (the toolbar command).
+    pub fn open_plugin_diagnostics(
+        &mut self,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Entity<PluginDiagnostics> {
+        let view = open_plugin_diagnostics(window, cx);
+        self.plugin_diagnostics = Some(view.downgrade());
+        view
+    }
+
+    /// The diagnostics view currently shown, if its dialog is still open.
+    pub fn plugin_diagnostics(&self) -> Option<Entity<PluginDiagnostics>> {
+        self.plugin_diagnostics
             .as_ref()
             .and_then(gpui_kit::WeakEntity::upgrade)
     }
@@ -94,6 +115,15 @@ impl Workspace {
                     .child(tr("app.title")),
             )
             .child(div().flex_1())
+            .child(
+                Button::new("plugin-diagnostics")
+                    .ghost()
+                    .small()
+                    .label(tr("diagnostics.open"))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.open_plugin_diagnostics(window, cx);
+                    })),
+            )
             .child(
                 Button::new("language-toggle")
                     .ghost()

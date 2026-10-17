@@ -423,6 +423,19 @@ Codex 只读评审（2026-10-17，结论"需修改"，3 项 P1、2 项 P2、1 �
 - 已修（P3）：`tasks::run_blocking` 保留 panic 载荷文本并带线程名。
 - 未做：Kit 的 `AlertDialog` 默认不允许点遮罩关闭，进度块中"遮罩关闭视为放弃"的描述据此修正为"关闭按钮/Escape"。
 
+进度（2026-10-17，第五片：插件诊断与 HEIC helper 选择，未经 Codex 评审）：
+
+- 新增功能 crate `crates/diagnostics`：`PluginDiagnostics` 实体 + Kit `Dialog`，工具栏"插件诊断…"按钮打开（shell 路由）。内容按 Svelte `PluginDiagnosticsDialog` 的分区移植：HEIC 状态（启用/未启用、扩展名、禁用原因、激活 provider 卡片）、探测摘要六格、许可与渠道边界说明、系统 codec、手动 helper（选择…/清除、已选路径与诊断）、系统 helper、manifest 搜索目录与各 manifest 状态。状态芯片以文字表意，颜色与图标只作强化。
+- 数据：`external_codecs::codec_diagnostics()` 与 `set_selected_heic_helper()` 都经 `tasks::run_blocking` 在专用线程上执行；请求号丢弃过期结果；加载中不重复探测。选择 helper 用 `PromptKind::SingleFile` 的原生文件选择器，之后像 Svelte 一样把 provider 解析出的路径（不可用时保留所键入路径）写入 `heicHelperPath`，再重新探测；启动时 shared `services::init` 已会把持久化的路径重新选中。诊断消息按 code 翻译，`detail`（路径、主机信息）只在 debug 构建显示，与 `diagnosticDetailForDisplay` 一致。
+- 测试：UI 测试从工具栏打开对话框、等待探测完成并核对 `heic.enabled` 与 `external_codecs::heic_available()` 一致、选择一个不存在的 helper 后设置被写入且诊断为"不可用"、清除后设置为空。
+- 未做、记入后续：环境影响面板（`runtime_diagnostics`）；Windows WIC 探测项只能在 Windows runner 上人工核对显示。
+
+Codex 只读评审（2026-10-17，结论"需修改"，0 项 P1、3 项 P2、3 项 P3，记录在 `artifacts/reviews/codex-stage3-diagnostics-review-2026-10-17.md`）与处置：
+
+- 已修（P2）：helper 选择的持久化改为直接经设置实体写入，对话框在工作线程结束前关闭也不会丢（进程内 helper 与下次启动一致）；探测进行中的刷新请求记为待办并在当前探测结束后补做，选择/清除 helper 后的重新探测不再被旧快照吞掉；对话框内容 id 改为 `plugin-diagnostics-view`，与工具栏按钮不再同名（原测试会因 ambiguous ElementId 失败）。
+- 已修（P3）：路径与参数改为换行显示而不是截断；状态芯片区分"失败"（拒绝/不受信任/不可读，危险色 + 图标）与"缺失"（中性）；zh-CN 文案把 helper/provider/manifest/codec 统一为辅助程序/提供方/清单/编解码器，保留 ImageIO、WIC 等标识符。
+- 测试补充：选择 helper 后立刻关闭对话框，设置仍被写入。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）
