@@ -48,6 +48,11 @@ const ignoredAdvisories = [
   "RUSTSEC-2026-0367",
   "RUSTSEC-2026-0368",
   "RUSTSEC-2026-0369",
+  // zbus_names / zvariant / zvariant_derive: unmaintained-only advisories
+  // from the Tauri Linux portal stack and GPUI's ashpd; see src-tauri/deny.toml.
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
 ];
 
 const auditTargets = [
