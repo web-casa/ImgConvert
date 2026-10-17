@@ -84,6 +84,12 @@ ignore = [
   "RUSTSEC-2026-0367",
   "RUSTSEC-2026-0368",
   "RUSTSEC-2026-0369",
+  # zbus_names / zvariant / zvariant_derive(2026-10-17 标记 unmaintained)由
+  # Tauri 的 Linux 桌面门户栈与 GPUI 的 ashpd 传递引入,只用于本机 D-Bus 消息
+  # 编码,不处理用户图片输入;上游 zbus 尚无替代版本,随 Tauri/gpui-kit 升级复查。
+  "RUSTSEC-2026-0370",
+  "RUSTSEC-2026-0371",
+  "RUSTSEC-2026-0372",
 ]
 yanked = "deny"
 
