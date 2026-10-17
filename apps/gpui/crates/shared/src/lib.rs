@@ -21,6 +21,7 @@ pub mod progress_bridge;
 pub mod queue_model;
 pub mod services;
 pub mod settings_model;
+pub mod tasks;
 
 pub use batch_model::{BatchModel, BatchPhase};
 pub use queue_model::{ItemStatus, QueueItem, QueueModel, ThumbnailState};

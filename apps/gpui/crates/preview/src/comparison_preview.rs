@@ -9,7 +9,6 @@
 //! open mark the shown result stale; the person refreshes explicitly.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::Button;
@@ -30,6 +29,7 @@ use imgconvert_backend::settings::Settings;
 use imgconvert_gpui_shared::conversion::{options_for_item, warning_texts};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::images::{decode_png, format_bytes};
+use imgconvert_gpui_shared::tasks;
 use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, Services, SettingsModel};
 
 /// Longest edge of the preview images, as the Svelte shell requests.
@@ -261,11 +261,11 @@ impl ComparisonPreview {
 
         let cancelled_text = tr("preview.cancelled").to_string();
         // The gate wait and the native encode block for seconds; they run on
-        // a dedicated thread so GPUI's shared background workers (thumbnails,
-        // autosave) stay free. A panic ends as a join error, not a dead worker.
-        let worker = std::thread::Builder::new()
-            .name("imgconvert-preview".into())
-            .spawn(move || -> Result<Generated, String> {
+        // a dedicated thread (see `shared::tasks`).
+        let task = tasks::run_blocking(
+            "imgconvert-preview",
+            cx,
+            move || -> Result<Generated, String> {
                 // The registration travels with the work: the current-preview
                 // slot clears when the native call really ends.
                 let _registration = registration;
@@ -303,30 +303,10 @@ impl ComparisonPreview {
                     before,
                     after,
                 })
-            });
-        let worker = match worker {
-            Ok(worker) => worker,
-            Err(error) => {
-                self.loading = false;
-                self.error = Some(format!("preview thread could not start: {error}"));
-                cx.notify();
-                return;
-            }
-        };
-        // Wait on the executor without blocking it: poll the thread, then join.
-        let task = cx.background_executor().spawn({
-            let executor = cx.background_executor().clone();
-            async move {
-                while !worker.is_finished() {
-                    executor.timer(Duration::from_millis(50)).await;
-                }
-                worker
-                    .join()
-                    .unwrap_or_else(|_| Err("preview task panicked".to_string()))
-            }
-        });
+            },
+        );
         cx.spawn(async move |this, cx| {
-            let outcome = task.await;
+            let outcome = task.await.and_then(|inner| inner);
             let _ = this.update(cx, |this, cx| {
                 if this.request_id != request_id {
                     // Superseded or cancelled: release what arrived late.
