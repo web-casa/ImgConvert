@@ -136,9 +136,10 @@ fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut Tes
 
 #[gpui_kit::test]
 fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
-    let _locale = locale_guard();
     use imgconvert_backend::settings::ResizeMode;
     use imgconvert_gpui_workflow::{NumberField, Section, SliderKind};
+
+    let _locale = locale_guard();
 
     let (handle, workspace) = open_workspace(cx);
     let form = cx.update(|cx| {
