@@ -255,7 +255,6 @@ jobs:
       - name: Launch with the perf probe (Linux, Xvfb + lavapipe)
         if: matrix.os == 'linux'
         run: |
-          set -o pipefail
           binary="${{ matrix.target_dir }}/release/imgconvert-gpui"
           # Software Vulkan (lavapipe): point the loader at the one ICD file this
           # architecture ships; a list with a missing entry makes it give up.
@@ -263,8 +262,24 @@ jobs:
           lvp=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json | head -n 1)
           test -n "$lvp"
           export VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp"
-          xvfb-run -a -s "-screen 0 1280x800x24" vulkaninfo --summary | head -40 || true
-          IMGCONVERT_PERF_PROBE=1 timeout --signal=TERM 45 xvfb-run -a -s "-screen 0 1280x800x24" "$binary" 2> probe.log || true
+          Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+          xvfb_pid=$!
+          export DISPLAY=:99
+          sleep 2
+          vulkaninfo --summary 2>&1 | head -40 || true
+          # Run the shell under our own supervision: wait for the probe to finish
+          # or for 45 s, then stop it. A GPUI app does not exit on its own.
+          IMGCONVERT_PERF_PROBE=1 "$binary" 2> probe.log &
+          app_pid=$!
+          for _ in $(seq 1 45); do
+            if grep -q '"mark":"probe_done"' probe.log 2>/dev/null; then break; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          kill "$app_pid" 2>/dev/null || true
+          sleep 1
+          kill -9 "$app_pid" 2>/dev/null || true
+          kill "$xvfb_pid" 2>/dev/null || true
           cat probe.log
           grep -q '"mark":"ready"' probe.log
 
@@ -298,14 +313,24 @@ jobs:
             throw "the GPUI shell never reported ready"
           }
 
+      # upload-artifact only accepts files under the workspace; the Windows
+      # target directory lives outside it, so stage everything first.
+      - name: Collect probe artifacts
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p probe-artifacts
+          for file in probe.log private-symbols.txt \
+            "${{ matrix.target_dir }}/release/imgconvert-gpui" \
+            "${{ matrix.target_dir }}/release/imgconvert-gpui.exe"; do
+            [ -f "$file" ] && cp "$file" probe-artifacts/ || true
+          done
+          ls -la probe-artifacts
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: gpui-probe-${{ matrix.target }}
-          path: |
-            probe.log
-            private-symbols.txt
-            ${{ matrix.target_dir }}/release/imgconvert-gpui
-            ${{ matrix.target_dir }}/release/imgconvert-gpui.exe
+          path: probe-artifacts
           if-no-files-found: ignore
           retention-days: 14
