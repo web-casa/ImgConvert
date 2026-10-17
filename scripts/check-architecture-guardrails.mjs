@@ -572,7 +572,9 @@ function checkGpuiShellLayering() {
   for (const feature of featureCrates) {
     for (const other of featurePackages) {
       if (other !== `imgconvert-gpui-${feature}` && deps[feature].has(other)) {
-        failures.push(`apps/gpui feature crates must not depend on each other (${feature} → ${other})`);
+        failures.push(
+          `apps/gpui feature crates must not depend on each other (${feature} → ${other})`,
+        );
       }
     }
   }
