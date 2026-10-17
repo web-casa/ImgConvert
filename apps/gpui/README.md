@@ -8,14 +8,14 @@ the root workspace ever compiles GPUI.
 
 ## Layout
 
-| Crate                              | Role                                                                                                                                                                                          |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `crates/shell` (`imgconvert-gpui`) | `main`, window, menus, key bindings, locale switch, perf-probe driver                                                                                                                         |
-| `crates/shared`                    | Retained models (`QueueModel`, `BatchModel`, `SettingsModel`), service globals, progress bridge, file prompts, strings, perf probe                                                            |
-| `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                                                                                                |
-| `crates/workflow`                  | The conversion settings form (`SettingsForm`: format, quality, output, policies, format parameters, presets, PDF, resize, target size, metadata), output folder, start/cancel, batch progress |
-| `crates/preview`                   | Before/after comparison dialog for one queue item (backend preview workflow, reveal slider, stats, warnings)                                                                                  |
-| `crates/diagnostics`               | Plugin diagnostics dialog: HEIC providers, system codecs and helpers, manifest search, manual helper selection                                                                                |
+| Crate                              | Role                                                                                                                                                                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `crates/shell` (`imgconvert-gpui`) | `main`, window, menus, key bindings, locale switch, perf-probe driver                                                                                                                                                                                              |
+| `crates/shared`                    | Retained models (`QueueModel`, `BatchModel`, `SettingsModel`), service globals, progress bridge, file prompts, strings, the product theme (`theme`: bundled Kit themes, glass tokens), perf probe                                                                  |
+| `crates/queue`                     | Import (drop, picker, scan), virtualized queue list, bounded thumbnail loading                                                                                                                                                                                     |
+| `crates/workflow`                  | The conversion settings form (`SettingsForm`: format, quality, output, policies, format parameters, presets, PDF, resize, target size, metadata, appearance), the start owner (`WorkflowPanel`) and the floating `ActionBar` (output folder, status, start/cancel) |
+| `crates/preview`                   | Before/after comparison dialog for one queue item (backend preview workflow, reveal slider, stats, warnings)                                                                                                                                                       |
+| `crates/diagnostics`               | Plugin diagnostics dialog: HEIC providers, system codecs and helpers, manifest search, manual helper selection                                                                                                                                                     |
 
 Feature crates depend on `shared`; nothing depends on `shell`. Every crate
 reaches GPUI through `gpui_kit` only. `scripts/check-architecture-guardrails.mjs`
@@ -65,14 +65,27 @@ per-platform path). Format, output folder and language changes are saved
 `settings.json.pre-gpui` backup. An `instance.lock` next to it stops the Tauri
 and GPUI shells from running at the same time.
 
+## Theme
+
+The window follows the "Liquid Glass" design chosen on 2026-10-18: a soft
+light backdrop, translucent cards for the queue and the settings, and a
+floating pill at the bottom with the one decision (Start). Two Kit theme files
+(`crates/shared/themes/imgconvert-glass.json`, light and dark) carry every
+component color; `shared::theme` adds the application-owned glass tokens
+(backdrop, panel stroke and highlight, bar, primary glow) and applies the
+persisted `theme` (system/light/dark) and `reduceMotion` settings, which the
+settings form's Appearance section edits. Feature code never holds a raw
+color: it reads `cx.theme()` and `cx.glass()`.
+
 ## Scope
 
-Stage 2 proof plus the first three stage 3 slices: import by drop or picker,
+Stage 2 proof plus the first stage 3 slices: import by drop or picker,
 virtual queue with thumbnails, the full conversion settings form with scenario
 presets (every field the Tauri shell persists), the before/after comparison
 preview, the output-safety prompts before Start (queued-source conflicts,
 overwrite "ask", source replacement), start/cancel with progress, the plugin
-diagnostics dialog with the manual HEIC helper selection, and the
-English/Chinese switch. No environment panel, updater or store packaging yet;
+diagnostics dialog with the manual HEIC helper selection, the light/dark
+glass theme following the persisted preference, and the English/Chinese
+switch. No environment panel, updater or store packaging yet;
 those are the remaining stage 3 work and keep shipping through the Tauri line
 meanwhile.

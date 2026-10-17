@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use gpui_kit::{App, KeyBinding, Menu, MenuItem, actions};
 use imgconvert_gpui_shared::i18n::{self, Locale, tr};
-use imgconvert_gpui_shared::{AppModels, Services, services, settings_model};
+use imgconvert_gpui_shared::{AppModels, Services, services, settings_model, theme};
 
 pub use blocked::open_blocked_window;
 pub use workspace::{Workspace, open_main_window};
@@ -23,12 +23,13 @@ actions!(imgconvert, [Quit, OpenFiles, ToggleLanguage]);
 /// How long quitting waits for in-flight atomic writes.
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Initializes Kit, services (which load the persisted settings), the locale
-/// from those settings, key bindings, menus and global actions. Call once
+/// Initializes Kit, services (which load the persisted settings), the product
+/// theme and locale from those settings, key bindings, menus and global actions. Call once
 /// inside `Application::run`, before opening a window.
 pub fn init_app(cx: &mut App) {
     gpui_kit::init(cx);
     services::init(cx);
+    theme::install(cx);
     let locale = AppModels::global(cx).settings().read(cx).settings().locale;
     i18n::set_locale(Locale::from_app_locale(locale));
     settings_model::flush_on_quit(cx);

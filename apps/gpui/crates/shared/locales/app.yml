@@ -902,3 +902,36 @@ diagnostics.messages.windows_heif_install_hint:
 diagnostics.messages.unknown:
   en: "Diagnostic %{code}: %{detail}"
   zh-CN: "诊断 %{code}：%{detail}"
+workflow.status:
+  en: Status
+  zh-CN: 状态
+workflow.ready:
+  en: "%{count} files ready"
+  zh-CN: "%{count} 个文件待转换"
+workflow.ready_empty:
+  en: Add files to begin
+  zh-CN: 先添加文件
+settings.appearance_section:
+  en: Appearance
+  zh-CN: 外观
+settings.theme:
+  en: Theme
+  zh-CN: 主题
+settings.theme_system:
+  en: System
+  zh-CN: 跟随系统
+settings.theme_light:
+  en: Light
+  zh-CN: 浅色
+settings.theme_dark:
+  en: Dark
+  zh-CN: 深色
+settings.reduce_motion_label:
+  en: Reduce motion
+  zh-CN: 减少动画
+settings.reduce_motion_description:
+  en: Shortens or removes interface animations.
+  zh-CN: 缩短或关闭界面动画。
+queue.page_count:
+  en: "%{count} pages"
+  zh-CN: "%{count} 页"

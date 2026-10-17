@@ -14,6 +14,7 @@ use gpui_kit::base::{VirtualListScrollHandle, v_virtual_list};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, IconName, Sizable as _, h_flex, v_flex,
 };
@@ -26,6 +27,7 @@ use gpui_kit::{
 };
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
+use imgconvert_gpui_shared::theme;
 use imgconvert_gpui_shared::{
     AppModels, BatchModel, ItemStatus, QueueItem, QueueModel, ThumbnailState, progress_bridge,
 };
@@ -369,6 +371,10 @@ impl QueueView {
         .track_scroll(&self.scroll)
         .flex_1()
         .min_h_0()
+        .px_2()
+        // The floating action bar covers the bottom of the card; the last
+        // rows must be able to scroll above it.
+        .pb(theme::ACTION_BAR_CLEARANCE)
     }
 }
 
@@ -382,7 +388,6 @@ impl Render for QueueView {
             .test_support()
             .size_full()
             .min_w_0()
-            .bg(cx.theme().background)
             .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
                 this.import_paths(paths.paths().to_vec(), cx);
             }))
@@ -441,40 +446,70 @@ impl RenderOnce for QueueRow {
         let muted = cx.theme().muted_foreground;
         let item = self.item;
         let on_compare = self.on_compare;
+        let meta = row_meta(&item);
         let compare = Button::new(SharedString::from(format!("compare:{}", item.key)))
             .ghost()
-            .small()
+            .xsmall()
             .label(tr("preview.open"))
             .tooltip(tr("preview.title"))
             .disabled(self.busy)
             .on_click(move |event, window, cx| on_compare(event, window, cx));
+        let path = item.path.clone();
         h_flex()
             .id(item.key.clone())
             .test_support()
             .aria_label(item.name.clone())
+            // Two files of the same name from different folders differ only
+            // by the full path, which the meta line abbreviates.
+            .tooltip(move |window, cx| Tooltip::new(path.clone()).build(window, cx))
             .h(self.row_height)
             .w_full()
-            .px_4()
+            .px_3()
             .gap_3()
-            .border_b_1()
-            .border_color(cx.theme().border)
+            .rounded(cx.theme().radius_lg)
+            .hover(|style| style.bg(cx.theme().list_hover))
             .child(render_thumbnail(&item.thumbnail, cx))
             .child(
                 v_flex()
                     .flex_1()
                     .min_w_0()
                     .gap_0p5()
-                    .child(div().text_sm().truncate().child(item.name.clone()))
                     .child(
                         div()
-                            .text_xs()
-                            .text_color(muted)
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
                             .truncate()
-                            .child(item.path.clone()),
-                    ),
+                            .child(item.name.clone()),
+                    )
+                    .child(div().text_xs().text_color(muted).truncate().child(meta)),
             )
             .child(compare)
             .child(render_status(&item.status, cx))
+    }
+}
+
+/// The row's second line: pixel size and page count when the import probed
+/// the file, then the folder it came from. The full path is the row's
+/// tooltip.
+fn row_meta(item: &QueueItem) -> SharedString {
+    let mut parts: Vec<String> = Vec::new();
+    if let (Some(width), Some(height)) = (item.source_width, item.source_height) {
+        parts.push(format!("{width} × {height}"));
+    }
+    if let Some(pages) = item.page_count {
+        parts.push(tr_with("queue.page_count", &[("count", &pages)]).to_string());
+    }
+    let folder = std::path::Path::new(item.path.as_ref())
+        .parent()
+        .and_then(std::path::Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned());
+    if let Some(folder) = folder {
+        parts.push(folder);
+    }
+    if parts.is_empty() {
+        item.path.clone()
+    } else {
+        SharedString::from(parts.join(" · "))
     }
 }
 
