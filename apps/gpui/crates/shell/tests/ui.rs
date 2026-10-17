@@ -550,7 +550,7 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
             settings.update(cx, |s| s.output_suffix_enabled = true);
         });
         workflow.update(cx, |workflow, cx| {
-            workflow.set_output_dir(fresh.clone(), cx)
+            workflow.set_output_dir(fresh.clone(), cx);
         });
     });
     cx.update_window(handle, |_, window, cx| {
