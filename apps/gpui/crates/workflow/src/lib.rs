@@ -6,6 +6,7 @@
 //! `BatchService`; this crate only issues commands and renders
 //! `shared::BatchModel`. Every setting lives in `shared::SettingsModel`.
 
+pub mod output_safety;
 pub mod settings_form;
 pub mod workflow_panel;
 

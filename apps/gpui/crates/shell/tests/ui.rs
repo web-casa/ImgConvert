@@ -445,6 +445,160 @@ fn comparison_preview_generates_marks_stale_and_releases(cx: &mut TestAppContext
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[gpui_kit::test]
+fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
+    use imgconvert_backend::settings::OverwriteMode;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!(
+        "imgconvert-gpui-safety-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let out = dir.join("out");
+    std::fs::create_dir_all(&out).unwrap();
+    let input = dir.join("one.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    // The output of the default settings (avif, `_done`) already exists.
+    std::fs::write(out.join("one_done.avif"), b"stale").unwrap();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().clone();
+        queue.update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: input.to_string_lossy().into_owned(),
+                key: "one".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+        let settings = AppModels::global(cx).settings().clone();
+        settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| s.overwrite = OverwriteMode::Ask);
+        });
+        let workflow = workspace.read(cx).workflow().clone();
+        workflow.update(cx, |workflow, cx| workflow.set_output_dir(out.clone(), cx));
+    });
+    let workflow = cx.update(|cx| workspace.read(cx).workflow().clone());
+
+    // Ask mode: the existing output is confirmed; Escape is not an answer,
+    // "Skip" keeps the stale file.
+    click_start_and_wait_for_prompt(cx, handle, &workflow);
+    cx.update_window(handle, |_, window, cx| {
+        window.press("escape", cx);
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx), "Escape must not answer Skip");
+        assert!(window.find("cancel").visible());
+        window.click("cancel", cx);
+    })
+    .unwrap();
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        let status = &queue.item(&"one".into()).unwrap().status;
+        assert!(matches!(status, ItemStatus::Skipped { .. }), "{status:?}");
+    });
+    assert_eq!(std::fs::read(out.join("one_done.avif")).unwrap(), b"stale");
+
+    // Ask again, this time "Overwrite": the file is replaced.
+    click_start_and_wait_for_prompt(cx, handle, &workflow);
+    cx.update_window(handle, |_, window, cx| window.click("ok", cx))
+        .unwrap();
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        let status = &queue.item(&"one".into()).unwrap().status;
+        assert!(matches!(status, ItemStatus::Done { .. }), "{status:?}");
+    });
+    assert_ne!(std::fs::read(out.join("one_done.avif")).unwrap(), b"stale");
+
+    // Skip mode with an output that is its own source: one informational
+    // prompt, then the batch runs and leaves the original alone.
+    let original = std::fs::read(&input).unwrap();
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().clone();
+        settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| {
+                s.overwrite = OverwriteMode::Skip;
+                s.format = "png".into();
+                s.output_suffix_enabled = false;
+            });
+        });
+        workflow.update(cx, |workflow, cx| workflow.set_output_dir(dir.clone(), cx));
+    });
+    click_start_and_wait_for_prompt(cx, handle, &workflow);
+    cx.update_window(handle, |_, window, cx| window.click("ok", cx))
+        .unwrap();
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        let status = &queue.item(&"one".into()).unwrap().status;
+        assert!(matches!(status, ItemStatus::Skipped { .. }), "{status:?}");
+    });
+    assert_eq!(std::fs::read(&input).unwrap(), original);
+
+    // Nothing to confirm (fresh folder, skip mode): no prompt, the batch runs.
+    let fresh = dir.join("fresh");
+    std::fs::create_dir_all(&fresh).unwrap();
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().clone();
+        settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| s.output_suffix_enabled = true);
+        });
+        workflow.update(cx, |workflow, cx| {
+            workflow.set_output_dir(fresh.clone(), cx)
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("workflow-start", cx);
+    })
+    .unwrap();
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        assert!(!workflow.read(cx).is_planning());
+        let queue = AppModels::global(cx).queue().read(cx);
+        let status = &queue.item(&"one".into()).unwrap().status;
+        assert!(matches!(status, ItemStatus::Done { .. }), "{status:?}");
+    });
+    assert!(fresh.join("one_done.png").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Clicks Start and pumps until the planning worker has produced a prompt.
+fn click_start_and_wait_for_prompt(
+    cx: &mut TestAppContext,
+    handle: gpui_kit::AnyWindowHandle,
+    workflow: &gpui_kit::Entity<imgconvert_gpui_workflow::WorkflowPanel>,
+) {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("workflow-start", cx);
+    })
+    .unwrap();
+    cx.update(|cx| assert!(workflow.read(cx).is_planning()));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
+    loop {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        if cx.update(|cx| window_has_dialog(cx, handle)) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "no safety prompt appeared"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+}
+
 fn window_has_dialog(cx: &mut gpui_kit::App, handle: gpui_kit::AnyWindowHandle) -> bool {
     use gpui_kit::component::WindowExt as _;
     cx.update_window(handle, |_, window, cx| window.has_active_dialog(cx))

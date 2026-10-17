@@ -9,13 +9,15 @@
 //! started here builds its options from that record through
 //! `conversion_request`, so it uses exactly what the Tauri shell would use.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, IconName, Sizable as _, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -29,10 +31,12 @@ use imgconvert_gpui_shared::conversion::options_for_item;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
+use imgconvert_gpui_shared::tasks;
 use imgconvert_gpui_shared::{
     AppModels, BatchModel, BatchPhase, QueueItem, QueueModel, SettingsModel,
 };
 
+use crate::output_safety;
 use crate::settings_form::SettingsForm;
 
 /// Semantic notices, translated at render time so a locale switch re-renders them.
@@ -41,6 +45,10 @@ enum Notice {
     NothingToConvert,
     AlreadyRunning,
     InvalidConfiguration,
+    Planning,
+    PlanFailed(String),
+    /// Queue or settings changed while the prompts were open.
+    RestartNeeded,
     Failed(String),
 }
 
@@ -50,9 +58,20 @@ impl Notice {
             Self::NothingToConvert => tr("workflow.nothing_to_convert"),
             Self::AlreadyRunning => tr("workflow.already_running"),
             Self::InvalidConfiguration => tr("workflow.invalid_configuration"),
+            Self::Planning => tr("safety.planning"),
+            Self::PlanFailed(detail) => tr_with("safety.plan_failed", &[("detail", detail)]),
+            Self::RestartNeeded => tr("safety.restart_needed"),
             Self::Failed(detail) => tr_with("workflow.failed", &[("detail", detail)]),
         }
     }
+}
+
+/// A start between planning and submission.
+struct PendingHandle {
+    state: Rc<RefCell<Option<output_safety::PendingStart>>>,
+    /// The queue and settings the jobs were built from.
+    queue_revision: u64,
+    settings: Settings,
 }
 
 pub struct WorkflowPanel {
@@ -61,6 +80,11 @@ pub struct WorkflowPanel {
     settings: Entity<SettingsModel>,
     settings_form: Entity<SettingsForm>,
     formats: Vec<SharedString>,
+    /// Output paths are being planned or confirmed; Start is disabled.
+    planning: bool,
+    /// The start waiting for its decisions, owned here so the panel can tear
+    /// it down (the dialog callbacks only borrow it).
+    pending_start: Option<PendingHandle>,
     notice: Option<Notice>,
     _subscriptions: Vec<Subscription>,
 }
@@ -76,9 +100,16 @@ impl WorkflowPanel {
             .collect();
         let settings_form = cx.new(|cx| SettingsForm::new(window, cx));
         let subscriptions = vec![
-            cx.observe(models.queue(), |_, _, cx| cx.notify()),
+            // A queue change or a settings edit invalidates planned jobs.
+            cx.observe_in(models.queue(), window, |this, _, window, cx| {
+                this.abort_pending_if_stale(window, cx);
+                cx.notify();
+            }),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
-            cx.observe(models.settings(), |_, _, cx| cx.notify()),
+            cx.observe_in(models.settings(), window, |this, _, window, cx| {
+                this.abort_pending_if_stale(window, cx);
+                cx.notify();
+            }),
             cx.observe(&settings_form, |_, _, cx| cx.notify()),
         ];
         Self {
@@ -87,6 +118,8 @@ impl WorkflowPanel {
             settings: models.settings().clone(),
             settings_form,
             formats,
+            planning: false,
+            pending_start: None,
             notice: None,
             _subscriptions: subscriptions,
         }
@@ -163,9 +196,12 @@ impl WorkflowPanel {
             cx.notify();
             return;
         }
+        if self.planning {
+            return;
+        }
         if let Some(dir) = self.output_dir(cx) {
             let format = self.selected_format(cx).to_string();
-            self.start_into(dir, format, cx);
+            self.start_with_safety_checks(dir, format, window, cx);
             return;
         }
         let picker =
@@ -173,12 +209,173 @@ impl WorkflowPanel {
         cx.spawn_in(window, async move |this, cx| {
             if let Some(mut paths) = picker.await {
                 let dir = paths.remove(0);
-                let _ = this.update(cx, |this, cx| {
-                    this.start_with_output_dir(dir, None, cx);
+                let _ = cx.update(|window, cx| {
+                    this.update(cx, |this, cx| {
+                        this.set_output_dir(dir.clone(), cx);
+                        let format = this.selected_format(cx).to_string();
+                        this.start_with_safety_checks(dir, format, window, cx);
+                    })
                 });
             }
         })
         .detach();
+    }
+
+    /// Plans every output path on a worker thread, then walks the
+    /// output-safety prompts (see `output_safety`) before starting.
+    fn start_with_safety_checks(
+        &mut self,
+        dir: PathBuf,
+        format: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (keys, options, concurrency) = self.prepare_jobs(&dir, &format, cx);
+        if keys.is_empty() {
+            self.notice = Some(Notice::NothingToConvert);
+            cx.notify();
+            return;
+        }
+        let settings = self.settings.read(cx).settings().clone();
+        let overwrite = settings.overwrite;
+        let revision = self.queue.read(cx).revision();
+        self.planning = true;
+        self.pending_start = Some(PendingHandle {
+            state: Rc::new(RefCell::new(None)),
+            queue_revision: revision,
+            settings,
+        });
+        self.notice = Some(Notice::Planning);
+        cx.notify();
+        let plan_options = options.clone();
+        let planned = tasks::run_blocking("imgconvert-plan", cx, move || {
+            convert::conversion_plan(&plan_options)
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let plan = planned.await;
+            let _ = cx.update(|window, cx| {
+                // Decide inside the entity, prompt outside it: `advance` may
+                // call straight back into the panel when no prompt is needed.
+                let next = this.update(cx, |panel, cx| {
+                    let Some(handle) = panel.pending_start.as_ref() else {
+                        return None; // torn down meanwhile
+                    };
+                    match plan {
+                        Ok(plan) => {
+                            *handle.state.borrow_mut() = Some(output_safety::PendingStart::new(
+                                keys,
+                                options,
+                                plan,
+                                concurrency,
+                                overwrite,
+                            ));
+                            Some(Rc::clone(&handle.state))
+                        }
+                        Err(detail) => {
+                            panel.planning = false;
+                            panel.pending_start = None;
+                            panel.notice = Some(Notice::PlanFailed(detail));
+                            cx.notify();
+                            None
+                        }
+                    }
+                });
+                if let Ok(Some(pending)) = next {
+                    output_safety::advance(this.clone(), pending, window, cx);
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Drops a pending start when the jobs it planned no longer match the
+    /// queue or the settings; an open prompt is closed.
+    fn abort_pending_if_stale(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(handle) = self.pending_start.as_ref() else {
+            return;
+        };
+        let stale = self.queue.read(cx).revision() != handle.queue_revision
+            || self.queue.read(cx).is_importing()
+            || *self.settings.read(cx).settings() != handle.settings;
+        if !stale {
+            return;
+        }
+        handle.state.borrow_mut().take();
+        self.pending_start = None;
+        self.planning = false;
+        self.notice = Some(Notice::RestartNeeded);
+        if window.has_active_dialog(cx) {
+            window.close_dialog(cx);
+        }
+        cx.notify();
+    }
+
+    /// The jobs a batch would submit: every queue item, in queue order.
+    fn prepare_jobs(
+        &self,
+        dir: &Path,
+        format: &str,
+        cx: &App,
+    ) -> (Vec<SharedString>, Vec<ConvertOptions>, Option<usize>) {
+        let settings = self.settings.read(cx).settings().clone();
+        let queue = self.queue.read(cx);
+        let keys = queue.keys();
+        let options = queue
+            .items()
+            .iter()
+            .map(|item| build_options(&settings, item, dir, format))
+            .collect::<Vec<_>>();
+        let concurrency = match settings.concurrency {
+            0 => None,
+            n => Some(usize::from(n)),
+        };
+        (keys, options, concurrency)
+    }
+
+    /// Every prompt was answered: start with the decided options, unless the
+    /// queue or settings moved on since they were planned.
+    pub(crate) fn start_decided(
+        &mut self,
+        decided: output_safety::PendingStart,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(handle) = self.pending_start.take() else {
+            self.planning = false;
+            return;
+        };
+        self.planning = false;
+        if self.queue.read(cx).revision() != handle.queue_revision
+            || self.queue.read(cx).is_importing()
+            || *self.settings.read(cx).settings() != handle.settings
+        {
+            self.notice = Some(Notice::RestartNeeded);
+            cx.notify();
+            return;
+        }
+        self.notice = match progress_bridge::start_batch(
+            decided.keys,
+            decided.options,
+            decided.concurrency,
+            cx,
+        ) {
+            Ok(_) => None,
+            Err(StartError::Empty) => Some(Notice::NothingToConvert),
+            Err(StartError::Settling) => Some(Notice::AlreadyRunning),
+            Err(StartError::Batch(error)) => Some(Notice::Failed(error.to_string())),
+        };
+        cx.notify();
+    }
+
+    /// A prompt was dismissed: nothing starts.
+    pub(crate) fn start_aborted(&mut self, cx: &mut Context<Self>) {
+        self.pending_start = None;
+        self.planning = false;
+        self.notice = None;
+        cx.notify();
+    }
+
+    pub fn is_planning(&self) -> bool {
+        self.planning
     }
 
     /// Starts the batch into `dir` without prompting (perf probe and tests).
@@ -194,22 +391,10 @@ impl WorkflowPanel {
         self.start_into(dir, format, cx);
     }
 
+    /// Starts without the output-safety prompts (perf probe and tests): the
+    /// persisted overwrite mode applies as is, so `ask` behaves like `skip`.
     fn start_into(&mut self, dir: PathBuf, format: String, cx: &mut Context<Self>) {
-        let settings = self.settings.read(cx).settings().clone();
-        let (keys, options) = {
-            let queue = self.queue.read(cx);
-            let keys = queue.keys();
-            let options = queue
-                .items()
-                .iter()
-                .map(|item| build_options(&settings, item, &dir, &format))
-                .collect::<Vec<_>>();
-            (keys, options)
-        };
-        let concurrency = match settings.concurrency {
-            0 => None,
-            n => Some(usize::from(n)),
-        };
+        let (keys, options, concurrency) = self.prepare_jobs(&dir, &format, cx);
         self.notice = match progress_bridge::start_batch(keys, options, concurrency, cx) {
             Ok(_) => None,
             Err(StartError::Empty) => Some(Notice::NothingToConvert),
@@ -298,8 +483,11 @@ impl Render for WorkflowPanel {
         let percent = batch.percent();
         let queue = self.queue.read(cx);
         // The bridge may still be settling after the backend reported Finished.
-        let can_start =
-            !queue.is_empty() && !queue.is_importing() && !active && !progress_bridge::is_busy(cx);
+        let can_start = !queue.is_empty()
+            && !queue.is_importing()
+            && !active
+            && !self.planning
+            && !progress_bridge::is_busy(cx);
         // Starting without a chosen folder opens the picker first.
         let output_dir = self.output_dir(cx);
         let start_label = if output_dir.is_some() {

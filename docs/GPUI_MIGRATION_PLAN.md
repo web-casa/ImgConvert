@@ -410,6 +410,19 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，1 项 P1、5 项 P2�
 - 未采纳/受限：Kit 0.7.1 的 `Slider` 没有可访问名称 builder，名称仍挂在可聚焦容器上（已在代码注释中说明，随 Kit 升级复查）。
 - 测试补充：改用行按钮打开的那个对话框实体；加载中二次刷新不重复提交、加载中改设置后落地结果过期、禁用时按键不改变揭示值。
 
+进度（2026-10-17，第四片：开始前的输出安全决策与覆盖询问，未经 Codex 评审）：
+
+- 此前 GPUI 的 Start 直接把持久化的 `overwrite` 交给后端，`ask` 模式下后端会以"输出已存在（需要确认覆盖）"报错而不是询问。现在 Start（用户路径）先在工作线程上跑 `convert::conversion_plan`，再按 Svelte `applyOutputSafetyDecisions` 的顺序走提示：与队列中其他输入同名的输出先报一次（继续其余 / 取消）；`ask` 模式下逐个已存在输出询问（覆盖/跳过，与原图同一文件时用"可能覆盖原图 / 确认覆盖原图"的措辞，多页 PDF 用页数措辞），不存在的输出直接设为 skip；非 `ask` 模式下与原图同一文件的输出按模式处理（`skip` 只告知，`overwrite` 需明确确认并只对这些任务设置 `allow_source_overwrite`）。全部回答后才 `start_batch`；关闭按钮或 Escape（仅取消类提示）视为放弃。规划期间 Start 禁用并显示"正在检查输出路径…"。
+- 实现：`crates/workflow/src/output_safety.rs`（`PendingStart` + `next_prompt` 状态机 + 用 Kit `AlertDialog` 回调续跑的 `advance`，每个对话框只接受一次回答，`on_close` 仅在未回答时放弃）；shared 新增 `tasks::run_blocking`（专用线程 + 执行器轮询），对比预览也改用它。探针与测试用的 `start_with_output_dir` 保持无提示路径。
+- 测试：`next_prompt` 的单测（ask 只问已存在的输出、冲突优先、按模式处理原图碰撞）；UI 测试：ask 模式下 Escape 不算回答、"跳过"保留旧文件、"覆盖"替换；skip 模式下输出即原图时出现一次告知提示并跳过；无需确认时不出提示直接开始。
+
+Codex 只读评审（2026-10-17，结论"需修改"，3 项 P1、2 项 P2、1 项 P3，记录在 `artifacts/reviews/codex-stage3-safety-review-2026-10-17.md`）与处置：
+
+- 已修（P1）：规划完成后在实体更新之外调用 `advance`，无提示直开不再触发 GPUI 的嵌套更新 panic；面板持有待开始状态（`PendingHandle`：决策状态 + 队列 `revision` + 设置快照），队列结构变化、导入开始或设置被改时关闭提示并放弃（提示"队列或设置已更改，请重新开始"），提交前再核对一次；`AlertDialog` 加 `.confirm()`，否则 Kit 0.7.1 不显示第二个按钮。
+- 已修（P2）：Kit 把 Escape 路由到第二个按钮，因此"跳过"类提示关闭键盘关闭（`keyboard(false)`），Escape 不会悄悄回答"跳过"；取消/放弃类提示保持 Escape = 取消；每个对话框只接受一次回答；面板自己持有并清理待开始状态，不再只依赖 `on_close`。
+- 已修（P3）：`tasks::run_blocking` 保留 panic 载荷文本并带线程名。
+- 未做：Kit 的 `AlertDialog` 默认不允许点遮罩关闭，进度块中"遮罩关闭视为放弃"的描述据此修正为"关闭按钮/Escape"。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）

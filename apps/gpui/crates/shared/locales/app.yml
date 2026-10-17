@@ -578,3 +578,54 @@ warning.pdf_pages_skipped_existing:
 warning.pdf_render_warnings:
   en: "PDF page %{page} produced %{count} compatibility warning(s); some content may be missing."
   zh-CN: "PDF 第 %{page} 页渲染时出现 %{count} 个兼容性警告，结果可能缺少部分内容。"
+safety.queued_input_conflict_title:
+  en: Queued source overwrite prevented
+  zh-CN: 已阻止覆盖队列中的原图
+safety.queued_input_conflict_message:
+  en: "%{count} output path(s) match another queued input. To protect sources, those items will not be written; the remaining items can continue."
+  zh-CN: "有 %{count} 个输出路径与队列中的其他输入文件相同。为保护原图，这些项目不会写入；其余项目可以继续转换。"
+safety.continue_remaining:
+  en: Continue remaining items
+  zh-CN: 继续其余项目
+safety.continue_conversion:
+  en: Continue conversion
+  zh-CN: 继续转换
+safety.source_overwrite_title:
+  en: Source file may be replaced
+  zh-CN: 可能覆盖原图
+safety.source_overwrite:
+  en: Replace source file
+  zh-CN: 确认覆盖原图
+safety.source_overwrite_message:
+  en: "%{count} output file(s) are the same file as their source. Continuing will replace the original and cannot be undone."
+  zh-CN: "有 %{count} 个输出文件与原图是同一个文件。继续后将替换原图，且无法撤销。"
+safety.source_overwrite_single_message:
+  en: "This output is the same file as its source: %{path}. Confirming will replace the original and cannot be undone."
+  zh-CN: "此输出与原图是同一个文件：%{path}。确认后将替换原图，且无法撤销。"
+safety.source_overwrite_will_skip_message:
+  en: "%{count} output file(s) match their source. With “Skip” selected, those originals will not be changed."
+  zh-CN: "有 %{count} 个输出文件与原图同名。当前设为“跳过”，这些原图不会被修改。"
+safety.confirm_overwrite_title:
+  en: Confirm overwrite
+  zh-CN: 确认覆盖
+safety.output_exists:
+  en: "Output file already exists: %{path}"
+  zh-CN: "输出文件已存在：%{path}"
+safety.pdf_outputs_exist:
+  en: "This PDF has %{count} existing page outputs. Overwrite those files?"
+  zh-CN: "此 PDF 有 %{count} 个页面输出已存在。是否覆盖这些文件？"
+safety.overwrite:
+  en: Overwrite
+  zh-CN: 覆盖
+safety.skip:
+  en: Skip
+  zh-CN: 跳过
+safety.planning:
+  en: Checking output paths…
+  zh-CN: 正在检查输出路径…
+safety.plan_failed:
+  en: "Couldn’t check the output paths: %{detail}"
+  zh-CN: "无法检查输出路径：%{detail}"
+safety.restart_needed:
+  en: The queue or the settings changed. Start again.
+  zh-CN: 队列或设置已更改，请重新开始。
