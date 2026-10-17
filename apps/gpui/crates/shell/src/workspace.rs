@@ -1,28 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! The main window: a single-workspace shell with a thin toolbar, the queue
-//! as the primary region and the workflow panel on the trailing edge.
+//! The main window: a soft backdrop, a thin toolbar, the queue card as the
+//! primary region, the settings card on the trailing edge and the floating
+//! action bar with the one decision (design: "Liquid Glass", 2026-10-18).
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
-    FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
-    Subscription, TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
-    px, size,
+    FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
+    Render, Styled as _, StyledImage as _, Subscription, TestSupportExt as _, TitlebarOptions,
+    Window, WindowBounds, WindowOptions, div, img, px, size,
 };
 use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
-use imgconvert_gpui_workflow::WorkflowPanel;
+use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
+use imgconvert_gpui_workflow::{ActionBar, WorkflowPanel};
 
 use crate::toggle_language;
 
 pub struct Workspace {
     queue_view: Entity<QueueView>,
     workflow: Entity<WorkflowPanel>,
+    action_bar: Entity<ActionBar>,
     focus_handle: FocusHandle,
     /// The dialog owns the preview; this only lets tests and menus find it.
     comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
@@ -34,19 +37,27 @@ impl Workspace {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let queue_view = cx.new(QueueView::new);
         let workflow = cx.new(|cx| WorkflowPanel::new(window, cx));
-        // Queue rows issue commands other features fulfil; the shell routes them.
-        let subscriptions = vec![cx.subscribe_in(
-            &queue_view,
-            window,
-            |this, _, event: &QueueViewEvent, window, cx| match event {
-                QueueViewEvent::ComparePreview(key) => {
-                    this.open_comparison_preview(key.clone(), window, cx);
-                }
-            },
-        )];
+        let action_bar = cx.new(|cx| ActionBar::new(workflow.clone(), cx));
+        let subscriptions = vec![
+            // Queue rows issue commands other features fulfil; the shell routes them.
+            cx.subscribe_in(
+                &queue_view,
+                window,
+                |this, _, event: &QueueViewEvent, window, cx| match event {
+                    QueueViewEvent::ComparePreview(key) => {
+                        this.open_comparison_preview(key.clone(), window, cx);
+                    }
+                },
+            ),
+            // "Follow system" needs the window's appearance, which only the
+            // window reports.
+            window.observe_window_appearance(|window, cx| theme::apply(Some(window), cx)),
+        ];
+        theme::apply(Some(window), cx);
         Self {
             queue_view,
             workflow,
+            action_bar,
             focus_handle: cx.focus_handle(),
             comparison_preview: None,
             plugin_diagnostics: None,
@@ -100,18 +111,21 @@ impl Workspace {
         &self.workflow
     }
 
+    pub fn action_bar(&self) -> &Entity<ActionBar> {
+        &self.action_bar
+    }
+
     fn render_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let pill = ButtonRounded::Size(cx.theme().radius_full());
         h_flex()
-            .h_10()
+            .h_12()
+            .flex_none()
             .px_4()
             .gap_2()
-            .border_b_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().title_bar)
             .child(
                 div()
                     .text_sm()
-                    .font_weight(FontWeight::SEMIBOLD)
+                    .font_weight(FontWeight::BOLD)
                     .child(tr("app.title")),
             )
             .child(div().flex_1())
@@ -119,6 +133,7 @@ impl Workspace {
                 Button::new("plugin-diagnostics")
                     .ghost()
                     .small()
+                    .rounded(pill)
                     .label(tr("diagnostics.open"))
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_plugin_diagnostics(window, cx);
@@ -128,6 +143,7 @@ impl Workspace {
                 Button::new("language-toggle")
                     .ghost()
                     .small()
+                    .rounded(pill)
                     .icon(IconName::Globe)
                     .label(tr("app.language_toggle"))
                     .tooltip(tr("app.language_toggle_tooltip"))
@@ -145,28 +161,75 @@ impl Focusable for Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
+        div()
             .id("workspace")
             .test_support()
             .key_context("Workspace")
             .track_focus(&self.focus_handle)
+            .relative()
             .size_full()
+            .overflow_hidden()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
-            .child(self.render_toolbar(cx))
+            // The soft light behind the glass; it scales to any window size.
+            .child(
+                img(ImageSource::Render(cx.glass().backdrop()))
+                    .absolute()
+                    .inset_0()
+                    .size_full()
+                    .object_fit(ObjectFit::Cover),
+            )
+            .child(
+                v_flex()
+                    .absolute()
+                    .inset_0()
+                    .size_full()
+                    .child(self.render_toolbar(cx))
+                    .child(
+                        h_flex()
+                            .flex_1()
+                            .min_h_0()
+                            .px_3()
+                            .pb_3()
+                            .gap_3()
+                            .items_stretch()
+                            .child(
+                                // Rows scroll under the card's rounded corners.
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .h_full()
+                                    .glass_panel(cx)
+                                    .overflow_hidden()
+                                    .child(self.queue_view.clone()),
+                            )
+                            .child(
+                                // The settings card ends above the floating bar.
+                                div()
+                                    .w_96()
+                                    .flex_none()
+                                    .h_full()
+                                    .pb(theme::ACTION_BAR_CLEARANCE)
+                                    .child(
+                                        div()
+                                            .size_full()
+                                            .glass_panel(cx)
+                                            .overflow_hidden()
+                                            .child(self.workflow.clone()),
+                                    ),
+                            ),
+                    ),
+            )
+            // Floats over the queue; the wrapper has no hitbox of its own.
             .child(
                 h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .items_stretch()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .child(self.queue_view.clone()),
-                    )
-                    .child(self.workflow.clone()),
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .pb(theme::ACTION_BAR_MARGIN)
+                    .justify_center()
+                    .child(self.action_bar.clone()),
             )
     }
 }

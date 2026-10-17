@@ -25,6 +25,15 @@ fn locale_guard() -> std::sync::MutexGuard<'static, ()> {
 fn open_workspace(
     cx: &mut TestAppContext,
 ) -> (gpui_kit::AnyWindowHandle, gpui_kit::Entity<Workspace>) {
+    open_workspace_sized(cx, size(px(1_000.), px(640.)))
+}
+
+/// A window of the given size; tall windows keep the lower settings
+/// sections inside the viewport so they can be clicked.
+fn open_workspace_sized(
+    cx: &mut TestAppContext,
+    window_size: gpui_kit::Size<gpui_kit::Pixels>,
+) -> (gpui_kit::AnyWindowHandle, gpui_kit::Entity<Workspace>) {
     cx.update(|cx| {
         // Tests never touch the real per-user store.
         services::init_with_settings(cx, || SettingsModel::in_memory(Settings::default()));
@@ -34,7 +43,7 @@ fn open_workspace(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::new(
                     gpui_kit::Point::default(),
-                    size(px(1_000.), px(640.)),
+                    window_size,
                 ))),
                 ..Default::default()
             },
@@ -53,7 +62,17 @@ fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext)
         window.render_frame(cx);
         assert!(window.find("queue-empty").visible());
         assert!(window.find("queue-empty-add").visible());
+        // The decision floats in the action bar with its status beside it.
+        assert!(window.find("workflow-action-bar").visible());
         assert!(window.find("workflow-start").visible());
+        assert_eq!(
+            window.find("workflow-status").label(),
+            Some("Add files to begin")
+        );
+        assert_eq!(
+            window.find("workflow-output-dir").label(),
+            Some("Chosen when you start")
+        );
         // Start on an empty queue is disabled: clicking must not start a batch.
         window.click("workflow-start", cx);
     })
@@ -685,6 +704,116 @@ fn plugin_diagnostics_dialog_probes_and_edits_the_helper(cx: &mut TestAppContext
 
 /// Pumps the executor until `condition` holds (blocking work runs on its
 /// own thread; the timer wakes the foreground).
+#[gpui_kit::test]
+fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestAppContext) {
+    use gpui_kit::component::{ActiveTheme as _, Theme, ThemeMode};
+    use imgconvert_backend::settings::Theme as ThemePreference;
+    use imgconvert_gpui_shared::theme::{ActiveGlass as _, DARK_THEME_NAME, LIGHT_THEME_NAME};
+    use imgconvert_gpui_workflow::Section;
+
+    fn edit(cx: &mut TestAppContext, apply: impl FnOnce(&mut Settings)) {
+        cx.update(|cx| {
+            let settings = AppModels::global(cx).settings().clone();
+            settings.update(cx, |model, cx| {
+                model.update(cx, apply);
+            });
+        });
+        // The theme follows through an observer, which runs after the update.
+        cx.run_until_parked();
+    }
+
+    let _locale = locale_guard();
+    // Tall enough for the appearance section, the last one, to be clickable.
+    let (handle, workspace) = open_workspace_sized(cx, size(px(1_000.), px(1_400.)));
+
+    // "System" (the default) under the test platform's light appearance.
+    cx.update(|cx| {
+        assert_eq!(cx.theme().mode, ThemeMode::Light);
+        assert_eq!(cx.theme().theme_name().as_ref(), LIGHT_THEME_NAME);
+        assert_eq!(cx.glass().mode(), ThemeMode::Light);
+        assert!(!cx.reduce_motion());
+    });
+
+    // An explicit preference wins over the system appearance.
+    edit(cx, |settings| settings.theme = ThemePreference::Dark);
+    cx.update(|cx| {
+        assert!(cx.theme().is_dark());
+        assert_eq!(cx.theme().theme_name().as_ref(), DARK_THEME_NAME);
+        assert_eq!(cx.glass().mode(), ThemeMode::Dark);
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("workflow-action-bar").visible());
+    })
+    .unwrap();
+
+    edit(cx, |settings| settings.reduce_motion = true);
+    cx.update(|cx| assert!(cx.reduce_motion()));
+
+    edit(cx, |settings| {
+        settings.theme = ThemePreference::Light;
+        settings.reduce_motion = false;
+    });
+    cx.update(|cx| {
+        assert_eq!(cx.theme().mode, ThemeMode::Light);
+        assert_eq!(cx.theme().theme_name().as_ref(), LIGHT_THEME_NAME);
+        assert!(!cx.reduce_motion());
+    });
+
+    // An unrelated settings edit must not reload the theme file: a reload
+    // would put the file's radius back over this sentinel.
+    cx.update(|cx| Theme::update(cx, |theme| theme.radius = px(3.)));
+    edit(cx, |settings| settings.quality = 55);
+    cx.update(|cx| {
+        assert_eq!(cx.theme().theme_name().as_ref(), LIGHT_THEME_NAME);
+        assert_eq!(cx.theme().radius, px(3.), "no reload on an unrelated edit");
+    });
+    cx.update(|cx| Theme::update(cx, |theme| theme.radius = px(10.)));
+
+    // The appearance section's switch writes the record, and the record
+    // drives GPUI's reduced-motion flag.
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    cx.update(|cx| {
+        form.update(cx, |form, cx| {
+            form.set_open_section(Some(Section::Appearance), cx);
+        });
+    });
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        assert!(window.find("workflow-theme").visible());
+        assert!(window.find("switch-reduce-motion").visible());
+        window.click("switch-reduce-motion", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .reduce_motion
+        );
+        assert!(cx.reduce_motion());
+    });
+
+    // The new labels follow a locale switch like every other string.
+    cx.update(toggle_language);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-status").label(), Some("先添加文件"));
+    })
+    .unwrap();
+    cx.update(toggle_language);
+}
+
 fn wait_until(cx: &mut TestAppContext, what: &str, condition: impl Fn(&gpui_kit::App) -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
     loop {

@@ -44,7 +44,7 @@ use imgconvert_backend::settings::{
     AvifSubsample, ColorManagementPolicy, DEFAULT_OUTPUT_SUFFIX, MAX_CUSTOM_PRESETS, MAX_PDF_DPI,
     MAX_PDF_PAGE_RANGE_CHARS, MAX_RESIZE_PERCENT, MAX_TARGET_SIZE_KIB, MIN_PDF_DPI,
     MIN_TARGET_SIZE_KIB, MetadataPolicy, OverwriteMode, ResizeMode, Settings,
-    normalize_output_suffix_input,
+    Theme as ThemePreference, normalize_output_suffix_input,
 };
 use imgconvert_backend::workflow_presets::{
     self, CUSTOM_PRESET_ID_PREFIX, builtin_workflow_presets,
@@ -68,10 +68,11 @@ pub enum Section {
     Resize,
     TargetSize,
     Metadata,
+    Appearance,
 }
 
 impl Section {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Output,
         Self::Compression,
         Self::Color,
@@ -82,6 +83,7 @@ impl Section {
         Self::Resize,
         Self::TargetSize,
         Self::Metadata,
+        Self::Appearance,
     ];
 
     /// Element id of the section's header button.
@@ -97,6 +99,7 @@ impl Section {
             Self::Resize => "section-resize",
             Self::TargetSize => "section-target-size",
             Self::Metadata => "section-metadata",
+            Self::Appearance => "section-appearance",
         }
     }
 
@@ -112,6 +115,7 @@ impl Section {
             Self::Resize => "workflow.resize_section",
             Self::TargetSize => "workflow.target_section",
             Self::Metadata => "workflow.metadata_section",
+            Self::Appearance => "settings.appearance_section",
         }
     }
 }
@@ -358,6 +362,7 @@ pub struct SettingsForm {
     resize_mode: Choice,
     metadata_policy: Choice,
     avif_subsample: Choice,
+    theme: Choice,
 
     /// In `SliderKind::ALL` order.
     sliders: Vec<SliderControl>,
@@ -415,6 +420,7 @@ impl SettingsForm {
             window,
             cx,
         );
+        let theme = Choice::new(theme_items(), settings.theme.as_str(), window, cx);
 
         let sliders: Vec<SliderControl> = SliderKind::ALL
             .into_iter()
@@ -542,6 +548,15 @@ impl SettingsForm {
                 }
             },
         ));
+        subscriptions.push(cx.subscribe(
+            &theme.state,
+            |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
+                let SelectEvent::Confirm(value) = event;
+                if let Some(theme) = value.as_deref().and_then(ThemePreference::parse) {
+                    this.edit(cx, |s| s.theme = theme);
+                }
+            },
+        ));
 
         // Sliders: live value into the record; the autosave coalesces.
         for control in &sliders {
@@ -633,6 +648,7 @@ impl SettingsForm {
             resize_mode,
             metadata_policy,
             avif_subsample,
+            theme,
             sliders,
             output_suffix,
             file_name_template,
@@ -1083,6 +1099,8 @@ impl SettingsForm {
             window,
             cx,
         );
+        self.theme
+            .sync(theme_items(), settings.theme.as_str(), window, cx);
 
         for control in &self.sliders {
             let value = control.kind.value(&settings);
@@ -1448,6 +1466,15 @@ impl SettingsForm {
                 (summary, invalid)
             }
             Section::Metadata => (metadata_label(settings.metadata_policy), false),
+            Section::Appearance => {
+                let theme = theme_label(settings.theme);
+                let summary = if settings.reduce_motion {
+                    format!("{theme} · {}", tr("settings.reduce_motion_label")).into()
+                } else {
+                    theme
+                };
+                (summary, false)
+            }
         }
     }
 
@@ -1487,6 +1514,7 @@ impl SettingsForm {
             Section::Resize => self.render_resize(settings, busy, cx),
             Section::TargetSize => self.render_target_size(settings, busy, cx),
             Section::Metadata => self.render_metadata(settings, busy, cx),
+            Section::Appearance => self.render_appearance(settings, busy, cx),
         }
     }
 
@@ -2181,6 +2209,34 @@ impl SettingsForm {
                 cx,
             ))
     }
+
+    fn render_appearance(&self, settings: &Settings, busy: bool, cx: &mut Context<Self>) -> Div {
+        v_flex()
+            .gap_3()
+            .child(
+                v_flex()
+                    .gap_1()
+                    .child(Self::field_label(tr("settings.theme"), cx))
+                    .child(
+                        Select::new(&self.theme.state)
+                            .id("workflow-theme")
+                            .small()
+                            .accessibility_label(tr("settings.theme"))
+                            .disabled(busy),
+                    ),
+            )
+            .child(self.switch_row(
+                "switch-reduce-motion",
+                tr("settings.reduce_motion_label"),
+                Some(tr("settings.reduce_motion_description")),
+                settings.reduce_motion,
+                busy,
+                |this, on, _, cx| {
+                    this.edit(cx, |s| s.reduce_motion = on);
+                },
+                cx,
+            ))
+    }
 }
 
 impl Render for SettingsForm {
@@ -2283,6 +2339,27 @@ fn metadata_items() -> Vec<ChoiceItem> {
     METADATA_POLICIES
         .into_iter()
         .map(|policy| ChoiceItem::new(policy.as_str(), metadata_label(policy)))
+        .collect()
+}
+
+const THEME_PREFERENCES: [ThemePreference; 3] = [
+    ThemePreference::System,
+    ThemePreference::Light,
+    ThemePreference::Dark,
+];
+
+fn theme_label(theme: ThemePreference) -> SharedString {
+    tr(match theme {
+        ThemePreference::System => "settings.theme_system",
+        ThemePreference::Light => "settings.theme_light",
+        ThemePreference::Dark => "settings.theme_dark",
+    })
+}
+
+fn theme_items() -> Vec<ChoiceItem> {
+    THEME_PREFERENCES
+        .into_iter()
+        .map(|theme| ChoiceItem::new(theme.as_str(), theme_label(theme)))
         .collect()
 }
 

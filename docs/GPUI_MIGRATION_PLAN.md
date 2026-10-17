@@ -1,6 +1,6 @@
 # ImgConvert 桌面端 Tauri → GPUI 迁移方案
 
-状态：草案 v0.8（2026-10-17）。阶段 3 首片（设置持久化）已实现，见 §4 阶段 3 进度。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
+状态：草案 v0.9（2026-10-18）。阶段 3 前五片已实现（前四片已合并 main），第六片把用户拍板的“液态玻璃”视觉方案落到主题层与主窗口，见 §4 阶段 3 进度。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
 
 ## 0. 决策前提
 
@@ -436,6 +436,21 @@ Codex 只读评审（2026-10-17，结论"需修改"，0 项 P1、3 项 P2、3 �
 - 已修（P3）：路径与参数改为换行显示而不是截断；状态芯片区分"失败"（拒绝/不受信任/不可读，危险色 + 图标）与"缺失"（中性）；zh-CN 文案把 helper/provider/manifest/codec 统一为辅助程序/提供方/清单/编解码器，保留 ImageIO、WIC 等标识符。
 - 测试补充：选择 helper 后立刻关闭对话框，设置仍被写入。
 
+进度（2026-10-18，第六片：视觉方案“液态玻璃”落地）：
+
+- 设计决策：用户在 14 个风格参考与 3 个液态玻璃变体中拍板——浅色用 9A Clear 清透、深色用 9B Obsidian 黑曜石、借鉴 9C 的底部悬浮操作栏（设计画布 F1/F2 为高保真，F3 为 token 表）。
+- 主题层（shared `theme` 模块，裸色值只允许出现在这里和 `themes/imgconvert-glass.json`）：两份 Kit `ThemeConfig`（`ImgConvert Glass Light` / `Dark`，radius 10、radius.lg 16）注册进 `ThemeRegistry` 并替换 Kit 的默认浅/深主题；`theme::install` 在 `gpui_kit::init` 与 services 之后调用，按持久化的 `theme`（跟随系统/浅/深，跟随系统取窗口外观并经 `observe_window_appearance` 跟随切换）调用 `Theme::change`，把 `reduceMotion` 映射到 GPUI 的 `set_reduce_motion`，并观察 `SettingsModel`——模式或主题名未变时不重载，所以逐键编辑设置不会触发主题重载。深色的主按钮通过 `tokens.primary` 携带竖向渐变（颜色仍为实色供文字与边框使用）。
+- 应用自有 `GlassTokens`（Global，按模式解析）：光斑背景、玻璃面板填充/描边/顶部内高光/外阴影、悬浮操作栏表面与阴影、主按钮光晕；`GlassStyled` 给任意元素 `glass_panel` / `glass_bar`。gpui-pre 0.3.8 没有径向渐变与模糊，背景改为 CPU 生成的 192×120 高斯光斑 `RenderImage`（Bayer 抖动防色带），按模式缓存一次，以 `ObjectFit::Cover` 铺满窗口；因此 Windows/Linux 没有系统级模糊时表现一致。
+- 主窗口：背景图层之上是透明工具栏（胶囊幽灵按钮）、队列玻璃卡（圆角内裁剪，行改为圆角悬停面、第二行显示像素尺寸·页数·来源文件夹而不是完整路径）、设置玻璃卡（在操作栏之上结束）；输出文件夹、状态/进度与开始/取消移入新的 `ActionBar` 实体（workflow crate），由 shell 以绝对定位浮在底部居中，队列列表底部预留 `ACTION_BAR_CLEARANCE` 让末行能滚到操作栏之上。`WorkflowPanel` 只剩标题与滚动的设置表单，仍是开始决策（规划、安全提示、提交）的所有者，操作栏通过实体调用它。
+- 设置表单新增“外观”分区：主题 `Select`（跟随系统/浅色/深色）与“减少动画”开关，写入同一条记录，与 Tauri 的 `theme` / `reduceMotion` 字段互通。
+- 测试：shared 单测（偏好与系统外观的解析、主题文件声明两种模式、背景图尺寸）；UI 测试新增“主题偏好与减少动画随设置记录变化”（Dark→名称与 Glass 模式切换并能渲染一帧，reduceMotion→`cx.reduce_motion()`，无关编辑不改主题名）、空队列时操作栏的状态与输出目录文案、外观分区渲染并写入；原有测试沿用 `workflow-start` / `workflow-output-dir` / `workflow-status` 等 id。
+Codex 只读评审（2026-10-18，结论"修后可合并"，0 项 P1、5 项 P2、1 项 P3，记录在 `artifacts/reviews/codex-stage3-glass-review-2026-10-18.md`）与处置：
+
+- 已修（P2）：按评审的 sRGB 合成估算提高对比度——浅色 `muted.foreground` 改 `#5b6471`、主色改 `#0071e3`（白字 ≥4.5:1）、危险色改 `#d93036`，深色 `muted.foreground` 不透明度 0.55→0.70；输出目录按钮加本地化 `accessibility_label`（命令 + 当前目录）；状态文本截断时提供完整 tooltip；队列行以完整路径为 tooltip，元信息行保持紧凑；测试改为在高窗口里强制断言"外观"分区控件可见并点击开关、用 `radius` 哨兵证明无关编辑不重载主题、语言切换后操作栏文案跟随。
+- 已修（P3）：输出目录为根目录（无 basename）时显示完整路径而不是"未选择"。
+- 未做：真实 `Select` 的确认/Escape 交互与系统外观事件测试（测试平台没有外观切换入口），随 Kit 测试 API 复查。
+- 未做、记入后续：Kit 对话框（预览、诊断、安全提示）仍是实色弹层，按设计评审“同类弹层同一处理”保留；滑杆/开关等 Kit 控件只吃主题色，没有做玻璃化；悬浮操作栏在 760 px 最小宽度下的截断只做了 `max_w` 约束，待 Windows/Linux 探针截图核对；无障碍清单人工项（VoiceOver 下操作栏朗读顺序）待虚拟机授权。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）
@@ -538,6 +553,11 @@ workflow 处置表：
 - Kit 内置 zh-CN 组件文案的覆盖度（§3.4）。
 
 ## 9. 修订记录
+
+v0.9（2026-10-18，阶段 3 第六片）：
+
+- 新增：§4 阶段 3 “视觉方案‘液态玻璃’落地”进度块——shared `theme` 主题层、`GlassTokens`、悬浮 `ActionBar`、设置表单“外观”分区，以及 gpui-pre 0.3.8 无径向渐变/模糊时的背景实现方式。
+- 说明：§2.4 “颜色只从 `cx.theme()` 读取”在本片的落点是“或产品主题层（shared `theme`）”，裸色值只允许在主题层与主题文件中出现。
 
 v0.8（2026-10-17，阶段 3 首片）：
 

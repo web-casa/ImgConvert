@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! Side panel with the conversion settings form above and the decision
-//! below: output folder, progress and Start/Cancel. Primary styling goes to
-//! Start because it is the panel's one commit.
+//! The settings card (title + scrolling [`SettingsForm`]) and the owner of
+//! the start decision: planning, output-safety prompts, batch start and
+//! cancel. The controls that trigger it (output folder, status, Start /
+//! Cancel) render in the floating [`crate::ActionBar`].
 //!
 //! Every field is read from and written to the persisted settings; a batch
 //! started here builds its options from that record through
@@ -13,17 +14,12 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::progress::Progress;
 use gpui_kit::component::scroll::ScrollableElement as _;
-use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
-};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::{WindowExt as _, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, Window, div,
+    ParentElement as _, Render, SharedString, Styled as _, Subscription, TestSupportExt as _,
+    Window, div,
 };
 use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
@@ -32,9 +28,7 @@ use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
 use imgconvert_gpui_shared::tasks;
-use imgconvert_gpui_shared::{
-    AppModels, BatchModel, BatchPhase, QueueItem, QueueModel, SettingsModel,
-};
+use imgconvert_gpui_shared::{AppModels, QueueItem, QueueModel, SettingsModel};
 
 use crate::output_safety;
 use crate::settings_form::SettingsForm;
@@ -76,7 +70,6 @@ struct PendingHandle {
 
 pub struct WorkflowPanel {
     queue: Entity<QueueModel>,
-    batch: Entity<BatchModel>,
     settings: Entity<SettingsModel>,
     settings_form: Entity<SettingsForm>,
     formats: Vec<SharedString>,
@@ -92,12 +85,7 @@ pub struct WorkflowPanel {
 impl WorkflowPanel {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let models = AppModels::global(cx).clone();
-        let capabilities = convert::capabilities();
-        let formats: Vec<SharedString> = capabilities
-            .writable
-            .iter()
-            .map(|format| SharedString::from((*format).to_string()))
-            .collect();
+        let formats = writable_formats();
         let settings_form = cx.new(|cx| SettingsForm::new(window, cx));
         let subscriptions = vec![
             // A queue change or a settings edit invalidates planned jobs.
@@ -114,7 +102,6 @@ impl WorkflowPanel {
         ];
         Self {
             queue: models.queue().clone(),
-            batch: models.batch().clone(),
             settings: models.settings().clone(),
             settings_form,
             formats,
@@ -167,7 +154,8 @@ impl WorkflowPanel {
             .update(cx, |form, cx| form.set_format(format, window, cx));
     }
 
-    fn choose_output_dir(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens the folder picker and persists the choice.
+    pub fn choose_output_dir(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let picker =
             file_prompt::prompt_paths(PromptKind::OutputFolder, tr("workflow.choose_output"), cx);
         cx.spawn_in(window, async move |this, cx| {
@@ -378,6 +366,12 @@ impl WorkflowPanel {
         self.planning
     }
 
+    /// The transient notice of the last start attempt, translated now so a
+    /// locale switch re-renders it.
+    pub fn notice_text(&self) -> Option<SharedString> {
+        self.notice.as_ref().map(Notice::text)
+    }
+
     /// Starts the batch into `dir` without prompting (perf probe and tests).
     /// `format` overrides the panel's selection when given.
     pub fn start_with_output_dir(
@@ -408,108 +402,15 @@ impl WorkflowPanel {
         progress_bridge::cancel_batch(cx);
         cx.notify();
     }
-
-    fn render_status(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let batch = self.batch.read(cx);
-        let muted = cx.theme().muted_foreground;
-        let text: SharedString = match batch.phase() {
-            BatchPhase::Idle => {
-                // A failed settings write outranks a transient notice: the
-                // person should know their choices are not being kept.
-                if let Some(detail) = self.settings.read(cx).last_error() {
-                    let text = tr_with("settings.save_failed", &[("detail", &detail)]);
-                    return Some(
-                        div()
-                            .id("workflow-status")
-                            .test_support()
-                            .aria_label(text.clone())
-                            .text_xs()
-                            .text_color(cx.theme().danger)
-                            .child(text),
-                    );
-                }
-                return self.notice.as_ref().map(|notice| {
-                    let text = notice.text();
-                    div()
-                        .id("workflow-status")
-                        .test_support()
-                        .aria_label(text.clone())
-                        .text_xs()
-                        .text_color(muted)
-                        .child(text)
-                });
-            }
-            BatchPhase::Running | BatchPhase::Cancelling => tr_with(
-                "workflow.progress",
-                &[("done", &batch.finished_count()), ("total", &batch.total())],
-            ),
-            BatchPhase::Finished(summary) if summary.cancelled => tr_with(
-                "workflow.summary_cancelled",
-                &[("done", &summary.completed), ("total", &summary.total)],
-            ),
-            BatchPhase::Finished(summary) => tr_with(
-                "workflow.summary",
-                &[
-                    ("done", &summary.completed),
-                    ("skipped", &summary.skipped),
-                    ("failed", &summary.failed),
-                ],
-            ),
-            BatchPhase::Failed(detail) => tr_with("workflow.failed", &[("detail", detail)]),
-        };
-        let color = if matches!(batch.phase(), BatchPhase::Failed(_)) {
-            cx.theme().danger
-        } else {
-            muted
-        };
-        Some(
-            div()
-                .id("workflow-status")
-                .test_support()
-                .aria_label(text.clone())
-                .text_xs()
-                .text_color(color)
-                .child(text),
-        )
-    }
 }
 
 impl Render for WorkflowPanel {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let batch = self.batch.read(cx);
-        let active = batch.is_active();
-        let cancelling = matches!(batch.phase(), BatchPhase::Cancelling);
-        let show_progress = active || matches!(batch.phase(), BatchPhase::Finished(_));
-        let percent = batch.percent();
-        let queue = self.queue.read(cx);
-        // The bridge may still be settling after the backend reported Finished.
-        let can_start = !queue.is_empty()
-            && !queue.is_importing()
-            && !active
-            && !self.planning
-            && !progress_bridge::is_busy(cx);
-        // Starting without a chosen folder opens the picker first.
-        let output_dir = self.output_dir(cx);
-        let start_label = if output_dir.is_some() {
-            tr("workflow.start")
-        } else {
-            tr("workflow.start_choose")
-        };
-        let output_label: SharedString = output_dir.as_ref().map_or_else(
-            || tr("workflow.output_not_chosen"),
-            |dir| SharedString::from(dir.to_string_lossy().into_owned()),
-        );
-        let muted = cx.theme().muted_foreground;
-
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .id("workflow-panel")
             .test_support()
-            .w_96()
-            .flex_none()
-            .h_full()
-            .border_l_1()
-            .border_color(cx.theme().border)
-            .bg(cx.theme().sidebar)
+            .size_full()
+            .min_h_0()
             .child(
                 div()
                     .px_4()
@@ -520,7 +421,6 @@ impl Render for WorkflowPanel {
                     .child(tr("settings.title")),
             )
             .child(
-                // The settings scroll; the decision below never moves.
                 v_flex()
                     .id("workflow-scroll")
                     .flex_1()
@@ -529,75 +429,6 @@ impl Render for WorkflowPanel {
                     .pb_4()
                     .overflow_y_scrollbar()
                     .child(self.settings_form.clone()),
-            )
-            .child(
-                v_flex()
-                    .flex_none()
-                    .p_4()
-                    .gap_3()
-                    .border_t_1()
-                    .border_color(cx.theme().border)
-                    .child(
-                        v_flex()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(muted)
-                                    .child(tr("workflow.output_dir")),
-                            )
-                            .child(
-                                Button::new("workflow-choose-output")
-                                    .outline()
-                                    .small()
-                                    .icon(IconName::FolderOpen)
-                                    .label(tr("workflow.choose_output"))
-                                    .disabled(active)
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.choose_output_dir(window, cx);
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .id("workflow-output-dir")
-                                    .test_support()
-                                    .aria_label(output_label.clone())
-                                    .text_xs()
-                                    .text_color(muted)
-                                    .truncate()
-                                    .child(output_label),
-                            ),
-                    )
-                    .when(show_progress, |this| {
-                        this.child(Progress::new("workflow-progress").value(percent))
-                    })
-                    .children(self.render_status(cx))
-                    .child(if active {
-                        h_flex().child(
-                            Button::new("workflow-cancel")
-                                .danger()
-                                .w_full()
-                                .label(if cancelling {
-                                    tr("workflow.cancelling")
-                                } else {
-                                    tr("workflow.cancel")
-                                })
-                                .disabled(cancelling)
-                                .loading(cancelling)
-                                .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
-                        )
-                    } else {
-                        h_flex().child(
-                            Button::new("workflow-start")
-                                .primary()
-                                .w_full()
-                                .label(start_label)
-                                .disabled(!can_start)
-                                .on_click(
-                                    cx.listener(|this, _, window, cx| this.start(window, cx)),
-                                ),
-                        )
-                    }),
             )
     }
 }
