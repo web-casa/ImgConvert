@@ -21,10 +21,23 @@ pub const DEFAULT_THUMBNAIL_BYTE_BUDGET: usize = 128 * 1024 * 1024;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ItemStatus {
     Pending,
-    Running { percent: f32 },
-    Done { in_size: u64, out_size: u64 },
-    Skipped { detail: SharedString },
-    Error { detail: SharedString },
+    Running {
+        percent: f32,
+    },
+    Done {
+        in_size: u64,
+        out_size: u64,
+        /// The sizes describe the same single static raster artifact, so a
+        /// storage scenario may compare them (`environment_comparable`
+        /// and exactly one written output).
+        comparable: bool,
+    },
+    Skipped {
+        detail: SharedString,
+    },
+    Error {
+        detail: SharedString,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -375,6 +388,9 @@ impl QueueModel {
                 ItemStatus::Done {
                     in_size: result.in_size,
                     out_size: result.out_size,
+                    comparable: result.environment_comparable
+                        && result.output_count == 1
+                        && result.skipped_output_count == 0,
                 },
             ),
             BatchProgressEvent::FileSkipped { index, error, .. } => self.set_status(
@@ -536,7 +552,8 @@ mod tests {
             model.item(&"b".into()).unwrap().status,
             ItemStatus::Done {
                 in_size: 10,
-                out_size: 4
+                out_size: 4,
+                comparable: true,
             }
         );
         assert!(model.apply_batch_event(

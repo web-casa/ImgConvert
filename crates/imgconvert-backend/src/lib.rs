@@ -12,6 +12,7 @@ pub mod command_error;
 pub mod conversion_request;
 pub mod convert;
 pub mod environment;
+pub mod environmental_impact;
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing;
 pub mod import;

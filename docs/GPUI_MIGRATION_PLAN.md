@@ -1,6 +1,6 @@
 # ImgConvert 桌面端 Tauri → GPUI 迁移方案
 
-状态：草案 v0.9（2026-10-18）。阶段 3 前五片已实现（前四片已合并 main），第六片把用户拍板的“液态玻璃”视觉方案落到主题层与主窗口，见 §4 阶段 3 进度。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
+状态：草案 v0.10（2026-10-18）。阶段 3 前六片已合并 main（含“液态玻璃”视觉方案），第七片“存储与环境情景面板”见 §4 阶段 3 进度。阶段 0 已通过 G0；阶段 1 代码经 Codex 评审并修复，待 0.3.x 三平台 QA 后关闭 G1。§6 的六项决定已由用户确认，阶段 0 工具已在 Parallels macOS 虚拟机上验证。v0.1、v0.2、v0.3 各经一轮 Codex 只读评审后修订；v0.4 与 v0.5 的改动未再经 Codex 复核。v0.5 依据已安装的 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` 三个 skill 的规范校对。修订点见 §9。本方案是迁移立项文档，不是已验收结论；每个阶段的门槛未通过前不进入下一阶段。
 
 ## 0. 决策前提
 
@@ -451,6 +451,19 @@ Codex 只读评审（2026-10-18，结论"修后可合并"，0 项 P1、5 项 P2�
 - 未做：真实 `Select` 的确认/Escape 交互与系统外观事件测试（测试平台没有外观切换入口），随 Kit 测试 API 复查。
 - 未做、记入后续：Kit 对话框（预览、诊断、安全提示）仍是实色弹层，按设计评审“同类弹层同一处理”保留；滑杆/开关等 Kit 控件只吃主题色，没有做玻璃化；悬浮操作栏在 760 px 最小宽度下的截断只做了 `max_w` 约束，待 Windows/Linux 探针截图核对；无障碍清单人工项（VoiceOver 下操作栏朗读顺序）待虚拟机授权。
 
+进度（2026-10-18，第七片：存储与环境情景面板）：
+
+- 来源：Tauri 侧的 `EnvironmentalImpact.svelte` 与 `desktop-impact.ts` 仍在 web 线工作树里未提交，其模型 `@imgconvert/environmental-impact`（v1.0.0）只存在于 web 线。因此先把模型移植为 `imgconvert_backend::environmental_impact`：`measure_byte_reduction`、`estimate_storage_impact`、`calculate_conversion_impact`、`scenario_assumptions`（0–3650 天，副本 0 表示模型默认的 1–3 范围）、`format_impact_range`（三位有效数字、整段同一单位，`2.96–17.7 mg CO₂`）、`summarize_measurements`（批量净变化，大输出抵消小输出）、`STORAGE_IMPACT_MODEL_V1` 元数据与来源；字节数仍按 JavaScript 安全整数上限拒绝，vitest 用例改写为 12 条 Rust 单测（含与 Intl 一致的有效数字格式）。
+- 数据：`ItemStatus::Done` 新增 `comparable`（后端 `environment_comparable` 且恰好一个输出且无跳过页），与 `captureDesktopImpact` 一致；批量口径 = 已完成且可比较的结果之净值，`excluded` = 其余已完成结果。
+- GPUI：新功能 crate `crates/impact`（`ImpactView` + Kit `Dialog`）。内容按 Svelte 面板：字节变化行、边界说明、"存储情景"选择（本地/云）、云情景下的原文件状态、保留天数、副本数三个控件与结果区（估算 / 无净减少 / 原图保留 / 天数无效），"方法与来源"折叠区用 `Link` 打开两处来源。参数只存在实体内，关闭对话框即丢弃，不写设置。入口：队列行已完成项的"存储情景"按钮（`QueueViewEvent::EnvironmentalImpact`），以及批次结束且有可比较结果时操作栏的"批量情景…"（`ActionBarEvent::BatchImpact`），均由 shell 路由。`Choice`/`ChoiceItem` 从设置表单移到 shared `choice`，两处共用。
+- 测试：UI 测试跑一次真实 PNG→PNG 批次，核对行按钮出现、对话框打开、本地情景无估算、云情景给出估算或"无净减少"、保留原图与无效天数的结果、关闭后实体释放、批量入口的 (1, 0) 计数。
+Codex 只读评审（2026-10-18，结论"修后可合并"，0 项 P1、4 项 P2、3 项 P3，记录在 `artifacts/reviews/codex-stage3-impact-review-2026-10-18.md`）与处置：
+
+- 已修（P2）：`format_significant` 改为与 `Intl.NumberFormat` 一致的实现——按十进制值四舍五入（半数远离零）、整数位也按有效数字舍入、千位分组（`12,300`、`1.13`、`9.996 → 10`），区间两端舍入后相同即合并；测量行改用模型自己的 `format_binary_bytes`（三位有效数字 + KiB/MiB 标签，`126464 B → 124 KiB`），其余界面保留原格式；"方法与来源"按钮加 `accessibility_label`；UI 测试在断言释放前先 `drop` 自己的实体句柄并推进关闭动画，再验证重开后参数恢复默认、测量行随语言切换。
+- 已修（P3）：对话框宽度改为 rem；模型的记录类型加 `#[non_exhaustive]`；新增 impact crate 单测覆盖混合批次（可比较、净增大、多输出文档、不可比较栅格）的净值与 `excluded` 计数。
+- 未做：通过真实 `Select` 确认事件驱动参数的测试（Kit 测试 API 对 Select 弹层的操作尚未梳理，setter 路径与订阅路径共用同一状态字段）；Escape 关闭与焦点恢复沿用 Kit `Dialog` 的既有行为。
+- 未做、记入后续：Svelte 行内面板改为对话框是有意的（虚拟列表定高）；`estimateDailyAccumulationImpact`（网页侧的累计情景）未移植，桌面端不展示；Tauri 侧该面板本身尚未合并，合并时应改用同一后端模型（Tauri 命令或共享 crate）以免两套口径。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）
@@ -553,6 +566,10 @@ workflow 处置表：
 - Kit 内置 zh-CN 组件文案的覆盖度（§3.4）。
 
 ## 9. 修订记录
+
+v0.10（2026-10-18，阶段 3 第七片）：
+
+- 新增：§4 阶段 3 “存储与环境情景面板”进度块——模型从 web 线的 TypeScript 包移植为 `imgconvert_backend::environmental_impact`，GPUI 新功能 crate `impact`，`ItemStatus::Done` 的 `comparable` 口径。
 
 v0.9（2026-10-18，阶段 3 第六片）：
 

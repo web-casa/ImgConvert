@@ -12,6 +12,7 @@
 rust_i18n::i18n!("locales", fallback = "en");
 
 pub mod batch_model;
+pub mod choice;
 pub mod conversion;
 pub mod file_prompt;
 pub mod i18n;

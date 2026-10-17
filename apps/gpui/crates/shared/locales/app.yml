@@ -935,3 +935,87 @@ settings.reduce_motion_description:
 queue.page_count:
   en: "%{count} pages"
   zh-CN: "%{count} 页"
+impact.title:
+  en: Storage and environmental scenario
+  zh-CN: 存储与环境情景
+impact.open:
+  en: Scenario
+  zh-CN: 存储情景
+impact.batch_open:
+  en: Batch scenario…
+  zh-CN: 批量情景…
+impact.smaller:
+  en: "Output smaller by %{bytes}"
+  zh-CN: "输出减少 %{bytes}"
+impact.larger:
+  en: "Output larger by %{bytes}"
+  zh-CN: "输出增加 %{bytes}"
+impact.same:
+  en: Output size unchanged
+  zh-CN: 输出大小不变
+impact.boundary:
+  en: A smaller file does not establish freed disk space, electricity savings or avoided emissions.
+  zh-CN: 文件变小不代表磁盘空间已释放，也不代表已经节电或减碳。
+impact.excluded:
+  en: A comparable single static raster result has not been confirmed. Documents, animations, multiple outputs, AVIF/HEIC with unknown sequence status and legacy results are excluded.
+  zh-CN: 无法确认可比较的单个静态栅格结果，暂不估算。PDF、动图、多输出、AVIF/HEIC 序列状态未知以及旧版本结果均不参与。
+impact.batch:
+  en: "Batch: %{count} eligible results; %{excluded} other completed results excluded. This shared scenario is independent of individual panels."
+  zh-CN: "批量：%{count} 个合资格结果，另有 %{excluded} 个已完成结果未计入。以下统一假设独立于单文件面板。"
+impact.storage:
+  en: Storage scenario
+  zh-CN: 存储情景
+impact.local:
+  en: "Local or unknown: bytes only"
+  zh-CN: "本地或未知：仅展示字节变化"
+impact.cloud:
+  en: Explore cloud storage assumptions
+  zh-CN: 探索云存储假设
+impact.originals:
+  en: Original files
+  zh-CN: 原文件状态
+impact.hypothetical:
+  en: Assume outputs replace originals
+  zh-CN: 假设用输出替换原图
+impact.confirmed:
+  en: I replaced originals (self-reported)
+  zh-CN: 我已替换原图（自行确认）
+impact.retained:
+  en: Originals are retained
+  zh-CN: 仍保留原图
+impact.days:
+  en: Retention days (0–3650)
+  zh-CN: 保留天数（0–3650）
+impact.copies:
+  en: Copies
+  zh-CN: 副本数
+impact.copies_default:
+  en: 1–3
+  zh-CN: 1–3
+impact.invalid:
+  en: Enter a whole number of days from 0 to 3650.
+  zh-CN: 请输入 0 至 3650 的整数天数。
+impact.estimate:
+  en: Cloud storage scenario estimate
+  zh-CN: 云存储情景估算
+impact.no_reduction:
+  en: No net output reduction; no positive environmental benefit estimate.
+  zh-CN: 输出没有净减少，不计算正向环境效益。
+impact.retained_notice:
+  en: Retaining originals does not support a positive storage reduction estimate.
+  zh-CN: 原图仍保留，不计算正向存储减排。
+impact.limits:
+  en: Average capacity allocation; an assumption range, not achieved or net reductions or a confidence interval. Self-reported replacement remains an estimate.
+  zh-CN: 采用平均容量分摊模型；这是情景范围，不是实际或净减排，也不是置信区间。即使自行确认替换，仍然只是估算。
+impact.method:
+  en: Method and sources (available offline)
+  zh-CN: 方法与来源（离线可读）
+impact.formula:
+  en: "Model v1.0.0: capacity (TB) × retention hours × 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × copies = energy (Wh). Energy ÷ 1000 × 473 g CO₂/kWh = grams CO₂. Grid intensity is the 2024 global average; historical factors do not describe a current provider or local device."
+  zh-CN: "模型 v1.0.0：容量（TB）× 保留小时数 × 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × 副本数 = 电量（Wh）。电量 ÷ 1000 × 473 g CO₂/kWh = 克 CO₂。碳强度为 2024 年全球平均；历史系数不代表当前供应商或本地设备。"
+impact.privacy:
+  en: Excludes conversion energy, networks, hardware manufacture, disposal and rebound effects. Parameters stay in panel memory, reset on close and are neither saved nor uploaded. File sizes use binary KB/MB; the model uses decimal TB.
+  zh-CN: 不含转换耗电、网络、硬件制造、处置及反弹效应。参数只在当前面板内存中使用，关闭重置，不保存、不上传。文件大小按二进制 KB/MB 显示；模型使用十进制 TB。
+impact.close:
+  en: Close
+  zh-CN: 关闭

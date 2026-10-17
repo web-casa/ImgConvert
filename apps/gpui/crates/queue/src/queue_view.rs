@@ -51,6 +51,8 @@ type RowClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 pub enum QueueViewEvent {
     /// Open the before/after comparison for the item with this key.
     ComparePreview(SharedString),
+    /// Open the storage and environmental scenario for a finished item.
+    EnvironmentalImpact(SharedString),
 }
 
 impl EventEmitter<QueueViewEvent> for QueueView {}
@@ -358,11 +360,17 @@ impl QueueView {
                             Rc::new(cx.listener(move |_, _: &ClickEvent, _, cx| {
                                 cx.emit(QueueViewEvent::ComparePreview(key.clone()));
                             }));
+                        let key = item.key.clone();
+                        let on_impact: RowClickHandler =
+                            Rc::new(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                                cx.emit(QueueViewEvent::EnvironmentalImpact(key.clone()));
+                            }));
                         QueueRow {
                             item,
                             row_height,
                             busy,
                             on_compare,
+                            on_impact,
                         }
                     })
                     .collect()
@@ -439,6 +447,7 @@ struct QueueRow {
     row_height: Pixels,
     busy: bool,
     on_compare: RowClickHandler,
+    on_impact: RowClickHandler,
 }
 
 impl RenderOnce for QueueRow {
@@ -446,6 +455,7 @@ impl RenderOnce for QueueRow {
         let muted = cx.theme().muted_foreground;
         let item = self.item;
         let on_compare = self.on_compare;
+        let on_impact = self.on_impact;
         let meta = row_meta(&item);
         let compare = Button::new(SharedString::from(format!("compare:{}", item.key)))
             .ghost()
@@ -454,6 +464,15 @@ impl RenderOnce for QueueRow {
             .tooltip(tr("preview.title"))
             .disabled(self.busy)
             .on_click(move |event, window, cx| on_compare(event, window, cx));
+        // A finished item has a measured size change to put in context.
+        let impact = matches!(item.status, ItemStatus::Done { .. }).then(|| {
+            Button::new(SharedString::from(format!("impact:{}", item.key)))
+                .ghost()
+                .xsmall()
+                .label(tr("impact.open"))
+                .tooltip(tr("impact.title"))
+                .on_click(move |event, window, cx| on_impact(event, window, cx))
+        });
         let path = item.path.clone();
         h_flex()
             .id(item.key.clone())
@@ -483,6 +502,7 @@ impl RenderOnce for QueueRow {
                     )
                     .child(div().text_xs().text_color(muted).truncate().child(meta)),
             )
+            .children(impact)
             .child(compare)
             .child(render_status(&item.status, cx))
     }
@@ -555,7 +575,9 @@ fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
                     .text_color(cx.theme().muted_foreground)
                     .child(format!("{percent:.0}%")),
             ),
-        ItemStatus::Done { in_size, out_size } => lane
+        ItemStatus::Done {
+            in_size, out_size, ..
+        } => lane
             .text_color(cx.theme().muted_foreground)
             .child(
                 Icon::new(IconName::CircleCheck)

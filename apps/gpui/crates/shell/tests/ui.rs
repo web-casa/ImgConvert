@@ -1040,6 +1040,188 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[gpui_kit::test]
+fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
+    use imgconvert_backend::environmental_impact::{ReplacementStatus, UnavailableReason};
+    use imgconvert_gpui_impact::{ImpactSubject, ScenarioOutcome};
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-gpui-impact-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    let input = dir.join("one.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+
+    cx.update(|cx| {
+        let models = AppModels::global(cx).clone();
+        models.queue().update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: input.to_string_lossy().into_owned(),
+                key: "one".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+    });
+    // No scenario command before the item finished.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("impact:one").is_none());
+        assert!(window.try_find("workflow-impact").is_none());
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let workflow = workspace.read(cx).workflow().clone();
+        workflow.update(cx, |workflow, cx| {
+            workflow.start_with_output_dir(dir.join("out"), Some("png".into()), cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    let (in_size, out_size) = cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        match &queue.item(&"one".into()).unwrap().status {
+            ItemStatus::Done {
+                in_size,
+                out_size,
+                comparable,
+            } => {
+                assert!(*comparable, "a single static PNG is comparable");
+                (*in_size, *out_size)
+            }
+            other => panic!("{other:?}"),
+        }
+    });
+
+    // The row's Scenario button opens the dialog for that item.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("impact:one", cx);
+    })
+    .unwrap();
+    let view = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .environmental_impact()
+            .expect("the dialog holds the scenario view")
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("impact-view").visible());
+        assert!(window.find("impact-measurement").visible());
+        assert!(window.find("impact-storage").visible());
+        // Local storage: bytes only, no estimate and no originals control.
+        assert!(window.try_find("impact-result").is_none());
+        assert!(window.try_find("impact-originals").is_none());
+        assert_eq!(view.read(cx).subject(), &ImpactSubject::Item("one".into()));
+        assert!(view.read(cx).is_comparable(cx));
+        assert_eq!(view.read(cx).outcome(cx), None);
+
+        view.update(cx, |view, cx| view.set_cloud(true, window, cx));
+        window.render_frame(cx);
+        assert!(window.find("impact-originals").visible());
+        assert!(window.find("impact-days").visible());
+        let outcome = view.read(cx).outcome(cx).expect("cloud scenario answers");
+        if out_size < in_size {
+            assert!(
+                matches!(outcome, ScenarioOutcome::Estimate { .. }),
+                "{outcome:?}"
+            );
+        } else {
+            assert_eq!(
+                outcome,
+                ScenarioOutcome::Unavailable(UnavailableReason::NoReduction)
+            );
+        }
+
+        // Retained originals never support a positive estimate; a blank or
+        // out-of-range day count is reported, not computed.
+        view.update(cx, |view, cx| {
+            view.set_replacement(ReplacementStatus::Retained, window, cx);
+        });
+        assert_eq!(
+            view.read(cx).outcome(cx),
+            Some(ScenarioOutcome::Unavailable(
+                UnavailableReason::OriginalRetained
+            ))
+        );
+        view.update(cx, |view, cx| {
+            view.set_replacement(ReplacementStatus::Confirmed, window, cx);
+            view.set_days("9999", window, cx);
+        });
+        assert_eq!(view.read(cx).outcome(cx), Some(ScenarioOutcome::Invalid));
+        view.update(cx, |view, cx| view.set_days("30", window, cx));
+        assert_ne!(view.read(cx).outcome(cx), Some(ScenarioOutcome::Invalid));
+        window.render_frame(cx);
+        assert!(window.find("impact-result").visible());
+        window.click("impact-close", cx);
+    })
+    .unwrap();
+    // The test's own handle would keep the entity alive; only the dialog
+    // may own it.
+    drop(view);
+    settle_animations(cx, handle);
+    cx.update(|cx| {
+        assert!(
+            workspace.read(cx).environmental_impact().is_none(),
+            "closing the dialog drops the view and its parameters"
+        );
+    });
+    // Reopening starts from the defaults again: local storage, no estimate.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("impact:one", cx);
+    })
+    .unwrap();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let reopened = workspace.read(cx).environmental_impact().expect("reopened");
+        assert_eq!(reopened.read(cx).outcome(cx), None);
+        assert!(window.try_find("impact-originals").is_none());
+        // The measurement line follows a locale switch like every string.
+        let english = window.find("impact-measurement").label().map(str::to_owned);
+        toggle_language(cx);
+        window.render_frame(cx);
+        let chinese = window.find("impact-measurement").label().map(str::to_owned);
+        assert_ne!(english, chinese);
+        assert!(
+            chinese
+                .as_deref()
+                .is_some_and(|text| text.starts_with("输出")),
+            "{chinese:?}"
+        );
+        toggle_language(cx);
+        window.render_frame(cx);
+        window.click("impact-close", cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+
+    // The action bar offers the batch scenario once a batch finished with a
+    // comparable result; it counts eligible and excluded results.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("workflow-impact").visible());
+        window.click("workflow-impact", cx);
+    })
+    .unwrap();
+    let batch_view = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .environmental_impact()
+            .expect("batch view")
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(batch_view.read(cx).subject(), &ImpactSubject::Batch);
+        assert_eq!(batch_view.read(cx).batch_counts(cx), Some((1, 0)));
+        assert!(window.find("impact-measurement").visible());
+        window.click("impact-close", cx);
+    })
+    .unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Pumps the test executor until the batch and its bridge are done. The
 /// backend runs on OS threads, so wall-clock waiting is unavoidable here.
 fn wait_for_batch_to_settle(cx: &mut TestAppContext) {

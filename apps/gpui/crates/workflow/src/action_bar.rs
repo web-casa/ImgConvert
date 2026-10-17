@@ -14,9 +14,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div,
+    App, Context, Entity, EventEmitter, FontWeight, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, div,
 };
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
@@ -25,6 +25,16 @@ use imgconvert_gpui_shared::{
 };
 
 use crate::workflow_panel::WorkflowPanel;
+
+/// Commands the bar issues that another feature fulfils; the shell routes
+/// them (feature crates never depend on each other).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionBarEvent {
+    /// Open the storage and environmental scenario for the finished batch.
+    BatchImpact,
+}
+
+impl EventEmitter<ActionBarEvent> for ActionBar {}
 
 pub struct ActionBar {
     panel: Entity<WorkflowPanel>,
@@ -142,6 +152,18 @@ impl Render for ActionBar {
         let choose_output_name: SharedString =
             format!("{}: {output_path}", tr("workflow.choose_output")).into();
         let (status_text, status_danger) = self.status(cx);
+        // A finished batch with comparable results can be put into the
+        // storage scenario; the shell decides what "comparable" means.
+        let batch_impact = matches!(batch.phase(), BatchPhase::Finished(_))
+            && queue.items().iter().any(|item| {
+                matches!(
+                    item.status,
+                    imgconvert_gpui_shared::ItemStatus::Done {
+                        comparable: true,
+                        ..
+                    }
+                )
+            });
         let muted = cx.theme().muted_foreground;
         let pill = ButtonRounded::Size(cx.theme().radius_full());
 
@@ -226,6 +248,19 @@ impl Render for ActionBar {
                         this.child(Progress::new("workflow-progress").value(percent))
                     }),
             )
+            .when(batch_impact, |this| {
+                this.child(
+                    Button::new("workflow-impact")
+                        .ghost()
+                        .small()
+                        .rounded(pill)
+                        .label(tr("impact.batch_open"))
+                        .tooltip(tr("impact.title"))
+                        .on_click(cx.listener(|_, _, _, cx| {
+                            cx.emit(ActionBarEvent::BatchImpact);
+                        })),
+                )
+            })
             .child(if active {
                 Button::new("workflow-cancel")
                     .danger()
