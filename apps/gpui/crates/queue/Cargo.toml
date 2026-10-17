@@ -11,8 +11,7 @@ rust-version.workspace = true
 gpui-kit.workspace = true
 imgconvert-backend.workspace = true
 imgconvert-gpui-shared.workspace = true
-# Same crate and major as GPUI; decodes the backend's PNG thumbnails into render frames.
-image = { version = "0.25", default-features = false, features = ["png"] }
+image.workspace = true
 
 [lints]
 workspace = true

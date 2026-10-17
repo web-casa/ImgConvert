@@ -503,3 +503,78 @@ workflow.metadata.preserve_all_description:
 workflow.invalid_configuration:
   en: Fix the highlighted settings before starting
   zh-CN: 开始前请先修正标红的设置
+preview.open:
+  en: Compare
+  zh-CN: 前后对比
+preview.title:
+  en: Before and after preview
+  zh-CN: 前后对比预览
+preview.pdf_page:
+  en: "PDF page %{page}"
+  zh-CN: "PDF 第 %{page} 页"
+preview.before:
+  en: Original
+  zh-CN: 原图
+preview.after:
+  en: Converted
+  zh-CN: 转换后
+preview.loading:
+  en: Generating an exact preview…
+  zh-CN: 正在生成精确预览…
+preview.refresh:
+  en: Refresh preview
+  zh-CN: 刷新预览
+preview.stale:
+  en: Conversion settings changed. Refresh to update the converted preview.
+  zh-CN: 转换设置已更改，请刷新以更新转换后预览。
+preview.close:
+  en: Close
+  zh-CN: 关闭
+preview.reveal:
+  en: Drag to compare before and after
+  zh-CN: 拖动查看转换前后
+preview.dimensions:
+  en: "%{width} × %{height}"
+  zh-CN: "%{width} × %{height}"
+preview.output_size:
+  en: "Estimated output %{size}"
+  zh-CN: "预计输出 %{size}"
+preview.quality:
+  en: "Selected quality %{quality}"
+  zh-CN: "实际质量 %{quality}"
+preview.target_met:
+  en: Target size reached
+  zh-CN: 已达到目标体积
+preview.target_not_met:
+  en: The target cannot be reached within the minimum-quality limit
+  zh-CN: 在最低质量限制内无法达到目标体积
+preview.error:
+  en: "Couldn’t generate the comparison preview: %{detail}"
+  zh-CN: "无法生成对比预览：%{detail}"
+preview.cancelled:
+  en: Preview cancelled
+  zh-CN: 预览已取消
+warning.output_backup_retained:
+  en: "Converted, but the previous output backup remains: %{path}"
+  zh-CN: "转换完成，但原输出备份仍保留在：%{path}"
+warning.modified_time_not_preserved:
+  en: "Converted, but the modified time could not be preserved: %{path}"
+  zh-CN: "转换完成，但未能保留修改时间：%{path}"
+warning.color_profile_converted_for_resize:
+  en: Pixels were converted to sRGB before resizing, and the now-invalid source ICC profile was removed.
+  zh-CN: 调整尺寸前已将像素转换为 sRGB，并移除不再匹配的原 ICC 配置。
+warning.invalid_color_profile_discarded:
+  en: The embedded ICC profile was invalid and was removed by the privacy policy. Pixels use their decoded values, so colours may differ from the source application.
+  zh-CN: 嵌入的 ICC 配置无效；已按隐私设置移除，像素按原始解码值输出，颜色可能与源应用不同。
+warning.invalid_color_profile_ignored_for_preview:
+  en: The embedded ICC profile is invalid. It remains in the converted file as requested, but this display preview uses the decoded pixel values without that profile.
+  zh-CN: 嵌入的 ICC 配置无效。转换文件会按设置继续保留该配置，但当前显示预览使用不含该配置的已解码像素。
+warning.target_size_not_met:
+  en: "Target %{target}; the smallest usable candidate was %{actual}, which could not reach the target within the minimum-quality limit."
+  zh-CN: "目标为 %{target}；已输出 %{actual} 的最小候选，但在最低质量限制内仍未达到目标。"
+warning.pdf_pages_skipped_existing:
+  en: "Kept %{count} existing page output(s)."
+  zh-CN: "已保留 %{count} 个已存在的页面文件。"
+warning.pdf_render_warnings:
+  en: "PDF page %{page} produced %{count} compatibility warning(s); some content may be missing."
+  zh-CN: "PDF 第 %{page} 页渲染时出现 %{count} 个兼容性警告，结果可能缺少部分内容。"

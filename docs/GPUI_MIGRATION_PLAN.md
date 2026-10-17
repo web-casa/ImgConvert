@@ -394,6 +394,22 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，0 项 P1、7 项 P2�
 - 已修（P3）：空字符串按 `Number("") === 0` 处理后夹到最小值；语言切换时重建选择的已提交项，辅助技术读到新语言。
 - 测试补充：同名预设各自可应用；聚焦质量滑杆后按键改变记录；分区在每种格式下渲染。
 
+进度（2026-10-17，第三片：前后对比预览，未经 Codex 评审）：
+
+- 新增功能 crate `crates/preview`（`imgconvert-gpui-preview`）：`ComparisonPreview` 实体 + `open_comparison_preview(key, window, cx)` 用 Kit `Dialog` 承载。生成走后端 `preview::generate_preview`（与批次相同的内存工作流，最长边 1200），在 GPUI 后台执行器上持 `BatchService::execution_gate()` 运行，`PreviewState::begin()` 让新请求取消旧请求；请求号丢弃迟到结果并释放其纹理。前后 PNG 由 shared 新增的 `images::decode_png` 解码为 `RenderImage`，关闭对话框时经 `observe_release` 释放 GPU 纹理并取消在途生成。
+- 对话框内容：原图与转换后两层 `img`（`ObjectFit::Contain`），转换后一层按 `reveal` 百分比裁剪（`relative(reveal)` 容器 + `relative(1/reveal)` 内图），白色分界线与"原图/转换后"角标；加载、错误、过期三种状态各自覆盖层或提示条；揭示滑杆同样套键盘容器；四格统计（前后尺寸、预计体积与实际质量、目标体积是否达成）与转换警告列表（`conversion::warning_texts` 移植 `formatConvertWarning`）。
+- 过期判定：观察 `SettingsModel`，以 `workflow_snapshot` + PDF 参数的 JSON 作签名，与打开/刷新时的基线不同即标记过期；队列项被移除时自动关闭。
+- 队列行新增"前后对比"幽灵按钮（忙碌时禁用），通过 `QueueViewEvent::ComparePreview` 交给 shell 路由，功能 crate 之间不互相依赖；护栏脚本把 `preview` 纳入分层检查。`Services` 增加 `PreviewState`。批次与预览共用的 `options_for_item` 移到 shared `conversion`。
+- 测试：UI 测试点击行按钮打开对话框，驱动一次真实生成（1×1 PNG → 默认 AVIF），断言尺寸、体积、图片就绪；改质量后标记过期，刷新后清除；关闭全部对话框后实体被释放。
+- 未做、记入后续：PDF 项的逐页预览选择（当前预览选区首页，与 Tauri 一致）；预览图在 HiDPI 下的像素级核对与 10k 队列下的内存观察（阶段 3 平台事项）。
+
+Codex 只读评审（2026-10-17，结论"修后可合并"，1 项 P1、5 项 P2，记录在 `artifacts/reviews/codex-stage3-preview-review-2026-10-17.md`）与处置：
+
+- 已修（P1）：生成改在专用 `std::thread` 上等待执行门与跑原生编码，GPUI 后台执行器只以 50 ms 定时轮询 `is_finished` 后 `join`，不再占用共享工作线程；`refresh` 在加载中直接返回，刷新按钮加载中禁用；进入执行门前后各检查一次取消；线程 panic 经 `join` 转为错误文案而不是杀死执行器工作线程。
+- 已修（P2）：设置观察器不再因加载中而忽略变化，结果落地时再比对一次签名，生成期间的改动会让落地结果直接带过期提示；批次开始时取消生成并关闭对话框（对应 Svelte `convertAll` 先关预览）；对话框正文改为 `overflow_y_scrollbar` 的有界滚动区，舞台高度与正文上限随窗口高度；揭示滑杆与设置表单的滑杆一样只在启用时才是 Tab stop 并处理按键。
+- 未采纳/受限：Kit 0.7.1 的 `Slider` 没有可访问名称 builder，名称仍挂在可聚焦容器上（已在代码注释中说明，随 Kit 升级复查）。
+- 测试补充：改用行按钮打开的那个对话框实体；加载中二次刷新不重复提交、加载中改设置后落地结果过期、禁用时按键不改变揭示值。
+
 门槛 G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成；MAS PKG 校验与 TestFlight 验收通过；完整候选测量不劣于基线。失败回退：继续发布 Tauri 0.3.x；设置备份保证降级可读。
 
 ### 阶段 4：Windows 与 Linux（6–7 周）

@@ -23,11 +23,9 @@ use gpui_kit::{
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, TestSupportExt as _, Window, div,
 };
-use imgconvert_backend::conversion_request::{
-    self, ConversionItem, output_suffix_for_request, quality_floor_for,
-};
 use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
+use imgconvert_gpui_shared::conversion::options_for_item;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
@@ -63,8 +61,6 @@ pub struct WorkflowPanel {
     settings: Entity<SettingsModel>,
     settings_form: Entity<SettingsForm>,
     formats: Vec<SharedString>,
-    /// Formats the core can write losslessly, from the capability matrix.
-    lossless_formats: Vec<String>,
     notice: Option<Notice>,
     _subscriptions: Vec<Subscription>,
 }
@@ -77,11 +73,6 @@ impl WorkflowPanel {
             .writable
             .iter()
             .map(|format| SharedString::from((*format).to_string()))
-            .collect();
-        let lossless_formats = capabilities
-            .lossless
-            .iter()
-            .map(|format| (*format).to_string())
             .collect();
         let settings_form = cx.new(|cx| SettingsForm::new(window, cx));
         let subscriptions = vec![
@@ -96,7 +87,6 @@ impl WorkflowPanel {
             settings: models.settings().clone(),
             settings_form,
             formats,
-            lossless_formats,
             notice: None,
             _subscriptions: subscriptions,
         }
@@ -206,14 +196,13 @@ impl WorkflowPanel {
 
     fn start_into(&mut self, dir: PathBuf, format: String, cx: &mut Context<Self>) {
         let settings = self.settings.read(cx).settings().clone();
-        let lossless_supported = self.lossless_formats.contains(&format);
         let (keys, options) = {
             let queue = self.queue.read(cx);
             let keys = queue.keys();
             let options = queue
                 .items()
                 .iter()
-                .map(|item| build_options(&settings, item, &dir, &format, lossless_supported))
+                .map(|item| build_options(&settings, item, &dir, &format))
                 .collect::<Vec<_>>();
             (keys, options)
         };
@@ -435,32 +424,18 @@ pub fn writable_formats() -> Vec<SharedString> {
 }
 
 /// Conversion options for one queue item from the persisted settings, the
-/// folder and format chosen in the panel. `settings.out_dir` is overridden by
-/// `out_dir` so a folder picked at start time applies even before the record
-/// is written.
+/// folder and format chosen in the panel (see `shared::conversion`).
 pub fn build_options(
     settings: &Settings,
     item: &QueueItem,
     out_dir: &Path,
     format: &str,
-    lossless_supported: bool,
 ) -> ConvertOptions {
-    let mut settings = settings.clone();
-    settings.out_dir = Some(out_dir.to_string_lossy().into_owned());
-    let conversion_item = ConversionItem::new(item.path.to_string())
-        .with_relative_dir(item.relative_dir.as_ref().map(ToString::to_string))
-        .with_source(
-            item.source_format.as_ref().map(ToString::to_string),
-            item.source_width,
-            item.source_height,
-        );
-    conversion_request::conversion_options_for(
-        &settings,
-        &conversion_item,
-        format,
-        quality_floor_for(&settings, format),
-        lossless_supported,
-        output_suffix_for_request(&settings).as_deref(),
+    options_for_item(
+        settings,
+        item,
+        Some(&out_dir.to_string_lossy()),
+        Some(format),
     )
 }
 
@@ -485,13 +460,7 @@ mod tests {
         settings.quality = 66;
         settings.output_suffix_enabled = true;
         settings.output_suffix = "_web".into();
-        let options = build_options(
-            &settings,
-            &item("/in/a.png"),
-            Path::new("/out"),
-            "webp",
-            true,
-        );
+        let options = build_options(&settings, &item("/in/a.png"), Path::new("/out"), "webp");
         assert_eq!(options.input, "/in/a.png");
         assert_eq!(options.out_dir.as_deref(), Some("/out"));
         assert_eq!(options.relative_dir.as_deref(), Some("sub"));
@@ -509,20 +478,8 @@ mod tests {
     fn lossless_needs_core_support_for_the_format() {
         let mut settings = Settings::default();
         settings.lossless = true;
-        let supported = build_options(
-            &settings,
-            &item("/in/a.png"),
-            Path::new("/out"),
-            "webp",
-            true,
-        );
-        let unsupported = build_options(
-            &settings,
-            &item("/in/a.png"),
-            Path::new("/out"),
-            "jpeg",
-            false,
-        );
+        let supported = build_options(&settings, &item("/in/a.png"), Path::new("/out"), "webp");
+        let unsupported = build_options(&settings, &item("/in/a.png"), Path::new("/out"), "jpeg");
         assert!(supported.lossless);
         assert!(!unsupported.lossless);
     }

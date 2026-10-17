@@ -3,6 +3,7 @@
 
 //! UI integration tests: the real workspace in a headless window.
 
+use gpui_kit::component::WindowExt as _;
 use gpui_kit::test::TestWindowExt;
 use gpui_kit::{AppContext, Bounds, TestAppContext, WindowBounds, WindowOptions, px, size};
 use imgconvert_backend::settings::{AppLocale, Settings};
@@ -307,6 +308,169 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
         window.render_frame(cx);
     })
     .unwrap();
+}
+
+#[gpui_kit::test]
+fn comparison_preview_generates_marks_stale_and_releases(cx: &mut TestAppContext) {
+    use imgconvert_gpui_preview::ComparisonPreview;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!(
+        "imgconvert-gpui-preview-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("one.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().clone();
+        queue.update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: input.to_string_lossy().into_owned(),
+                key: "one".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+    });
+
+    // Holding the backend's execution gate keeps the generation parked, so
+    // the loading-time behaviour below is deterministic.
+    let gate = cx.update(|cx| {
+        imgconvert_gpui_shared::Services::global(cx)
+            .batch()
+            .execution_gate()
+            .handle()
+    });
+    let held_gate = gate.lock().unwrap();
+
+    // The row's Compare button opens the dialog and starts generating.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("compare:one").visible());
+        window.click("compare:one", cx);
+    })
+    .unwrap();
+    // The row emits an event; the workspace opens the dialog once effects flush.
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx));
+        assert!(window.find("comparison-preview").visible());
+    })
+    .unwrap();
+    let preview = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .comparison_preview()
+            .expect("the row opened a preview")
+    });
+    // While the first generation runs: a second refresh is ignored, a
+    // settings change is remembered, and the disabled reveal takes no keys.
+    cx.update_window(handle, |_, window, cx| {
+        assert!(preview.read(cx).is_loading());
+        assert_eq!(preview.read(cx).request_id(), 1);
+        preview.update(cx, ComparisonPreview::refresh);
+        assert_eq!(preview.read(cx).request_id(), 1, "no duplicate submission");
+        let settings = AppModels::global(cx).settings().clone();
+        settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| s.quality = 44);
+        });
+        window.render_frame(cx);
+        window.press("end", cx);
+        assert!((preview.read(cx).reveal() - 50.).abs() < f32::EPSILON);
+    })
+    .unwrap();
+    drop(held_gate);
+    wait_for_preview(cx, &preview);
+    cx.update(|cx| {
+        assert!(
+            preview.read(cx).is_stale(),
+            "a change during generation marks the landed result stale"
+        );
+    });
+    cx.update(|cx| preview.update(cx, ComparisonPreview::refresh));
+    wait_for_preview(cx, &preview);
+    cx.update(|cx| {
+        let preview = preview.read(cx);
+        assert_eq!(preview.error(), None, "{:?}", preview.error());
+        let summary = preview.summary().expect("summary");
+        assert_eq!((summary.source_width, summary.source_height), (1, 1));
+        assert_eq!((summary.output_width, summary.output_height), (1, 1));
+        assert!(summary.output_size > 0);
+        assert!(preview.has_images());
+        assert!(!preview.is_stale());
+    });
+
+    // An output-affecting settings change marks the result stale; a refresh
+    // regenerates and clears the flag.
+    cx.update(|cx| {
+        let settings = AppModels::global(cx).settings().clone();
+        settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| s.quality = 33);
+        });
+    });
+    // Observers run when effects flush, after the update above returns.
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert!(preview.read(cx).is_stale());
+        preview.update(cx, ComparisonPreview::refresh);
+        assert!(preview.read(cx).is_loading());
+    });
+    wait_for_preview(cx, &preview);
+    cx.update(|cx| {
+        assert!(!preview.read(cx).is_stale());
+        assert!(preview.read(cx).has_images());
+    });
+
+    // Closing the dialog releases the preview entity.
+    let weak = preview.downgrade();
+    drop(preview);
+    cx.update_window(handle, |_, window, cx| {
+        window.close_all_dialogs(cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert!(!window_has_dialog(cx, handle));
+        assert!(weak.upgrade().is_none(), "the dialog owned the preview");
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn window_has_dialog(cx: &mut gpui_kit::App, handle: gpui_kit::AnyWindowHandle) -> bool {
+    use gpui_kit::component::WindowExt as _;
+    cx.update_window(handle, |_, window, cx| window.has_active_dialog(cx))
+        .unwrap_or(false)
+}
+
+/// Pumps the executor until the preview finished generating (the backend
+/// runs on the background executor; the timer wakes the foreground).
+fn wait_for_preview(
+    cx: &mut TestAppContext,
+    preview: &gpui_kit::Entity<imgconvert_gpui_preview::ComparisonPreview>,
+) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
+    loop {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        if !cx.update(|cx| preview.read(cx).is_loading()) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "preview never finished"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 }
 
 /// Renders frames while advancing the test clock past Kit's spring motions.

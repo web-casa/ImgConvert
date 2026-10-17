@@ -9,4 +9,4 @@ pub mod import;
 pub mod queue_view;
 pub mod thumbnails;
 
-pub use queue_view::QueueView;
+pub use queue_view::{QueueView, QueueViewEvent};
