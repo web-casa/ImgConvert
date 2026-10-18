@@ -69,7 +69,19 @@ pub fn start_batch(
 
     // 2. The backend batch. Dropping `sink` on failure closes the channel.
     perf_probe::mark_count("batch_start", jobs.len());
-    let running = match services.batch().start(options, sink, concurrency) {
+    let protected_inputs = models
+        .queue()
+        .read(cx)
+        .items()
+        .iter()
+        .map(|item| item.path.to_string())
+        .collect();
+    let running = match services.batch().start_with_protected_inputs(
+        options,
+        sink,
+        concurrency,
+        protected_inputs,
+    ) {
         Ok(running) => running,
         Err(error) => {
             perf_probe::mark_count("batch_failed", 0);
@@ -79,7 +91,9 @@ pub fn start_batch(
     let id = running.id();
 
     // 3. Models and the foreground pump.
-    models.queue().update(cx, |queue, _| queue.reset_statuses());
+    models
+        .queue()
+        .update(cx, |queue, _| queue.reset_statuses(&jobs));
     models.batch().update(cx, |batch, cx| {
         batch.begin(id, jobs.clone());
         cx.notify();
@@ -214,14 +228,15 @@ fn settle(
             });
         }
         Err(error) => {
-            let detail = SharedString::from(error.to_string());
+            let error =
+                imgconvert_backend::command_error::CommandError::batch_failed(error.to_string());
             perf_probe::mark_count("batch_failed", batch.read(cx).completed());
             queue.update(cx, |queue, cx| {
-                queue.fail_unfinished(jobs, &detail);
+                queue.fail_unfinished(jobs, &error);
                 cx.notify();
             });
             batch.update(cx, |batch, cx| {
-                batch.fail(detail);
+                batch.fail(crate::command_error::format_command_error(&error));
                 cx.notify();
             });
         }

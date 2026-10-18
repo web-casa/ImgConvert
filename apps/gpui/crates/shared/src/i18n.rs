@@ -84,20 +84,38 @@ pub fn tr(key: &str) -> SharedString {
 
 /// Looks a key up and substitutes `%{name}` placeholders.
 pub fn tr_with(key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> SharedString {
-    let mut text = rust_i18n::t!(key).into_owned();
-    for (name, value) in args {
-        text = text.replace(&format!("%{{{name}}}"), &value.to_string());
-    }
-    SharedString::from(text)
+    let template = rust_i18n::t!(key);
+    SharedString::from(interpolate(&template, args))
 }
+
+fn interpolate(template: &str, args: &[(&str, &dyn std::fmt::Display)]) -> String {
+    let mut text = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find("%{") {
+        text.push_str(&rest[..start]);
+        let placeholder = &rest[start..];
+        let Some(end) = placeholder.find('}') else {
+            text.push_str(placeholder);
+            return text;
+        };
+        let name = &placeholder[2..end];
+        if let Some((_, value)) = args.iter().find(|(key, _)| *key == name) {
+            text.push_str(&value.to_string());
+        } else {
+            text.push_str(&placeholder[..=end]);
+        }
+        rest = &placeholder[end + 1..];
+    }
+    text.push_str(rest);
+    text
+}
+
+#[cfg(test)]
+pub(crate) static LOCALE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-
-    /// The locale is process-wide; tests that change it must not overlap.
-    static LOCALE_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn both_locales_resolve_the_same_keys() {
@@ -112,6 +130,50 @@ mod tests {
     }
 
     #[test]
+    fn every_app_key_has_both_locales_and_matching_placeholders() {
+        let _guard = LOCALE_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let source = include_str!("../locales/app.yml");
+        for line in source
+            .lines()
+            .filter(|line| !line.starts_with([' ', '#', '_']) && line.ends_with(':'))
+        {
+            let key = line.trim_end_matches(':');
+            let english = rust_i18n::t!(key, locale = "en");
+            let chinese = rust_i18n::t!(key, locale = "zh-CN");
+            assert_ne!(english, key, "missing English: {key}");
+            assert_ne!(chinese, key, "missing Chinese: {key}");
+            let tokens = |text: &str| -> std::collections::BTreeSet<String> {
+                text.split("%{")
+                    .skip(1)
+                    .filter_map(|part| part.split_once('}').map(|(name, _)| name.to_owned()))
+                    .collect()
+            };
+            assert_eq!(tokens(&english), tokens(&chinese), "{key}");
+            // Check explicit locale entries, too: English fallback must not
+            // conceal a missing Chinese translation.
+            let block = source
+                .split_once(&format!("{key}:\n"))
+                .unwrap()
+                .1
+                .split("\n\n")
+                .next()
+                .unwrap();
+            assert!(
+                block
+                    .lines()
+                    .take_while(|line| line.starts_with("  "))
+                    .any(|line| line.starts_with("  zh-CN:")),
+                "{key}"
+            );
+        }
+        set_locale(Locale::SimplifiedChinese);
+        assert_eq!(&*gpui_kit::component::locale(), "zh-CN");
+        set_locale(Locale::English);
+    }
+
+    #[test]
     fn placeholders_are_substituted() {
         let _guard = LOCALE_LOCK
             .lock()
@@ -119,6 +181,17 @@ mod tests {
         set_locale(Locale::English);
         let text = tr_with("queue.item_count", &[("count", &42)]);
         assert_eq!(text.as_ref(), "42 items");
+    }
+
+    #[test]
+    fn interpolation_preserves_values_and_unknown_tokens_literally() {
+        assert_eq!(
+            interpolate(
+                "%{path}: %{count} / %{count} {count} %{unknown} %{",
+                &[("path", &"%{count}.png"), ("count", &42)]
+            ),
+            "%{count}.png: 42 / 42 {count} %{unknown} %{"
+        );
     }
 
     #[test]

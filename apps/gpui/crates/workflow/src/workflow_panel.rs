@@ -25,7 +25,7 @@ use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
 use imgconvert_gpui_shared::conversion::options_for_item;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
-use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
 use imgconvert_gpui_shared::tasks;
 use imgconvert_gpui_shared::{AppModels, QueueItem, QueueModel, SettingsModel};
@@ -53,9 +53,9 @@ impl Notice {
             Self::AlreadyRunning => tr("workflow.already_running"),
             Self::InvalidConfiguration => tr("workflow.invalid_configuration"),
             Self::Planning => tr("safety.planning"),
-            Self::PlanFailed(detail) => tr_with("safety.plan_failed", &[("detail", detail)]),
+            Self::PlanFailed(_detail) => tr("errors.outputSafetyCheckFailedGeneric"),
             Self::RestartNeeded => tr("safety.restart_needed"),
-            Self::Failed(detail) => tr_with("workflow.failed", &[("detail", detail)]),
+            Self::Failed(_detail) => tr("errors.batchFailed"),
         }
     }
 }
@@ -75,11 +75,18 @@ pub struct WorkflowPanel {
     formats: Vec<SharedString>,
     /// Output paths are being planned or confirmed; Start is disabled.
     planning: bool,
+    output_session_grant: Option<PathBuf>,
     /// The start waiting for its decisions, owned here so the panel can tear
     /// it down (the dialog callbacks only borrow it).
     pending_start: Option<PendingHandle>,
     notice: Option<Notice>,
     _subscriptions: Vec<Subscription>,
+}
+
+/// A saved path is not a fresh sandbox grant. The picker must authorize this
+/// exact directory again on platforms requiring a per-session selection.
+fn output_grant_valid(required: bool, dir: &Path, granted: Option<&Path>) -> bool {
+    !required || granted == Some(dir)
 }
 
 impl WorkflowPanel {
@@ -106,6 +113,7 @@ impl WorkflowPanel {
             settings_form,
             formats,
             planning: false,
+            output_session_grant: None,
             pending_start: None,
             notice: None,
             _subscriptions: subscriptions,
@@ -129,6 +137,7 @@ impl WorkflowPanel {
     /// Sets and persists the output folder without a prompt (the picker
     /// callback, tests and the perf probe).
     pub fn set_output_dir(&mut self, dir: PathBuf, cx: &mut Context<Self>) {
+        self.output_session_grant = Some(dir.clone());
         let dir = dir.to_string_lossy().into_owned();
         self.settings.update(cx, |settings, cx| {
             settings.update(cx, |settings| settings.out_dir = Some(dir));
@@ -187,7 +196,14 @@ impl WorkflowPanel {
         if self.planning {
             return;
         }
-        if let Some(dir) = self.output_dir(cx) {
+        let access = imgconvert_backend::access::runtime_file_access();
+        if let Some(dir) = self.output_dir(cx).filter(|dir| {
+            output_grant_valid(
+                access.requires_output_directory_session_grant,
+                dir,
+                self.output_session_grant.as_deref(),
+            )
+        }) {
             let format = self.selected_format(cx).to_string();
             self.start_with_safety_checks(dir, format, window, cx);
             return;
@@ -237,8 +253,15 @@ impl WorkflowPanel {
         self.notice = Some(Notice::Planning);
         cx.notify();
         let plan_options = options.clone();
+        let protected_inputs: Vec<_> = self
+            .queue
+            .read(cx)
+            .items()
+            .iter()
+            .map(|item| item.path.to_string())
+            .collect();
         let planned = tasks::run_blocking("imgconvert-plan", cx, move || {
-            convert::conversion_plan(&plan_options)
+            convert::conversion_plan_with_protected_inputs(&plan_options, &protected_inputs)
         });
         cx.spawn_in(window, async move |this, cx| {
             let plan = planned.await;
@@ -314,7 +337,7 @@ impl WorkflowPanel {
         cx.notify();
     }
 
-    /// The jobs a batch would submit: every queue item, in queue order.
+    /// The jobs a batch would submit: unfinished queue items, in queue order.
     fn prepare_jobs(
         &self,
         dir: &Path,
@@ -323,10 +346,14 @@ impl WorkflowPanel {
     ) -> (Vec<SharedString>, Vec<ConvertOptions>, Option<usize>) {
         let settings = self.settings.read(cx).settings().clone();
         let queue = self.queue.read(cx);
-        let keys = queue.keys();
-        let options = queue
+        let pending: Vec<_> = queue
             .items()
             .iter()
+            .filter(|item| item.is_pending_conversion())
+            .collect();
+        let keys = pending.iter().map(|item| item.key.clone()).collect();
+        let options = pending
+            .into_iter()
             .map(|item| build_options(&settings, item, dir, format))
             .collect::<Vec<_>>();
         let concurrency = match settings.concurrency {
@@ -476,6 +503,17 @@ pub fn build_options(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn persisted_output_path_does_not_grant_session_access() {
+        use super::output_grant_valid;
+        use std::path::Path;
+        let dir = Path::new("/chosen");
+        assert!(!output_grant_valid(true, dir, None));
+        assert!(!output_grant_valid(true, dir, Some(Path::new("/other"))));
+        assert!(output_grant_valid(true, dir, Some(dir)));
+        assert!(output_grant_valid(false, dir, None));
+    }
+
     use super::*;
 
     fn item(path: &str) -> QueueItem {

@@ -320,7 +320,7 @@ impl SettingsForm {
         let locale = Locale::current();
 
         let format = Choice::new(
-            format_items(&capabilities.writable),
+            format_items(&capabilities.writable, models.queue().read(cx).items()),
             &settings.format,
             window,
             cx,
@@ -412,7 +412,10 @@ impl SettingsForm {
             .collect();
 
         let mut subscriptions = vec![
-            cx.observe(models.queue(), |_, _, cx| cx.notify()),
+            cx.observe_in(models.queue(), window, |this, _, window, cx| {
+                this.sync_controls(window, cx);
+                cx.notify();
+            }),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
             cx.observe_in(models.settings(), window, |this, _, window, cx| {
                 this.sync_controls(window, cx);
@@ -669,7 +672,11 @@ impl SettingsForm {
             return vec![settings.format.as_str()];
         }
         let mut formats = Vec::new();
-        for item in queue.items() {
+        for item in queue
+            .items()
+            .iter()
+            .filter(|item| item.is_pending_conversion())
+        {
             let format = item.target_format.as_deref().unwrap_or(&settings.format);
             if !formats.contains(&format) {
                 formats.push(format);
@@ -697,18 +704,7 @@ impl SettingsForm {
     /// The first page-range error among the PDF items a batch would submit.
     fn pdf_range_error_for_batch(&self, cx: &App) -> Option<PdfPageRangeError> {
         let settings = self.settings.read(cx).settings();
-        self.queue
-            .read(cx)
-            .items()
-            .iter()
-            .filter(|item| item.is_pdf())
-            .find_map(|item| {
-                conversion_request::validate_pdf_page_range(
-                    &settings.pdf_page_range,
-                    item.page_count,
-                )
-                .err()
-            })
+        pdf_range_error_for_items(settings, self.queue.read(cx).items())
     }
 
     /// What the PDF section shows: the batch error when there are PDF
@@ -1026,7 +1022,10 @@ impl SettingsForm {
         self.syncing = true;
 
         self.format.sync(
-            format_items(&self.capabilities.writable),
+            format_items(
+                &self.capabilities.writable,
+                AppModels::global(cx).queue().read(cx).items(),
+            ),
             &settings.format,
             window,
             cx,
@@ -1690,8 +1689,8 @@ impl SettingsForm {
                 false,
                 cx,
             )),
-            CacheClear::Failed(detail) => Some(Self::hint(
-                tr_with("settings.clear_result_cache_failed", &[("detail", detail)]),
+            CacheClear::Failed(_detail) => Some(Self::hint(
+                tr("settings.clear_result_cache_failed_generic"),
                 true,
                 cx,
             )),
@@ -2192,7 +2191,11 @@ impl SettingsForm {
 }
 
 impl Render for SettingsForm {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Locale is global and can change without a settings notification.
+        if self.locale != Locale::current() {
+            self.sync_controls(window, cx);
+        }
         let settings = self.snapshot(cx);
         let busy = self.is_busy(cx);
         v_flex()
@@ -2227,10 +2230,26 @@ const METADATA_POLICIES: [MetadataPolicy; 3] = [
     MetadataPolicy::PreserveAll,
 ];
 
-fn format_items(formats: &[String]) -> Vec<ChoiceItem> {
+fn format_items(
+    formats: &[String],
+    items: &[imgconvert_gpui_shared::QueueItem],
+) -> Vec<ChoiceItem> {
     formats
         .iter()
-        .map(|format| ChoiceItem::new(format.clone(), format.to_ascii_uppercase()))
+        .map(|format| {
+            let label = if items
+                .iter()
+                .any(|item| item.source_format_hint() == Some(format.as_str()))
+            {
+                tr_with(
+                    "queue.source_format",
+                    &[("format", &format.to_ascii_uppercase())],
+                )
+            } else {
+                format.to_ascii_uppercase().into()
+            };
+            ChoiceItem::new(format.clone(), label)
+        })
         .collect()
 }
 
@@ -2379,5 +2398,57 @@ fn pdf_error_text(error: &PdfPageRangeError) -> SharedString {
         }
         // `Invalid` and any variant a newer backend adds.
         _ => tr("workflow.pdf_range_invalid"),
+    }
+}
+
+fn pdf_range_error_for_items(
+    settings: &Settings,
+    items: &[imgconvert_gpui_shared::QueueItem],
+) -> Option<PdfPageRangeError> {
+    items
+        .iter()
+        .filter(|item| item.is_pdf() && item.is_pending_conversion())
+        .find_map(|item| {
+            conversion_request::validate_pdf_page_range(&settings.pdf_page_range, item.page_count)
+                .err()
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn completed_pdf_does_not_limit_the_next_batch_page_range() {
+        let mut queue = QueueModel::default();
+        queue.add_files(
+            [("old", 1), ("new", 2)]
+                .into_iter()
+                .map(|(key, pages)| imgconvert_backend::import::ImportScanFile {
+                    key: key.into(),
+                    path: format!("/fixture/{key}.pdf"),
+                    relative_dir: None,
+                    metadata: Some(imgconvert_backend::import::ImportImageMetadata {
+                        format: "pdf".into(),
+                        width: 150,
+                        height: 150,
+                        dpi_x: None,
+                        dpi_y: None,
+                        page_count: Some(pages),
+                    }),
+                })
+                .collect(),
+        );
+        let mut items = queue.items().to_vec();
+        let mut settings = Settings::default();
+        settings.pdf_page_range = "2".into();
+        assert!(pdf_range_error_for_items(&settings, &items).is_some());
+        items[0].status = imgconvert_gpui_shared::ItemStatus::Done {
+            in_size: 1,
+            out_size: 1,
+            comparable: false,
+        };
+        assert!(pdf_range_error_for_items(&settings, &items).is_none());
+        items[0].status = imgconvert_gpui_shared::ItemStatus::Pending;
+        assert!(pdf_range_error_for_items(&settings, &items).is_some());
     }
 }

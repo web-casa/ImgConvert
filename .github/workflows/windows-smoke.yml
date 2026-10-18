@@ -291,10 +291,10 @@ jobs:
       - name: Native clipboard import tests
         run: cargo +1.96.0 test -p imgconvert-platform --features clipboard --lib clipboard -- --include-ignored
 
-      - name: Atomic output commit tests (platform + backend)
+      - name: Output safety tests (platform + backend)
         run: |
           cargo +1.96.0 test -p imgconvert-platform --lib atomic_output
-          cargo +1.96.0 test -p imgconvert-backend --lib -- write_output atomic_commit modified_time
+          cargo +1.96.0 test -p imgconvert-backend --lib -- write_output atomic_commit modified_time retained_sources
 
       - name: Windows runtime smoke
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.build_direct }}
