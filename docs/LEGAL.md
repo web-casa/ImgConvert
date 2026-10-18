@@ -98,6 +98,8 @@
 
 ## 合规自动化与审计范围
 
+- GPUI 归属由独立锁文件生成，`pnpm run license:gpui` / `license:gpui:verify`；原生库及图标的实际版权、NOTICE、专利文本复核见 [GPUI_LICENSE_AUDIT.md](GPUI_LICENSE_AUDIT.md)。该清单完整嵌入 GPUI 许可页，不复用 Tauri/npm 清单。
+
 - `src-tauri/deny.toml`(cargo-deny)**禁止 GPL/AGPL/LGPL**,只放行宽松许可;CI 自动运行 `pnpm run license:rust`。
 - `pnpm run architecture:check` 作为额外静态护栏,检查主包依赖名、关键 crate feature、HEIC read-only/主包不内置、store build 禁外部 helper、Flatpak 主包不捆绑 `libheif`/`x265`/helper 和文件访问授权抽象。它不能替代 `cargo deny`,但能防止常见架构红线被配置改动绕开。
 - RustSec advisory gate 有显式上游例外清单:`src-tauri/deny.toml` 与 `scripts/audit-rust-advisories.mjs` 必须同步。例外只覆盖当前 Tauri GTK3/WebKitGTK、Tauri `plist -> quick-xml` 配置解析链和 rav1e/libavif 构建链的已知 ID;不得用它放行新 codec 输入解析漏洞或新增 GPL/AGPL/LGPL 依赖。

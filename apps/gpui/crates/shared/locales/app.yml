@@ -1144,3 +1144,28 @@ queue.clipboard_unavailable:
 queue.clipboard_image_failed:
   en: Couldn’t read the image. Copy a supported image within the size limits and try again.
   zh-CN: 无法读取图片。请复制未超出大小限制的受支持图片后重试。
+
+legal.privacy_open:
+  en: Privacy…
+  zh-CN: 隐私…
+legal.licenses_open:
+  en: About…
+  zh-CN: 关于…
+legal.privacy_title:
+  en: Privacy and support
+  zh-CN: 隐私与支持
+legal.licenses_title:
+  en: About and licenses
+  zh-CN: 关于与开源许可
+legal.offline_policy:
+  en: Read the privacy policy included with this app. The support link opens your browser.
+  zh-CN: 阅读此应用附带的隐私政策。支持链接会打开浏览器。
+legal.version:
+  en: "ImgConvert %{version} · Apache-2.0 · Project and third-party license texts"
+  zh-CN: "ImgConvert %{version} · Apache-2.0 · 项目与第三方许可全文"
+legal.support:
+  en: Support on GitHub
+  zh-CN: GitHub 项目支持
+legal.close:
+  en: Close
+  zh-CN: 关闭

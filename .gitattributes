@@ -1,0 +1,6 @@
+# Preserve pinned license text hashes and generated attribution bytes on Windows.
+/apps/gpui/THIRD_PARTY_LICENSES.md text eol=lf
+/apps/gpui/licenses/** text eol=lf
+# Bundled policy documents have the same bytes on every desktop platform.
+/PRIVACY.md text eol=lf
+/PRIVACY.en.md text eol=lf
