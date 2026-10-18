@@ -9,10 +9,13 @@ publish = false
 [features]
 # Exposes the manifest parser to cargo-fuzz and corpus replay. Never enabled in app builds.
 fuzzing = []
+clipboard = ["dep:arboard"]
 update-guard = ["dep:ash", "dep:os_info"]
 
 [dependencies]
 imgconvert-core = { path = "../imgconvert-core" }
+# Native clipboard I/O runs on a worker, independent of GPUI's UI thread.
+arboard = { version = "=3.7.0", features = ["wayland-data-control"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Same major as Tauri 2.11 so the settings directory resolves identically.

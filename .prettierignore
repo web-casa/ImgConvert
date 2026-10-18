@@ -23,3 +23,6 @@ src-tauri/gen
 Cargo.lock
 src-tauri/Cargo.lock
 pnpm-lock.yaml
+
+# Preserve upstream dependency formatting and full license texts.
+vendor/

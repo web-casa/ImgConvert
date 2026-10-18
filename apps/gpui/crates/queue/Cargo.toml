@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
-imgconvert-backend.workspace = true
+imgconvert-backend = { workspace = true, features = ["clipboard"] }
 imgconvert-gpui-shared.workspace = true
 image.workspace = true
 

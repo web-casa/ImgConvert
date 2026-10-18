@@ -73,11 +73,13 @@ impl Workspace {
             window.observe_window_appearance(|window, cx| theme::apply(Some(window), cx)),
         ];
         theme::apply(Some(window), cx);
+        let focus_handle = cx.focus_handle();
+        window.focus(&focus_handle, cx);
         Self {
             queue_view,
             workflow,
             action_bar,
-            focus_handle: cx.focus_handle(),
+            focus_handle,
             comparison_preview: None,
             plugin_diagnostics: None,
             environmental_impact: None,
@@ -217,6 +219,9 @@ impl Render for Workspace {
             .id("workspace")
             .test_support()
             .key_context("Workspace")
+            .on_action(|_: &gpui_kit::component::input::Paste, _, cx| {
+                imgconvert_gpui_queue::clipboard::paste(cx);
+            })
             .track_focus(&self.focus_handle)
             .relative()
             .size_full()

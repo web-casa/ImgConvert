@@ -4,3 +4,7 @@
 resolver = "2"
 members = ["crates/imgconvert-core", "crates/imgconvert-platform", "crates/imgconvert-backend"]
 exclude = ["src-tauri", "fuzz"]
+
+[patch.crates-io]
+# Narrow file-list fixes; origin and patch notes are in vendor/arboard/IMGCONVERT_PATCHES.md.
+arboard = { path = "vendor/arboard" }

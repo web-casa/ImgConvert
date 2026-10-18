@@ -1316,3 +1316,407 @@ fn updates_dialog_explains_manual_preview_updates_and_escape_closes_it(cx: &mut 
     })
     .unwrap();
 }
+
+fn clipboard_bitmap() -> gpui_kit::ClipboardItem {
+    gpui_kit::ClipboardItem::new_image(&gpui_kit::Image::from_bytes(
+        gpui_kit::ImageFormat::Png,
+        one_by_one_png(),
+    ))
+}
+
+fn wait_for_import(cx: &mut TestAppContext) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        cx.run_until_parked();
+        if !cx.update(|cx| AppModels::global(cx).queue().read(cx).is_importing()) {
+            return;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "clipboard import never finished"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+#[gpui_kit::test]
+fn clipboard_bitmap_button_imports_metadata_and_clears_only_managed_files(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace_sized(cx, size(px(760.), px(480.)));
+    cx.update(|cx| cx.write_to_clipboard(clipboard_bitmap()));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-paste", cx);
+        assert!(AppModels::global(cx).queue().read(cx).is_importing());
+        // A repeated command in the same frame cannot create a second image.
+        imgconvert_gpui_queue::clipboard::paste(cx);
+        imgconvert_gpui_queue::import::import_paths(vec!["/not-scanned".into()], cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    let path = cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        let item = queue.item_at(0).unwrap();
+        assert_eq!(item.source_format.as_deref(), Some("png"));
+        assert_eq!((item.source_width, item.source_height), (Some(1), Some(1)));
+        std::path::PathBuf::from(item.path.as_ref())
+    });
+    assert_eq!(std::fs::read(&path).unwrap(), one_by_one_png());
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("queue-feedback").label(), Some("Added 1 files"));
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(
+        !path.exists(),
+        "clearing the queue cleans its managed image"
+    );
+    assert!(
+        !path.parent().unwrap().exists(),
+        "the marked session is cleaned too"
+    );
+}
+
+#[gpui_kit::test]
+fn clipboard_shortcut_imports_native_and_text_file_paths_without_deleting_sources(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::{ClipboardEntry, ClipboardItem, ClipboardString, ExternalPaths};
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-clipboard-ui-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("photo with spaces.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        cx.write_to_clipboard(ClipboardItem {
+            entries: vec![
+                ClipboardEntry::ExternalPaths(ExternalPaths(
+                    vec![input.clone(), input.clone()].into(),
+                )),
+                ClipboardEntry::String(ClipboardString::new("ignored text".into())),
+                ClipboardEntry::Image(gpui_kit::Image::empty()),
+            ],
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.press("secondary-v", cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    cx.update(|cx| {
+        assert_eq!(AppModels::global(cx).queue().read(cx).len(), 1);
+        let uri_path = input
+            .to_str()
+            .unwrap()
+            .replace('\\', "/")
+            .replace(' ', "%20");
+        let uri = if cfg!(windows) {
+            format!("file:///{uri_path}")
+        } else {
+            format!("file://{uri_path}")
+        };
+        cx.write_to_clipboard(ClipboardItem::new_string(format!(
+            "copy\n# paths\n{uri}\n{uri}\nhttps://example.com/a.png"
+        )));
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        // Native Edit > Paste dispatches this same standard action.
+        window.dispatch_action(Box::new(gpui_kit::component::input::Paste), cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(
+            queue.feedback(),
+            &imgconvert_gpui_shared::queue_model::ImportFeedback::Nothing,
+            "the file URL resolves to the same queued file"
+        );
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(
+        input.exists(),
+        "ordinary clipboard file paths remain user-owned"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn clipboard_empty_invalid_partial_and_cancelled_imports_leave_a_usable_queue(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::{ClipboardEntry, ClipboardItem, Image, ImageFormat};
+    use imgconvert_gpui_shared::queue_model::ImportFeedback;
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    cx.update(|cx| {
+        cx.write_to_clipboard(ClipboardItem::new_string("ordinary text".into()));
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("queue-feedback")
+                .label()
+                .unwrap()
+                .contains("Copy an image")
+        );
+    })
+    .unwrap();
+    cx.update(|cx| {
+        cx.write_to_clipboard(ClipboardItem::new_image(&Image::from_bytes(
+            ImageFormat::Png,
+            vec![1, 2],
+        )));
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert!(queue.is_empty());
+        assert!(matches!(queue.feedback(), ImportFeedback::Failed(_)));
+        cx.write_to_clipboard(clipboard_bitmap());
+        imgconvert_gpui_queue::clipboard::paste(cx);
+        assert!(imgconvert_gpui_queue::import::cancel_import(cx));
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert!(queue.is_empty());
+        assert_eq!(queue.feedback(), &ImportFeedback::Cancelled);
+        let mut entries = clipboard_bitmap().entries;
+        entries.push(ClipboardEntry::Image(Image::from_bytes(
+            ImageFormat::Png,
+            vec![1, 2],
+        )));
+        cx.write_to_clipboard(ClipboardItem { entries });
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        assert!(matches!(queue.feedback(), ImportFeedback::Partial { added: 1, detail } if detail.contains("1 images couldn’t be imported")));
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+}
+
+#[gpui_kit::test]
+fn clipboard_paste_in_a_settings_input_edits_text_without_importing(cx: &mut TestAppContext) {
+    use imgconvert_gpui_workflow::Section;
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace_sized(cx, size(px(1_000.), px(1_400.)));
+    cx.update_window(handle, |_, window, cx| {
+        let form = workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone();
+        form.update(cx, |form, cx| {
+            form.set_open_section(Some(Section::Output), cx);
+        });
+        window.render_frame(cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update(|cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string("pasted".into())));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("settings-output-suffix", cx);
+        window.press("secondary-a", cx);
+        window.press("secondary-v", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        assert!(models.queue().read(cx).is_empty());
+        assert!(!models.queue().read(cx).is_importing());
+        assert_eq!(
+            models.settings().read(cx).settings().output_suffix,
+            "pasted"
+        );
+    });
+}
+
+#[gpui_kit::test]
+fn clipboard_stop_after_worker_completion_prevents_commit_and_cleans_the_bitmap(
+    cx: &mut TestAppContext,
+) {
+    use imgconvert_gpui_shared::queue_model::ImportFeedback;
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    cx.run_until_parked();
+    let sessions = || -> std::collections::BTreeSet<std::path::PathBuf> {
+        std::fs::read_dir(std::env::temp_dir())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("imgconvert-clipboard-")
+            })
+            .map(|entry| entry.path())
+            .collect()
+    };
+    let before = sessions();
+    cx.update(|cx| {
+        cx.write_to_clipboard(clipboard_bitmap());
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    // Start the importer, then execute only its worker. The foreground result
+    // stays pending while the user's Stop command is dispatched.
+    while cx.dispatcher.tick(true) {}
+    assert!(cx.dispatcher.tick(false));
+    while cx.dispatcher.tick(true) {}
+    let created: Vec<_> = sessions().difference(&before).cloned().collect();
+    assert_eq!(
+        created.len(),
+        1,
+        "the bitmap was written before cancellation"
+    );
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(AppModels::global(cx).queue().read(cx).is_importing());
+        window.click("queue-cancel-import", cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert!(queue.is_empty());
+        assert_eq!(queue.feedback(), &ImportFeedback::Cancelled);
+    });
+    assert!(!created[0].exists(), "late cancellation cleans its session");
+}
+
+#[gpui_kit::test]
+fn clipboard_cancelled_rescan_preserves_an_existing_managed_source(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    cx.update(|cx| {
+        cx.write_to_clipboard(clipboard_bitmap());
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    let path = cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .read(cx)
+            .item_at(0)
+            .unwrap()
+            .path
+            .to_string()
+    });
+    cx.update(|cx| {
+        cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(path.clone()));
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    while cx.dispatcher.tick(true) {}
+    assert!(cx.dispatcher.tick(false));
+    while cx.dispatcher.tick(true) {}
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-cancel-import", cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    cx.run_until_parked();
+    assert!(
+        std::path::Path::new(&path).exists(),
+        "cancelling a rescan must not delete an older bitmap"
+    );
+    cx.update(|cx| assert_eq!(AppModels::global(cx).queue().read(cx).len(), 1));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!std::path::Path::new(&path).exists());
+}
+
+#[gpui_kit::test]
+fn clipboard_partial_path_errors_are_visible_and_modals_do_not_import(cx: &mut TestAppContext) {
+    use imgconvert_gpui_shared::queue_model::ImportFeedback;
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!(
+        "imgconvert-clipboard-partial-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("photo.png");
+    let spaced = dir.join("photo.png ");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    std::fs::write(&spaced, one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(
+            spaced.to_str().unwrap().to_string(),
+        ));
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        // The scanner's existing extension policy skips `.png `, but must
+        // never import the different valid `.png` file by trimming its path.
+        assert!(AppModels::global(cx).queue().read(cx).is_empty());
+    });
+    cx.update(|cx| {
+        cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(format!(
+            "{}\n{}",
+            input.display(),
+            dir.join("missing.png").display()
+        )));
+        imgconvert_gpui_queue::clipboard::paste(cx);
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue.item_at(0).unwrap().path.as_ref(), input.to_str().unwrap());
+        assert!(matches!(queue.feedback(), ImportFeedback::Partial { added: 1, detail } if detail.contains("1 paths couldn’t be read")));
+        cx.write_to_clipboard(clipboard_bitmap());
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("plugin-diagnostics", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx));
+        window.press("secondary-v", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        assert!(!queue.is_importing());
+    });
+    std::fs::remove_dir_all(dir).unwrap();
+}

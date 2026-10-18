@@ -127,6 +127,7 @@ impl QueueItem {
 pub enum ImportFeedback {
     None,
     Added { added: usize, skipped: usize },
+    Partial { added: usize, detail: SharedString },
     Nothing,
     Cancelled,
     Failed(SharedString),

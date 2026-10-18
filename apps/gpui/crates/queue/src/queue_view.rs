@@ -108,10 +108,19 @@ impl QueueView {
 
     fn clear_queue(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Re-check at the command entry: the toolbar state may be one frame old.
-        if self.batch.read(cx).is_active() || progress_bridge::is_busy(cx) {
+        if self.batch.read(cx).is_active()
+            || progress_bridge::is_busy(cx)
+            || self.queue.read(cx).is_importing()
+        {
             return;
         }
         let evicted = self.queue.update(cx, |queue, cx| {
+            let paths = queue
+                .items()
+                .iter()
+                .map(|item| item.path.to_string())
+                .collect();
+            crate::clipboard::cleanup(paths, cx);
             let evicted = queue.clear();
             cx.notify();
             evicted
@@ -244,6 +253,14 @@ impl QueueView {
                     .on_click(cx.listener(|this, _, window, cx| this.clear_queue(window, cx))),
             )
             .child(
+                Button::new("queue-paste")
+                    .ghost()
+                    .small()
+                    .label(tr("queue.paste"))
+                    .disabled(queue.is_importing())
+                    .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+            )
+            .child(
                 Button::new("queue-add-files")
                     .small()
                     .icon(IconName::FolderOpen)
@@ -267,6 +284,10 @@ impl QueueView {
                 ImportFeedback::Added { added, skipped } => tr_with(
                     "queue.import_added_skipped",
                     &[("added", added), ("skipped", skipped)],
+                ),
+                ImportFeedback::Partial { added, detail } => tr_with(
+                    "queue.import_partial",
+                    &[("added", added), ("detail", detail)],
                 ),
                 ImportFeedback::Nothing => tr("queue.import_nothing"),
                 ImportFeedback::Cancelled => tr("queue.import_cancelled"),

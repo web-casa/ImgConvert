@@ -28,7 +28,7 @@ pub fn pick_and_import(cx: &mut App) {
 
 /// Scans `paths` recursively and appends supported images to the queue.
 pub fn import_paths(paths: Vec<PathBuf>, cx: &mut App) {
-    if paths.is_empty() {
+    if paths.is_empty() || AppModels::global(cx).queue().read(cx).is_importing() {
         return;
     }
     let models = AppModels::global(cx).clone();
