@@ -226,10 +226,11 @@ impl WorkflowPanel {
         }
         let settings = self.settings.read(cx).settings().clone();
         let overwrite = settings.overwrite;
-        let revision = self.queue.read(cx).revision();
+        let revision = self.queue.read(cx).conversion_revision();
         self.planning = true;
+        let request = Rc::new(RefCell::new(None));
         self.pending_start = Some(PendingHandle {
-            state: Rc::new(RefCell::new(None)),
+            state: Rc::clone(&request),
             queue_revision: revision,
             settings,
         });
@@ -245,28 +246,16 @@ impl WorkflowPanel {
                 // Decide inside the entity, prompt outside it: `advance` may
                 // call straight back into the panel when no prompt is needed.
                 let next = this.update(cx, |panel, cx| {
-                    let Some(handle) = panel.pending_start.as_ref() else {
-                        return None; // torn down meanwhile
-                    };
-                    match plan {
-                        Ok(plan) => {
-                            *handle.state.borrow_mut() = Some(output_safety::PendingStart::new(
-                                keys,
-                                options,
-                                plan,
-                                concurrency,
-                                overwrite,
-                            ));
-                            Some(Rc::clone(&handle.state))
-                        }
-                        Err(detail) => {
-                            panel.planning = false;
-                            panel.pending_start = None;
-                            panel.notice = Some(Notice::PlanFailed(detail));
-                            cx.notify();
-                            None
-                        }
-                    }
+                    let result = plan.map(|plan| {
+                        output_safety::PendingStart::new(
+                            keys,
+                            options,
+                            plan,
+                            concurrency,
+                            overwrite,
+                        )
+                    });
+                    panel.finish_plan(&request, result, cx)
                 });
                 if let Ok(Some(pending)) = next {
                     output_safety::advance(this.clone(), pending, window, cx);
@@ -276,13 +265,40 @@ impl WorkflowPanel {
         .detach();
     }
 
+    /// Only the request that owns the current handle may publish or fail it.
+    /// A stale worker may finish after a format edit and a second Start.
+    fn finish_plan(
+        &mut self,
+        request: &Rc<RefCell<Option<output_safety::PendingStart>>>,
+        result: Result<output_safety::PendingStart, String>,
+        cx: &mut Context<Self>,
+    ) -> Option<Rc<RefCell<Option<output_safety::PendingStart>>>> {
+        let handle = self.pending_start.as_ref()?;
+        if !Rc::ptr_eq(request, &handle.state) {
+            return None;
+        }
+        match result {
+            Ok(plan) => {
+                *handle.state.borrow_mut() = Some(plan);
+                Some(Rc::clone(&handle.state))
+            }
+            Err(detail) => {
+                self.planning = false;
+                self.pending_start = None;
+                self.notice = Some(Notice::PlanFailed(detail));
+                cx.notify();
+                None
+            }
+        }
+    }
+
     /// Drops a pending start when the jobs it planned no longer match the
     /// queue or the settings; an open prompt is closed.
     fn abort_pending_if_stale(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(handle) = self.pending_start.as_ref() else {
             return;
         };
-        let stale = self.queue.read(cx).revision() != handle.queue_revision
+        let stale = self.queue.read(cx).conversion_revision() != handle.queue_revision
             || self.queue.read(cx).is_importing()
             || *self.settings.read(cx).settings() != handle.settings;
         if !stale {
@@ -332,7 +348,7 @@ impl WorkflowPanel {
             return;
         };
         self.planning = false;
-        if self.queue.read(cx).revision() != handle.queue_revision
+        if self.queue.read(cx).conversion_revision() != handle.queue_revision
             || self.queue.read(cx).is_importing()
             || *self.settings.read(cx).settings() != handle.settings
         {
@@ -501,6 +517,86 @@ mod tests {
         let unsupported = build_options(&settings, &item("/in/a.png"), Path::new("/out"), "jpeg");
         assert!(supported.lossless);
         assert!(!unsupported.lossless);
+    }
+
+    #[test]
+    fn mixed_formats_plan_the_overridden_extension_and_queued_source_conflict() {
+        let dir = std::env::temp_dir().join(format!("imgconvert-s10-plan-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let png = dir.join("source.png");
+        let jpeg = dir.join("source.jpg");
+        std::fs::write(&png, b"path planning does not decode").unwrap();
+        std::fs::write(&jpeg, b"queued source must be preserved").unwrap();
+        let mut first = item(&png.to_string_lossy());
+        first.relative_dir = None;
+        first.target_format = Some("jpeg".into());
+        let second = item(&jpeg.to_string_lossy());
+        let mut settings = Settings::default();
+        settings.output_suffix_enabled = false;
+        settings.result_cache = false;
+        let jobs = [
+            build_options(&settings, &first, &dir, "webp"),
+            build_options(&settings, &second, &dir, "webp"),
+        ];
+        let plan = convert::conversion_plan(&jobs);
+        assert!(plan[0].error.is_none(), "{:?}", plan[0].error);
+        assert_eq!(
+            plan[0].output.as_deref(),
+            Some(jpeg.to_string_lossy().as_ref())
+        );
+        assert!(plan[0].conflicts_with_queued_input);
+        assert_eq!(jobs[1].format, "webp");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[gpui_kit::test]
+    fn superseded_plan_success_and_failure_cannot_overwrite_the_next_request(
+        cx: &mut gpui_kit::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            imgconvert_gpui_shared::services::init_with_settings(cx, || {
+                SettingsModel::in_memory(Settings::default())
+            });
+            gpui_kit::init(cx);
+            let (_, panel) =
+                gpui_kit::open_window(gpui_kit::WindowOptions::default(), cx, |window, cx| {
+                    cx.new(|cx| WorkflowPanel::new(window, cx))
+                })
+                .unwrap();
+            panel.update(cx, |panel, cx| {
+                let old = Rc::new(RefCell::new(None));
+                let current = Rc::new(RefCell::new(None));
+                panel.planning = true;
+                panel.pending_start = Some(PendingHandle {
+                    state: current.clone(),
+                    queue_revision: 2,
+                    settings: Settings::default(),
+                });
+                let plan = || {
+                    output_safety::PendingStart::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        None,
+                        imgconvert_backend::settings::OverwriteMode::Skip,
+                    )
+                };
+                assert!(panel.finish_plan(&old, Ok(plan()), cx).is_none());
+                assert!(current.borrow().is_none());
+                assert!(
+                    panel
+                        .finish_plan(&old, Err("obsolete error".into()), cx)
+                        .is_none()
+                );
+                assert!(panel.planning);
+                assert!(panel.notice.is_none());
+                assert!(Rc::ptr_eq(
+                    &panel.finish_plan(&current, Ok(plan()), cx).unwrap(),
+                    &current
+                ));
+                assert!(current.borrow().is_some());
+            });
+        });
     }
 
     #[test]

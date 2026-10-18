@@ -78,6 +78,8 @@ pub struct QueueItem {
     pub source_height: Option<u32>,
     /// Page count of a document input (PDF); raster images keep `None`.
     pub page_count: Option<usize>,
+    /// Session-only override; `None` follows the global workflow format.
+    pub target_format: Option<SharedString>,
     pub status: ItemStatus,
     pub thumbnail: ThumbnailState,
 }
@@ -116,6 +118,7 @@ impl QueueItem {
                 .metadata
                 .as_ref()
                 .and_then(|metadata| metadata.page_count),
+            target_format: None,
             status: ItemStatus::Pending,
             thumbnail: ThumbnailState::NotRequested,
         }
@@ -147,6 +150,7 @@ pub struct QueueModel {
     /// Bumped on every structural change (import, clear) so views rebuild
     /// row sizes and stale thumbnail results are rejected.
     revision: u64,
+    conversion_revision: u64,
 }
 
 impl Default for QueueModel {
@@ -167,6 +171,7 @@ impl QueueModel {
             thumbnail_last_shown: HashMap::new(),
             tick: 0,
             revision: 0,
+            conversion_revision: 0,
         }
     }
 
@@ -184,6 +189,59 @@ impl QueueModel {
 
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Changes to the inputs or their conversion requests. Separate from the
+    /// thumbnail generation: editing a format must not strand an in-flight image.
+    pub fn conversion_revision(&self) -> u64 {
+        self.conversion_revision
+    }
+
+    /// Validates against the engine capability matrix. The UI additionally
+    /// guards the batch execution/settling gate before calling this method.
+    pub fn set_target_format(&mut self, key: &SharedString, format: Option<&str>) -> bool {
+        if self.importing
+            || self
+                .items
+                .iter()
+                .any(|item| matches!(item.status, ItemStatus::Running { .. }))
+        {
+            return false;
+        }
+        let normalized = format.map(str::to_ascii_lowercase);
+        if normalized.as_deref().is_some_and(|format| {
+            !imgconvert_backend::convert::capabilities()
+                .writable
+                .contains(&format)
+        }) {
+            return false;
+        }
+        let Some(ix) = self.index_by_key.get(key).copied() else {
+            return false;
+        };
+        let item = &mut self.items[ix];
+        item.target_format = normalized.map(SharedString::from);
+        item.status = ItemStatus::Pending;
+        self.conversion_revision += 1;
+        true
+    }
+
+    /// Restores the global format and makes all items eligible for conversion.
+    pub fn reset_target_formats(&mut self) -> bool {
+        if self.importing
+            || self
+                .items
+                .iter()
+                .any(|item| matches!(item.status, ItemStatus::Running { .. }))
+        {
+            return false;
+        }
+        for item in &mut self.items {
+            item.target_format = None;
+            item.status = ItemStatus::Pending;
+        }
+        self.conversion_revision += 1;
+        true
     }
 
     pub fn is_importing(&self) -> bool {
@@ -240,6 +298,7 @@ impl QueueModel {
         }
         if added > 0 {
             self.revision += 1;
+            self.conversion_revision += 1;
         }
         added
     }
@@ -260,6 +319,7 @@ impl QueueModel {
         self.thumbnail_bytes = 0;
         self.feedback = ImportFeedback::None;
         self.revision += 1;
+        self.conversion_revision += 1;
         released
     }
 
@@ -486,6 +546,56 @@ mod tests {
             relative_dir: None,
             metadata: None,
         }
+    }
+
+    #[test]
+    fn format_edits_validate_and_preserve_inflight_thumbnails() {
+        let mut queue = QueueModel::default();
+        queue.add_files(vec![scan_file("a"), scan_file("b")]);
+        let key = SharedString::from("a");
+        let ticket = queue.mark_thumbnail_loading(&key).unwrap();
+        let revision = queue.conversion_revision();
+        assert!(!queue.set_target_format(&key, Some("heic")));
+        assert_eq!(queue.conversion_revision(), revision);
+        assert!(queue.set_target_format(&key, Some("JPEG")));
+        assert_eq!(
+            queue.item(&key).unwrap().target_format.as_deref(),
+            Some("jpeg")
+        );
+        assert!(queue.conversion_revision() > revision);
+        queue.set_thumbnail(&ticket, image(1));
+        assert!(matches!(
+            queue.item(&key).unwrap().thumbnail,
+            ThumbnailState::Ready(_)
+        ));
+        assert!(queue.item_at(1).unwrap().target_format.is_none());
+    }
+
+    #[test]
+    fn format_edits_reset_results_and_reject_importing_or_running() {
+        let mut queue = QueueModel::default();
+        queue.add_files(vec![scan_file("a")]);
+        let key = SharedString::from("a");
+        queue.item_mut(&key).unwrap().status = ItemStatus::Done {
+            in_size: 10,
+            out_size: 5,
+            comparable: true,
+        };
+        assert!(queue.set_target_format(&key, Some("png")));
+        assert_eq!(queue.item(&key).unwrap().status, ItemStatus::Pending);
+        queue.set_importing(true);
+        assert!(!queue.set_target_format(&key, None));
+        assert!(!queue.reset_target_formats());
+        queue.set_importing(false);
+        queue.item_mut(&key).unwrap().status = ItemStatus::Running { percent: 20. };
+        assert!(!queue.set_target_format(&key, None));
+        assert!(!queue.reset_target_formats());
+        queue.reset_statuses();
+        assert!(queue.reset_target_formats());
+        assert!(queue.item(&key).unwrap().target_format.is_none());
+        queue.clear();
+        queue.add_files(vec![scan_file("a")]);
+        assert!(queue.item(&key).unwrap().target_format.is_none());
     }
 
     /// A render image of `pixels` pixels (4 bytes each), 1 px tall.

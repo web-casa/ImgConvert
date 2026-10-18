@@ -12,5 +12,8 @@ gpui-kit.workspace = true
 imgconvert-backend.workspace = true
 imgconvert-gpui-shared.workspace = true
 
+[dev-dependencies]
+gpui-kit = { workspace = true, features = ["test-support"] }
+
 [lints]
 workspace = true

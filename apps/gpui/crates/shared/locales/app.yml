@@ -44,6 +44,21 @@ queue.paste:
 queue.clipboard_empty:
   en: Copy an image or absolute file paths, then paste again.
   zh-CN: 复制图片或完整文件路径后，再次粘贴。
+queue.item_format_label:
+  en: "Target format for %{name}: %{format}"
+  zh-CN: "%{name} 的目标格式：%{format}"
+queue.target_format:
+  en: Target format for this file
+  zh-CN: 此文件的目标格式
+queue.global_format:
+  en: "Global · %{format}"
+  zh-CN: "全局 · %{format}"
+queue.follow_global:
+  en: Follow global format
+  zh-CN: 跟随全局格式
+queue.reset_formats:
+  en: Reset formats
+  zh-CN: 重置格式
 queue.clear:
   en: Clear
   zh-CN: 清空

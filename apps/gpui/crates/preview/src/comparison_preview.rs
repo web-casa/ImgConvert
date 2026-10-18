@@ -106,6 +106,9 @@ impl ComparisonPreview {
                 if queue.read(cx).item(&this.item_key).is_none() {
                     this.cancel(cx);
                     window.close_dialog(cx);
+                } else if this.signature(cx) != this.baseline {
+                    this.stale = true;
+                    cx.notify();
                 }
             }),
             // A batch takes the execution gate; the preview yields the way
@@ -187,8 +190,13 @@ impl ComparisonPreview {
         let settings = self.settings.read(cx).settings();
         let snapshot = serde_json::to_string(&settings.workflow_snapshot()).unwrap_or_default();
         format!(
-            "{snapshot}|{}|{}",
-            settings.pdf_dpi, settings.pdf_page_range
+            "{snapshot}|{}|{}|{:?}",
+            settings.pdf_dpi,
+            settings.pdf_page_range,
+            self.queue
+                .read(cx)
+                .item(&self.item_key)
+                .and_then(|item| item.target_format.as_deref())
         )
     }
 
