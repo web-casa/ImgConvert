@@ -18,7 +18,8 @@ use crate::queue_model::QueueItem;
 
 /// Conversion options for one queue item. `out_dir` overrides the record's
 /// folder (a folder picked at start time applies before the record is
-/// written); `format` overrides the record's format (the perf probe).
+/// written); `format` supplies the global fallback (including the perf probe).
+/// A per-item format takes precedence in both batches and previews.
 pub fn options_for_item(
     settings: &Settings,
     item: &QueueItem,
@@ -29,7 +30,11 @@ pub fn options_for_item(
     if let Some(dir) = out_dir {
         settings.out_dir = Some(dir.to_string());
     }
-    let format = format.unwrap_or(settings.format.as_str()).to_string();
+    let format = item
+        .target_format
+        .as_deref()
+        .unwrap_or_else(|| format.unwrap_or(settings.format.as_str()))
+        .to_string();
     let lossless_supported = convert::capabilities().lossless.contains(&format.as_str());
     let conversion_item = ConversionItem::new(item.path.to_string())
         .with_relative_dir(item.relative_dir.as_ref().map(ToString::to_string))
@@ -149,6 +154,27 @@ mod tests {
         assert_eq!(options.format, "avif");
         assert_eq!(options.out_dir, None);
         assert_eq!(options.relative_dir, None, "no folder, no mirrored tree");
+    }
+
+    #[test]
+    fn item_format_controls_preview_batch_quality_and_lossless_together() {
+        let mut settings = Settings::default();
+        settings.lossless = true;
+        let mut item = item("/in/a.png");
+        item.target_format = Some("jpeg".into());
+        let preview = options_for_item(&settings, &item, None, None);
+        let batch = options_for_item(&settings, &item, None, Some("webp"));
+        assert_eq!(preview.format, "jpeg");
+        assert_eq!(batch.format, preview.format);
+        assert_eq!(batch.quality_floor, quality_floor_for(&settings, "jpeg"));
+        assert!(!batch.lossless);
+        settings.format = "png".into();
+        assert_eq!(
+            options_for_item(&settings, &item, None, None).format,
+            "jpeg"
+        );
+        item.target_format = None;
+        assert_eq!(options_for_item(&settings, &item, None, None).format, "png");
     }
 
     #[test]

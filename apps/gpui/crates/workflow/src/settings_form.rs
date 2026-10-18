@@ -660,10 +660,38 @@ impl SettingsForm {
     /// the same set is validated here.
     pub fn has_invalid_configuration(&self, cx: &App) -> bool {
         let settings = self.settings.read(cx).settings();
+        self.invalid_target_size(settings, cx) || self.pdf_range_error_for_batch(cx).is_some()
+    }
+
+    fn target_formats<'a>(&'a self, settings: &'a Settings, cx: &'a App) -> Vec<&'a str> {
+        let queue = self.queue.read(cx);
+        if queue.is_empty() {
+            return vec![settings.format.as_str()];
+        }
+        let mut formats = Vec::new();
+        for item in queue.items() {
+            let format = item.target_format.as_deref().unwrap_or(&settings.format);
+            if !formats.contains(&format) {
+                formats.push(format);
+            }
+        }
+        formats
+    }
+
+    fn target_formats_support_size(&self, settings: &Settings, cx: &App) -> bool {
+        self.target_formats(settings, cx)
+            .iter()
+            .all(|format| matches!(*format, "jpeg" | "webp"))
+    }
+
+    fn invalid_target_size(&self, settings: &Settings, cx: &App) -> bool {
+        if !settings.target_size_enabled {
+            return false;
+        }
         conversion_request::has_invalid_target_size_configuration(
             settings,
-            &[settings.format.as_str()],
-        ) || self.pdf_range_error_for_batch(cx).is_some()
+            &self.target_formats(settings, cx),
+        )
     }
 
     /// The first page-range error among the PDF items a batch would submit.
@@ -881,7 +909,7 @@ impl SettingsForm {
 
     pub fn set_target_size_enabled(&mut self, enabled: bool, cx: &mut Context<Self>) {
         let settings = self.snapshot(cx);
-        let supported = matches!(settings.format.as_str(), "jpeg" | "webp");
+        let supported = self.target_formats_support_size(&settings, cx);
         if enabled && !supported {
             return;
         }
@@ -1381,10 +1409,7 @@ impl SettingsForm {
             }
             Section::Resize => (resize_mode_label(settings.resize_mode), false),
             Section::TargetSize => {
-                let invalid = conversion_request::has_invalid_target_size_configuration(
-                    settings,
-                    &[settings.format.as_str()],
-                );
+                let invalid = self.invalid_target_size(settings, cx);
                 let summary = if settings.target_size_enabled {
                     tr_with(
                         "workflow.target_summary",
@@ -2086,11 +2111,8 @@ impl SettingsForm {
     }
 
     fn render_target_size(&self, settings: &Settings, busy: bool, cx: &mut Context<Self>) -> Div {
-        let supported = matches!(settings.format.as_str(), "jpeg" | "webp");
-        let invalid = conversion_request::has_invalid_target_size_configuration(
-            settings,
-            &[settings.format.as_str()],
-        );
+        let supported = self.target_formats_support_size(settings, cx);
+        let invalid = self.invalid_target_size(settings, cx);
         v_flex()
             .gap_3()
             .child(self.switch_row(

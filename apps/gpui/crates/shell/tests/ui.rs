@@ -448,6 +448,25 @@ fn comparison_preview_generates_marks_stale_and_releases(cx: &mut TestAppContext
         assert!(preview.read(cx).has_images());
     });
 
+    // A per-item edit also invalidates the retained preview, without a
+    // global settings change. Refresh must then encode the overridden format.
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                assert!(queue.set_target_format(&"one".into(), Some("jpeg")));
+                cx.notify();
+            });
+    });
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert!(preview.read(cx).is_stale());
+        preview.update(cx, ComparisonPreview::refresh);
+    });
+    wait_for_preview(cx, &preview);
+    cx.update(|cx| assert!(!preview.read(cx).is_stale()));
+
     // Closing the dialog releases the preview entity.
     let weak = preview.downgrade();
     drop(preview);
@@ -1717,6 +1736,205 @@ fn clipboard_partial_path_errors_are_visible_and_modals_do_not_import(cx: &mut T
         let queue = AppModels::global(cx).queue().read(cx);
         assert_eq!(queue.len(), 1);
         assert!(!queue.is_importing());
+    });
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn item_formats_menu_drives_mixed_outputs_and_reset(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace_sized(cx, size(px(760.), px(480.)));
+    let dir = std::env::temp_dir().join(format!("imgconvert-s10-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    for name in ["one", "two"] {
+        std::fs::write(dir.join(format!("{name}.png")), one_by_one_png()).unwrap();
+    }
+    cx.update(|cx| {
+        let models = AppModels::global(cx).clone();
+        models.queue().update(cx, |queue, cx| {
+            queue.add_files(
+                ["one", "two"]
+                    .map(|name| imgconvert_backend::import::ImportScanFile {
+                        path: dir
+                            .join(format!("{name}.png"))
+                            .to_string_lossy()
+                            .into_owned(),
+                        key: name.into(),
+                        relative_dir: None,
+                        metadata: None,
+                    })
+                    .to_vec(),
+            );
+            cx.notify();
+        });
+        models.settings().update(cx, |settings, cx| {
+            settings.update(cx, |s| {
+                s.format = "webp".into();
+                s.result_cache = false;
+            });
+        });
+        workspace
+            .read(cx)
+            .workflow()
+            .clone()
+            .update(cx, |workflow, cx| {
+                workflow.set_output_dir(dir.join("out"), cx);
+            });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("item-format:one").visible());
+        let row = window.find("one").bounds();
+        let control = window.find("item-format:one").bounds();
+        assert!(control.origin.x >= row.origin.x && control.right() <= row.right());
+        assert!(control.origin.y >= row.origin.y && control.bottom() <= row.bottom());
+        toggle_language(cx);
+        let font = gpui_kit::component::Theme::global(cx).font_size;
+        gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font * 1.15);
+        window.render_frame(cx);
+        let row = window.find("one").bounds();
+        let control = window.find("item-format:one").bounds();
+        assert!(control.right() <= row.right() && control.bottom() <= row.bottom());
+        assert!(
+            window.find("queue-reset-formats").bounds().right()
+                <= window.find("queue-drop-target").bounds().right()
+        );
+        gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font);
+        toggle_language(cx);
+        window.render_frame(cx);
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.set_importing(true);
+                cx.notify();
+            });
+        window.render_frame(cx);
+        window.click("item-format:one", cx);
+        assert!(window.try_find("popup-menu").is_none());
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.set_importing(false);
+                cx.notify();
+            });
+        window.render_frame(cx);
+        window.click("item-format:one", cx);
+        window.render_frame(cx);
+        let jpeg_ix = imgconvert_backend::convert::capabilities()
+            .writable
+            .iter()
+            .position(|f| *f == "jpeg")
+            .unwrap()
+            + 2;
+        window.within("popup-menu").click(jpeg_ix, cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        let jpeg_ix = imgconvert_backend::convert::capabilities()
+            .writable
+            .iter()
+            .position(|f| *f == "jpeg")
+            .unwrap()
+            + 2;
+        window.click("item-format:one", cx);
+        window.render_frame(cx);
+        // The first Down selects Follow global; subsequent Down skips the separator.
+        for _ in 0..jpeg_ix {
+            window.within("popup-menu").press("down", cx);
+        }
+        assert_eq!(
+            window.within("popup-menu").find(jpeg_ix).selected(),
+            Some(true)
+        );
+        window.within("popup-menu").press("enter", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        assert_eq!(
+            models
+                .queue()
+                .read(cx)
+                .item(&"one".into())
+                .unwrap()
+                .target_format
+                .as_deref(),
+            Some("jpeg")
+        );
+        assert_eq!(models.settings().read(cx).settings().format, "webp");
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let models = AppModels::global(cx).clone();
+        let form = workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone();
+        // AVIF globally, but every actual output is JPEG/WebP: target size is valid.
+        models.queue().update(cx, |queue, cx| {
+            queue.set_target_format(&"two".into(), Some("webp"));
+            cx.notify();
+        });
+        models.settings().update(cx, |settings, cx| {
+            settings.update(cx, |s| s.format = "avif".into());
+        });
+        form.update(cx, |form, cx| form.set_target_size_enabled(true, cx));
+        assert!(models.settings().read(cx).settings().target_size_enabled);
+        assert!(!form.read(cx).has_invalid_configuration(cx));
+        // An unsupported per-item format must block Start despite a supported global one.
+        models.settings().update(cx, |settings, cx| {
+            settings.update(cx, |s| s.format = "jpeg".into());
+        });
+        models.queue().update(cx, |queue, cx| {
+            queue.set_target_format(&"two".into(), Some("png"));
+            cx.notify();
+        });
+        assert!(form.read(cx).has_invalid_configuration(cx));
+        models.queue().update(cx, |queue, cx| {
+            queue.set_target_format(&"two".into(), None);
+            cx.notify();
+        });
+        form.update(cx, |form, cx| form.set_target_size_enabled(false, cx));
+        models.settings().update(cx, |settings, cx| {
+            settings.update(cx, |s| s.format = "webp".into());
+        });
+        window.render_frame(cx);
+        window.click("item-format:one", cx);
+        assert_eq!(window.find("popup-menu").focused(), Some(true));
+        window.press("escape", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.click("workflow-start", cx);
+    })
+    .unwrap();
+    wait_for_batch_to_settle(cx);
+    assert!(dir.join("out/one_done.jpg").exists());
+    assert!(dir.join("out/two_done.webp").exists());
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-reset-formats", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        assert!(
+            AppModels::global(cx)
+                .queue()
+                .read(cx)
+                .items()
+                .iter()
+                .all(|item| item.target_format.is_none() && item.status == ItemStatus::Pending)
+        );
     });
     std::fs::remove_dir_all(dir).unwrap();
 }

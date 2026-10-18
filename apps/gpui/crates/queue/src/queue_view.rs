@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use gpui_kit::base::{VirtualListScrollHandle, v_virtual_list};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
@@ -36,7 +37,7 @@ use crate::import;
 use crate::thumbnails;
 
 /// Row height in rem so the list follows application zoom.
-const ROW_HEIGHT_REM: f32 = 3.5;
+const ROW_HEIGHT_REM: f32 = 5.25;
 /// Thumbnails decoding at once; matches the backend's thumbnail concurrency.
 const MAX_INFLIGHT_THUMBNAILS: usize = 4;
 /// Rows beyond the viewport that get thumbnails ahead of scrolling.
@@ -76,6 +77,7 @@ impl QueueView {
         let subscriptions = vec![
             cx.observe(models.queue(), |_, _, cx| cx.notify()),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
+            cx.observe(models.settings(), |_, _, cx| cx.notify()),
         ];
         Self {
             queue: models.queue().clone(),
@@ -215,58 +217,89 @@ impl QueueView {
         let queue = self.queue.read(cx);
         let count = queue.len();
         let batch_busy = self.batch.read(cx).is_active() || progress_bridge::is_busy(cx);
-        h_flex()
-            .h_12()
+        v_flex()
+            .py_2()
             .px_4()
-            .gap_3()
+            .gap_1()
             .border_b_1()
             .border_color(cx.theme().border)
             .child(
                 h_flex()
                     .gap_2()
-                    .items_baseline()
                     .child(
-                        div()
-                            .id("queue-title")
-                            .test_support()
-                            .aria_label(tr("queue.title"))
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr("queue.title")),
+                        h_flex()
+                            .gap_2()
+                            .items_baseline()
+                            .child(
+                                div()
+                                    .id("queue-title")
+                                    .test_support()
+                                    .aria_label(tr("queue.title"))
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(tr("queue.title")),
+                            )
+                            .when(count > 0, |this| {
+                                this.child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(tr_with("queue.item_count", &[("count", &count)])),
+                                )
+                            }),
                     )
-                    .when(count > 0, |this| {
-                        this.child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(tr_with("queue.item_count", &[("count", &count)])),
-                        )
-                    }),
-            )
-            .child(div().flex_1())
-            .child(
-                Button::new("queue-clear")
-                    .ghost()
-                    .small()
-                    .label(tr("queue.clear"))
-                    .disabled(count == 0 || batch_busy || queue.is_importing())
-                    .on_click(cx.listener(|this, _, window, cx| this.clear_queue(window, cx))),
-            )
-            .child(
-                Button::new("queue-paste")
-                    .ghost()
-                    .small()
-                    .label(tr("queue.paste"))
-                    .disabled(queue.is_importing())
-                    .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+                    .child(div().flex_1())
+                    .child(
+                        Button::new("queue-reset-formats")
+                            .ghost()
+                            .xsmall()
+                            .label(tr("queue.reset_formats"))
+                            .disabled(count == 0 || batch_busy || queue.is_importing())
+                            .on_click(|_, _, cx| {
+                                if format_edit_busy(cx) {
+                                    return;
+                                }
+                                AppModels::global(cx)
+                                    .queue()
+                                    .clone()
+                                    .update(cx, |queue, cx| {
+                                        if queue.reset_target_formats() {
+                                            cx.notify();
+                                        }
+                                    });
+                            }),
+                    ),
             )
             .child(
-                Button::new("queue-add-files")
-                    .small()
-                    .icon(IconName::FolderOpen)
-                    .label(tr("queue.add_files"))
-                    .disabled(queue.is_importing())
-                    .on_click(|_, _, cx| import::pick_and_import(cx)),
+                h_flex()
+                    .gap_2()
+                    .justify_end()
+                    .child(
+                        Button::new("queue-clear")
+                            .ghost()
+                            .small()
+                            .label(tr("queue.clear"))
+                            .disabled(count == 0 || batch_busy || queue.is_importing())
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.clear_queue(window, cx)),
+                            ),
+                    )
+                    .child(
+                        Button::new("queue-paste")
+                            .ghost()
+                            .small()
+                            .label(tr("queue.paste"))
+                            .disabled(queue.is_importing())
+                            .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+                    )
+                    .child(
+                        Button::new("queue-add-files")
+                            .small()
+                            .icon(IconName::FolderOpen)
+                            .label(tr("queue.add_files"))
+                            .disabled(queue.is_importing())
+                            .on_click(|_, _, cx| import::pick_and_import(cx)),
+                    ),
             )
     }
 
@@ -368,7 +401,8 @@ impl QueueView {
             move |this, range, window, cx| {
                 this.on_visible_range(range.clone(), window, cx);
                 let busy = queue.read(cx).is_importing()
-                    || AppModels::global(cx).batch().read(cx).is_active();
+                    || AppModels::global(cx).batch().read(cx).is_active()
+                    || progress_bridge::is_busy(cx);
                 let items: Vec<QueueItem> = {
                     let queue = queue.read(cx);
                     range.filter_map(|ix| queue.item_at(ix).cloned()).collect()
@@ -495,38 +529,118 @@ impl RenderOnce for QueueRow {
                 .on_click(move |event, window, cx| on_impact(event, window, cx))
         });
         let path = item.path.clone();
-        h_flex()
+        v_flex()
             .id(item.key.clone())
             .test_support()
             .aria_label(item.name.clone())
-            // Two files of the same name from different folders differ only
-            // by the full path, which the meta line abbreviates.
             .tooltip(move |window, cx| Tooltip::new(path.clone()).build(window, cx))
             .h(self.row_height)
             .w_full()
             .px_3()
-            .gap_3()
+            .py_1()
+            .gap_1()
+            .justify_center()
             .rounded(cx.theme().radius_lg)
             .hover(|style| style.bg(cx.theme().list_hover))
-            .child(render_thumbnail(&item.thumbnail, cx))
             .child(
-                v_flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap_0p5()
+                h_flex()
+                    .gap_3()
+                    .child(render_thumbnail(&item.thumbnail, cx))
                     .child(
-                        div()
-                            .text_sm()
-                            .font_weight(FontWeight::MEDIUM)
-                            .truncate()
-                            .child(item.name.clone()),
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_0p5()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .truncate()
+                                    .child(item.name.clone()),
+                            )
+                            .child(div().text_xs().text_color(muted).truncate().child(meta)),
                     )
-                    .child(div().text_xs().text_color(muted).truncate().child(meta)),
+                    .children(impact)
+                    .child(compare),
             )
-            .children(impact)
-            .child(compare)
-            .child(render_status(&item.status, cx))
+            .child(
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(format_control(&item, self.busy, cx))
+                    .child(render_status(&item.status, cx)),
+            )
     }
+}
+
+/// Re-check when the menu action commits: it may have opened before a batch.
+fn format_edit_busy(cx: &App) -> bool {
+    let models = AppModels::global(cx);
+    models.queue().read(cx).is_importing()
+        || models.batch().read(cx).is_active()
+        || progress_bridge::is_busy(cx)
+}
+
+fn set_item_format(key: &SharedString, format: Option<&str>, cx: &mut App) {
+    if format_edit_busy(cx) {
+        return;
+    }
+    AppModels::global(cx)
+        .queue()
+        .clone()
+        .update(cx, |queue, cx| {
+            if queue.set_target_format(key, format) {
+                cx.notify();
+            }
+        });
+}
+
+/// The standard menu retains focus/navigation only for rendered rows; no
+/// select entity or subscription is allocated for every queued file.
+fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
+    let global = &AppModels::global(cx).settings().read(cx).settings().format;
+    let label = item.target_format.as_ref().map_or_else(
+        || {
+            tr_with(
+                "queue.global_format",
+                &[("format", &global.to_ascii_uppercase())],
+            )
+        },
+        |format| SharedString::from(format.to_ascii_uppercase()),
+    );
+    let key = item.key.clone();
+    let selected = item.target_format.clone();
+    Button::new(SharedString::from(format!("item-format:{key}")))
+        .ghost()
+        .xsmall()
+        .flex_none()
+        .accessibility_label(tr_with(
+            "queue.item_format_label",
+            &[("name", &item.name), ("format", &label)],
+        ))
+        .label(label)
+        .icon(IconName::ChevronDown)
+        .tooltip(tr("queue.target_format"))
+        .disabled(busy)
+        .dropdown_menu(move |menu, _, _| {
+            let default_key = key.clone();
+            let mut menu = menu
+                .item(
+                    PopupMenuItem::new(tr("queue.follow_global"))
+                        .checked(selected.is_none())
+                        .on_click(move |_, _, cx| set_item_format(&default_key, None, cx)),
+                )
+                .separator();
+            for format in imgconvert_backend::convert::capabilities().writable {
+                let item_key = key.clone();
+                menu = menu.item(
+                    PopupMenuItem::new(format.to_ascii_uppercase())
+                        .checked(selected.as_deref() == Some(format))
+                        .on_click(move |_, _, cx| set_item_format(&item_key, Some(format), cx)),
+                );
+            }
+            menu
+        })
 }
 
 /// The row's second line: pixel size and page count when the import probed
@@ -580,7 +694,7 @@ fn render_thumbnail(thumbnail: &ThumbnailState, cx: &App) -> impl IntoElement {
 }
 
 fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
-    let lane = h_flex().flex_none().w_40().justify_end().gap_2().text_xs();
+    let lane = h_flex().flex_1().min_w_0().justify_end().gap_2().text_xs();
     match status {
         ItemStatus::Pending => lane
             .text_color(cx.theme().muted_foreground)
@@ -605,13 +719,13 @@ fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
                     .small()
                     .text_color(cx.theme().success),
             )
-            .child(tr_with(
+            .child(div().truncate().child(tr_with(
                 "status.saved",
                 &[
                     ("before", &format_bytes(*in_size)),
                     ("after", &format_bytes(*out_size)),
                 ],
-            )),
+            ))),
         ItemStatus::Skipped { .. } => lane
             .text_color(cx.theme().muted_foreground)
             .child(tr("status.skipped")),
