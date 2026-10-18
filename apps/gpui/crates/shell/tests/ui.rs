@@ -2162,6 +2162,7 @@ fn parity_structured_errors_retranslate_and_remove_preserves_sources(cx: &mut Te
                     path: "/no-real-data/source.png".into(),
                     relative_dir: None,
                     metadata: Some(imgconvert_backend::import::ImportImageMetadata {
+                        animation: imgconvert_backend::import::ImportAnimation::Static,
                         format: "png".into(),
                         width: 1,
                         height: 1,
@@ -2434,5 +2435,177 @@ fn parity_next_batch_keeps_completed_items_and_converts_only_new_inputs(cx: &mut
         assert!(matches!(&models.queue().read(cx).item_at(2).unwrap().status, ItemStatus::Error { error } if error.code == imgconvert_backend::command_error::ErrorCode::OutputConflictsWithInput));
     });
     assert_eq!(std::fs::read(dir.join("first.png")).unwrap(), original);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn animation_facts_mark_rows_and_count_pending_inputs_before_decode(cx: &mut TestAppContext) {
+    use imgconvert_backend::import::ImportAnimation;
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-b2b-animation-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    std::fs::write(dir.join("static.png"), one_by_one_png()).unwrap();
+    std::fs::write(
+        dir.join("animated.png"),
+        include_bytes!("fixtures/animated.png"),
+    )
+    .unwrap();
+    std::fs::write(dir.join("prefix.png"), &one_by_one_png()[..33]).unwrap();
+    cx.update(|cx| {
+        imgconvert_gpui_queue::import::import_paths(
+            vec![
+                dir.join("static.png"),
+                dir.join("animated.png"),
+                dir.join("prefix.png"),
+            ],
+            cx,
+        );
+    });
+    wait_for_import(cx);
+    let (animated, unknown) = cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.animation_counts(), (1, 1));
+        (
+            queue
+                .items()
+                .iter()
+                .find(|item| item.animation == ImportAnimation::Animated)
+                .unwrap()
+                .key
+                .clone(),
+            queue
+                .items()
+                .iter()
+                .find(|item| item.animation == ImportAnimation::Unknown)
+                .unwrap()
+                .key
+                .clone(),
+        )
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("workflow-animation-check")
+                .label()
+                .unwrap()
+                .contains("1 animated (unsupported) · 1 unverified")
+        );
+        assert!(
+            window
+                .find(gpui_kit::SharedString::from(format!("meta:{animated}")))
+                .label()
+                .unwrap()
+                .contains("Animated · unsupported")
+        );
+        toggle_language(cx);
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("workflow-animation-check")
+                .label()
+                .unwrap()
+                .contains("1 个动画（暂不支持）")
+        );
+        assert!(
+            window
+                .find(gpui_kit::SharedString::from(format!("meta:{unknown}")))
+                .label()
+                .unwrap()
+                .contains("动画状态未确认")
+        );
+    })
+    .unwrap();
+    let workflow = cx.update(|cx| workspace.read(cx).workflow().clone());
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |s| {
+                    s.format = "png".into();
+                    s.result_cache = false;
+                });
+            });
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.join("out"), None, cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        let queue = models.queue().read(cx);
+        assert_eq!((models.batch().read(cx).completed(),models.batch().read(cx).failed()),(1,2));
+        assert!(matches!(&queue.item(&animated).unwrap().status,ItemStatus::Error {error} if error.code == imgconvert_backend::command_error::ErrorCode::ConversionFailed && error.detail.as_deref().is_some_and(|detail| detail.contains("动画 PNG"))));
+        assert!(matches!(&queue.item(&unknown).unwrap().status,ItemStatus::Error {error} if !error.detail.as_deref().is_some_and(|detail| detail.contains("动画 PNG"))));
+    });
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn precision_warnings_survive_queue_completion_and_retranslate(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-b2b-precision-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    let source = dir.join("source.png");
+    std::fs::write(&source, include_bytes!("fixtures/precision16.png")).unwrap();
+    cx.update(|cx| imgconvert_gpui_queue::import::import_paths(vec![source], cx));
+    wait_for_import(cx);
+    let key = cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .read(cx)
+            .item_at(0)
+            .unwrap()
+            .key
+            .clone()
+    });
+    let workflow = cx.update(|cx| workspace.read(cx).workflow().clone());
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |s| {
+                    s.format = "jpeg".into();
+                    s.result_cache = false;
+                });
+            });
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.join("out"), None, cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        let item = queue.item(&key).unwrap();
+        assert!(matches!(item.status, ItemStatus::Done { .. }));
+        assert!(item.warnings.contains(
+            &imgconvert_backend::convert::ConvertWarning::BitDepthReduced { from: 16, to: 8 }
+        ));
+        assert!(
+            item.warnings
+                .contains(&imgconvert_backend::convert::ConvertWarning::AlphaFlattened)
+        );
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let id = gpui_kit::SharedString::from(format!("status:{key}"));
+        let text = window.find(id.clone()).label().unwrap().to_owned();
+        assert!(
+            text.contains("16-bit to 8-bit") && text.contains("opaque background"),
+            "{text}"
+        );
+        toggle_language(cx);
+        window.render_frame(cx);
+        let text = window.find(id).label().unwrap().to_owned();
+        assert!(
+            text.contains("16 位降至 8 位") && text.contains("不透明背景"),
+            "{text}"
+        );
+    })
+    .unwrap();
     std::fs::remove_dir_all(dir).unwrap();
 }

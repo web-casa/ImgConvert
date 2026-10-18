@@ -643,7 +643,7 @@ impl RenderOnce for QueueRow {
                     .justify_between()
                     .gap_2()
                     .child(format_control(&item, self.busy, cx))
-                    .child(render_status(&item.key, &item.status, cx)),
+                    .child(render_status(&item.key, &item.status, &item.warnings, cx)),
             )
     }
 }
@@ -731,6 +731,15 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
 /// tooltip.
 fn row_meta(item: &QueueItem) -> SharedString {
     let mut parts: Vec<String> = Vec::new();
+    match item.animation {
+        imgconvert_backend::import::ImportAnimation::Animated => {
+            parts.push(tr("queue.animated").to_string());
+        }
+        imgconvert_backend::import::ImportAnimation::Unknown => {
+            parts.push(tr("queue.animation_unknown").to_string());
+        }
+        imgconvert_backend::import::ImportAnimation::Static => {}
+    }
     if let Some(format) = item.source_format_hint() {
         parts.push(format.to_ascii_uppercase());
     }
@@ -779,12 +788,29 @@ fn render_thumbnail(thumbnail: &ThumbnailState, cx: &App) -> impl IntoElement {
     }
 }
 
-fn render_status(key: &SharedString, status: &ItemStatus, cx: &App) -> impl IntoElement {
+fn render_status(
+    key: &SharedString,
+    status: &ItemStatus,
+    warnings: &[imgconvert_backend::convert::ConvertWarning],
+    cx: &App,
+) -> impl IntoElement {
     let lane = h_flex().flex_1().min_w_0().justify_end().gap_2().text_xs();
     let lane = lane
         .id(SharedString::from(format!("status:{key}")))
         .test_support();
     let lane = match status {
+        ItemStatus::Done { .. } if !warnings.is_empty() => {
+            let text = SharedString::from(
+                warnings
+                    .iter()
+                    .flat_map(imgconvert_gpui_shared::conversion::warning_texts)
+                    .map(|text| text.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+            lane.aria_label(text.clone())
+                .tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
+        }
         ItemStatus::Error { error } | ItemStatus::Skipped { error } => {
             let text = format_command_error(error);
             lane.aria_label(text.clone())
@@ -816,6 +842,9 @@ fn render_status(key: &SharedString, status: &ItemStatus, cx: &App) -> impl Into
                     .small()
                     .text_color(cx.theme().success),
             )
+            .when(!warnings.is_empty(), |lane| {
+                lane.child(div().flex_none().child(tr("status.warnings")))
+            })
             .child(div().truncate().child(tr_with(
                 "status.saved",
                 &[

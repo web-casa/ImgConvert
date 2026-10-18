@@ -439,6 +439,11 @@ pub struct ConvertResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "code")]
 pub enum ConvertWarning {
+    BitDepthReduced {
+        from: u8,
+        to: u8,
+    },
+    AlphaFlattened,
     PreviousOutputBackupRetained {
         path: String,
     },
@@ -1677,6 +1682,16 @@ fn convert_with_control(
         (workflow_result.width, workflow_result.height) != (probe.width, probe.height)
     });
     let cached_workflow_status = result_cache::CachedWorkflowStatus {
+        bit_depth_reduced: workflow_result
+            .warnings
+            .iter()
+            .find_map(|warning| match warning {
+                WorkflowWarning::BitDepthReduced { from, to } => Some((*from, *to)),
+                _ => None,
+            }),
+        alpha_flattened: workflow_result
+            .warnings
+            .contains(&WorkflowWarning::AlphaFlattened),
         width: workflow_result.width,
         height: workflow_result.height,
         selected_quality: workflow_result.selected_quality,
@@ -2103,6 +2118,11 @@ fn preserve_source_modified_time(
 
 pub(crate) fn convert_workflow_warning(warning: &WorkflowWarning) -> ConvertWarning {
     match warning {
+        WorkflowWarning::BitDepthReduced { from, to } => ConvertWarning::BitDepthReduced {
+            from: *from,
+            to: *to,
+        },
+        WorkflowWarning::AlphaFlattened => ConvertWarning::AlphaFlattened,
         WorkflowWarning::ColorProfileConvertedForResize => {
             ConvertWarning::ColorProfileConvertedForResize
         }
@@ -2127,6 +2147,12 @@ fn cached_workflow_warnings(
     hit: result_cache::CacheHit,
 ) -> Vec<ConvertWarning> {
     let mut warnings = Vec::new();
+    if let Some((from, to)) = hit.workflow.bit_depth_reduced {
+        warnings.push(ConvertWarning::BitDepthReduced { from, to });
+    }
+    if hit.workflow.alpha_flattened {
+        warnings.push(ConvertWarning::AlphaFlattened);
+    }
     if hit.workflow.color_profile_converted_for_resize {
         warnings.push(ConvertWarning::ColorProfileConvertedForResize);
     }
@@ -3449,8 +3475,17 @@ fn result_cache_key(
 ) -> String {
     let source_hash = blake3::hash(source);
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"imgconvert-result-cache-v6\0");
+    hasher.update(b"imgconvert-result-cache-v7-precision-warnings\0");
     hasher.update(source_hash.as_bytes());
+    let animation = imgconvert_core::probe(source)
+        .map_or(imgconvert_core::AnimationStatus::Unknown, |probe| {
+            probe.animation
+        });
+    hasher.update(&[match animation {
+        imgconvert_core::AnimationStatus::Static => 0,
+        imgconvert_core::AnimationStatus::Animated => 1,
+        imgconvert_core::AnimationStatus::Unknown => 2,
+    }]);
     hasher.update(target.id().as_bytes());
     hasher.update(color_management_policy_id(color_policy));
     hasher.update(&[encode_options.quality]);
@@ -5179,6 +5214,8 @@ pub(crate) mod tests {
             result_cache::CacheHit {
                 output_size: 20 * 1024,
                 workflow: result_cache::CachedWorkflowStatus {
+                    bit_depth_reduced: Some((16, 8)),
+                    alpha_flattened: true,
                     width: 320,
                     height: 200,
                     selected_quality: Some(30),
@@ -5192,6 +5229,8 @@ pub(crate) mod tests {
         assert_eq!(
             warnings,
             vec![
+                ConvertWarning::BitDepthReduced { from: 16, to: 8 },
+                ConvertWarning::AlphaFlattened,
                 ConvertWarning::InvalidColorProfileDiscarded,
                 ConvertWarning::TargetSizeNotMet {
                     target_bytes: 16 * 1024,

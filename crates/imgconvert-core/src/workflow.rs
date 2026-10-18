@@ -124,6 +124,11 @@ pub struct WorkflowOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkflowWarning {
+    BitDepthReduced {
+        from: u8,
+        to: u8,
+    },
+    AlphaFlattened,
     ColorProfileConvertedForResize,
     InvalidColorProfileDiscarded,
     InvalidColorProfileIgnoredForPreview,

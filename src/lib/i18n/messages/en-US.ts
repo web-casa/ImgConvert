@@ -465,6 +465,10 @@ export const enUS = {
     },
   },
   state: {
+    bitDepthReduced: "Precision reduced from {from}-bit to {to}-bit.",
+    alphaFlattened: "Transparency was composited onto an opaque background.",
+    unknownConvertWarning: "Conversion completed with an unrecognized warning.",
+
     image: "Images and PDFs",
     allFiles: "All files",
     formatLabelavif: "AVIF",

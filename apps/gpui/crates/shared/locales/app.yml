@@ -1282,3 +1282,22 @@ errors.outputSafetyCheckFailedGeneric:
 settings.clear_result_cache_failed_generic:
   en: Could not clear the result cache. Check file access and try again.
   zh-CN: 无法清空结果缓存，请检查文件权限后重试。
+
+warning.bit_depth_reduced:
+  en: "Precision reduced from %{from}-bit to %{to}-bit."
+  zh-CN: "精度已从 %{from} 位降至 %{to} 位。"
+warning.alpha_flattened:
+  en: Transparency was composited onto an opaque background.
+  zh-CN: 透明区域已合成到不透明背景。
+queue.animated:
+  en: Animated · unsupported
+  zh-CN: 动画 · 暂不支持
+queue.animation_unknown:
+  en: Animation unverified
+  zh-CN: 动画状态未确认
+workflow.animation_summary:
+  en: "%{count} files · %{animated} animated (unsupported) · %{unknown} unverified"
+  zh-CN: "%{count} 个文件 · %{animated} 个动画（暂不支持）· %{unknown} 个状态未确认"
+status.warnings:
+  en: Warnings
+  zh-CN: 有告警

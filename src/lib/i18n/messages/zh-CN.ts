@@ -436,6 +436,10 @@ export const zhCN = {
     },
   },
   state: {
+    bitDepthReduced: "精度已从 {from} 位降至 {to} 位。",
+    alphaFlattened: "透明区域已合成到不透明背景。",
+    unknownConvertWarning: "转换已完成，但有一项无法识别的告警。",
+
     image: "图片与 PDF",
     allFiles: "全部文件",
     formatLabelavif: "AVIF",

@@ -57,6 +57,11 @@ pub fn options_for_item(
 /// `formatConvertWarning`); one warning can carry two.
 pub fn warning_texts(warning: &ConvertWarning) -> Vec<SharedString> {
     match warning {
+        ConvertWarning::BitDepthReduced { from, to } => vec![tr_with(
+            "warning.bit_depth_reduced",
+            &[("from", from), ("to", to)],
+        )],
+        ConvertWarning::AlphaFlattened => vec![tr("warning.alpha_flattened")],
         ConvertWarning::PreviousOutputBackupRetained { path } => {
             vec![tr_with("warning.output_backup_retained", &[("path", path)])]
         }
