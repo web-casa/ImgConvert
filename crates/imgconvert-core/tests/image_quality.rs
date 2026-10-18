@@ -122,8 +122,11 @@ fn cmyk_jpeg_decodes_and_converts_without_panicking() {
 #[test]
 fn animated_webp_is_rejected_before_decode_or_thumbnail() {
     let animated = animated_webp_fixture();
+    assert_eq!(
+        probe(&animated).unwrap().animation,
+        imgconvert_core::AnimationStatus::Animated
+    );
     for (label, operation) in [
-        ("probe", probe(&animated).map(|_| ())),
         ("thumbnail", thumbnail(&animated, 128).map(|_| ())),
         (
             "convert",

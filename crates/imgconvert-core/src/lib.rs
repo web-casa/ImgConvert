@@ -615,6 +615,17 @@ impl ImageData {
     }
 }
 
+/// Container-level animation facts, independent of conversion support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationStatus {
+    /// The container establishes a single static image.
+    Static,
+    /// The container declares animation or more than one frame.
+    Animated,
+    /// The available prefix does not establish whether animation is present.
+    Unknown,
+}
+
 /// 不解码像素的图片头部探测结果。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImageProbe {
@@ -622,6 +633,7 @@ pub struct ImageProbe {
     pub width: u32,
     pub height: u32,
     pub dpi: Option<Dpi>,
+    pub animation: AnimationStatus,
 }
 
 /// 图片声明的物理分辨率。并非所有容器都会提供该信息。
@@ -651,6 +663,34 @@ pub enum Format {
     Bmp,
 }
 
+/// Limits and sample support of the encoders shipped by this core.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncoderCapabilities {
+    pub max_side: u32,
+    pub max_pixels: u64,
+    pub bit_depths: &'static [u8],
+    pub alpha: bool,
+    pub animation: bool,
+    pub lossless: bool,
+}
+
+impl ImageProbe {
+    /// Reject known animation; an incomplete probe must still reach the decoder.
+    pub fn ensure_static(&self) -> Result<()> {
+        ensure_static_animation(self.animation, self.format)
+    }
+}
+
+fn ensure_static_animation(animation: AnimationStatus, format: Format) -> Result<()> {
+    if animation == AnimationStatus::Animated {
+        return Err(Error::Unsupported(format!(
+            "动画 {} 暂不支持；请先导出静态图片",
+            format.id().to_uppercase()
+        )));
+    }
+    Ok(())
+}
+
 /// 进程内 core 当前可读格式。
 pub const READABLE_FORMATS: &[Format] = &[
     Format::Jpeg,
@@ -669,6 +709,44 @@ pub const WRITABLE_FORMATS: &[Format] = &[Format::Jpeg, Format::Png, Format::Web
 pub const LOSSLESS_FORMATS: &[Format] = &[Format::Png, Format::WebP, Format::Avif];
 
 impl Format {
+    /// Output limits include the core's shared 64 MP working-set ceiling.
+    pub const fn encoder_capabilities(self) -> Option<EncoderCapabilities> {
+        let (max_side, bit_depths, alpha, lossless): (u32, &'static [u8], bool, bool) = match self {
+            // mozjpeg-sys 2.2.3 jmorecfg.h: JPEG_MAX_DIMENSION.
+            Self::Jpeg => (65_500, &[8], false, false),
+            // PNG permits 31-bit dimensions; the pixel ceiling remains independent.
+            Self::Png => (0x7fff_ffff, &[8, 16], true, true),
+            Self::WebP => (16_383, &[8], true, true),
+            // rav1e 0.7.1 and libavif 1.0.4's av1C metadata constrain sides.
+            Self::Avif => (65_535, &[8], true, true),
+            Self::Svg | Self::Gif | Self::Bmp => return None,
+        };
+        Some(EncoderCapabilities {
+            max_side,
+            max_pixels: MAX_PIXELS as u64,
+            bit_depths,
+            alpha,
+            animation: false,
+            lossless,
+        })
+    }
+
+    /// Validate the final dimensions after explicit resize, before encoder work.
+    pub fn validate_output_dimensions(self, width: u32, height: u32) -> Result<()> {
+        let caps = self
+            .encoder_capabilities()
+            .ok_or_else(|| Error::Unsupported(format!("{} 不支持输出", self.id())))?;
+        rgba_byte_len(width, height)?;
+        if width > caps.max_side || height > caps.max_side {
+            return Err(Error::Unsupported(format!(
+                "{} 输出尺寸 {width} × {height} 超过编码器边长上限 {}；请设置缩小尺寸",
+                self.id(),
+                caps.max_side
+            )));
+        }
+        Ok(())
+    }
+
     /// 稳定的前后端格式 id。
     pub const fn id(self) -> &'static str {
         match self {
@@ -1319,6 +1397,8 @@ fn convert_decoded_workflow_inner(
     deadline: Option<&EncodeDeadline>,
     cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<WorkflowResult> {
+    let (output_width, output_height) = options.resize.dimensions(image.width, image.height)?;
+    target.validate_output_dimensions(output_width, output_height)?;
     // A malformed profile that is being preserved must not make preview fail
     // when the same conversion without a display render succeeds. Render the
     // already-decoded samples and report the display-only degradation.
@@ -1338,7 +1418,6 @@ fn convert_decoded_workflow_inner(
         .transpose()?;
     check_pipeline_control(deadline, cancelled, "源图预览生成完成")?;
 
-    let (output_width, output_height) = options.resize.dimensions(image.width, image.height)?;
     let resized = (output_width, output_height) != (image.width, image.height);
     let had_embedded_profile = image.icc.as_ref().is_some_and(|icc| !icc.is_empty());
     let forced_profile_conversion = resized
@@ -1711,6 +1790,7 @@ fn encode_best_candidate_with_control(
         return Err(Error::Invalid("至少需要一个编码候选".into()));
     }
 
+    target.validate_output_dimensions(img.width, img.height)?;
     let codec = codec_for(target);
     let mut best: Option<BestEncodedCandidate> = None;
     for opts in options {
@@ -2287,7 +2367,7 @@ pub fn probe(input: &[u8]) -> Result<ImageProbe> {
         Format::Jpeg => probe_jpeg(input)?,
         Format::Png => probe_png(input)?,
         Format::WebP => probe_webp(input)?,
-        Format::Avif => probe_avif(input)?,
+        Format::Avif => return probe_avif(input),
         Format::Svg => probe_svg(input)?,
         Format::Gif => probe_gif(input)?,
         Format::Bmp => probe_bmp(input)?,
@@ -2298,6 +2378,7 @@ pub fn probe(input: &[u8]) -> Result<ImageProbe> {
         width,
         height,
         dpi,
+        animation: probe_animation(input, format),
     })
 }
 
@@ -2865,6 +2946,48 @@ fn le_u32(bytes: &[u8]) -> Option<u32> {
     Some(u32::from_le_bytes(bytes.get(0..4)?.try_into().ok()?))
 }
 
+fn probe_animation(bytes: &[u8], format: Format) -> AnimationStatus {
+    use AnimationStatus::{Animated, Static, Unknown};
+    match format {
+        Format::Jpeg | Format::Svg | Format::Bmp => Static,
+        Format::Png => {
+            let mut offset = 8usize;
+            while let Some(header) = bytes.get(offset..).and_then(|tail| tail.get(..8)) {
+                let length =
+                    u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
+                // acTL precedes the first IDAT in an APNG. No pixel read is needed.
+                if &header[4..8] == b"IDAT" || &header[4..8] == b"IEND" {
+                    return Static;
+                }
+                let Some(end) = offset.checked_add(12).and_then(|n| n.checked_add(length)) else {
+                    return Unknown;
+                };
+                if end > bytes.len() {
+                    return Unknown;
+                }
+                if &header[4..8] == b"acTL" && length == 8 {
+                    return Animated;
+                }
+                offset = end;
+            }
+            Unknown
+        }
+        Format::WebP => webp::BitstreamFeatures::new(bytes).map_or(Unknown, |features| {
+            if features.has_animation() {
+                Animated
+            } else {
+                Static
+            }
+        }),
+        Format::Gif => match gif_header_and_frame_count(bytes) {
+            Ok((_, _, 1)) => Static,
+            Ok((_, _, frames)) if frames > 1 => Animated,
+            _ => Unknown,
+        },
+        Format::Avif => Unknown, // AVIF facts are returned by probe_avif itself.
+    }
+}
+
 fn probe_png(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
     if bytes.len() < 33 || &bytes[12..16] != b"IHDR" {
         return Err(Error::Decode("PNG 头不完整".into()));
@@ -3063,9 +3186,6 @@ fn is_jpeg_sof(marker: u8) -> bool {
 fn probe_webp(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
     let feat =
         webp::BitstreamFeatures::new(bytes).ok_or_else(|| Error::Decode("非法 WebP 头".into()))?;
-    if feat.has_animation() {
-        return Err(Error::Unsupported("动画 WebP 暂不支持".into()));
-    }
     let metadata = extract_webp_metadata(bytes);
     let orientation =
         metadata_exif_orientation(&metadata).unwrap_or(image::metadata::Orientation::NoTransforms);
@@ -3074,7 +3194,99 @@ fn probe_webp(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
     Ok((width, height, dpi))
 }
 
-fn probe_avif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
+fn avif_declares_sequence(bytes: &[u8]) -> bool {
+    let extended = be_u32(bytes.get(..4).unwrap_or_default()) == Some(1);
+    let header = if extended { 16 } else { 8 };
+    let size = if extended {
+        bytes
+            .get(8..16)
+            .and_then(|data| <[u8; 8]>::try_from(data).ok())
+            .and_then(|value| usize::try_from(u64::from_be_bytes(value)).ok())
+    } else {
+        be_u32(bytes.get(..4).unwrap_or_default()).map(|size| size as usize)
+    };
+    let end = size
+        .filter(|size| *size != 0)
+        .unwrap_or(bytes.len())
+        .min(bytes.len());
+    bytes.get(header..header + 4) == Some(b"avis")
+        || bytes
+            .get(header + 8..end)
+            .is_some_and(|brands| brands.chunks_exact(4).any(|brand| brand == b"avis"))
+}
+
+// Walk only top-level box headers; payload sizes are skipped without allocation.
+// None means the supplied prefix cannot establish the complete container facts.
+fn avif_has_track_box(bytes: &[u8]) -> Option<bool> {
+    let mut offset = 0usize;
+    while offset < bytes.len() {
+        let header = bytes.get(offset..)?.get(..8)?;
+        let short_size = u32::from_be_bytes(header[..4].try_into().ok()?);
+        let (size, minimum) = match short_size {
+            0 => (bytes.len() - offset, 8),
+            1 => (
+                usize::try_from(u64::from_be_bytes(
+                    bytes.get(offset + 8..offset + 16)?.try_into().ok()?,
+                ))
+                .ok()?,
+                16,
+            ),
+            size => (size as usize, 8),
+        };
+        if size < minimum {
+            return None;
+        }
+        let end = offset.checked_add(size)?;
+        if end > bytes.len() {
+            return None;
+        }
+        if &header[4..8] == b"moov" {
+            return Some(true);
+        }
+        offset = end;
+    }
+    Some(false)
+}
+
+fn parsed_avif_animation(decoder: &DecoderGuard, bytes: &[u8]) -> Result<AnimationStatus> {
+    // SAFETY: callers parsed this live decoder; SetSource rebuilds its image.
+    // No borrowed image pointer may be retained across this function.
+    unsafe {
+        if decoder.0.is_null() {
+            return Err(Error::Decode("AVIF decoder 缺失".into()));
+        }
+        let selected_count = (*decoder.0).imageCount;
+        if selected_count > 1 {
+            return Ok(AnimationStatus::Animated);
+        }
+        // SOURCE_AUTO selects only the primary item when major brand is avif,
+        // even if multi-frame tracks are also present. Inspect tracks explicitly.
+        let animation =
+            match avif::avifDecoderSetSource(decoder.0, avif::AVIF_DECODER_SOURCE_TRACKS) {
+                avif::AVIF_RESULT_OK => match (*decoder.0).imageCount {
+                    n if n > 1 => AnimationStatus::Animated,
+                    1 => AnimationStatus::Static,
+                    _ => AnimationStatus::Unknown,
+                },
+                avif::AVIF_RESULT_NO_CONTENT
+                    if selected_count == 1
+                        && !avif_declares_sequence(bytes)
+                        && avif_has_track_box(bytes) == Some(false) =>
+                {
+                    AnimationStatus::Static
+                }
+                _ => AnimationStatus::Unknown,
+            };
+        if avif::avifDecoderSetSource(decoder.0, avif::AVIF_DECODER_SOURCE_AUTO)
+            != avif::AVIF_RESULT_OK
+        {
+            return Err(Error::Decode("AVIF 无法恢复图像源".into()));
+        }
+        Ok(animation)
+    }
+}
+
+fn probe_avif(bytes: &[u8]) -> Result<ImageProbe> {
     unsafe {
         let decoder = DecoderGuard(avif::avifDecoderCreate());
         if decoder.0.is_null() {
@@ -3088,6 +3300,7 @@ fn probe_avif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
         if avif::avifDecoderParse(decoder.0) != avif::AVIF_RESULT_OK {
             return Err(Error::Decode("avifDecoderParse 失败".into()));
         }
+        let animation = parsed_avif_animation(&decoder, bytes)?;
         let image = (*decoder.0).image;
         if image.is_null() {
             return Err(Error::Decode("decoder.image 为 null".into()));
@@ -3095,7 +3308,14 @@ fn probe_avif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
         let metadata = avif_metadata_from_image(image);
         let orientation = avif_effective_orientation(image, &metadata);
         let (width, height) = oriented_dimensions((*image).width, (*image).height, orientation);
-        Ok((width, height, probe_avif_exif_dpi(image)))
+        rgba_byte_len(width, height)?;
+        Ok(ImageProbe {
+            format: Format::Avif,
+            width,
+            height,
+            dpi: probe_avif_exif_dpi(image),
+            animation,
+        })
     }
 }
 
@@ -3307,7 +3527,13 @@ fn ensure_static_gif(bytes: &[u8]) -> Result<(u32, u32)> {
 }
 
 fn probe_gif(bytes: &[u8]) -> Result<(u32, u32, Option<Dpi>)> {
-    let (width, height) = ensure_static_gif(bytes)?;
+    if bytes.len() < 13 {
+        return Err(Error::Decode("GIF 头不完整".into()));
+    }
+    let width =
+        u32::from(le_u16(&bytes[6..8]).ok_or_else(|| Error::Decode("GIF 宽度缺失".into()))?);
+    let height =
+        u32::from(le_u16(&bytes[8..10]).ok_or_else(|| Error::Decode("GIF 高度缺失".into()))?);
     Ok((width, height, None))
 }
 
@@ -3345,11 +3571,29 @@ fn decode_via_image(bytes: &[u8], format: image::ImageFormat) -> Result<ImageDat
     decode_limits.max_image_width = Some(width);
     decode_limits.max_image_height = Some(height);
     decode_limits.max_alloc = Some(max_decode_alloc);
-    let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
-    reader.limits(decode_limits);
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|e| Error::Decode(e.to_string()))?;
+    let mut decoder: Box<dyn image::ImageDecoder + '_> = if format == image::ImageFormat::Png {
+        let decoder =
+            image::codecs::png::PngDecoder::with_limits(Cursor::new(bytes), decode_limits)
+                .map_err(|error| Error::Decode(error.to_string()))?;
+        let animation = if decoder
+            .is_apng()
+            .map_err(|error| Error::Decode(error.to_string()))?
+        {
+            AnimationStatus::Animated
+        } else {
+            AnimationStatus::Static
+        };
+        ensure_static_animation(animation, Format::Png)?;
+        Box::new(decoder)
+    } else {
+        let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
+        reader.limits(decode_limits);
+        Box::new(
+            reader
+                .into_decoder()
+                .map_err(|error| Error::Decode(error.to_string()))?,
+        )
+    };
     let source_color = decoder.color_type();
     let orientation = decoder
         .orientation()
@@ -4691,6 +4935,7 @@ impl Codec for JpegCodec {
 
     fn encode(&self, img: &ImageData, opts: &EncodeOptions) -> Result<Vec<u8>> {
         img.validate()?;
+        Format::Jpeg.validate_output_dimensions(img.width, img.height)?;
         let quality = opts.quality_clamped();
         let width = img.width as usize;
         let height = img.height as usize;
@@ -4760,6 +5005,7 @@ impl Codec for PngCodec {
 
     fn encode(&self, img: &ImageData, opts: &EncodeOptions) -> Result<Vec<u8>> {
         img.validate()?;
+        Format::Png.validate_output_dimensions(img.width, img.height)?;
         let preserves_rgba16 =
             matches!(&img.pixels, PixelBuffer::Rgba16(_)) && !opts.png_lossy_quantize;
         let raw = match &img.pixels {
@@ -4845,6 +5091,7 @@ impl Codec for WebpCodec {
 
     fn encode(&self, img: &ImageData, opts: &EncodeOptions) -> Result<Vec<u8>> {
         img.validate()?;
+        Format::WebP.validate_output_dimensions(img.width, img.height)?;
         let rgba = img.rgba8_cow();
         let encoder = webp::Encoder::from_rgba(&rgba, img.width, img.height);
         let mut config =
@@ -4995,6 +5242,11 @@ impl Codec for AvifCodec {
             if avif::avifDecoderParse(decoder.0) != avif::AVIF_RESULT_OK {
                 return Err(Error::Decode("avifDecoderParse 失败".into()));
             }
+            let animation = parsed_avif_animation(&decoder, bytes)?;
+            ensure_static_animation(animation, Format::Avif)?;
+            if animation == AnimationStatus::Unknown {
+                return Err(Error::Decode("无法确认 AVIF 动画状态".into()));
+            }
             // `Parse` 已暴露 image dimensions；必须在 `NextImage` 触发 YUV
             // 解码/分配之前拒绝异常 canvas，不能等 RGB 转换阶段才检查。
             let parsed_image = (*decoder.0).image;
@@ -5058,6 +5310,7 @@ impl Codec for AvifCodec {
 
     fn encode(&self, img: &ImageData, opts: &EncodeOptions) -> Result<Vec<u8>> {
         img.validate()?;
+        Format::Avif.validate_output_dimensions(img.width, img.height)?;
         let quality: i32 = if opts.lossless {
             100
         } else {
@@ -6545,6 +6798,7 @@ mod tests {
     #[test]
     fn non_jpeg_thumbnail_full_decode_budget_is_bounded() {
         let at_budget = ImageProbe {
+            animation: AnimationStatus::Static,
             format: Format::Png,
             width: 8_000,
             height: 4_000,
@@ -6712,10 +6966,257 @@ mod tests {
         ));
     }
 
+    fn animated_png() -> Vec<u8> {
+        let png = encode_png_rgba(2, 2, &[255; 16]).unwrap();
+        let mut result = png[..33].to_vec();
+        append_png_chunk(&mut result, b"acTL", &[0, 0, 0, 2, 0, 0, 0, 0]);
+        let frame_control = |sequence: u32| {
+            let mut data = sequence.to_be_bytes().to_vec();
+            for value in [2u32, 2, 0, 0] {
+                data.extend_from_slice(&value.to_be_bytes());
+            }
+            data.extend_from_slice(&[0, 1, 0, 10, 0, 0]);
+            data
+        };
+        append_png_chunk(&mut result, b"fcTL", &frame_control(0));
+        let mut offset = 33;
+        let mut compressed = Vec::new();
+        while offset + 12 <= png.len() {
+            let length = u32::from_be_bytes(png[offset..offset + 4].try_into().unwrap()) as usize;
+            if &png[offset + 4..offset + 8] == b"IDAT" {
+                compressed.extend_from_slice(&png[offset + 8..offset + 8 + length]);
+            }
+            offset += length + 12;
+        }
+        append_png_chunk(&mut result, b"IDAT", &compressed);
+        append_png_chunk(&mut result, b"fcTL", &frame_control(1));
+        let mut data = 2u32.to_be_bytes().to_vec();
+        data.extend(compressed);
+        append_png_chunk(&mut result, b"fdAT", &data);
+        append_png_chunk(&mut result, b"IEND", &[]);
+        result
+    }
+
+    fn animated_avif() -> Vec<u8> {
+        // SAFETY: guards retain all native resources until the owned output copy exists.
+        unsafe {
+            let image = ImageGuard(avif::avifImageCreate(
+                16,
+                16,
+                8,
+                avif::AVIF_PIXEL_FORMAT_YUV444,
+            ));
+            assert!(!image.0.is_null());
+            assert_eq!(
+                avif::avifImageAllocatePlanes(image.0, avif::AVIF_PLANES_YUV),
+                avif::AVIF_RESULT_OK
+            );
+            for plane in 0..3 {
+                std::ptr::write_bytes(
+                    (*image.0).yuvPlanes[plane],
+                    128,
+                    (*image.0).yuvRowBytes[plane] as usize * 16,
+                );
+            }
+            let encoder = EncoderGuard(avif::avifEncoderCreate());
+            assert!(!encoder.0.is_null());
+            (*encoder.0).codecChoice = avif::AVIF_CODEC_CHOICE_AOM;
+            (*encoder.0).maxThreads = 1;
+            (*encoder.0).speed = 8;
+            for _ in 0..2 {
+                assert_eq!(
+                    avif::avifEncoderAddImage(
+                        encoder.0,
+                        image.0,
+                        1,
+                        avif::AVIF_ADD_IMAGE_FLAG_NONE
+                    ),
+                    avif::AVIF_RESULT_OK
+                );
+            }
+            let mut output = RwDataGuard(avif::avifRWData::default());
+            assert_eq!(
+                avif::avifEncoderFinish(encoder.0, &mut output.0),
+                avif::AVIF_RESULT_OK
+            );
+            std::slice::from_raw_parts(output.0.data, output.0.size).to_vec()
+        }
+    }
+
+    #[test]
+    fn apng_facts_are_reported_but_every_decode_entry_rejects_animation() {
+        use image::AnimationDecoder as _;
+        let bytes = animated_png();
+        let frames = image::codecs::png::PngDecoder::new(Cursor::new(&bytes))
+            .unwrap()
+            .apng()
+            .unwrap()
+            .into_frames()
+            .collect_frames()
+            .unwrap();
+        assert_eq!(frames.len(), 2, "fixture must be a real two-frame APNG");
+        assert_eq!(probe(&bytes).unwrap().animation, AnimationStatus::Animated);
+        assert!(matches!(
+            PngCodec.decode(&bytes),
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(
+            convert_workflow(
+                &bytes,
+                Format::Png,
+                &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+                None
+            ),
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(thumbnail(&bytes, 32), Err(Error::Unsupported(_))));
+    }
+
+    #[test]
+    fn avif_sequence_is_reported_and_rejected_before_pixel_decode() {
+        let bytes = animated_avif();
+        assert_eq!(probe(&bytes).unwrap().animation, AnimationStatus::Animated);
+        assert!(
+            matches!(AvifCodec.decode(&bytes), Err(Error::Unsupported(message)) if message.contains("AVIF"))
+        );
+        assert!(matches!(
+            convert(&bytes, Format::Png, &EncodeOptions::default()),
+            Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn avif_primary_brand_cannot_hide_a_multiframe_track() {
+        for keep_sequence_brand in [true, false] {
+            let mut bytes = animated_avif();
+            bytes[8..12].copy_from_slice(b"avif");
+            let ftyp_end = u32::from_be_bytes(bytes[..4].try_into().unwrap()) as usize;
+            if !keep_sequence_brand {
+                for brand in bytes[16..ftyp_end].chunks_exact_mut(4) {
+                    if brand == b"avis" {
+                        brand.copy_from_slice(b"mif1");
+                    }
+                }
+            }
+            // Prove this fixture hits libavif's primary-item selection branch.
+            unsafe {
+                let decoder = DecoderGuard(avif::avifDecoderCreate());
+                assert!(!decoder.0.is_null());
+                assert_eq!(
+                    avif::avifDecoderSetIOMemory(decoder.0, bytes.as_ptr(), bytes.len()),
+                    avif::AVIF_RESULT_OK
+                );
+                assert_eq!(avif::avifDecoderParse(decoder.0), avif::AVIF_RESULT_OK);
+                assert_eq!((*decoder.0).imageCount, 1);
+            }
+            if keep_sequence_brand {
+                assert_eq!(probe(&bytes).unwrap().animation, AnimationStatus::Animated);
+            } else {
+                // libavif stops parsing before undeclared tracks. Do not call
+                // this static merely because its primary item parsed successfully.
+                assert_eq!(probe(&bytes).unwrap().animation, AnimationStatus::Unknown);
+            }
+            assert!(AvifCodec.decode(&bytes).is_err());
+            assert!(thumbnail(&bytes, 32).is_err());
+            assert!(convert(&bytes, Format::Png, &EncodeOptions::default()).is_err());
+        }
+    }
+
+    #[test]
+    fn avif_declared_sequence_with_missing_tracks_is_not_treated_as_static() {
+        let mut bytes = animated_avif();
+        bytes[8..12].copy_from_slice(b"avif");
+        let mut without_tracks = Vec::new();
+        let mut offset = 0;
+        while offset + 8 <= bytes.len() {
+            let size = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize;
+            assert!(size >= 8 && offset + size <= bytes.len());
+            if &bytes[offset + 4..offset + 8] != b"moov" {
+                without_tracks.extend_from_slice(&bytes[offset..offset + size]);
+            }
+            offset += size;
+        }
+        assert!(probe(&without_tracks).is_err());
+        assert!(AvifCodec.decode(&without_tracks).is_err());
+    }
+
+    #[test]
+    fn incomplete_probe_is_unknown_and_full_decode_still_checks_animation() {
+        let bytes = animated_png();
+        let padded = insert_png_chunk_after_ihdr(&bytes, b"npAD", &vec![0; 512 * 1024]);
+        let partial = probe(&padded[..512 * 1024]).unwrap();
+        assert_eq!(partial.animation, AnimationStatus::Unknown);
+        partial.ensure_static().unwrap();
+        assert_eq!(probe(&padded).unwrap().animation, AnimationStatus::Animated);
+        assert!(matches!(
+            PngCodec.decode(&padded),
+            Err(Error::Unsupported(_))
+        ));
+        let gif = animated_gif();
+        assert_eq!(
+            probe(&gif[..13]).unwrap().animation,
+            AnimationStatus::Unknown
+        );
+        assert!(GifCodec.decode(&gif[..13]).is_err());
+    }
+
+    #[test]
+    fn encoder_table_matches_shipped_formats_and_lossless_contract() {
+        for &format in READABLE_FORMATS {
+            let caps = format.encoder_capabilities();
+            assert_eq!(caps.is_some(), WRITABLE_FORMATS.contains(&format));
+            if let Some(caps) = caps {
+                assert_eq!(caps.lossless, LOSSLESS_FORMATS.contains(&format));
+                assert_eq!(caps.max_pixels, MAX_PIXELS as u64);
+                assert!(!caps.animation);
+            }
+        }
+        assert_eq!(
+            Format::WebP.encoder_capabilities().unwrap().max_side,
+            16_383
+        );
+        assert!(Format::WebP.validate_output_dimensions(16_383, 1).is_ok());
+        assert!(Format::WebP.validate_output_dimensions(16_384, 1).is_err());
+        assert!(Format::Jpeg.validate_output_dimensions(65_501, 1).is_err());
+    }
+
+    #[test]
+    fn thin_large_webp_is_rejected_by_side_not_pixel_budget() {
+        let image = ImageData::new(1_000, 20_000, vec![255; 1_000 * 20_000 * 4]).unwrap();
+        let error = convert_image_workflow_with_control(
+            image,
+            Format::WebP,
+            &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::Unsupported(message) if message.contains("16383")));
+    }
+
+    #[test]
+    fn explicit_resize_can_make_an_oversize_side_encodable() {
+        let image = ImageData::new(1, 20_000, vec![255; 20_000 * 4]).unwrap();
+        let options = WorkflowOptions {
+            resize: ResizeRule {
+                mode: ResizeMode::LongestEdge,
+                value: Some(32),
+                ..ResizeRule::default()
+            },
+            ..workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll)
+        };
+        let output =
+            convert_image_workflow_with_control(image, Format::WebP, &options, None, None).unwrap();
+        assert_eq!((output.width, output.height), (1, 32));
+    }
+
     #[test]
     fn animated_gif_is_rejected_before_decode() {
-        let err = probe(&animated_gif()).unwrap_err();
-        assert!(matches!(err, Error::Unsupported(message) if message.contains("动画 GIF")));
+        let bytes = animated_gif();
+        assert_eq!(probe(&bytes).unwrap().animation, AnimationStatus::Animated);
+        assert!(
+            matches!(GifCodec.decode(&bytes), Err(Error::Unsupported(message)) if message.contains("动画 GIF"))
+        );
     }
 
     #[test]
