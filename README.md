@@ -62,7 +62,7 @@
 </p>
 
 > [!NOTE]
-> The latest GitHub Release is **v0.2.22**, with signed/notarized macOS DMGs,
+> The latest GitHub Release is **v0.3.1**, with signed/notarized macOS DMGs,
 > checksum-verified unsigned Windows x64/arm64 MSI and NSIS packages, Linux amd64/arm64 direct
 > packages, and signed Linux x86_64 updater metadata. Snap Store independently provides Linux amd64
 > and arm64 builds on its stable channel.
@@ -130,7 +130,7 @@
 
 ## Release and project status
 
-- ✅ **GitHub Release v0.2.22**: provides Linux amd64/arm64 direct packages, signed
+- ✅ **GitHub Release v0.3.1**: provides Linux amd64/arm64 direct packages, signed
   Linux x86_64 updater metadata, and notarized macOS arm64/x64 DMGs. Snap Store stable
   independently serves amd64 and arm64.
 - ✅ **Windows direct packages**: native arm64/x64 workflows build intentionally

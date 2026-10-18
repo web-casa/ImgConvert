@@ -215,6 +215,10 @@ export type ConvertWarning =
       code: "pdfRenderWarnings";
       page: number;
       count: number;
+    }
+  | {
+      code: "temporaryFileRetained";
+      path: string;
     };
 export interface ImportScanError {
   path: string;
@@ -2535,6 +2539,8 @@ export function formatConvertWarning(warning: ConvertWarning): string[] {
           count: warning.count,
         }),
       ];
+    case "temporaryFileRetained":
+      return [translate("state.temporaryFileRetained", { path: warning.path })];
   }
 }
 

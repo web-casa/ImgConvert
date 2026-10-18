@@ -240,6 +240,8 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 
 B1a（2026-10-18，分支 `feat/backend-cancel-wiring`）：`convert_with_control` 的普通图片分支改调 `convert_workflow_with_control` 并传入 token 钩子；`write_output` 前与结果缓存查找前各加一次 `ensure_not_cancelled` 作为两条提交路径的判定点；新增 `ConversionErrorKind::Cancelled`（核心 `Error::Cancelled` 的映射，单文件入口仍报 `conversion_failed`，批次 worker 对已取消 token 下的错误照旧丢弃）。测试：预先取消的 token 不写输出且同选项无 token 可转换；测试专用的检查点钩子让 worker 停在核心第一个取消检查点、另一线程取消后放行，确定性地证明核心内取消时输出不落盘、`cancelled=true`、`completed=failed=skipped=0`。Codex 评审 0 P1/2 P2/1 P3，已全修（缓存命中路径的提交判定点、竞态测试改为同步钩子、ENGINE 文案收窄）。两壳无接口变化。`docs/ENGINE.md` §7 补取消点说明。
 
+B1b（2026-10-18，分支 `feat/atomic-new-output`）：新增 `imgconvert_platform::atomic_output`（`commit_new_file`：Linux `renameat2(RENAME_NOREPLACE)` 走原始 syscall、macOS `renamex_np(RENAME_EXCL)`、Windows `MoveFileExW(0)`；仅“不支持”类错误退到 `hard_link`，已存在/权限错误直接返回，无直写回退）；backend `write_new_output` 改为临时文件 + `sync_all` + 提交，`OutputExists` 语义不变，新增 `temporaryFileRetained` 告警（GPUI 与 Tauri 前端各加一条文案）。Codex 评审后修正：硬链接失败单独分类（仅 `EPERM`/`ERROR_INVALID_FUNCTION` 等能力类错误算不支持，其余按 IO 错误原样返回）；Windows 路径先转 `\\?\` verbatim 形式再调 `MoveFileExW`，与 std 的长路径行为一致；`preserve_source_modified_time` 改为返回告警列表，`temporaryFileRetained` 与 `modifiedTimeNotPreserved` 可并存（`warning` 兼容字段取首条）。单测：提交前不可见、已存在（文件/目录/悬空链接）不覆盖、注入“不支持”走硬链接且仍不覆盖、硬链接成功但删临时名失败仍算提交、权限错误不进回退、硬链接 IO 错误保留原义、两者都不支持报“请更换输出目录”、Windows verbatim 路径转换。N3：README 两份与 `docs/public-release.json` 同步到 v0.3.1（`docs:check` 已校验三者一致）。三平台验证：Linux 由 CI `Rust Core` 覆盖，macOS 在 Parallels 虚拟机实跑，Windows 走手动 `Windows Smoke` 新增的平台/backend 写出测试步骤。
+
 ## 5. 各切片的设计要点
 
 ### B1：取消与原子新建输出

@@ -62,7 +62,7 @@
 </p>
 
 > [!NOTE]
-> 最新 GitHub Release 为 **v0.2.22**，提供已签名/公证的 macOS DMG、经校验和验证但未
+> 最新 GitHub Release 为 **v0.3.1**，提供已签名/公证的 macOS DMG、经校验和验证但未
 > 签名的 Windows x64/arm64 MSI 与 NSIS 安装包、Linux amd64/arm64 直装包，以及已签名的
 > Linux x86_64 updater 元数据。Snap Store 的 stable 渠道也独立提供 Linux amd64 与
 > arm64 版本。
@@ -129,7 +129,7 @@
 
 ## 发布与项目状态
 
-- ✅ **GitHub Release v0.2.22**：提供 Linux amd64/arm64 直装包、已签名的 Linux
+- ✅ **GitHub Release v0.3.1**：提供 Linux amd64/arm64 直装包、已签名的 Linux
   x86_64 updater 元数据，以及已公证的 macOS arm64/x64 DMG。Snap Store stable 独立
   提供 amd64 与 arm64。
 - ✅ **Windows 直装包**：arm64/x64 EXE/MSI 按项目策略保持未签名，已纳入安装

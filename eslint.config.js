@@ -17,6 +17,7 @@ export default [
       "src-tauri/fuzz/target/**",
       "src-tauri/target/**",
       "target/**",
+      "apps/gpui/target/**",
       "tmp/**",
       "docs-site/**",
       "THIRD_PARTY_LICENSES.md",
