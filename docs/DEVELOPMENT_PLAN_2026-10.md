@@ -242,6 +242,8 @@ B1a（2026-10-18，分支 `feat/backend-cancel-wiring`，PR #23 已合并 main 8
 
 B1b（2026-10-18，分支 `feat/atomic-new-output`，PR #24 已合并 main 1528ba3；三平台实跑：Linux CI、macOS 虚拟机 APFS、Windows 手动 Smoke x64 NTFS）：新增 `imgconvert_platform::atomic_output`（`commit_new_file`：Linux `renameat2(RENAME_NOREPLACE)` 走原始 syscall、macOS `renamex_np(RENAME_EXCL)`、Windows `MoveFileExW(0)`；仅“不支持”类错误退到 `hard_link`，已存在/权限错误直接返回，无直写回退）；backend `write_new_output` 改为临时文件 + `sync_all` + 提交，`OutputExists` 语义不变，新增 `temporaryFileRetained` 告警（GPUI 与 Tauri 前端各加一条文案）。Codex 评审后修正：硬链接失败单独分类（仅 `EPERM`/`ERROR_INVALID_FUNCTION` 等能力类错误算不支持，其余按 IO 错误原样返回）；Windows 路径先转 `\\?\` verbatim 形式再调 `MoveFileExW`，与 std 的长路径行为一致；`preserve_source_modified_time` 改为返回告警列表，`temporaryFileRetained` 与 `modifiedTimeNotPreserved` 可并存（`warning` 兼容字段取首条）。单测：提交前不可见、已存在（文件/目录/悬空链接）不覆盖、注入“不支持”走硬链接且仍不覆盖、硬链接成功但删临时名失败仍算提交、权限错误不进回退、硬链接 IO 错误保留原义、两者都不支持报“请更换输出目录”、Windows verbatim 路径转换。N3：README 两份与 `docs/public-release.json` 同步到 v0.3.1（`docs:check` 已校验三者一致）。三平台验证：Linux 由 CI `Rust Core` 覆盖，macOS 在 Parallels 虚拟机实跑，Windows 走手动 `Windows Smoke` 新增的平台/backend 写出测试步骤。
 
+R1 + L2（2026-10-18，分支 `fix/tauri-instance-lock`，进行中）：Tauri 启动最前端接入共享 `instance.lock`，flavor=`tauri`、version 为包版本，app state 持锁到退出；同 flavor 或 GPUI 占用时仅原生提示并退出，无 WebView/store/业务服务。数据目录缺失或锁 IO 错误也停止启动，防止 Tauri store 无锁写入。单测覆盖 Tauri→GPUI、GPUI→Tauri、同 flavor、释放后可重启、残留标记恢复、IO/路径失败和设置不变；Linux 启动模块 4 项与 platform 锁测试 2 项通过，根 376 项、GPUI 44 项、前端 153 项通过；负向验证确认绕过占用检查会变红。Codex 无 P1/P2、1 项 P3 文案已修；顺带修正 platform 既有 Windows 持锁读 marker 的测试断言并纳入 Windows Smoke。L2 的补丁说明与逐项 QA 状态见 `docs/GPUI_R1_L2_QA.md`；尚未获得合并/打 tag/发布授权，三平台安装件 QA 与签名/公证证据未齐，**G1 保持未关闭**。
+
 ## 5. 各切片的设计要点
 
 ### B1：取消与原子新建输出

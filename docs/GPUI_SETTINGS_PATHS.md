@@ -61,4 +61,4 @@ identifier 为 `com.ivmm.imgconvert`（`src-tauri/tauri.conf.json`）。
 
 - MSIX：`%APPDATA%` 是否被虚拟化到包目录（方案 §3.5、§8）。
 - Snap/Flatpak：`$XDG_DATA_HOME` 在沙盒内的实际值，以及 0.3.x 与 GPUI 包是否落在同一 home。
-- 0.3.x 过渡版尚未写 `instance.lock`（Tauri 侧待办，随 G1 的 0.3.x 补丁一起做）。
+- 0.3.x 过渡版的锁接入见 `src-tauri/src/startup.rs`：Tauri 在缓存清理、插件注册和 WebView 创建前取锁，flavor 为 `tauri`、version 为包版本，由 app state 持有到退出。占用时（含同 flavor）只启动没有 WebView、store 插件和 IPC 的原生提示框，关闭后退出；不读写共享设置。无法解析数据目录或取锁发生 IO 错误时也停止启动：Tauri store 没有 GPUI 的“仅内存设置”模式，不能保证未持锁启动不会写盘。两壳安装件的互斥/崩溃恢复端到端验收仍待 R2；代码接入不等于 G1 已关闭。

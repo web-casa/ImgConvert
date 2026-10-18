@@ -304,6 +304,8 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，4 项 P1、3 项 P2�
 - P2 测试缺口：新增"运行中进度发送失败 ⇒ 取消令牌、worker 停止、不再发任何终态事件"测试；剩余缺口（预览与 service 的真实竞争集成测试、IPC future 取消的 Tauri 侧测试）需要 GUI 运行时，留给阶段 2 的 Kit UI 测试。
 - `cargo about` 复核：重新生成 `THIRD_PARTY_LICENSES.md`，相比迁移前只多出 `imgconvert-backend`/`imgconvert-platform` 两个工作区 crate，没有新增第三方依赖。
 
+R1 收口准备（2026-10-18）：Tauri 在任何 WebView/store 插件启动前取得共享 `instance.lock`，由应用状态持有至退出。占用或锁 IO 失败只显示原生提示并退出，不启动读写设置的前端。实现与验证记录见 `docs/GPUI_R1_L2_QA.md`。L2 补丁发布、三平台完整安装 QA 未完成，G1 **未关闭**；不要把 R1 的代码测试当作发布验收。
+
 门槛 G1：全部现有 Rust 测试、fuzz 回放、`e2e-desktop` 通过；0.3.x 完成三平台 QA；许可证扫描通过。
 
 ### 阶段 2：GPUI 技术验证（3 周）

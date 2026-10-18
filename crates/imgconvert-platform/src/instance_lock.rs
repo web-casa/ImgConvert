@@ -131,6 +131,8 @@ mod tests {
             AcquireOutcome::HeldByOther(other) => panic!("unexpected holder {other:?}"),
         };
         assert_eq!(first.info().flavor, "gpui");
+        assert_eq!(first.info().version, "1");
+        #[cfg(unix)]
         assert_eq!(read_info(&path).unwrap().version, "1");
 
         // Any second starter is refused, same flavor or not.
@@ -150,11 +152,13 @@ mod tests {
         // Closing the holder (a clean exit or a crash) frees the marker.
         drop(first);
         match acquire(&path, InstanceInfo::new("tauri", "0.3.1")).unwrap() {
-            AcquireOutcome::Acquired(_lock) => {
-                assert_eq!(read_info(&path).unwrap().flavor, "tauri")
+            AcquireOutcome::Acquired(lock) => {
+                assert_eq!(lock.info().flavor, "tauri")
             }
             AcquireOutcome::HeldByOther(other) => panic!("stale hold {other:?}"),
         }
+        // Windows rejects reads while the exclusive byte-range lock is held.
+        assert_eq!(read_info(&path).unwrap().flavor, "tauri");
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
@@ -173,11 +177,12 @@ mod tests {
         );
         match acquire(&path, InstanceInfo::new("gpui", "1")).unwrap() {
             AcquireOutcome::Acquired(lock) => {
-                assert_eq!(read_info(&path).unwrap().pid, std::process::id());
+                assert_eq!(lock.info().pid, std::process::id());
                 assert_eq!(lock.path(), path);
             }
             AcquireOutcome::HeldByOther(other) => panic!("dead marker blocked start: {other:?}"),
         }
+        assert_eq!(read_info(&path).unwrap().pid, std::process::id());
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 }

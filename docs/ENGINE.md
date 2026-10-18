@@ -206,6 +206,8 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 
 ## 7. 进度 / 取消(全员缺失,我们自建,直接领先)
 
+- **桌面启动互斥**：Tauri 与 GPUI 复用 backend 导出的 `instance_lock` 协议及 `paths::instance_lock_file()`。Tauri 在创建 WebView 和注册 store 前取得独占锁，作为应用状态持有到退出（含批次 shutdown 等待）；锁占用时只显示原生提示后退出，不创建业务服务、不读取共享设置。Tauri 无法定位数据目录或取锁 IO 失败时拒绝启动，避免 store 在无锁状态写入；GPUI 的既有仅内存/错误策略不变。锁文件永久保留，进程退出或崩溃由 OS 释放锁；旧版未实现协议的 Tauri 安装件仍不能受此保护。
+
 - **进度**:用 **Tauri Channel**(有序、低延迟、按调用作用域),非 event。批量逐文件 + 文件内进度。
   ```rust
   use tauri::ipc::Channel;
