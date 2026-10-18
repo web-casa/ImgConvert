@@ -215,6 +215,7 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
   ```
   可参考 Hando 的 **EventSink trait**(生产/测试两实现)做可测试抽象,但用 Channel 落地。
 - **取消**:`tokio_util::sync::CancellationToken` 存入 `.manage()`,长任务 `select!` 监听;参考项目**无一实现**,这是我们的增量。
+  - 普通图片与 PDF 页面都把 token 以 `is_cancelled` 钩子传入 `imgconvert_core::convert_workflow_with_control`/`convert_image_workflow_with_control`：核心在解码前后、色彩与缩放之后、每个编码候选前后、每次质量评分前后检查并返回 `Error::Cancelled`；后端以 `write_output` 之前（结果缓存命中路径则是缓存查找之前）的 token 检查为提交判定点：检查时已取消的结果不落盘，检查通过后允许完成写出与收尾。单次原生编码调用（mozjpeg/libwebp/libavif/oxipng 的一次 encode）仍不可中断，取消在它返回后的下一个检查点生效。批次 worker 对已取消 token 下的错误不发 `FileError`，因此取消项既不计失败也不计完成。
 - **并发**:全局信号量限并发(默认 `(num_cpus-1).clamp(1,8)`)。⚠️ **关键(评审 #4 + Codex)**:AVIF 编码器内部多线程;文件级并发 × 内部多线程 = **oversubscribe + OOM**。走 libavif 路线时应设 **libavif encoder `maxThreads=1`**(sys 层对应 C 字段;高层 `libavif` wrapper 是 `set_max_threads`),靠文件级并行,不要两层都开。
 - **P0.5 诊断**:`AVIF_ENCODER_MAX_THREADS=1` 已提升为 `imgconvert-core` 常量并写入 `avifEncoder.maxThreads`;Tauri `runtime_diagnostics()` 暴露默认并发、内存预算、RGBA 工作集倍率和 AVIF 内部线程上限。批处理估算同时纳入导入尺寸的像素工作集和实际源文件字节数，文件大小无法可靠读取时按 256 MiB 上限保守预留。单测覆盖该诊断,平台性能/线程数实测放到 P3/macOS 阶段。
 - **传参传文件路径**,⚠️ 别学 tavif/compressor 把整图 base64 穿 IPC。
