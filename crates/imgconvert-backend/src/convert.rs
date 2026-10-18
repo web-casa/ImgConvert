@@ -60,6 +60,10 @@ enum WriteMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConversionErrorKind {
+    /// The caller's cancellation token fired while this file was being processed.
+    /// Batch workers drop the file silently; the single-file entry point reports
+    /// it as a plain conversion failure because it never passes a token.
+    Cancelled,
     ConversionFailed,
     FileNotFound,
     GenerationLossGuard,
@@ -1115,7 +1119,7 @@ pub fn command_error_for_conversion(
             CommandError::pdf_resource_limit(options.input.clone(), detail)
         }
         ConversionErrorKind::PdfInvalid => CommandError::pdf_invalid(options.input.clone(), detail),
-        ConversionErrorKind::ConversionFailed => {
+        ConversionErrorKind::Cancelled | ConversionErrorKind::ConversionFailed => {
             CommandError::conversion_failed(options.input.clone(), detail)
         }
     }
@@ -1529,6 +1533,10 @@ fn convert_with_control(
             metadata_override,
         )
     });
+    // Commit gate for the cache-hit path: a hit only refreshes the output's
+    // timestamp, so this check right before the lookup is its last chance to
+    // observe a cancelled batch. The freshly encoded path checks again below.
+    ensure_not_cancelled(cancel, &out)?;
     if let Some(key) = cache_key.as_deref() {
         if let Some(hit) = result_cache::hit(&out, key) {
             let out_size = hit.output_size;
@@ -1570,18 +1578,25 @@ fn convert_with_control(
             });
         }
     }
-    let workflow_result = if let Some(timeout) = wall_clock_timeout {
-        imgconvert_core::convert_workflow_with_timeout(
-            source,
-            target,
-            &workflow_options,
-            metadata_override,
-            timeout,
-        )
-    } else {
-        imgconvert_core::convert_workflow(source, target, &workflow_options, metadata_override)
-    }
-    .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
+    // The core checks this hook after decoding, before and after every encode
+    // candidate and around every quality scoring pass, so a cancelled batch
+    // stops a long encode at the next checkpoint instead of finishing it. The
+    // single-file entry point passes no token and keeps the old behaviour.
+    let is_cancelled = || {
+        #[cfg(test)]
+        tests::observe_cancel_check(input);
+        cancel.is_some_and(CancellationToken::is_cancelled)
+    };
+    let cancelled_hook: Option<&dyn Fn() -> bool> = cancel.map(|_| &is_cancelled as _);
+    let workflow_result = imgconvert_core::convert_workflow_with_control(
+        source,
+        target,
+        &workflow_options,
+        metadata_override,
+        wall_clock_timeout,
+        cancelled_hook,
+    )
+    .map_err(conversion_error_for_core)?;
     let dimensions_changed = source_probe.as_ref().is_some_and(|probe| {
         (workflow_result.width, workflow_result.height) != (probe.width, probe.height)
     });
@@ -1622,6 +1637,9 @@ fn convert_with_control(
         return Err(message);
     }
 
+    // Last cancellation point before the output becomes visible: an encode
+    // that finished just as the batch was cancelled must not be committed.
+    ensure_not_cancelled(cancel, &out)?;
     let write_mode = if overwrite_mode == "overwrite" {
         WriteMode::Replace
     } else {
@@ -1655,6 +1673,29 @@ fn convert_with_control(
         output_count: 1,
         skipped_output_count: 0,
     })
+}
+
+fn conversion_error_for_core(error: imgconvert_core::Error) -> ConversionError {
+    match error {
+        imgconvert_core::Error::Cancelled(stage) => ConversionError::new(
+            ConversionErrorKind::Cancelled,
+            format!("转换已取消（{stage}）"),
+        ),
+        other => ConversionError::conversion_failed(other.to_string()),
+    }
+}
+
+fn ensure_not_cancelled(
+    cancel: Option<&CancellationToken>,
+    out: &Path,
+) -> Result<(), ConversionError> {
+    if cancel.is_some_and(CancellationToken::is_cancelled) {
+        return Err(ConversionError::new(
+            ConversionErrorKind::Cancelled,
+            format!("转换已取消（输出提交前）: {}", out.display()),
+        ));
+    }
+    Ok(())
 }
 
 fn convert_pdf(
@@ -5948,6 +5989,116 @@ pub(crate) mod tests {
         assert_eq!(summary.failed, 0);
         assert!(summary.cancelled);
         assert!(!out_dir.join("sample.jpg").exists());
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    type CancelCheckHook = Arc<dyn Fn(&Path) + Send + Sync>;
+
+    /// Test-only observer of the core's cancellation checkpoints. A test
+    /// installs a hook keyed on its own input path, so parallel tests that
+    /// convert other files never see it.
+    static CANCEL_CHECK_HOOK: Mutex<Option<CancelCheckHook>> = Mutex::new(None);
+
+    pub(super) fn observe_cancel_check(input: &Path) {
+        let hook = CANCEL_CHECK_HOOK.lock().unwrap().clone();
+        if let Some(hook) = hook {
+            hook(input);
+        }
+    }
+
+    fn lossless_webp_options(input: &Path, out_dir: &Path) -> ConvertOptions {
+        ConvertOptions {
+            lossless: true,
+            result_cache: false,
+            ..default_conversion_options(
+                input.to_string_lossy().into_owned(),
+                Some(out_dir.to_string_lossy().into_owned()),
+                "webp".into(),
+            )
+        }
+    }
+
+    #[test]
+    fn cancelled_token_stops_a_plain_image_before_any_output_is_written() {
+        let dir = unique_test_dir("cancel-plain-image");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.png");
+        fs::write(&input, one_by_one_png()).unwrap();
+        let options = lossless_webp_options(&input, &out_dir);
+
+        let token = CancellationToken::new();
+        token.cancel();
+        let error = convert_with_control(&options, Some(&token), None).unwrap_err();
+
+        assert_eq!(error.kind, ConversionErrorKind::Cancelled, "{error}");
+        assert!(!out_dir.join("sample.webp").exists());
+        assert!(!out_dir.exists() || fs::read_dir(&out_dir).unwrap().next().is_none());
+
+        // Without a token the same options still convert, so the early return
+        // is attributable to the cancellation and not to the options.
+        convert_with_control(&options, None, None).unwrap();
+        assert!(out_dir.join("sample.webp").exists());
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn cancelling_inside_the_core_workflow_discards_the_file_without_counting_it() {
+        let dir = unique_test_dir("cancel-inside-core");
+        let out_dir = dir.join("out");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("sample.png");
+        fs::write(&input, one_by_one_png()).unwrap();
+        let options = lossless_webp_options(&input, &out_dir);
+
+        // The worker blocks at the core's first cancellation checkpoint until
+        // the helper thread has cancelled the token, so the cancellation is
+        // observed inside the workflow regardless of scheduling or encode time.
+        let (entered_tx, entered_rx) = mpsc::channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let release_rx = Mutex::new(release_rx);
+        let hook_input = input.clone();
+        let armed = std::sync::atomic::AtomicBool::new(true);
+        let hook: CancelCheckHook = Arc::new(move |path: &Path| {
+            if path != hook_input || !armed.swap(false, Ordering::SeqCst) {
+                return;
+            }
+            entered_tx.send(()).unwrap();
+            release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the test thread releases the worker after cancelling");
+        });
+        *CANCEL_CHECK_HOOK.lock().unwrap() = Some(hook);
+
+        let token = CancellationToken::new();
+        let canceller = token.clone();
+        let helper = thread::spawn(move || {
+            entered_rx
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the worker reaches a core cancellation checkpoint");
+            canceller.cancel();
+            release_tx.send(()).unwrap();
+        });
+        let summary = convert_batch(
+            vec![options],
+            &crate::progress::NullSink,
+            BatchId::new(1),
+            token,
+            Some(1),
+        )
+        .unwrap();
+        helper.join().unwrap();
+        *CANCEL_CHECK_HOOK.lock().unwrap() = None;
+
+        assert!(summary.cancelled, "{summary:?}");
+        assert_eq!(summary.completed, 0);
+        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.skipped, 0);
+        assert!(!out_dir.join("sample.webp").exists());
 
         fs::remove_dir_all(dir).unwrap();
     }

@@ -236,6 +236,10 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 | E2 | 4 d | 2 d | 无 |
 | E3 | 2 d | 1 d | 无 |
 
+### 4.2 进度
+
+B1a（2026-10-18，分支 `feat/backend-cancel-wiring`）：`convert_with_control` 的普通图片分支改调 `convert_workflow_with_control` 并传入 token 钩子；`write_output` 前与结果缓存查找前各加一次 `ensure_not_cancelled` 作为两条提交路径的判定点；新增 `ConversionErrorKind::Cancelled`（核心 `Error::Cancelled` 的映射，单文件入口仍报 `conversion_failed`，批次 worker 对已取消 token 下的错误照旧丢弃）。测试：预先取消的 token 不写输出且同选项无 token 可转换；测试专用的检查点钩子让 worker 停在核心第一个取消检查点、另一线程取消后放行，确定性地证明核心内取消时输出不落盘、`cancelled=true`、`completed=failed=skipped=0`。Codex 评审 0 P1/2 P2/1 P3，已全修（缓存命中路径的提交判定点、竞态测试改为同步钩子、ENGINE 文案收窄）。两壳无接口变化。`docs/ENGINE.md` §7 补取消点说明。
+
 ## 5. 各切片的设计要点
 
 ### B1：取消与原子新建输出
