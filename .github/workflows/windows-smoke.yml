@@ -280,6 +280,9 @@ jobs:
       - name: Tauri backend Windows tests
         run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
 
+      - name: Shared instance lock tests (platform)
+        run: cargo +1.96.0 test -p imgconvert-platform --lib instance_lock
+
       - name: Atomic output commit tests (platform + backend)
         run: |
           cargo +1.96.0 test -p imgconvert-platform --lib atomic_output

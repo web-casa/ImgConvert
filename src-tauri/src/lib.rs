@@ -9,6 +9,7 @@
 //! in `imgconvert-backend` and system capabilities in `imgconvert-platform`.
 
 mod perf_probe;
+mod startup;
 
 use std::sync::Arc;
 
@@ -389,9 +390,20 @@ fn desktop_e2e_seed() -> Option<DesktopE2ESeed> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Acquire before any plugin or webview can access the shared settings.
+    let instance_lock = match startup::acquire_instance_lock(
+        imgconvert_backend::paths::instance_lock_file().as_deref(),
+    ) {
+        Ok(lock) => lock,
+        Err(message) => {
+            show_startup_error(message);
+            return;
+        }
+    };
     result_cache::cleanup_best_effort();
     import::cleanup_stale_clipboard_temp_dirs_best_effort();
     let builder = tauri::Builder::default()
+        .manage(instance_lock)
         .manage(BatchService::new())
         .manage(PreviewState::default())
         .manage(ImportScanState::default())
@@ -434,7 +446,7 @@ pub fn run() {
             perf_probe::perf_probe_config,
             perf_probe::perf_probe_mark
         ])
-        .build(tauri::generate_context!())
+        .build(application_context())
         .expect("error while building tauri application")
         .run(|app, event| {
             // Exit path: cancel the running batch and wait for in-flight atomic writes.
@@ -447,6 +459,38 @@ pub fn run() {
                 }
             }
         });
+}
+
+// Keep exactly one macro expansion: on macOS each expansion embeds the same
+// Info.plist linker symbol, even when the two startup paths are exclusive.
+fn application_context() -> tauri::Context<tauri::Wry> {
+    tauri::generate_context!()
+}
+
+/// The rejected process has no webview, business IPC handlers or store plugin.
+fn show_startup_error(message: String) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+
+    eprintln!("imgconvert: {message}");
+    let mut context = application_context();
+    context.config_mut().app.windows.clear();
+    let result = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            app.dialog()
+                .message(message)
+                .title("ImgConvert")
+                .kind(MessageDialogKind::Warning)
+                .buttons(MessageDialogButtons::OkCustom("Exit / 退出".into()))
+                // Nonblocking: native dialogs may dispatch to the main thread.
+                .show(move |_| handle.exit(1));
+            Ok(())
+        })
+        .run(context);
+    if let Err(error) = result {
+        eprintln!("imgconvert: cannot show the startup message: {error}");
+    }
 }
 
 /// How long exit waits for a cancelled batch to reach a safe boundary.
