@@ -127,6 +127,11 @@ jobs:
       - name: Tauri backend macOS tests
         run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
 
+      - name: Atomic output commit tests (platform + backend)
+        run: |
+          cargo +1.96.0 test -p imgconvert-platform --lib atomic_output
+          cargo +1.96.0 test -p imgconvert-backend --lib -- write_output atomic_commit modified_time
+
       - name: Generate HEIC fixture
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.heic_smoke }}
         run: |

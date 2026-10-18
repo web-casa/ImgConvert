@@ -7,6 +7,7 @@
 //! only. It must never depend on `tauri`, `gpui` or any UI toolkit; shells
 //! implement the traits declared here (for example [`dialogs::FilePicker`]).
 
+pub mod atomic_output;
 pub mod dialogs;
 pub mod external_codecs;
 pub mod instance_lock;

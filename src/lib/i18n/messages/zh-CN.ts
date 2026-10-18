@@ -493,6 +493,7 @@ export const zhCN = {
     outputExists: "输出文件已存在：\n{path}",
     outputBackupRetained: "转换完成，但原输出备份仍保留在：{path}",
     modifiedTimeNotPreserved: "转换完成，但未能保留修改时间：{path}",
+    temporaryFileRetained: "转换完成，但未能删除临时文件：{path}",
     colorProfileConvertedForResize: "调整尺寸前已将像素转换为 sRGB，并移除不再匹配的原 ICC 配置。",
     invalidColorProfileDiscarded:
       "嵌入的 ICC 配置无效；已按隐私设置移除，像素按原始解码值输出，颜色可能与源应用不同。",

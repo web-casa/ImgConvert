@@ -560,6 +560,9 @@ warning.output_backup_retained:
 warning.modified_time_not_preserved:
   en: "Converted, but the modified time could not be preserved: %{path}"
   zh-CN: "转换完成，但未能保留修改时间：%{path}"
+warning.temporary_file_retained:
+  en: "Converted, but the temporary file could not be removed: %{path}"
+  zh-CN: "转换完成，但未能删除临时文件：%{path}"
 warning.color_profile_converted_for_resize:
   en: Pixels were converted to sRGB before resizing, and the now-invalid source ICC profile was removed.
   zh-CN: 调整尺寸前已将像素转换为 sRGB，并移除不再匹配的原 ICC 配置。

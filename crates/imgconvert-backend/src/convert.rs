@@ -31,7 +31,7 @@ use crate::pdf;
 pub use crate::pdf::PdfConvertOptions;
 use crate::progress::{BatchId, ProgressSink};
 use crate::result_cache;
-use imgconvert_platform::external_codecs;
+use imgconvert_platform::{atomic_output, external_codecs};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 const MAX_BATCH_CONCURRENCY: usize = 8;
@@ -427,6 +427,11 @@ pub struct ConvertResult {
 #[serde(rename_all = "camelCase", tag = "code")]
 pub enum ConvertWarning {
     PreviousOutputBackupRetained {
+        path: String,
+    },
+    /// The output was committed through the hard-link fallback but the temporary name could
+    /// not be removed afterwards; the output itself is complete.
+    TemporaryFileRetained {
         path: String,
     },
     ModifiedTimeNotPreserved {
@@ -1199,7 +1204,7 @@ fn write_output(
 
     match mode {
         WriteMode::Replace => replace_output(out, bytes),
-        WriteMode::CreateNew => write_new_output(out, bytes).map(|()| None),
+        WriteMode::CreateNew => write_new_output(out, bytes),
     }
 }
 
@@ -1374,30 +1379,54 @@ fn ensure_replaceable_output_entry(out: &Path) -> Result<(), ConversionError> {
     }
 }
 
-fn write_new_output(out: &Path, bytes: &[u8]) -> Result<(), ConversionError> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(out)
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::AlreadyExists {
-                ConversionError::new(
-                    ConversionErrorKind::OutputExists,
-                    format!("输出已存在（未开启覆盖）: {}", out.display()),
-                )
-            } else {
-                output_io_error("无法创建输出文件", out, &e)
-            }
-        })?;
+/// Create a new output without ever exposing a partially written file: the bytes go to a
+/// temporary name in the same directory first and reach `out` through a no-replace commit
+/// (`imgconvert_platform::atomic_output`). An entry that appears at `out` in the meantime
+/// wins and is reported as `OutputExists`; a file system without any atomic commit
+/// primitive is an error rather than a reason to write `out` directly.
+fn write_new_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, ConversionError> {
+    let tmp = write_temp_output(out, bytes)?;
 
-    if let Err(e) = file.write_all(bytes).and_then(|_| file.sync_all()) {
-        drop(file);
-        let cleanup = cleanup_partial_note(out);
-        let detail = output_io_error("无法写入输出文件", out, &e);
-        return Err(detail.append(&cleanup));
+    match atomic_output::commit_new_file(&tmp, out) {
+        Ok(atomic_output::Committed {
+            leftover_temp: None,
+            ..
+        }) => Ok(None),
+        Ok(atomic_output::Committed {
+            leftover_temp: Some(_),
+            ..
+        }) => Ok(Some(ConvertWarning::TemporaryFileRetained {
+            path: tmp.to_string_lossy().to_string(),
+        })),
+        Err(error) => {
+            let detail = conversion_error_for_commit(out, &error);
+            Err(match fs::remove_file(&tmp) {
+                Ok(()) => detail,
+                Err(cleanup) => detail.append(&format!(
+                    "; 尝试清理临时文件 {} 失败: {cleanup}",
+                    tmp.display()
+                )),
+            })
+        }
     }
+}
 
-    Ok(())
+fn conversion_error_for_commit(out: &Path, error: &atomic_output::CommitError) -> ConversionError {
+    match error {
+        atomic_output::CommitError::AlreadyExists => ConversionError::new(
+            ConversionErrorKind::OutputExists,
+            format!("输出已存在（未开启覆盖）: {}", out.display()),
+        ),
+        atomic_output::CommitError::Unsupported { rename, link } => {
+            ConversionError::conversion_failed(format!(
+                "输出目录所在的文件系统不支持原子新建输出，请更换输出目录或开启覆盖 {}: 不覆盖改名失败: {rename}; 硬链接失败: {link}",
+                out.display()
+            ))
+        }
+        atomic_output::CommitError::Io(io_error) => {
+            output_io_error("无法提交输出文件", out, io_error)
+        }
+    }
 }
 
 fn cleanup_partial_note(path: &Path) -> String {
@@ -1560,11 +1589,10 @@ fn convert_with_control(
             ) {
                 return Err(message);
             }
-            let warning = preserve_source_modified_time(&out, source_modified, None);
+            let file_warnings = preserve_source_modified_time(&out, source_modified, None);
+            let warning = file_warnings.first().cloned();
             let mut warnings = cached_workflow_warnings(opts, hit);
-            if let Some(file_warning) = warning.clone() {
-                warnings.push(file_warning);
-            }
+            warnings.extend(file_warnings);
             return Ok(ConvertResult {
                 input: opts.input.clone(),
                 output: out.to_string_lossy().to_string(),
@@ -1645,11 +1673,12 @@ fn convert_with_control(
     } else {
         WriteMode::CreateNew
     };
-    let warning = preserve_source_modified_time(
+    let file_warnings = preserve_source_modified_time(
         &out,
         source_modified,
         write_output(&out, &encoded, write_mode)?,
     );
+    let warning = file_warnings.first().cloned();
 
     let in_size = input_metadata.len();
     let out_size = fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
@@ -1658,9 +1687,7 @@ fn convert_with_control(
     }
 
     let mut warnings = workflow_warnings;
-    if let Some(file_warning) = warning.clone() {
-        warnings.push(file_warning);
-    }
+    warnings.extend(file_warnings);
 
     Ok(ConvertResult {
         input: opts.input.clone(),
@@ -1875,7 +1902,7 @@ fn convert_pdf(
         } else {
             WriteMode::CreateNew
         };
-        let file_warning = preserve_source_modified_time(
+        let file_warnings = preserve_source_modified_time(
             output,
             source_modified,
             write_output(output, &workflow.bytes, write_mode).map_err(|error| {
@@ -1893,7 +1920,7 @@ fn convert_pdf(
                 warnings.push(warning);
             }
         }
-        if let Some(warning) = file_warning {
+        for warning in file_warnings {
             compatibility_warning.get_or_insert_with(|| warning.clone());
             warnings.push(warning);
         }
@@ -1988,31 +2015,42 @@ fn pdf_partial_conversion_error(
     ConversionError::new(error.kind, context)
 }
 
+/// Apply the source's modified time to the written output and fold the result into the
+/// file-system warnings for this output. The write warning (if any) comes first so the
+/// single compatibility `warning` field keeps pointing at it; a modified-time failure is
+/// appended as its own warning, except for the retained-backup case which keeps its
+/// combined variant for older front ends.
 fn preserve_source_modified_time(
     out: &Path,
     source_modified: Option<SystemTime>,
     warning: Option<ConvertWarning>,
-) -> Option<ConvertWarning> {
-    if let Some(modified) = source_modified {
-        if let Err(error) = set_modified_time(out, modified) {
-            eprintln!(
-                "ImgConvert could not preserve the output modified time {}: {error}",
-                out.display()
-            );
-            let output_path = out.to_string_lossy().to_string();
-            return Some(match warning {
-                Some(ConvertWarning::PreviousOutputBackupRetained { path }) => {
-                    ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
-                        backup_path: path,
-                        output_path,
-                    }
-                }
-                Some(warning) => warning,
-                None => ConvertWarning::ModifiedTimeNotPreserved { path: output_path },
-            });
+) -> Vec<ConvertWarning> {
+    let Some(modified) = source_modified else {
+        return warning.into_iter().collect();
+    };
+    let Err(error) = set_modified_time(out, modified) else {
+        return warning.into_iter().collect();
+    };
+    eprintln!(
+        "ImgConvert could not preserve the output modified time {}: {error}",
+        out.display()
+    );
+    let output_path = out.to_string_lossy().to_string();
+    match warning {
+        Some(ConvertWarning::PreviousOutputBackupRetained { path }) => {
+            vec![
+                ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
+                    backup_path: path,
+                    output_path,
+                },
+            ]
         }
+        Some(warning) => vec![
+            warning,
+            ConvertWarning::ModifiedTimeNotPreserved { path: output_path },
+        ],
+        None => vec![ConvertWarning::ModifiedTimeNotPreserved { path: output_path }],
     }
-    warning
 }
 
 pub(crate) fn convert_workflow_warning(warning: &WorkflowWarning) -> ConvertWarning {
@@ -3812,10 +3850,73 @@ pub(crate) mod tests {
         fs::write(&out, b"old").unwrap();
 
         let err = write_output(&out, b"new", WriteMode::CreateNew).unwrap_err();
+        assert_eq!(err.kind, ConversionErrorKind::OutputExists);
         assert!(err.detail.contains("输出已存在"));
         assert_eq!(fs::read(&out).unwrap(), b"old");
+        assert_eq!(
+            temp_file_count(&dir),
+            0,
+            "the staged temp file must be removed"
+        );
 
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn write_output_create_new_commits_through_a_temp_file_and_leaves_none_behind() {
+        let dir = unique_test_dir("create-new-fresh");
+        fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("out.bin");
+
+        let warning = write_output(&out, b"new", WriteMode::CreateNew).unwrap();
+
+        assert!(warning.is_none());
+        assert_eq!(fs::read(&out).unwrap(), b"new");
+        assert_eq!(temp_file_count(&dir), 0);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_unsupported_atomic_commit_is_an_error_that_tells_the_user_to_move_the_output() {
+        let out = Path::new("/images/output/photo.webp");
+        let error = atomic_output::CommitError::Unsupported {
+            rename: std::io::Error::from(std::io::ErrorKind::Unsupported),
+            link: std::io::Error::from(std::io::ErrorKind::Unsupported),
+        };
+
+        let detail = conversion_error_for_commit(out, &error);
+
+        assert_eq!(detail.kind, ConversionErrorKind::ConversionFailed);
+        assert!(detail.detail.contains("不支持原子新建输出"));
+        assert!(detail.detail.contains("请更换输出目录"));
+        assert!(detail.detail.contains("/images/output/photo.webp"));
+    }
+
+    #[test]
+    fn a_denied_atomic_commit_keeps_the_output_permission_error_machine_readable() {
+        let out = Path::new("/images/output/photo.webp");
+        let error = atomic_output::CommitError::Io(std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied,
+        ));
+
+        let detail = conversion_error_for_commit(out, &error);
+
+        assert_eq!(detail.kind, ConversionErrorKind::OutputPermissionDenied);
+        assert!(detail.detail.contains("/images/output"));
+    }
+
+    fn temp_file_count(dir: &Path) -> usize {
+        fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".imgconvert-")
+            })
+            .count()
     }
 
     #[test]
@@ -5759,13 +5860,56 @@ pub(crate) mod tests {
 
         assert_eq!(
             warning,
-            Some(
+            vec![
                 ConvertWarning::OutputBackupRetainedAndModifiedTimeNotPreserved {
                     backup_path: "backup.jpg".to_string(),
                     output_path: missing.to_string_lossy().to_string(),
                 }
-            )
+            ]
         );
+    }
+
+    #[test]
+    fn modified_time_failure_is_reported_next_to_a_retained_temp_file_warning() {
+        let dir = unique_test_dir("mtime-temp-warning");
+        let missing = dir.join("missing.jpg");
+        let warnings = preserve_source_modified_time(
+            &missing,
+            Some(UNIX_EPOCH),
+            Some(ConvertWarning::TemporaryFileRetained {
+                path: "photo.tmp".to_string(),
+            }),
+        );
+
+        assert_eq!(
+            warnings,
+            vec![
+                ConvertWarning::TemporaryFileRetained {
+                    path: "photo.tmp".to_string(),
+                },
+                ConvertWarning::ModifiedTimeNotPreserved {
+                    path: missing.to_string_lossy().to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_successful_modified_time_update_keeps_only_the_write_warning() {
+        let dir = unique_test_dir("mtime-ok");
+        fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("out.bin");
+        fs::write(&out, b"x").unwrap();
+
+        let write_warning = ConvertWarning::TemporaryFileRetained {
+            path: "photo.tmp".to_string(),
+        };
+        let warnings =
+            preserve_source_modified_time(&out, Some(UNIX_EPOCH), Some(write_warning.clone()));
+
+        assert_eq!(warnings, vec![write_warning]);
+        assert!(preserve_source_modified_time(&out, Some(UNIX_EPOCH), None).is_empty());
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

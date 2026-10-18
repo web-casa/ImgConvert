@@ -524,6 +524,7 @@ export const enUS = {
     outputExists: "Output file already exists:\n{path}",
     outputBackupRetained: "Converted, but the previous output backup remains: {path}",
     modifiedTimeNotPreserved: "Converted, but the modified time could not be preserved: {path}",
+    temporaryFileRetained: "Converted, but the temporary file could not be removed: {path}",
     colorProfileConvertedForResize:
       "Pixels were converted to sRGB before resizing, and the now-invalid source ICC profile was removed.",
     invalidColorProfileDiscarded:

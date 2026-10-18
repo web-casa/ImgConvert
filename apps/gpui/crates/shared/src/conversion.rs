@@ -100,6 +100,12 @@ pub fn warning_texts(warning: &ConvertWarning) -> Vec<SharedString> {
             "warning.pdf_render_warnings",
             &[("page", page), ("count", count)],
         )],
+        ConvertWarning::TemporaryFileRetained { path } => {
+            vec![tr_with(
+                "warning.temporary_file_retained",
+                &[("path", path)],
+            )]
+        }
     }
 }
 
