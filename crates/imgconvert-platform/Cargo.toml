@@ -9,6 +9,7 @@ publish = false
 [features]
 # Exposes the manifest parser to cargo-fuzz and corpus replay. Never enabled in app builds.
 fuzzing = []
+update-guard = ["dep:ash", "dep:os_info"]
 
 [dependencies]
 imgconvert-core = { path = "../imgconvert-core" }
@@ -19,6 +20,10 @@ dirs = "6"
 fd-lock = "4"
 thiserror = "2"
 unicode-normalization = "0.1"
+os_info = { version = "3", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ash = { version = "0.38", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

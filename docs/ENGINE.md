@@ -260,3 +260,21 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 - crate 文档:docs.rs/{mozjpeg, oxipng, webp, libavif-sys, image, fast_image_resize, ssimulacra2}
 - Tauri:Channel https://v2.tauri.app/develop/calling-frontend/ · macOS 签名 https://v2.tauri.app/distribute/sign/macos/
 - cargo-dist:https://opensource.axo.dev/cargo-dist/ · cargo-about:https://github.com/EmbarkStudios/cargo-about
+
+
+## GPUI update compatibility contract (S8)
+
+`imgconvert-platform::update_policy` owns the shared minimum-system gate used by
+the Tauri bridge and GPUI updater. GPUI 0.4.x and later require OS-keyed numeric
+`minimum_system_version`; Linux additionally requires a hardware Vulkan 1.3
+device. Older 0.3.x updates remain eligible without GPUI hardware. These checks
+do not read or write settings or conversion caches.
+
+The optional GPUI app-settings updater owns its state independently of the
+dialog. Blocking HTTP, signature verification and installation run outside the
+UI thread. The shell only composes the entry point. The direct Linux AppImage
+path downloads a bounded signed raw artifact, checks its architecture, then
+flushes settings and atomically installs only when no conversion is active.
+Failures preserve the old file until the replacement is committed. Production
+endpoints and release authorization are outside this internal preview slice.
+See `docs/UPDATER.md` for configuration and SDK smoke scope.

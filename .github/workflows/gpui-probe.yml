@@ -6,6 +6,10 @@ name: GPUI Probe
 on:
   workflow_dispatch:
     inputs:
+      updater_compatibility:
+        description: Run the internal Linux updater SDK compatibility matrix instead of GUI probes.
+        type: boolean
+        default: false
       targets:
         description: Which targets to probe
         type: choice
@@ -26,6 +30,7 @@ env:
 
 jobs:
   probe:
+    if: ${{ !inputs.updater_compatibility }}
     name: GPUI Probe (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
@@ -333,4 +338,55 @@ jobs:
           name: gpui-probe-${{ matrix.target }}
           path: probe-artifacts
           if-no-files-found: ignore
+          retention-days: 14
+
+  updater-compatibility:
+    name: Updater SDK compatibility (${{ matrix.arch }})
+    if: ${{ inputs.updater_compatibility }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: |
+          scripts/ci-install-apt-packages.sh \
+            build-essential cmake meson nasm ninja-build libgtk-3-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            squashfs-tools patchelf libfuse2 file
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.34.4
+          run_install: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: updater-sdk-${{ matrix.arch }}
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Install pinned cargo-packager CLI
+        run: cargo install cargo-packager --version 0.11.8 --locked -j 2
+      - name: Native old and new updater signature/install/run smoke
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+          IMGCONVERT_UPDATER_SMOKE_REPORT: target/updater-compat/${{ matrix.arch }}.json
+        run: node scripts/smoke-gpui-updater-compat.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: updater-sdk-compat-${{ matrix.arch }}
+          path: target/updater-compat/${{ matrix.arch }}.json
+          if-no-files-found: error
           retention-days: 14

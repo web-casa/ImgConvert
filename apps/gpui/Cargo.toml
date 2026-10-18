@@ -10,6 +10,7 @@ members = [
     "crates/preview",
     "crates/diagnostics",
     "crates/impact",
+    "crates/app-settings",
 ]
 
 [workspace.package]
@@ -30,6 +31,7 @@ imgconvert-gpui-workflow = { path = "crates/workflow" }
 imgconvert-gpui-preview = { path = "crates/preview" }
 imgconvert-gpui-diagnostics = { path = "crates/diagnostics" }
 imgconvert-gpui-impact = { path = "crates/impact" }
+imgconvert-gpui-app-settings = { path = "crates/app-settings" }
 # Same crate and major as GPUI; decodes the backend's PNG previews into render frames.
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Same major as gpui-component so one global locale drives Kit and app strings.

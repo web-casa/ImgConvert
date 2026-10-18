@@ -72,6 +72,18 @@ pub fn run_path_conversion_smoke(
     convert::convert(&options).map_err(|error| error.to_string())
 }
 
+/// Validates the exact metadata retained by the Tauri updater before download.
+#[cfg(feature = "updater")]
+#[tauri::command]
+async fn validate_update_manifest(manifest: serde_json::Value) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        imgconvert_platform::update_policy::validate_on_host(&manifest)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 /// 返回当前运行时的文件访问策略,供前端选择正确的系统文件选择器和输出目录流程。
 #[tauri::command]
 fn file_access_runtime() -> access::RuntimeFileAccess {
@@ -425,6 +437,8 @@ pub fn run() {
 
     builder
         .invoke_handler(tauri::generate_handler![
+            #[cfg(feature = "updater")]
+            validate_update_manifest,
             file_access_runtime,
             capabilities,
             runtime_diagnostics,

@@ -263,6 +263,7 @@ describe("desktop state orchestration", () => {
     mocks.storeSet.mockResolvedValue(undefined);
     mocks.invoke.mockImplementation(async (command: string) => {
       if (command === "file_access_runtime") return runtimeAccess;
+      if (command === "validate_update_manifest") return undefined;
       throw new Error(`unexpected command: ${command}`);
     });
   });
@@ -804,6 +805,43 @@ describe("desktop state orchestration", () => {
 
     await expect(clearResultCache()).resolves.toBe(7);
     expect(mocks.invoke).toHaveBeenCalledWith("clear_result_cache");
+  });
+
+  it("rejects incompatible update metadata and releases the updater resource", async () => {
+    const close = vi.fn(async () => undefined);
+    const download = vi.fn();
+    const rawJson = { version: "0.4.0", minimum_system_version: { linux: "5.4" } };
+    mocks.checkUpdate.mockResolvedValue({
+      version: "0.4.0",
+      rawJson,
+      close,
+      downloadAndInstall: download,
+    });
+    mocks.invoke.mockRejectedValue(new Error("hardware Vulkan 1.3 required"));
+    await checkForAppUpdate();
+    await installAppUpdate();
+    expect(mocks.invoke).toHaveBeenCalledWith("validate_update_manifest", { manifest: rawJson });
+    expect(appUpdate.available).toBe(false);
+    expect(close).toHaveBeenCalledOnce();
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("checks the retained manifest again before downloading an accepted update", async () => {
+    const rawJson = { version: "0.4.0", minimum_system_version: { linux: "5.4" } };
+    const download = vi.fn(async () => undefined);
+    mocks.checkUpdate.mockResolvedValue({
+      version: "0.4.0",
+      rawJson,
+      close: vi.fn(async () => undefined),
+      downloadAndInstall: download,
+    });
+    await checkForAppUpdate();
+    mocks.invoke.mockRejectedValueOnce(new Error("GPU no longer available"));
+    await installAppUpdate();
+    expect(
+      mocks.invoke.mock.calls.filter(([command]) => command === "validate_update_manifest"),
+    ).toHaveLength(2);
+    expect(download).not.toHaveBeenCalled();
   });
 
   it("reports relaunch failure as post-install instead of update-check failure", async () => {

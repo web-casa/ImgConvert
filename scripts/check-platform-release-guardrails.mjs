@@ -1870,7 +1870,9 @@ function checkMacosStoreConfig() {
   }
   if (
     !cargoManifest.includes('default = ["updater"]') ||
-    !cargoManifest.includes('updater = ["dep:tauri-plugin-updater"]') ||
+    !cargoManifest.includes(
+      'updater = ["dep:tauri-plugin-updater", "imgconvert-platform/update-guard"]',
+    ) ||
     !/tauri-plugin-updater\s*=\s*\{[^}]*optional\s*=\s*true[^}]*\}/.test(cargoManifest)
   ) {
     failures.push(

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { assertLegacyUpdaterVersion } from "./gpui-updater-manifest.mjs";
+
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,6 +93,7 @@ function validateManifestShape(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     fail("manifest root must be an object");
   }
+  assertLegacyUpdaterVersion(value.version);
   if (!isSemver(value.version)) {
     fail(`manifest version must be SemVer: ${String(value.version)}`);
   }

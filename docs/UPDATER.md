@@ -200,3 +200,83 @@ Flatpak updates remain managed by Flathub once that channel is opened. `.deb`
 and `.rpm` updates remain manual GitHub Release downloads in the first batch;
 the Tauri updater is for direct-distribution artifacts such as AppImage, macOS
 `.app.tar.gz`, and Windows installers.
+
+## GPUI internal channel (S8)
+
+The production endpoint is unchanged. `latest.json` is permanently limited to
+0.3.x bridge releases; both the legacy generator and verifier reject 0.4.x and
+later. A bridge build can opt into `latest-v2.json` using the existing
+`TAURI_UPDATER_ENDPOINTS` release-config overlay. Shipping that build, changing
+hosted metadata, signing with a production key, and publishing remain separate
+release actions.
+
+The new internal manifest includes an explicit per-platform `format` and an
+OS-keyed `minimum_system_version` map, for example:
+
+```json
+{
+  "version": "0.4.1",
+  "minimum_system_version": { "linux": "5.4", "macos": "12", "windows": "10.0.18362" },
+  "platforms": {
+    "linux-aarch64": {
+      "format": "appimage",
+      "url": "https://example.invalid/ImgConvert.AppImage",
+      "signature": "TAURI_BASE64_SIGNATURE"
+    }
+  }
+}
+```
+
+`node scripts/gpui-updater-manifest.mjs INPUT OUTPUT/latest-v2.json` creates a
+new file and refuses to overwrite an existing file. It validates formats,
+minimum versions and credential-free HTTPS URLs. macOS entries include both
+`darwin-*` (Tauri) and `macos-*` (cargo-packager) aliases, with conflicts rejected;
+package signatures are checked
+by the consumer, not by this generator. Minima cannot lower macOS 12 or Windows
+10 build 18362. Linux compares the numeric kernel version and independently
+requires a hardware Vulkan 1.3 device; CPU/software devices do not qualify.
+Unknown host versions and missing metadata fail closed. The Tauri bridge checks
+these rules before offering an update and again before downloading it. Legacy
+0.3.x updates remain usable on older machines.
+
+The GPUI shell's optional `updater` feature currently enables direct **Linux
+AppImage only**. Builds without that feature omit the update entry point. The
+build-time `IMGCONVERT_DISABLE_UPDATER=1` flag also hides it. Store, Snap and
+Flatpak packaging must build with `--no-default-features`; they retain their
+own update channel. macOS and Windows preview builds currently show manual
+update guidance until their later packaging slices are verified.
+
+Automatic AppImage updating requires both compile-time
+`IMGCONVERT_UPDATER_ENDPOINT` (HTTPS, ending in `/latest-v2.json`) and
+`IMGCONVERT_UPDATER_PUBKEY` (the existing Tauri public-key encoding), plus the
+AppImage runtime's `APPIMAGE`/`APPDIR`. No endpoint or key is implicit. Opening
+the dialog does not start a network request. Check, download and install are
+explicit actions; state survives closing and reopening the dialog. Downloads
+are bounded to 512 MiB and verified before the Install button appears. The
+signed payload must be a raw type-2 AppImage for the running architecture.
+Installation flushes settings, refuses an active conversion batch, syncs a
+sibling temporary file and atomically replaces the AppImage. It does not quit
+automatically; users reopen the application after installation. A failed
+download or installation can be retried.
+
+### Internal Linux SDK compatibility evidence
+
+Run `node scripts/smoke-gpui-updater-compat.mjs` on native Linux x86_64/aarch64
+with cargo-packager 0.11.8 and the repository's Tauri build dependencies. Or
+manually dispatch `GPUI Probe` with `updater_compatibility=true`; it runs both
+architectures and uploads JSON reports as internal CI artifacts.
+
+This harness builds real cargo-packager AppImages containing a small executable,
+generates an ephemeral Tauri signing key, serves a loopback-only manifest and
+runs the actual Tauri updater 2.10.1 and cargo-packager-updater 0.2.3 against the
+same signed artifact. It compares installed bytes and runs each installed
+AppImage. Private test keys are deleted and never uploaded; production endpoints,
+keys, settings and result caches are not used. The committed small signed ELF
+fixtures separately test bounded downloads, signature rejection and atomic
+installation in the application service.
+
+SDK compatibility reports exclude the real desktop GUI, GPU eligibility,
+settings migration and released installers. They are evidence for the Linux
+package/signing rows of migration §3.6, not complete G3 or release acceptance.
+Windows NSIS/MSI interoperability remains a G4 requirement; macOS has no shipped
+automatic update channel. Final distributed artifacts must be reverified at G5.
