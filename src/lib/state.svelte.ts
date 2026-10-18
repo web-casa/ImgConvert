@@ -764,6 +764,7 @@ export function writableFormats() {
 }
 
 export async function checkForAppUpdate(): Promise<void> {
+  if (appUpdate.checking || appUpdate.installing) return;
   if (!isTauriRuntime()) {
     resetAppUpdateResult();
     appUpdate.checked = true;
@@ -799,6 +800,7 @@ export async function checkForAppUpdate(): Promise<void> {
       return;
     }
 
+    await invoke("validate_update_manifest", { manifest: pendingAppUpdate.rawJson });
     appUpdate.available = true;
     appUpdate.version = pendingAppUpdate.version;
     appUpdate.currentVersion = pendingAppUpdate.currentVersion;
@@ -808,6 +810,7 @@ export async function checkForAppUpdate(): Promise<void> {
       translationMessage("update.newVersion", { version: pendingAppUpdate.version }),
     );
   } catch (error) {
+    if (pendingAppUpdate) void pendingAppUpdate.close().catch(() => undefined);
     resetAppUpdateResult();
     appUpdate.checked = true;
     setAppUpdateError(updaterErrorMessage(error));
@@ -826,6 +829,7 @@ export async function installAppUpdate(): Promise<void> {
   appUpdate.contentLength = null;
 
   try {
+    await invoke("validate_update_manifest", { manifest: pendingAppUpdate.rawJson });
     await pendingAppUpdate.downloadAndInstall(handleUpdateDownloadEvent, { timeout: 120_000 });
     appUpdate.installed = true;
     appUpdate.available = false;

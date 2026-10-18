@@ -30,6 +30,7 @@ pub fn init_app(cx: &mut App) {
     gpui_kit::init(cx);
     services::init(cx);
     theme::install(cx);
+    imgconvert_gpui_app_settings::init(cx);
     let locale = AppModels::global(cx).settings().read(cx).settings().locale;
     i18n::set_locale(Locale::from_app_locale(locale));
     settings_model::flush_on_quit(cx);

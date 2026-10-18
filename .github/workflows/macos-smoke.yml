@@ -127,6 +127,9 @@ jobs:
       - name: Tauri backend macOS tests
         run: cargo +1.96.0 test --manifest-path src-tauri/Cargo.toml
 
+      - name: Native updater compatibility policy tests
+        run: cargo +1.96.0 test -p imgconvert-platform --features update-guard --lib update_policy
+
       - name: Atomic output commit tests (platform + backend)
         run: |
           cargo +1.96.0 test -p imgconvert-platform --lib atomic_output

@@ -19,12 +19,18 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "replay_fuzz_corpus"
 required-features = ["fuzzing"]
 
+[[example]]
+name = "updater_compat_smoke"
+required-features = ["updater", "updater-test"]
+
 [features]
 # Direct builds retain the in-app updater. Mac App Store builds explicitly turn
 # this feature off, since Store updates are delivered by the App Store itself.
 default = ["updater"]
-updater = ["dep:tauri-plugin-updater"]
+updater = ["dep:tauri-plugin-updater", "imgconvert-platform/update-guard"]
 desktop-e2e = []
+# Internal compatibility harness only, never selected by release builds.
+updater-test = ["tauri/test"]
 fuzzing = ["imgconvert-backend/fuzzing"]
 
 [build-dependencies]

@@ -212,8 +212,8 @@ Linux GPU 策略：在创建 GPUI 窗口之前，用独立的 `wgpu`/`ash` 探�
 更新器：
 
 - 现状：`docs/UPDATER.md` 记录 macOS 尚无已发布的自动更新资产；`updater-upgrade-smoke.yml` 只覆盖 Linux x86_64。
-- 新实现用 `cargo-packager-updater` 0.2.3。其清单比现有 `generate-tauri-updater-manifest.mjs` 产出多一个必需字段 `format`（`app`/`appimage`/`nsis`/`wix`），现有 JSON 不能原样复用；静态托管位置 `releases/latest/download/latest.json` 可以复用。
-- 旧客户端升级矩阵（阶段 3 前完成，当前全部未核实）：
+- 新实现用 `cargo-packager-updater` 0.2.3。其清单比现有 `generate-tauri-updater-manifest.mjs` 产出多一个必需字段 `format`（`app`/`appimage`/`nsis`/`wix`），现有 JSON 不能原样复用；保留 GitHub Releases 静态托管方式，新通道独立使用 `releases/latest/download/latest-v2.json`，旧 `latest.json` 永久只保留 0.3.x。
+- 旧客户端升级矩阵（阶段 3 前完成，验收证据按 docs/UPDATER.md 记录，SDK 演练不能代替 GUI/GPU 与最终安装件验收）：
 
 | 旧客户端 | 渠道 | 需验证 |
 |---|---|---|
@@ -568,6 +568,9 @@ workflow 处置表：
 - Kit 内置 zh-CN 组件文案的覆盖度（§3.4）。
 
 ## 9. 修订记录
+
+v0.12（S8 实现，验证中）：新增可禁用的 app-settings 更新对话框、共享 OS/GPU 护栏、latest-v2 清单生成器与旧 latest.json 版本护栏。Linux AppImage 下载有限且验签后原子替换；双架构内部 SDK 测试用 cargo-packager 包与临时密钥，不修改生产端点。macOS/Windows 当前仅手动更新提示；不据此关闭 G1/G3 或最终发布门槛，详见 UPDATER.md。
+
 
 v0.11（2026-10-18，开发方案并入）：
 

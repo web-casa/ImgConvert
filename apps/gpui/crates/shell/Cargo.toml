@@ -14,6 +14,10 @@ path = "src/main.rs"
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = ["updater"]
+updater = ["imgconvert-gpui-app-settings/updater"]
+
 [dependencies]
 gpui-kit.workspace = true
 imgconvert-backend.workspace = true
@@ -23,6 +27,7 @@ imgconvert-gpui-workflow.workspace = true
 imgconvert-gpui-preview.workspace = true
 imgconvert-gpui-diagnostics.workspace = true
 imgconvert-gpui-impact.workspace = true
+imgconvert-gpui-app-settings.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]

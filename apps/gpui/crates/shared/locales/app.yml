@@ -1022,3 +1022,79 @@ impact.privacy:
 impact.close:
   en: Close
   zh-CN: 关闭
+
+update.open:
+  en: "Updates…"
+  zh-CN: "更新…"
+
+update.title:
+  en: "Updates"
+  zh-CN: "更新"
+
+update.manual:
+  en: "Updates for this preview are supplied manually."
+  zh-CN: "此预览版采用手动更新。"
+
+update.idle:
+  en: "Check for a newer version."
+  zh-CN: "检查是否有新版本。"
+
+update.checking:
+  en: "Checking for updates"
+  zh-CN: "正在检查更新"
+
+update.current:
+  en: "You’re up to date"
+  zh-CN: "已是最新版本"
+
+update.available:
+  en: "An update is available"
+  zh-CN: "有可用更新"
+
+update.downloading:
+  en: "Downloading and verifying the update"
+  zh-CN: "正在下载并验证更新"
+
+update.ready:
+  en: "Update verified. Install when your batch is finished."
+  zh-CN: "更新已通过验证。请在批次结束后安装。"
+
+update.installing:
+  en: "Installing the update"
+  zh-CN: "正在安装更新"
+
+update.installed:
+  en: "Update installed. Quit and reopen ImgConvert to use it."
+  zh-CN: "更新已安装。请退出并重新打开 ImgConvert。"
+
+update.current_version:
+  en: "Current version: %{version}"
+  zh-CN: "当前版本：%{version}"
+
+update.new_version:
+  en: "New version: %{version}"
+  zh-CN: "新版本：%{version}"
+
+update.bytes:
+  en: "%{bytes} bytes downloaded"
+  zh-CN: "已下载 %{bytes} 字节"
+
+update.check:
+  en: "Check for updates"
+  zh-CN: "检查更新"
+
+update.download:
+  en: "Download update"
+  zh-CN: "下载更新"
+
+update.install:
+  en: "Install update"
+  zh-CN: "安装更新"
+
+update.close:
+  en: "Close"
+  zh-CN: "关闭"
+
+update.batch_active:
+  en: "Wait for the current batch to finish before installing."
+  zh-CN: "请等待当前批次结束后再安装。"

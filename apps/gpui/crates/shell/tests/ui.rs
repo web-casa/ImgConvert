@@ -1289,3 +1289,30 @@ fn adler32(bytes: &[u8]) -> u32 {
     }
     (b << 16) | a
 }
+
+#[cfg(feature = "updater")]
+#[gpui_kit::test]
+fn updates_dialog_explains_manual_preview_updates_and_escape_closes_it(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("updates-open").visible());
+        window.click("updates-open", cx);
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("update-status").label(),
+            Some("Updates for this preview are supplied manually.")
+        );
+        window.click("update-check", cx);
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("update-status").label(),
+            Some("Updates for this preview are supplied manually.")
+        );
+        window.press("escape", cx);
+        window.render_frame(cx);
+        assert!(window.try_find("update-close").is_none());
+    })
+    .unwrap();
+}

@@ -7,6 +7,7 @@
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
     FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
@@ -178,6 +179,18 @@ impl Workspace {
                         this.open_plugin_diagnostics(window, cx);
                     })),
             )
+            .when(imgconvert_gpui_app_settings::is_visible(), |bar| {
+                bar.child(
+                    Button::new("updates-open")
+                        .ghost()
+                        .small()
+                        .rounded(pill)
+                        .label(tr("update.open"))
+                        .on_click(|_, window, cx| {
+                            imgconvert_gpui_app_settings::open_updates(window, cx);
+                        }),
+                )
+            })
             .child(
                 Button::new("language-toggle")
                     .ghost()

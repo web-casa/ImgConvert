@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { assertLegacyUpdaterVersion } from "./gpui-updater-manifest.mjs";
+
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +45,7 @@ const bundleRoot =
   options.bundleRoot || path.join(repoRoot, "src-tauri", "target", options.profile, "bundle");
 const baseUrl = validateBaseUrl(options.baseUrl);
 validateVersion(options.version);
+assertLegacyUpdaterVersion(options.version);
 validatePubDate(options.pubDate);
 
 const artifacts = collectUpdaterArtifacts(bundleRoot);
