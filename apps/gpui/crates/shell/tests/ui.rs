@@ -1938,3 +1938,134 @@ fn item_formats_menu_drives_mixed_outputs_and_reset(cx: &mut TestAppContext) {
     });
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// Copy through the real read-only document control, using the test platform's
+/// clipboard. This never reads or overwrites the host's native clipboard.
+fn copy_legal_document(cx: &mut TestAppContext, handle: gpui_kit::AnyWindowHandle) -> String {
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("legal-document", cx);
+        window.press("secondary-a", cx);
+        window.press("secondary-c", cx);
+        cx.read_from_clipboard()
+            .and_then(|item| item.text())
+            .unwrap_or_default()
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn privacy_policy_is_offline_readonly_localized_and_restores_focus(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace_sized(cx, size(px(760.), px(480.)));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        for _ in 0..30 {
+            if window.find("privacy-open").focused() == Some(true) {
+                break;
+            }
+            window.press("tab", cx);
+            window.render_frame(cx);
+        }
+        assert_eq!(window.find("privacy-open").focused(), Some(true));
+        window.press("enter", cx);
+        window.render_frame(cx);
+        assert!(window.find("legal-dialog").visible());
+        let document = window.find("legal-document").bounds();
+        let close = window.find("legal-close").bounds();
+        assert!(document.bottom() < close.origin.y);
+        assert!(close.bottom() < window.viewport_size().height);
+    })
+    .unwrap();
+    let english = include_str!("../../../../../PRIVACY.en.md");
+    assert!(
+        copy_legal_document(cx, handle) == english,
+        "the entire English policy is available offline"
+    );
+    cx.update_window(handle, |_, window, cx| {
+        window.input("must not replace the policy", cx);
+        window.press("backspace", cx);
+        window.press("secondary-v", cx);
+    })
+    .unwrap();
+    assert!(
+        copy_legal_document(cx, handle) == english,
+        "editing and paste cannot change the policy"
+    );
+    assert!(
+        cx.opened_url().is_none(),
+        "opening a local document does not open a browser"
+    );
+    cx.update_window(handle, |_, window, cx| {
+        window.press("tab", cx);
+        window.render_frame(cx);
+        window.press("enter", cx);
+    })
+    .unwrap();
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some("https://github.com/web-casa/ImgConvert/issues")
+    );
+    cx.update(toggle_language);
+    cx.run_until_parked();
+    assert!(copy_legal_document(cx, handle) == include_str!("../../../../../PRIVACY.md"));
+    cx.update(|cx| assert!(AppModels::global(cx).queue().read(cx).is_empty()));
+    cx.update_window(handle, |_, window, cx| {
+        window.press("escape", cx);
+        window.render_frame(cx);
+        assert!(!window.has_active_dialog(cx));
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, _| {
+        assert_eq!(window.find("privacy-open").focused(), Some(true));
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
+fn licenses_include_the_full_gpui_and_native_notices_and_remain_copyable(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("licenses-open", cx);
+        window.render_frame(cx);
+        assert!(window.find("legal-document").visible());
+    })
+    .unwrap();
+    let expected = include_str!("../../../THIRD_PARTY_LICENSES.md");
+    let copied = copy_legal_document(cx, handle);
+    assert!(
+        copied == expected,
+        "copy includes the end of the complete license bundle"
+    );
+    for marker in [
+        "gpui-kit@0.7.1",
+        "gpui-pre@0.3.8",
+        "LICENSE-LUCIDE",
+        "libavif/LICENSE",
+        "vendor/third_party/libyuv/LICENSE",
+        "The Independent JPEG Group",
+        "Project notice",
+    ] {
+        assert!(copied.contains(marker), "missing attribution: {marker}");
+    }
+    cx.update_window(handle, |_, window, cx| {
+        window.press("end", cx);
+        window.press("pagedown", cx);
+        window.press("escape", cx);
+        window.render_frame(cx);
+        assert!(!window.has_active_dialog(cx));
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.click("licenses-open", cx);
+        window.render_frame(cx);
+        window.click("legal-close", cx);
+        window.render_frame(cx);
+        assert!(!window.has_active_dialog(cx));
+    })
+    .unwrap();
+}

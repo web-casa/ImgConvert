@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
+//! Application settings surfaces include offline legal documents and updates.
 //! Application-owned update state survives closing its dialog. Network and disk
 //! work runs outside GPUI; the view only presents state and issues commands.
+
+pub mod legal;
 
 #[cfg(feature = "updater")]
 mod service;

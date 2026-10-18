@@ -194,6 +194,26 @@ impl Workspace {
                 )
             })
             .child(
+                Button::new("privacy-open")
+                    .ghost()
+                    .small()
+                    .rounded(pill)
+                    .label(tr("legal.privacy_open"))
+                    .on_click(|_, window, cx| {
+                        imgconvert_gpui_app_settings::legal::open_privacy(window, cx);
+                    }),
+            )
+            .child(
+                Button::new("licenses-open")
+                    .ghost()
+                    .small()
+                    .rounded(pill)
+                    .label(tr("legal.licenses_open"))
+                    .on_click(|_, window, cx| {
+                        imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
+                    }),
+            )
+            .child(
                 Button::new("language-toggle")
                     .ghost()
                     .small()

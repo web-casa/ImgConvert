@@ -1,0 +1,121 @@
+[
+  {
+    "crate": "libavif-sys",
+    "version": "0.17.0+libavif.1.0.4",
+    "file": "libavif-sys-0.17.0+libavif.1.0.4-LICENSE",
+    "url": "https://raw.githubusercontent.com/njaard/libavif-rs/c39a91dbf6c9414298d0066e5335c5312287af02/LICENSE",
+    "sha256": "fe490679de7d4c113698ef4a4f130b10c2b561f6b847db87efbaefa64b9ac057"
+  },
+  {
+    "crate": "alloc-stdlib",
+    "version": "0.2.4",
+    "file": "alloc-stdlib-0.2.4-LICENSE",
+    "url": "https://raw.githubusercontent.com/dropbox/rust-alloc-no-stdlib/ae42d22078b98549e987d2f03d12df7b984fde47/LICENSE",
+    "sha256": "c0c56f26d9c051cac4d200c34c84e7ae9aaa853e01a982a1df08b09931e518ae"
+  },
+  {
+    "crate": "block2",
+    "version": "0.6.2",
+    "file": "block2-0.6.2-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+    "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+  },
+  {
+    "crate": "harfrust",
+    "version": "0.5.2",
+    "file": "harfrust-0.5.2-LICENSE",
+    "url": "https://raw.githubusercontent.com/harfbuzz/harfrust/efdae3142ab76a2f1524d72cff9e3dfdc5afd7ca/LICENSE",
+    "sha256": "3a7c3f0b887abb7c638faf022d29257418458614c6724b120ceeffb279f9c7d2"
+  },
+  {
+    "crate": "objc-sys",
+    "version": "0.3.5",
+    "file": "objc-sys-0.3.5-LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/4fc083f1c6d6784577e38b0ee8dbd344481e2fd2/LICENSE.txt",
+    "sha256": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
+  },
+  {
+    "crate": "objc2-app-kit",
+    "version": "0.2.2",
+    "file": "objc2-app-kit-0.2.2-LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt",
+    "sha256": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
+  },
+  {
+    "crate": "objc2-encode",
+    "version": "4.1.0",
+    "file": "objc2-encode-4.1.0-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+    "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+  },
+  {
+    "crate": "objc2-foundation",
+    "version": "0.2.2",
+    "file": "objc2-foundation-0.2.2-LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/e282618be4c3a3b9542957e0c8540e9588472ce8/LICENSE.txt",
+    "sha256": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
+  },
+  {
+    "crate": "objc2-foundation",
+    "version": "0.3.2",
+    "file": "objc2-foundation-0.3.2-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+    "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+  },
+  {
+    "crate": "objc2",
+    "version": "0.5.3",
+    "file": "objc2-0.5.3-LICENSE.txt",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/5237cbf081d04ef75a1f6a207b4018e7c1ae7438/LICENSE.txt",
+    "sha256": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
+  },
+  {
+    "crate": "objc2",
+    "version": "0.6.5",
+    "file": "objc2-0.6.5-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/madsmtm/objc2/d7d2fa23ceaa5e6096c923b081040e5d81b3b9df/LICENSE.md",
+    "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+  },
+  {
+    "crate": "pulp-wasm-simd-flag",
+    "version": "0.1.1",
+    "file": "pulp-wasm-simd-flag-0.1.1-LICENSE",
+    "url": "https://raw.githubusercontent.com/sarah-quinones/pulp/5eb07fd7b68edf0a5e19f71737d315f72a510295/LICENSE",
+    "sha256": "d64f878c89bd5f1e5ada7e4aad57690b122727cf5229b7b87ea1980c188da1d9"
+  },
+  {
+    "crate": "rust-i18n-macro",
+    "version": "4.2.4",
+    "file": "rust-i18n-macro-4.2.4-LICENSE",
+    "url": "https://raw.githubusercontent.com/longbridge/rust-i18n/5f3ea5ba03395f2f2908e3587e01788cfdfd3555/LICENSE",
+    "sha256": "d6fde6c28ecbccfc7f6d97c0badbb14bbea2cc8f5e81a8c1537204bdfed9a6d5"
+  },
+  {
+    "crate": "rust-i18n-support",
+    "version": "4.2.4",
+    "file": "rust-i18n-support-4.2.4-LICENSE",
+    "url": "https://raw.githubusercontent.com/longbridge/rust-i18n/5f3ea5ba03395f2f2908e3587e01788cfdfd3555/LICENSE",
+    "sha256": "d6fde6c28ecbccfc7f6d97c0badbb14bbea2cc8f5e81a8c1537204bdfed9a6d5"
+  },
+  {
+    "crate": "taffy",
+    "version": "0.13.0",
+    "file": "taffy-0.13.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/DioxusLabs/taffy/45a56299d366ddb383e593a1f0372158d00e8530/LICENSE",
+    "sha256": "f97daf1a0124413dccf399a4e6626b4b74acd05282f80b6d64ac82225650b77a"
+  },
+  {
+    "crate": "xim-ctext",
+    "version": "0.3.0",
+    "file": "xim-ctext-0.3.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/Riey/xim-rs/65f77e44524ba487285a63aac4080faf2c05b4ed/LICENSE",
+    "sha256": "efa1224931b98468f5005f77285457f8d2eab0a77a15941aa10abbab1ae9a74e"
+  },
+  {
+    "crate": "xim-parser",
+    "version": "0.2.2",
+    "file": "xim-parser-0.2.2-LICENSE",
+    "url": "https://raw.githubusercontent.com/Riey/xim-rs/7300de35a111de2df1a694bf70454532a8419685/LICENSE",
+    "sha256": "efa1224931b98468f5005f77285457f8d2eab0a77a15941aa10abbab1ae9a74e"
+  }
+]

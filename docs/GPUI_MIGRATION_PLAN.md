@@ -345,7 +345,7 @@ Codex 只读评审（2026-10-17，结论"修后可合并"，8 项 P1、7 项 P2�
 - 已修（P1 3、4）：缩略图请求改为带队列代次的 `ThumbnailTicket`；结果先经应用级 `AsyncApp` 写回 Global 模型再更新视图，窗口关闭也不会留下 Loading；清空/重导后的旧结果被拒绝并交回释放，替换 Ready 图时扣账并释放旧图；LRU 改为"最近展示 tick + 淘汰时扫描"（touch O(1)）。
 - 已修（P1 5、6、7、8）：滚动改为按 `elapsed/duration` 的一次完整三角波，距离从句柄实际偏移累计，无滚动范围发 `probe_error_scroll_range`；各帧阶段由帧回调自行判定完成，墙钟只做 `nominal + 60 s` 看门狗，不再有同步伪首帧；`ready` 在两次强制重绘之后发出，静默判定加入视图的在途/待调度缩略图工作并经一次帧屏障复核（§7 的"设置已读取"在 PoC 中没有设置可读，注释已改为如实描述）；Clear 改按 `BatchModel::is_active() || is_busy()` 门控并在命令入口复查。
 - 已修（P2）：渲染闭包只在 `(revision, range)` 变化时调度一次 deferred 缩略图扫描并带单一 pending 标记；扫描时提供"停止"按钮；菜单 `File` 入 YAML；面板提示改存语义键（`Notice` 枚举）随 locale 重译；未选目录时 Start 文案带省略号；`ProbeConfig`/`IntervalSummary` 加 `#[non_exhaustive]`，`QueueItem` 加 `#[non_exhaustive]`；行高回退不再用 `px(56.)`；i18n 单测用互斥锁串行；UI 测试改为等桥接 `settled` 并连续跑第二批次验证交接（第二批次对已存在输出应为 Skipped）。
-- 未做、记入后续：GPUI workspace 的 cargo-about 归属生成（阶段 5 与 Tauri 一起处理许可证文本）；拖放/取消/淘汰路径的无头 Kit 测试（阶段 3 的 Kit UI 测试计划）；真机 GPU 纹理回收、透明 PNG/HiDPI、VoiceOver/IME、MAS 沙盒写权限（本阶段平台事项，需要裸机或签名构建）。
+- 后续事项承接：GPUI workspace 的 cargo-about 归属生成已提前至 S11 + L6（生成与复核范围见 `GPUI_LICENSE_AUDIT.md`）；拖放/取消/淘汰路径的无头 Kit 测试（阶段 3 的 Kit UI 测试计划）；真机 GPU 纹理回收、透明 PNG/HiDPI、VoiceOver/IME、MAS 沙盒写权限（本阶段平台事项，需要裸机或签名构建）。
 
 平台事项进度（2026-10-17）：
 
