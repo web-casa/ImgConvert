@@ -14,8 +14,7 @@ use gpui_kit::{
 };
 use imgconvert_backend::clipboard::{self as native, ClipboardContent, ClipboardError};
 use imgconvert_backend::import::{self, ClipboardImageImportOptions, ScanImportOptions};
-use imgconvert_gpui_shared::i18n::{tr, tr_with};
-use imgconvert_gpui_shared::queue_model::ImportFeedback;
+use imgconvert_gpui_shared::queue_model::{ClipboardIssue, ImportFeedback};
 use imgconvert_gpui_shared::{AppModels, Services};
 
 #[derive(Debug)]
@@ -140,10 +139,7 @@ pub fn paste(cx: &mut App) {
                     Ok(Some(item)) => match payload(item) {
                         Payload::Paths { paths, invalid } => {
                             if invalid > 0 {
-                                issues.push(tr_with(
-                                    "queue.clipboard_invalid_paths",
-                                    &[("count", &invalid)],
-                                ));
+                                issues.push(ClipboardIssue::InvalidPaths(invalid));
                             }
                             let scan = import::scan_import_paths(
                                 ScanImportOptions {
@@ -156,13 +152,13 @@ pub fn paste(cx: &mut App) {
                                 cancel.clone(),
                             );
                             if scan.skipped > 0 || !scan.errors.is_empty() {
-                                issues.push(tr_with(
-                                    "queue.clipboard_path_issues",
-                                    &[("skipped", &scan.skipped), ("errors", &scan.errors.len())],
-                                ));
+                                issues.push(ClipboardIssue::PathIssues {
+                                    skipped: scan.skipped,
+                                    errors: scan.errors.len(),
+                                });
                             }
                             if scan.truncated {
-                                issues.push(tr("queue.clipboard_truncated"));
+                                issues.push(ClipboardIssue::Truncated);
                             }
                             files = scan.files;
                         }
@@ -200,20 +196,17 @@ pub fn paste(cx: &mut App) {
                                 }
                             }
                             if failed > 0 {
-                                issues.push(tr_with(
-                                    "queue.clipboard_image_issues",
-                                    &[("count", &failed)],
-                                ));
+                                issues.push(ClipboardIssue::ImageIssues(failed));
                             }
                         }
-                        Payload::Empty => issues.push(tr("queue.clipboard_empty")),
+                        Payload::Empty => issues.push(ClipboardIssue::Empty),
                     },
-                    Ok(None) => issues.push(tr("queue.clipboard_empty")),
+                    Ok(None) => issues.push(ClipboardIssue::Empty),
                     Err(ClipboardError::Unavailable) => {
-                        issues.push(tr("queue.clipboard_unavailable"));
+                        issues.push(ClipboardIssue::Unavailable);
                     }
                     Err(ClipboardError::InvalidImage) => {
-                        issues.push(tr("queue.clipboard_image_failed"));
+                        issues.push(ClipboardIssue::ImageFailed);
                     }
                 }
                 (files, created, issues)
@@ -227,22 +220,12 @@ pub fn paste(cx: &mut App) {
             }
             queue.update(cx, |queue, cx| {
                 let added = if cancelled { 0 } else { queue.add_files(files) };
-                let detail = issues
-                    .iter()
-                    .map(AsRef::as_ref)
-                    .collect::<Vec<&str>>()
-                    .join(" ");
                 queue.set_feedback(if cancelled {
                     ImportFeedback::Cancelled
-                } else if added > 0 && !issues.is_empty() {
-                    ImportFeedback::Partial {
-                        added,
-                        detail: detail.into(),
-                    }
+                } else if !issues.is_empty() {
+                    ImportFeedback::Clipboard { added, issues }
                 } else if added > 0 {
                     ImportFeedback::Added { added, skipped: 0 }
-                } else if !issues.is_empty() {
-                    ImportFeedback::Failed(detail.into())
                 } else {
                     ImportFeedback::Nothing
                 });

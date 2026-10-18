@@ -975,7 +975,17 @@ fn safe_relative_dir(relative_dir: Option<&str>) -> Result<Option<PathBuf>, Conv
 }
 
 pub fn conversion_plan(options: &[ConvertOptions]) -> Vec<ConversionPlanEntry> {
-    let input_identities = match input_identity_index(options) {
+    conversion_plan_with_protected_inputs(options, &[])
+}
+
+/// Plans executable jobs while preserving additional queued sources (for
+/// example completed items retained by a shell). Protection uses file identity,
+/// including aliases, exactly as for sources that participate in the batch.
+pub fn conversion_plan_with_protected_inputs(
+    options: &[ConvertOptions],
+    protected_inputs: &[String],
+) -> Vec<ConversionPlanEntry> {
+    let input_identities = match input_identity_index_with_protected(options, protected_inputs) {
         Ok(identities) => identities,
         Err(error) => {
             // Do not claim that a batch is safe when a queued source could
@@ -2543,6 +2553,20 @@ pub fn convert_batch(
     cancel: CancellationToken,
     concurrency: Option<usize>,
 ) -> Result<BatchSummary, String> {
+    convert_batch_with_protected_inputs(options, sink, batch_id, cancel, concurrency, &[])
+}
+
+/// Executes a batch with the same additional-source protection as
+/// [`conversion_plan_with_protected_inputs`]. Checked again under the service's
+/// execution gate; shells must not rely solely on an earlier UI plan.
+pub fn convert_batch_with_protected_inputs(
+    options: Vec<ConvertOptions>,
+    sink: &dyn ProgressSink,
+    batch_id: BatchId,
+    cancel: CancellationToken,
+    concurrency: Option<usize>,
+    protected_inputs: &[String],
+) -> Result<BatchSummary, String> {
     let progress = BatchEmitter { sink, batch_id };
     let total = options.len();
     let mut summary = BatchSummary {
@@ -2575,7 +2599,8 @@ pub fn convert_batch(
         return Ok(summary);
     }
 
-    let (jobs, preflight_events) = prepare_batch_work(options);
+    let (jobs, preflight_events) =
+        prepare_batch_work_with_protected_inputs(options, protected_inputs);
     for event in preflight_events {
         apply_batch_event(&progress, &mut summary, event)?;
     }
@@ -2639,13 +2664,21 @@ pub fn convert_batch(
     Ok(summary)
 }
 
+#[cfg(test)]
 fn prepare_batch_work(
     options: Vec<ConvertOptions>,
+) -> (VecDeque<IndexedConvertOptions>, Vec<BatchProgressEvent>) {
+    prepare_batch_work_with_protected_inputs(options, &[])
+}
+
+fn prepare_batch_work_with_protected_inputs(
+    options: Vec<ConvertOptions>,
+    protected_inputs: &[String],
 ) -> (VecDeque<IndexedConvertOptions>, Vec<BatchProgressEvent>) {
     let mut jobs = VecDeque::new();
     let mut preflight_events = Vec::new();
     let mut output_paths = HashSet::new();
-    let input_identities = match input_identity_index(&options) {
+    let input_identities = match input_identity_index_with_protected(&options, protected_inputs) {
         Ok(identities) => identities,
         Err(error) => {
             // A source whose identity cannot be checked may still exist. Do
@@ -2798,6 +2831,33 @@ fn input_identity_index(
                 .entry(identity)
                 .or_insert_with(Vec::new)
                 .push(index);
+        }
+    }
+    Ok(identities)
+}
+
+/// Additional sources use an index outside the job range. Exact job paths
+/// keep their original indexes so explicit self-overwrite remains possible;
+/// distinct queued aliases still count as other protected sources.
+fn input_identity_index_with_protected(
+    options: &[ConvertOptions],
+    protected_inputs: &[String],
+) -> Result<HashMap<FileIdentity, Vec<usize>>, String> {
+    let mut identities = input_identity_index(options)?;
+    let executable_paths: HashSet<_> = options.iter().map(|option| option.input.as_str()).collect();
+    for input in protected_inputs {
+        // Exact job paths already have their real indexes. A different queued
+        // path that aliases a job is still another source and must be protected.
+        if executable_paths.contains(input.as_str()) {
+            continue;
+        }
+        let input = Path::new(input);
+        let _input_scope = access::scoped_path_access(input);
+        if let Some(identity) = existing_file_identity(input)? {
+            identities
+                .entry(identity)
+                .or_insert_with(Vec::new)
+                .push(options.len());
         }
     }
     Ok(identities)
@@ -5512,6 +5572,73 @@ pub(crate) mod tests {
 
         let error = output_path(&options).unwrap_err();
         assert!(error.detail.contains("不支持的路径 URL scheme"));
+    }
+
+    #[test]
+    fn retained_sources_stay_protected_in_plan_and_execution_including_aliases() {
+        let dir = unique_test_dir("retained-inputs");
+        fs::create_dir_all(dir.join("other")).unwrap();
+        let retained = dir.join("source.png");
+        let input = dir.join("other/source.png");
+        fs::write(&retained, one_by_one_png()).unwrap();
+        fs::write(&input, one_by_one_png()).unwrap();
+        let original = fs::read(&retained).unwrap();
+        let mut options = test_convert_options(input.to_string_lossy().into_owned());
+        options.format = "png".into();
+        options.out_dir = Some(dir.to_string_lossy().into_owned());
+        options.overwrite_mode = Some("overwrite".into());
+        options.overwrite = true;
+        options.allow_source_overwrite = true;
+        let protected = vec![
+            retained.to_string_lossy().into_owned(),
+            options.input.clone(),
+        ];
+        let plan = conversion_plan_with_protected_inputs(&[options.clone()], &protected);
+        assert!(plan[0].conflicts_with_queued_input);
+        let service = crate::service::BatchService::new();
+        let (sink, receiver) = crate::progress::ProgressChannel::new();
+        let summary = service
+            .start_with_protected_inputs(vec![options.clone()], sink, None, protected)
+            .unwrap()
+            .wait_blocking()
+            .unwrap();
+        assert_eq!(
+            (summary.total, summary.completed, summary.failed),
+            (1, 0, 1)
+        );
+        assert!(
+            std::iter::from_fn(|| receiver.try_recv()).any(|(_, event)| matches!(
+                event,
+                BatchProgressEvent::FileError {
+                    error: CommandError {
+                        code: crate::command_error::ErrorCode::OutputConflictsWithInput,
+                        ..
+                    },
+                    ..
+                }
+            ))
+        );
+        assert_eq!(fs::read(&retained).unwrap(), original);
+        // A completed source can be addressed through a different hard-link
+        // name, including an alias of the current job. Identity is decisive.
+        let alias = dir.join("alias.png");
+        fs::hard_link(&input, &alias).unwrap();
+        options.out_dir = Some(dir.join("other").to_string_lossy().into_owned());
+        let own = vec![options.input.clone()];
+        assert!(
+            !conversion_plan_with_protected_inputs(&[options.clone()], &own)[0]
+                .conflicts_with_queued_input
+        );
+        let protected_alias = vec![alias.to_string_lossy().into_owned(), options.input.clone()];
+        assert!(
+            conversion_plan_with_protected_inputs(&[options.clone()], &protected_alias)[0]
+                .conflicts_with_queued_input
+        );
+        let (jobs, events) =
+            prepare_batch_work_with_protected_inputs(vec![options], &protected_alias);
+        assert!(jobs.is_empty());
+        assert_eq!(events.len(), 1);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

@@ -465,10 +465,17 @@ impl ComparisonPreview {
                     .p_6()
                     .bg(cx.theme().background.opacity(0.9))
                     .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().danger)
-                            .child(tr_with("preview.error", &[("detail", error)])),
+                        div().text_sm().text_color(cx.theme().danger).child(
+                            imgconvert_gpui_shared::command_error::format_command_error(
+                                &imgconvert_backend::command_error::CommandError::preview_failed(
+                                    self.queue
+                                        .read(cx)
+                                        .item(&self.item_key)
+                                        .map_or("", |item| item.path.as_ref()),
+                                    error,
+                                ),
+                            ),
+                        ),
                     ),
             );
         } else if self.before.is_none() {

@@ -26,6 +26,7 @@ use gpui_kit::{
     Pixels, Render, RenderImage, RenderOnce, SharedString, Size, StatefulInteractiveElement as _,
     Styled as _, StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, size,
 };
+use imgconvert_gpui_shared::command_error::format_command_error;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
 use imgconvert_gpui_shared::theme;
@@ -318,15 +319,50 @@ impl QueueView {
                     "queue.import_added_skipped",
                     &[("added", added), ("skipped", skipped)],
                 ),
-                ImportFeedback::Partial { added, detail } => tr_with(
-                    "queue.import_partial",
-                    &[("added", added), ("detail", detail)],
-                ),
+                ImportFeedback::Clipboard { added, issues } => {
+                    let detail = issues
+                        .iter()
+                        .map(|issue| issue.text().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if *added > 0 {
+                        tr_with(
+                            "queue.import_partial",
+                            &[("added", added), ("detail", &detail)],
+                        )
+                    } else {
+                        tr_with("queue.import_failed", &[("detail", &detail)])
+                    }
+                }
+                ImportFeedback::Scan {
+                    added,
+                    skipped,
+                    errors,
+                    truncated,
+                    cancelled,
+                } => {
+                    let mut parts =
+                        vec![tr_with("queue.import_added", &[("added", added)]).to_string()];
+                    if *skipped > 0 || *errors > 0 {
+                        parts.push(
+                            tr_with(
+                                "queue.scan_issues",
+                                &[("skipped", skipped), ("errors", errors)],
+                            )
+                            .to_string(),
+                        );
+                    }
+                    if *truncated {
+                        parts.push(tr("queue.clipboard_truncated").to_string());
+                    }
+                    if *cancelled {
+                        parts.push(tr("queue.import_cancelled").to_string());
+                    }
+                    parts.join(" ").into()
+                }
                 ImportFeedback::Nothing => tr("queue.import_nothing"),
                 ImportFeedback::Cancelled => tr("queue.import_cancelled"),
-                ImportFeedback::Failed(detail) => {
-                    tr_with("queue.import_failed", &[("detail", detail)])
-                }
+                ImportFeedback::Failed(error) => format_command_error(error),
             }
         };
         Some(
@@ -528,6 +564,35 @@ impl RenderOnce for QueueRow {
                 .tooltip(tr("impact.title"))
                 .on_click(move |event, window, cx| on_impact(event, window, cx))
         });
+        let remove_key = item.key.clone();
+        let remove = Button::new(SharedString::from(format!("remove:{}", item.key)))
+            .ghost()
+            .xsmall()
+            .icon(IconName::CircleX)
+            .accessibility_label(tr_with("queue.remove_item", &[("name", &item.name)]))
+            .tooltip(tr("queue.remove"))
+            .disabled(self.busy)
+            .on_click(move |_, window, cx| {
+                if format_edit_busy(cx) {
+                    return;
+                }
+                let removed = AppModels::global(cx)
+                    .queue()
+                    .clone()
+                    .update(cx, |queue, cx| {
+                        let removed = queue.remove(&remove_key);
+                        if removed.is_some() {
+                            cx.notify();
+                        }
+                        removed
+                    });
+                if let Some(item) = removed {
+                    crate::clipboard::cleanup(vec![item.path.to_string()], cx);
+                    if let ThumbnailState::Ready(image) = item.thumbnail {
+                        release_images(vec![image], Some(window), cx);
+                    }
+                }
+            });
         let path = item.path.clone();
         v_flex()
             .id(item.key.clone())
@@ -558,17 +623,27 @@ impl RenderOnce for QueueRow {
                                     .truncate()
                                     .child(item.name.clone()),
                             )
-                            .child(div().text_xs().text_color(muted).truncate().child(meta)),
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("meta:{}", item.key)))
+                                    .test_support()
+                                    .aria_label(meta.clone())
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .truncate()
+                                    .child(meta),
+                            ),
                     )
                     .children(impact)
-                    .child(compare),
+                    .child(compare)
+                    .child(remove),
             )
             .child(
                 h_flex()
                     .justify_between()
                     .gap_2()
                     .child(format_control(&item, self.busy, cx))
-                    .child(render_status(&item.status, cx)),
+                    .child(render_status(&item.key, &item.status, cx)),
             )
     }
 }
@@ -610,6 +685,7 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
     );
     let key = item.key.clone();
     let selected = item.target_format.clone();
+    let source = item.source_format_hint().map(SharedString::from);
     Button::new(SharedString::from(format!("item-format:{key}")))
         .ghost()
         .xsmall()
@@ -634,9 +710,16 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
             for format in imgconvert_backend::convert::capabilities().writable {
                 let item_key = key.clone();
                 menu = menu.item(
-                    PopupMenuItem::new(format.to_ascii_uppercase())
-                        .checked(selected.as_deref() == Some(format))
-                        .on_click(move |_, _, cx| set_item_format(&item_key, Some(format), cx)),
+                    PopupMenuItem::new(if source.as_deref() == Some(format) {
+                        tr_with(
+                            "queue.source_format",
+                            &[("format", &format.to_ascii_uppercase())],
+                        )
+                    } else {
+                        format.to_ascii_uppercase().into()
+                    })
+                    .checked(selected.as_deref() == Some(format))
+                    .on_click(move |_, _, cx| set_item_format(&item_key, Some(format), cx)),
                 );
             }
             menu
@@ -648,6 +731,9 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
 /// tooltip.
 fn row_meta(item: &QueueItem) -> SharedString {
     let mut parts: Vec<String> = Vec::new();
+    if let Some(format) = item.source_format_hint() {
+        parts.push(format.to_ascii_uppercase());
+    }
     if let (Some(width), Some(height)) = (item.source_width, item.source_height) {
         parts.push(format!("{width} × {height}"));
     }
@@ -693,8 +779,19 @@ fn render_thumbnail(thumbnail: &ThumbnailState, cx: &App) -> impl IntoElement {
     }
 }
 
-fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
+fn render_status(key: &SharedString, status: &ItemStatus, cx: &App) -> impl IntoElement {
     let lane = h_flex().flex_1().min_w_0().justify_end().gap_2().text_xs();
+    let lane = lane
+        .id(SharedString::from(format!("status:{key}")))
+        .test_support();
+    let lane = match status {
+        ItemStatus::Error { error } | ItemStatus::Skipped { error } => {
+            let text = format_command_error(error);
+            lane.aria_label(text.clone())
+                .tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
+        }
+        _ => lane,
+    };
     match status {
         ItemStatus::Pending => lane
             .text_color(cx.theme().muted_foreground)
@@ -726,13 +823,14 @@ fn render_status(status: &ItemStatus, cx: &App) -> impl IntoElement {
                     ("after", &format_bytes(*out_size)),
                 ],
             ))),
-        ItemStatus::Skipped { .. } => lane
+        ItemStatus::Skipped { error } => lane
             .text_color(cx.theme().muted_foreground)
+            .child(div().truncate().child(format_command_error(error)))
             .child(tr("status.skipped")),
-        ItemStatus::Error { detail } => lane
+        ItemStatus::Error { error } => lane
             .text_color(cx.theme().danger)
             .child(Icon::new(IconName::CircleX).small())
-            .child(div().truncate().child(detail.clone()))
+            .child(div().truncate().child(format_command_error(error)))
             .child(tr("status.error")),
     }
 }

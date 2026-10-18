@@ -324,7 +324,7 @@ settings.near_lossless:
   en: Near-lossless
   zh-CN: 近无损
 settings.near_lossless_off:
-  en: Off
+  en: "Off"
   zh-CN: 关闭
 settings.sharp_yuv:
   en: Sharp YUV
@@ -342,7 +342,7 @@ settings.minimum_quality:
   en: Minimum quality
   zh-CN: 最低质量
 settings.quality_floor_off:
-  en: Off
+  en: "Off"
   zh-CN: 关闭
 workflow.preset:
   en: Scenario preset
@@ -1169,3 +1169,116 @@ legal.support:
 legal.close:
   en: Close
   zh-CN: 关闭
+
+errors.fileNotFound:
+  en: "File not found: %{path}"
+  zh-CN: "找不到文件：%{path}"
+
+errors.permissionDenied:
+  en: "Permission denied: %{path}"
+  zh-CN: "没有权限访问：%{path}"
+
+errors.outputPermissionDenied:
+  en: "Cannot write to the output directory: %{path}. Choose an output directory and try again."
+  zh-CN: "没有权限写入输出目录：%{path}。请点击“输出目录”选择文件夹后重试。"
+
+errors.unsupportedFormat:
+  en: "Unsupported format: %{format}"
+  zh-CN: "不支持的格式：%{format}"
+
+errors.outputExists:
+  en: "Output file already exists: %{path}"
+  zh-CN: "输出文件已存在：%{path}"
+
+errors.invalidOutputSuffix:
+  en: "The file-name suffix contains unsupported characters or is too long."
+  zh-CN: "文件后缀包含无效字符或过长，请修改后重试。"
+
+errors.sourceOverwriteConfirmationRequired:
+  en: "Explicit confirmation is required before replacing a source file: %{path}"
+  zh-CN: "需要明确确认后才能覆盖原图：%{path}"
+
+errors.outputConflictsWithInput:
+  en: "To protect a queued source, this output was not written because it matches another input: %{path}"
+  zh-CN: "为保护队列中的原图，未写入与其他输入同名的输出：%{path}"
+
+errors.outputSafetyCheckFailed:
+  en: "Could not verify that this batch can safely preserve source files. Check access to the affected file and try again: %{path}"
+  zh-CN: "无法确认本批任务会安全保留原图，请检查相关文件权限后重试：%{path}"
+
+errors.outputNotSmaller:
+  en: "Skipped because the output is not smaller than the source: %{path}"
+  zh-CN: "已跳过：输出文件未小于源文件：%{path}"
+
+errors.pdfPasswordProtected:
+  en: "This PDF is encrypted or password-protected and cannot be converted: %{path}"
+  zh-CN: "PDF 已加密或受密码保护，当前无法转换：%{path}"
+
+errors.pdfSettingsInvalid:
+  en: "The PDF page range or DPI setting is invalid: %{path}"
+  zh-CN: "PDF 页面范围或 DPI 设置无效：%{path}"
+
+errors.pdfResourceLimit:
+  en: "The PDF file or page exceeds the safe resource limit. Select fewer pages or lower the DPI: %{path}"
+  zh-CN: "PDF 文件或页面超过安全资源上限；请减少页面、降低 DPI 后重试：%{path}"
+
+errors.pdfInvalid:
+  en: "The PDF is invalid, damaged, or contains unsupported content: %{path}"
+  zh-CN: "PDF 无效、损坏或包含暂不支持的内容：%{path}"
+
+errors.conversionFailed:
+  en: "Could not convert image: %{path}"
+  zh-CN: "无法转换图片：%{path}"
+
+errors.batchFailed:
+  en: "The batch conversion could not be completed."
+  zh-CN: "批量转换无法完成。"
+
+errors.importFailed:
+  en: "Could not import the selected file or folder."
+  zh-CN: "无法导入所选文件或文件夹。"
+
+errors.clipboardImportFailed:
+  en: "Could not import the clipboard image."
+  zh-CN: "无法导入剪贴板图片。"
+
+errors.nativeDialogFailed:
+  en: "Could not open the system file picker."
+  zh-CN: "无法打开系统文件选择器。"
+
+errors.thumbnailFailed:
+  en: "Could not generate an image preview: %{path}"
+  zh-CN: "无法生成图片预览：%{path}"
+
+errors.previewFailed:
+  en: "Could not generate a comparison preview: %{path}"
+  zh-CN: "无法生成对比预览：%{path}"
+
+errors.codecConfigurationFailed:
+  en: "Could not configure the HEIC helper."
+  zh-CN: "无法配置 HEIC helper。"
+
+errors.taskFailed:
+  en: "The requested operation could not be completed. Please try again."
+  zh-CN: "请求无法完成，请重试。"
+
+queue.source_format:
+  en: "%{format} · Source"
+  zh-CN: "%{format} · 来源"
+queue.remove:
+  en: Remove
+  zh-CN: 移除
+queue.remove_item:
+  en: "Remove %{name} from the queue"
+  zh-CN: "从队列移除 %{name}"
+queue.scan_issues:
+  en: "%{skipped} entries skipped; %{errors} paths couldn’t be read."
+  zh-CN: "跳过 %{skipped} 项；%{errors} 个路径无法读取。"
+
+errors.outputSafetyCheckFailedGeneric:
+  en: Could not verify that this batch can safely preserve source files. Check file access and try again.
+  zh-CN: 无法确认本批任务会安全保留原图，请检查文件权限后重试。
+
+settings.clear_result_cache_failed_generic:
+  en: Could not clear the result cache. Check file access and try again.
+  zh-CN: 无法清空结果缓存，请检查文件权限后重试。

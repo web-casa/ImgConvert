@@ -557,6 +557,11 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
     // Skip mode with an output that is its own source: one informational
     // prompt, then the batch runs and leaves the original alone.
     let original = std::fs::read(&input).unwrap();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-reset-formats", cx);
+    })
+    .unwrap();
     cx.update(|cx| {
         let settings = AppModels::global(cx).settings().clone();
         settings.update(cx, |settings, cx| {
@@ -1027,9 +1032,11 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
         assert!(matches!(status, ItemStatus::Done { .. }), "{status:?}");
     });
 
-    // A second batch right after the first: the handoff must not drop the
+    // Explicitly retry the completed item. The handoff must not drop the
     // previous bridge early, and the existing output is skipped, not clobbered.
     cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-reset-formats", cx);
         window.render_frame(cx);
         window.click("workflow-start", cx);
     })
@@ -1507,7 +1514,10 @@ fn clipboard_empty_invalid_partial_and_cancelled_imports_leave_a_usable_queue(
     cx.update(|cx| {
         let queue = AppModels::global(cx).queue().read(cx);
         assert!(queue.is_empty());
-        assert!(matches!(queue.feedback(), ImportFeedback::Failed(_)));
+        assert!(matches!(
+            queue.feedback(),
+            ImportFeedback::Clipboard { added: 0, .. }
+        ));
         cx.write_to_clipboard(clipboard_bitmap());
         imgconvert_gpui_queue::clipboard::paste(cx);
         assert!(imgconvert_gpui_queue::import::cancel_import(cx));
@@ -1529,7 +1539,7 @@ fn clipboard_empty_invalid_partial_and_cancelled_imports_leave_a_usable_queue(
     cx.update(|cx| {
         let queue = AppModels::global(cx).queue().read(cx);
         assert_eq!(queue.len(), 1);
-        assert!(matches!(queue.feedback(), ImportFeedback::Partial { added: 1, detail } if detail.contains("1 images couldn’t be imported")));
+        assert!(matches!(queue.feedback(), ImportFeedback::Clipboard { added: 1, issues } if issues.contains(&imgconvert_gpui_shared::queue_model::ClipboardIssue::ImageIssues(1))));
     });
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
@@ -1716,10 +1726,21 @@ fn clipboard_partial_path_errors_are_visible_and_modals_do_not_import(cx: &mut T
         let queue = AppModels::global(cx).queue().read(cx);
         assert_eq!(queue.len(), 1);
         assert_eq!(queue.item_at(0).unwrap().path.as_ref(), input.to_str().unwrap());
-        assert!(matches!(queue.feedback(), ImportFeedback::Partial { added: 1, detail } if detail.contains("1 paths couldn’t be read")));
+        assert!(matches!(queue.feedback(), ImportFeedback::Clipboard { added: 1, issues } if issues.iter().any(|issue| matches!(issue, imgconvert_gpui_shared::queue_model::ClipboardIssue::PathIssues { errors: 1, .. }))));
         cx.write_to_clipboard(clipboard_bitmap());
     });
     cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        toggle_language(cx);
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("queue-feedback")
+                .label()
+                .unwrap()
+                .contains("1 个路径无法读取")
+        );
+        toggle_language(cx);
         window.render_frame(cx);
         window.click("plugin-diagnostics", cx);
     })
@@ -2068,4 +2089,350 @@ fn licenses_include_the_full_gpui_and_native_notices_and_remain_copyable(cx: &mu
         assert!(!window.has_active_dialog(cx));
     })
     .unwrap();
+}
+
+#[gpui_kit::test]
+fn parity_scan_reports_failures_and_stop_preserves_existing_queue(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-s12-scan-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("source.png");
+    std::fs::write(&file, one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        imgconvert_gpui_queue::import::import_paths(
+            vec![file.clone(), dir.join("missing.png")],
+            cx,
+        );
+    });
+    wait_for_import(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let text = window.find("queue-feedback").label().unwrap().to_owned();
+        assert!(
+            text.contains("Added 1 files") && text.contains("1 paths couldn’t be read"),
+            "{text}"
+        );
+        toggle_language(cx);
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("queue-feedback")
+                .label()
+                .unwrap()
+                .contains("1 个路径无法读取")
+        );
+        toggle_language(cx);
+        let unseen = dir.join("unseen.png");
+        std::fs::write(&unseen, one_by_one_png()).unwrap();
+        imgconvert_gpui_queue::import::import_paths(vec![unseen], cx);
+        // The worker has not run; Stop deterministically cancels this scan.
+        window.render_frame(cx);
+        window.click("queue-cancel-import", cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    cx.update(|cx| assert_eq!(AppModels::global(cx).queue().read(cx).len(), 1));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("queue-feedback")
+                .label()
+                .unwrap()
+                .contains("Added 0 files")
+        );
+    })
+    .unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn parity_structured_errors_retranslate_and_remove_preserves_sources(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace_sized(cx, size(px(760.), px(480.)));
+    let key = gpui_kit::SharedString::from("parity-source");
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                    key: key.to_string(),
+                    path: "/no-real-data/source.png".into(),
+                    relative_dir: None,
+                    metadata: Some(imgconvert_backend::import::ImportImageMetadata {
+                        format: "png".into(),
+                        width: 1,
+                        height: 1,
+                        dpi_x: None,
+                        dpi_y: None,
+                        page_count: None,
+                    }),
+                }]);
+                queue.apply_batch_event(
+                    &imgconvert_backend::convert::BatchProgressEvent::FileError {
+                        index: 0,
+                        input: "/no-real-data/source.png".into(),
+                        error: imgconvert_backend::command_error::CommandError::file_not_found(
+                            "/no-real-data/source.png",
+                            "PRIVATE backend detail",
+                        ),
+                    },
+                    std::slice::from_ref(&key),
+                );
+                cx.notify();
+            });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("status:parity-source").label(),
+            Some("File not found: /no-real-data/source.png")
+        );
+        toggle_language(cx);
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("status:parity-source").label(),
+            Some("找不到文件：/no-real-data/source.png")
+        );
+        let row = window.find("parity-source").bounds();
+        let remove = window.find("remove:parity-source").bounds();
+        assert!(remove.right() <= row.right() && remove.bottom() <= row.bottom());
+        window.click("remove:parity-source", cx);
+        window.render_frame(cx);
+        assert!(window.find("queue-empty").visible());
+    })
+    .unwrap();
+    cx.update(|cx| assert!(AppModels::global(cx).queue().read(cx).is_empty()));
+}
+
+#[gpui_kit::test]
+fn parity_pdf_import_metadata_and_source_format_menu(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |s| s.format = "png".into());
+            });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG"));
+    })
+    .unwrap();
+    let dir = std::env::temp_dir().join(format!("imgconvert-s12-pdf-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let pdf = dir.join("document.pdf");
+    std::fs::write(&pdf, include_bytes!("fixtures/minimal.pdf")).unwrap();
+    let png = dir.join("image.png");
+    std::fs::write(&png, one_by_one_png()).unwrap();
+    cx.update(|cx| imgconvert_gpui_queue::import::import_paths(vec![pdf.clone(), png.clone()], cx));
+    wait_for_import(cx);
+    let (pdf_key, png_key) = cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        let pdf_item = queue.items().iter().find(|item| item.is_pdf()).unwrap();
+        assert_eq!(pdf_item.page_count, Some(1));
+        assert_eq!(pdf_item.source_format.as_deref(), Some("pdf"));
+        assert!(pdf_item.source_width.is_some() && pdf_item.source_height.is_some());
+        let png_item = queue.items().iter().find(|item| !item.is_pdf()).unwrap();
+        (pdf_item.key.clone(), png_item.key.clone())
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG · Source"));
+        toggle_language(cx);
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG · 来源"));
+        toggle_language(cx);
+        window.render_frame(cx);
+        let meta_id = gpui_kit::SharedString::from(format!("meta:{pdf_key}"));
+        assert!(window.find(meta_id).label().unwrap().contains("PDF"));
+        window.click(
+            gpui_kit::SharedString::from(format!("item-format:{png_key}")),
+            cx,
+        );
+        window.render_frame(cx);
+        let png_ix = imgconvert_backend::convert::capabilities()
+            .writable
+            .iter()
+            .position(|format| *format == "png")
+            .unwrap()
+            + 2;
+        assert_eq!(
+            window.within("popup-menu").find(png_ix).label(),
+            Some("PNG · Source")
+        );
+        window.within("popup-menu").press("escape", cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(
+            gpui_kit::SharedString::from(format!("remove:{png_key}")),
+            cx,
+        );
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG"));
+    })
+    .unwrap();
+    assert!(
+        png.exists() && pdf.exists(),
+        "removing regular inputs must preserve originals"
+    );
+    cx.update(|cx| imgconvert_gpui_queue::import::import_paths(vec![png], cx));
+    wait_for_import(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG · Source"));
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    // Queue observers run when the app update closes, before the next frame.
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("workflow-format").value(), Some("PNG"));
+    })
+    .unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[gpui_kit::test]
+fn parity_remove_clipboard_item_cleans_only_its_registered_file(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    cx.update(|cx| cx.write_to_clipboard(clipboard_bitmap()));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-paste", cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+    let (key, path) = cx.update(|cx| {
+        let item = AppModels::global(cx).queue().read(cx).item_at(0).unwrap();
+        (
+            item.key.clone(),
+            std::path::PathBuf::from(item.path.as_ref()),
+        )
+    });
+    assert!(path.exists());
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(gpui_kit::SharedString::from(format!("remove:{key}")), cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!path.exists());
+    cx.update(|cx| assert!(AppModels::global(cx).queue().read(cx).is_empty()));
+}
+
+#[gpui_kit::test]
+fn parity_next_batch_keeps_completed_items_and_converts_only_new_inputs(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir =
+        std::env::temp_dir().join(format!("imgconvert-s12-next-batch-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    for name in ["first", "next"] {
+        std::fs::write(dir.join(format!("{name}.png")), one_by_one_png()).unwrap();
+    }
+    let first = dir.join("first.png");
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |settings| {
+                    settings.format = "png".into();
+                    settings.result_cache = false;
+                })
+            });
+        imgconvert_gpui_queue::import::import_paths(vec![first], cx);
+    });
+    wait_for_import(cx);
+    let workflow = cx.update(|cx| workspace.read(cx).workflow().clone());
+    cx.update(|cx| {
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.join("out"), None, cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    let (first_key, status) = cx.update(|cx| {
+        let item = AppModels::global(cx).queue().read(cx).item_at(0).unwrap();
+        assert!(
+            matches!(item.status, ItemStatus::Done { .. }),
+            "{:?}",
+            item.status
+        );
+        (item.key.clone(), item.status.clone())
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("workflow-start", cx);
+        assert!(!progress_bridge::is_busy(cx));
+    })
+    .unwrap();
+    cx.update(|cx| imgconvert_gpui_queue::import::import_paths(vec![dir.join("next.png")], cx));
+    wait_for_import(cx);
+    cx.update(|cx| {
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.join("out"), None, cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        assert_eq!(models.batch().read(cx).total(), 1);
+        assert_eq!(
+            models.queue().read(cx).item(&first_key).unwrap().status,
+            status
+        );
+        assert!(matches!(
+            models.queue().read(cx).item_at(1).unwrap().status,
+            ItemStatus::Done { .. }
+        ));
+    });
+    // A later job must not overwrite the original of an already completed
+    // queue item, even when overwrite mode and self-overwrite are permitted.
+    let original = std::fs::read(dir.join("first.png")).unwrap();
+    std::fs::create_dir_all(dir.join("other")).unwrap();
+    let collision = dir.join("other/first.png");
+    std::fs::write(&collision, one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |s| {
+                    s.output_suffix_enabled = false;
+                    s.overwrite = imgconvert_backend::settings::OverwriteMode::Overwrite;
+                });
+            });
+        imgconvert_gpui_queue::import::import_paths(vec![collision], cx);
+    });
+    wait_for_import(cx);
+    cx.update(|cx| {
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.clone(), None, cx);
+        });
+    });
+    wait_for_batch_to_settle(cx);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        assert_eq!(models.batch().read(cx).total(), 1);
+        assert_eq!(models.batch().read(cx).failed(), 1);
+        assert_eq!(models.queue().read(cx).item(&first_key).unwrap().status, status);
+        assert!(matches!(&models.queue().read(cx).item_at(2).unwrap().status, ItemStatus::Error { error } if error.code == imgconvert_backend::command_error::ErrorCode::OutputConflictsWithInput));
+    });
+    assert_eq!(std::fs::read(dir.join("first.png")).unwrap(), original);
+    std::fs::remove_dir_all(dir).unwrap();
 }

@@ -33,10 +33,10 @@ pub enum ItemStatus {
         comparable: bool,
     },
     Skipped {
-        detail: SharedString,
+        error: CommandError,
     },
     Error {
-        detail: SharedString,
+        error: CommandError,
     },
 }
 
@@ -85,6 +85,26 @@ pub struct QueueItem {
 }
 
 impl QueueItem {
+    /// Probed format, or a filename hint when probing was deferred/failed.
+    /// This is presentation only; it does not assert a successful decode.
+    pub fn source_format_hint(&self) -> Option<&str> {
+        self.source_format.as_deref().or_else(|| {
+            let extension = std::path::Path::new(self.path.as_ref())
+                .extension()?
+                .to_str()?;
+            [
+                "jpeg", "png", "webp", "avif", "svg", "gif", "bmp", "heic", "pdf",
+            ]
+            .into_iter()
+            .find(|format| extension.eq_ignore_ascii_case(format))
+            .or_else(|| match extension.to_ascii_lowercase().as_str() {
+                "jpg" => Some("jpeg"),
+                "heif" | "hif" => Some("heic"),
+                _ => None,
+            })
+        })
+    }
+
     /// A document input: PDF by probed format or by extension.
     pub fn is_pdf(&self) -> bool {
         self.source_format.as_deref() == Some("pdf")
@@ -125,15 +145,62 @@ impl QueueItem {
     }
 }
 
-/// Feedback line under the toolbar after an import.
+/// Locale-neutral clipboard feedback, translated when the queue renders.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClipboardIssue {
+    InvalidPaths(usize),
+    PathIssues { skipped: usize, errors: usize },
+    Truncated,
+    ImageIssues(usize),
+    Empty,
+    Unavailable,
+    ImageFailed,
+}
+
+impl ClipboardIssue {
+    pub fn text(&self) -> SharedString {
+        use crate::i18n::{tr, tr_with};
+        match self {
+            Self::InvalidPaths(count) => {
+                tr_with("queue.clipboard_invalid_paths", &[("count", count)])
+            }
+            Self::PathIssues { skipped, errors } => tr_with(
+                "queue.clipboard_path_issues",
+                &[("skipped", skipped), ("errors", errors)],
+            ),
+            Self::Truncated => tr("queue.clipboard_truncated"),
+            Self::ImageIssues(count) => {
+                tr_with("queue.clipboard_image_issues", &[("count", count)])
+            }
+            Self::Empty => tr("queue.clipboard_empty"),
+            Self::Unavailable => tr("queue.clipboard_unavailable"),
+            Self::ImageFailed => tr("queue.clipboard_image_failed"),
+        }
+    }
+}
+
+/// Feedback line under the toolbar after an import.
+#[derive(Debug, Clone, PartialEq)]
 pub enum ImportFeedback {
     None,
-    Added { added: usize, skipped: usize },
-    Partial { added: usize, detail: SharedString },
+    Added {
+        added: usize,
+        skipped: usize,
+    },
+    Clipboard {
+        added: usize,
+        issues: Vec<ClipboardIssue>,
+    },
+    Scan {
+        added: usize,
+        skipped: usize,
+        errors: usize,
+        truncated: bool,
+        cancelled: bool,
+    },
     Nothing,
     Cancelled,
-    Failed(SharedString),
+    Failed(CommandError),
 }
 
 pub struct QueueModel {
@@ -303,6 +370,38 @@ impl QueueModel {
         added
     }
 
+    /// Removes one idle item; the caller releases its thumbnail. Outstanding
+    /// tickets become stale and surviving items may request thumbnails again.
+    pub fn remove(&mut self, key: &SharedString) -> Option<QueueItem> {
+        if self.importing
+            || self
+                .items
+                .iter()
+                .any(|item| matches!(item.status, ItemStatus::Running { .. }))
+        {
+            return None;
+        }
+        let ix = self.index_by_key.remove(key)?;
+        let item = self.items.remove(ix);
+        for (index, item) in self.items.iter().enumerate().skip(ix) {
+            self.index_by_key.insert(item.key.clone(), index);
+        }
+        if let ThumbnailState::Ready(image) = &item.thumbnail {
+            self.thumbnail_bytes = self.thumbnail_bytes.saturating_sub(image_bytes(image));
+        }
+        self.thumbnail_last_shown.remove(key);
+        // Structural revision also invalidates existing tickets; make loading
+        // items requestable again so a removal cannot strand their thumbnails.
+        for item in &mut self.items {
+            if matches!(item.thumbnail, ThumbnailState::Loading) {
+                item.thumbnail = ThumbnailState::NotRequested;
+            }
+        }
+        self.revision += 1;
+        self.conversion_revision += 1;
+        Some(item)
+    }
+
     /// Empties the queue and returns every decoded thumbnail for release.
     /// Outstanding thumbnail requests become stale through the revision bump.
     pub fn clear(&mut self) -> Vec<Arc<RenderImage>> {
@@ -323,10 +422,13 @@ impl QueueModel {
         released
     }
 
-    /// Resets every item to pending before a batch starts.
-    pub fn reset_statuses(&mut self) {
-        for item in &mut self.items {
-            item.status = ItemStatus::Pending;
+    /// Resets only the jobs selected for the next batch; completed results
+    /// outside that batch retain their status and environmental measurements.
+    pub fn reset_statuses(&mut self, jobs: &[SharedString]) {
+        for key in jobs {
+            if let Some(item) = self.item_mut(key) {
+                item.status = ItemStatus::Pending;
+            }
         }
     }
 
@@ -457,13 +559,13 @@ impl QueueModel {
             BatchProgressEvent::FileSkipped { index, error, .. } => self.set_status(
                 job_key(*index),
                 ItemStatus::Skipped {
-                    detail: command_error_text(error),
+                    error: error.clone(),
                 },
             ),
             BatchProgressEvent::FileError { index, error, .. } => self.set_status(
                 job_key(*index),
                 ItemStatus::Error {
-                    detail: command_error_text(error),
+                    error: error.clone(),
                 },
             ),
             BatchProgressEvent::Cancelled { .. } | BatchProgressEvent::Finished { .. } => {
@@ -482,7 +584,7 @@ impl QueueModel {
     }
 
     /// Everything still pending or running after a batch ended abnormally.
-    pub fn fail_unfinished(&mut self, jobs: &[SharedString], detail: &SharedString) {
+    pub fn fail_unfinished(&mut self, jobs: &[SharedString], error: &CommandError) {
         for key in jobs {
             if let Some(item) = self.item_mut(key)
                 && matches!(
@@ -491,7 +593,7 @@ impl QueueModel {
                 )
             {
                 item.status = ItemStatus::Error {
-                    detail: detail.clone(),
+                    error: error.clone(),
                 };
             }
         }
@@ -512,17 +614,6 @@ impl QueueModel {
         let ix = *self.index_by_key.get(key)?;
         self.items.get_mut(ix)
     }
-}
-
-/// Short, locale-neutral text for a backend command error: its detail when
-/// present, otherwise the error code. Localized rendering is stage 3 work.
-fn command_error_text(error: &CommandError) -> SharedString {
-    SharedString::from(
-        error
-            .detail
-            .clone()
-            .unwrap_or_else(|| format!("{:?}", error.code)),
-    )
 }
 
 /// Decoded size of the first frame: width × height × 4 bytes (BGRA).
@@ -546,6 +637,57 @@ mod tests {
             relative_dir: None,
             metadata: None,
         }
+    }
+
+    #[test]
+    fn source_hints_use_probes_before_case_insensitive_filename_aliases() {
+        let mut file = scan_file("x");
+        file.path = "/images/source.JPG".into();
+        let mut item = QueueItem::from_scan(file);
+        assert_eq!(item.source_format_hint(), Some("jpeg"));
+        item.source_format = Some("png".into());
+        assert_eq!(item.source_format_hint(), Some("png"));
+        item.source_format = None;
+        item.path = "/images/source.HIF".into();
+        assert_eq!(item.source_format_hint(), Some("heic"));
+        item.path = "/images/source.unknown".into();
+        assert_eq!(item.source_format_hint(), None);
+    }
+
+    #[test]
+    fn removal_updates_indexes_releases_bytes_and_recovers_loading_survivors() {
+        let mut queue = QueueModel::default();
+        queue.add_files(vec![scan_file("a"), scan_file("b"), scan_file("c")]);
+        let a = SharedString::from("a");
+        let b = SharedString::from("b");
+        let ticket = queue.mark_thumbnail_loading(&a).unwrap();
+        queue.set_thumbnail(&ticket, image(2));
+        let loading = queue.mark_thumbnail_loading(&b).unwrap();
+        let revision = queue.conversion_revision();
+        queue.set_importing(true);
+        assert!(queue.remove(&a).is_none());
+        queue.set_importing(false);
+        queue.item_mut(&b).unwrap().status = ItemStatus::Running { percent: 1. };
+        assert!(queue.remove(&a).is_none());
+        queue.item_mut(&b).unwrap().status = ItemStatus::Pending;
+        assert!(matches!(
+            queue.remove(&a).unwrap().thumbnail,
+            ThumbnailState::Ready(_)
+        ));
+        assert_eq!(queue.thumbnail_bytes, 0);
+        assert!(queue.conversion_revision() > revision);
+        assert_eq!(
+            queue.keys(),
+            vec![SharedString::from("b"), SharedString::from("c")]
+        );
+        assert_eq!(queue.item(&b).unwrap().name.as_ref(), "b.png");
+        assert!(matches!(
+            queue.item(&b).unwrap().thumbnail,
+            ThumbnailState::NotRequested
+        ));
+        assert_eq!(queue.set_thumbnail(&loading, image(1)).len(), 1);
+        assert!(queue.mark_thumbnail_loading(&b).is_some());
+        assert!(queue.remove(&a).is_none());
     }
 
     #[test]
@@ -590,7 +732,7 @@ mod tests {
         queue.item_mut(&key).unwrap().status = ItemStatus::Running { percent: 20. };
         assert!(!queue.set_target_format(&key, None));
         assert!(!queue.reset_target_formats());
-        queue.reset_statuses();
+        queue.reset_statuses(&queue.keys());
         assert!(queue.reset_target_formats());
         assert!(queue.item(&key).unwrap().target_format.is_none());
         queue.clear();

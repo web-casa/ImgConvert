@@ -4,3 +4,5 @@
 # Bundled policy documents have the same bytes on every desktop platform.
 /PRIVACY.md text eol=lf
 /PRIVACY.en.md text eol=lf
+# PDF xref offsets require byte-identical test fixtures.
+/apps/gpui/crates/shell/tests/fixtures/*.pdf binary

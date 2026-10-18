@@ -267,6 +267,21 @@ impl BatchService {
     where
         S: ProgressSink + 'static,
     {
+        self.start_with_protected_inputs(options, sink, concurrency, Vec::new())
+    }
+
+    /// Starts executable jobs while protecting all retained queue sources,
+    /// including completed items that must not be converted again.
+    pub fn start_with_protected_inputs<S>(
+        &self,
+        options: Vec<ConvertOptions>,
+        sink: S,
+        concurrency: Option<usize>,
+        protected_inputs: Vec<String>,
+    ) -> Result<RunningBatch, BatchError>
+    where
+        S: ProgressSink + 'static,
+    {
         let completion = Arc::new(Completion::default());
         let (id, token) = {
             let mut current = self.inner.current();
@@ -302,7 +317,14 @@ impl BatchService {
                 let execution = inner.gate.handle();
                 let outcome = catch_unwind(AssertUnwindSafe(|| {
                     let _gate = lock_workflow_execution_gate(&execution);
-                    convert::convert_batch(options, &sink, id, token, concurrency)
+                    convert::convert_batch_with_protected_inputs(
+                        options,
+                        &sink,
+                        id,
+                        token,
+                        concurrency,
+                        &protected_inputs,
+                    )
                 }));
                 let result = match outcome {
                     Ok(Ok(summary)) => Ok(summary),

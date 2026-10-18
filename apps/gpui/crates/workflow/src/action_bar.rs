@@ -105,7 +105,7 @@ impl ActionBar {
                     ("failed", &summary.failed),
                 ],
             ),
-            BatchPhase::Failed(detail) => tr_with("workflow.failed", &[("detail", detail)]),
+            BatchPhase::Failed(_detail) => tr("errors.batchFailed"),
         };
         (text, matches!(batch.phase(), BatchPhase::Failed(_)))
     }
@@ -121,7 +121,10 @@ impl Render for ActionBar {
         let queue = self.queue.read(cx);
         let planning = self.panel.read(cx).is_planning();
         // The bridge may still be settling after the backend reported Finished.
-        let can_start = !queue.is_empty()
+        let can_start = queue
+            .items()
+            .iter()
+            .any(imgconvert_gpui_shared::QueueItem::is_pending_conversion)
             && !queue.is_importing()
             && !active
             && !planning

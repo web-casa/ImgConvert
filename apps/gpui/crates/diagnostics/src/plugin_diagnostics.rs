@@ -507,12 +507,8 @@ impl PluginDiagnostics {
             ActionNotice::HelperUnavailable => tr("diagnostics.manual_helper_unavailable"),
             ActionNotice::HelperCleared => tr("diagnostics.helper_cleared"),
             ActionNotice::Diagnostic(message) => diagnostic_text(message),
-            ActionNotice::SetFailed(detail) => {
-                tr_with("diagnostics.set_helper_failed", &[("detail", detail)])
-            }
-            ActionNotice::ClearFailed(detail) => {
-                tr_with("diagnostics.clear_helper_failed", &[("detail", detail)])
-            }
+            ActionNotice::SetFailed(_detail) => tr("errors.codecConfigurationFailed"),
+            ActionNotice::ClearFailed(_detail) => tr("errors.codecConfigurationFailed"),
         });
         Self::section(tr("diagnostics.manual_helper_title"), cx)
             .child(
@@ -689,11 +685,11 @@ impl PluginDiagnostics {
     }
 
     fn render_body(&self, cx: &mut Context<Self>) -> Div {
-        if let Some(error) = &self.load_error {
+        if self.load_error.is_some() {
             return div()
                 .text_sm()
                 .text_color(cx.theme().danger)
-                .child(tr_with("diagnostics.load_error", &[("detail", error)]));
+                .child(tr("errors.taskFailed"));
         }
         let Some(diagnostics) = self.diagnostics.clone() else {
             return h_flex()
