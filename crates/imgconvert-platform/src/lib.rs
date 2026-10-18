@@ -8,6 +8,8 @@
 //! implement the traits declared here (for example [`dialogs::FilePicker`]).
 
 pub mod atomic_output;
+#[cfg(feature = "clipboard")]
+pub mod clipboard;
 pub mod dialogs;
 pub mod external_codecs;
 pub mod instance_lock;

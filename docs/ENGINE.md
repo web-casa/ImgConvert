@@ -286,3 +286,14 @@ flushes settings and atomically installs only when no conversion is active.
 Failures preserve the old file until the replacement is committed. Production
 endpoints and release authorization are outside this internal preview slice.
 See `docs/UPDATER.md` for configuration and SDK smoke scope.
+
+
+## GPUI 剪贴板导入（S9）
+
+- 队列的粘贴按钮、编辑菜单和 Ctrl/Command+V 进入同一 owner。复用 Kit 的标准 `input::Paste`，设置输入框消费文本粘贴；模态对话框不把粘贴路由到背后的队列。
+- `platform::clipboard` 是可选系统能力，backend 转发该 feature；Tauri 默认依赖图不启用它。原生读取使用 arboard 3.7.0（MIT/Apache）独立连接，始终在后台执行，按文件列表、位图、文本顺序查询。不会使用锁定版 GPUI 同步的桌面 clipboard read，也不依赖其 macOS/Wayland 的文字优先协商。Wayland 需要 data-control 协议或 XWayland 剪贴板桥；两者都没有时提示无法读取，可改用文件选择器，不静默阻塞界面。
+- 原生位图按 RGBA8 导入，OS/库完成像素采集后，应用在复制/编码前复用 core 的 64 MP 尺寸和长度验证，再编码成 PNG；不承诺保留复制来源文件的 ICC/EXIF 或动画。剪贴板库自身的格式解码和传输分配不受应用的像素预检控制。Kit 测试平台则提供编码图片 fixture，仍经 backend 的真实格式探测与 128 MiB 编码文件上限。
+- 完整原生路径优先；不能表示为 UTF-8 的路径明确计数，不以预览位图替代。文本按行接受本机绝对路径和 `file:` URL，忽略 URI 注释及 copy/cut 头；普通路径保留合法尾部空白，URL 解码与授权仍只在 backend access 层完成。目录扫描继续使用共享的递归、条目、文件数与深度预算；部分成功和截断有可见反馈。
+- 位图复用 backend 的受管临时目录、标记文件和 session lock。注册保留到退出，清空队列时后台清理；普通用户文件从不因队列清空而删除。一次读取/导入的取消注册保留到主线程最终入队，停止在提交前再次检查。取消只回收本次新建的位图，扫描已有受管图片路径不获得删除所有权。原生库读取不能强行中断，取消在返回后的提交点生效；单个导入未结束前拒绝重复粘贴/选择/拖放。启动时按已有锁协议后台清理过期且不活跃的剪贴板会话。
+
+- 两个 workspace 对 arboard 统一使用 `vendor/arboard` 的窄补丁：3.7.0 上游已修 CRLF；本地保留百分号解码后的非 UTF-8 原生文件名字节，使队列能报告不支持的路径，并将 Windows 的“文件列表存在但读取失败”与“没有文件列表格式”区分，避免偷偷导入预览。来源、完整许可、改动和回归命令见 `vendor/arboard/IMGCONVERT_PATCHES.md`。

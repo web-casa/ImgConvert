@@ -47,6 +47,11 @@ pub fn init_app(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-o", OpenFiles, None),
+        KeyBinding::new(
+            "secondary-v",
+            gpui_kit::component::input::Paste,
+            Some("Workspace"),
+        ),
     ]);
     install_menus(cx);
 }
@@ -69,6 +74,14 @@ fn install_menus(cx: &mut App) {
         Menu {
             name: tr("app.title"),
             items: vec![MenuItem::action(tr("app.quit"), Quit)],
+            disabled: false,
+        },
+        Menu {
+            name: tr("menu.edit"),
+            items: vec![MenuItem::action(
+                tr("queue.paste"),
+                gpui_kit::component::input::Paste,
+            )],
             disabled: false,
         },
         Menu {

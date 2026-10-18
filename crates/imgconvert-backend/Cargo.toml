@@ -7,6 +7,7 @@ description = "ImgConvert 的桌面业务服务层:转换、导入、预览、�
 publish = false
 
 [features]
+clipboard = ["imgconvert-platform/clipboard"]
 fuzzing = ["dep:tempfile", "imgconvert-platform/fuzzing"]
 
 [dependencies]

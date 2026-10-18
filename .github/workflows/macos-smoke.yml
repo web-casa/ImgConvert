@@ -132,6 +132,9 @@ jobs:
       - name: Core animation and encoder capability regressions
         run: cargo +1.96.0 test -p imgconvert-core --lib
 
+      - name: Native clipboard import tests
+        run: cargo +1.96.0 test -p imgconvert-platform --features clipboard --lib clipboard -- --include-ignored
+
       - name: Atomic output commit tests (platform + backend)
         run: |
           cargo +1.96.0 test -p imgconvert-platform --lib atomic_output

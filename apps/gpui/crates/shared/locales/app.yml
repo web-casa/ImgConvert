@@ -23,6 +23,9 @@ app.instance_blocked:
 app.instance_blocked_unknown:
   en: "Another ImgConvert is open. The two versions share one settings file, so only one can run at a time. Quit the other ImgConvert, then open this one again."
   zh-CN: "另一个 ImgConvert 正在运行。两个版本共用同一份设置文件，因此同一时间只能运行一个。请先退出另一个 ImgConvert，再重新打开。"
+menu.edit:
+  en: Edit
+  zh-CN: 编辑
 menu.file:
   en: File
   zh-CN: 文件
@@ -35,6 +38,12 @@ queue.title:
 queue.add_files:
   en: Add files…
   zh-CN: 添加文件…
+queue.paste:
+  en: Paste
+  zh-CN: 粘贴
+queue.clipboard_empty:
+  en: Copy an image or absolute file paths, then paste again.
+  zh-CN: 复制图片或完整文件路径后，再次粘贴。
 queue.clear:
   en: Clear
   zh-CN: 清空
@@ -45,14 +54,14 @@ queue.empty_title:
   en: No images yet
   zh-CN: 还没有图片
 queue.empty_description:
-  en: Drop images or folders here, or add them with the button above.
-  zh-CN: 把图片或文件夹拖到这里，或用上方按钮添加。
+  en: Drop images or folders here, add files, or paste a copied image or file paths.
+  zh-CN: 拖入图片或文件夹、添加文件，或粘贴复制的图片和文件路径。
 queue.drop_hint:
   en: Drop to add to the queue
   zh-CN: 松开即可加入队列
 queue.importing:
-  en: Scanning…
-  zh-CN: 正在扫描…
+  en: Importing…
+  zh-CN: 正在导入…
 queue.item_count:
   en: "%{count} items"
   zh-CN: "%{count} 个文件"
@@ -66,11 +75,11 @@ queue.import_nothing:
   en: No supported images found
   zh-CN: 没有找到支持的图片
 queue.import_failed:
-  en: "Couldn’t scan the selection: %{detail}"
-  zh-CN: "无法扫描所选内容：%{detail}"
+  en: "Couldn’t import: %{detail}"
+  zh-CN: "无法导入：%{detail}"
 queue.import_cancelled:
-  en: Scan cancelled
-  zh-CN: 扫描已取消
+  en: Import cancelled
+  zh-CN: 导入已取消
 queue.thumbnail_unavailable:
   en: No preview
   zh-CN: 无预览
@@ -1098,3 +1107,25 @@ update.close:
 update.batch_active:
   en: "Wait for the current batch to finish before installing."
   zh-CN: "请等待当前批次结束后再安装。"
+
+queue.import_partial:
+  en: "Added %{added} files. %{detail}"
+  zh-CN: "已添加 %{added} 个文件。%{detail}"
+queue.clipboard_invalid_paths:
+  en: "%{count} file paths couldn’t be represented as UTF-8. Choose files with supported names."
+  zh-CN: "%{count} 个文件路径无法表示为 UTF-8。请选择名称受支持的文件。"
+queue.clipboard_path_issues:
+  en: "%{skipped} entries skipped; %{errors} paths couldn’t be read. Check that the files exist and are readable."
+  zh-CN: "跳过 %{skipped} 项；%{errors} 个路径无法读取。请确认文件存在且具有读取权限。"
+queue.clipboard_truncated:
+  en: The scan reached its limit. Import fewer files at a time.
+  zh-CN: 扫描已达到上限。请分批导入较少的文件。
+queue.clipboard_image_issues:
+  en: "%{count} images couldn’t be imported. Copy a supported image within the size limits and try again."
+  zh-CN: "%{count} 张图片无法导入。请复制未超出大小限制的受支持图片后重试。"
+queue.clipboard_unavailable:
+  en: Couldn’t read the clipboard. Try again, or add files with the file picker.
+  zh-CN: 无法读取剪贴板。请重试，或通过文件选择器添加文件。
+queue.clipboard_image_failed:
+  en: Couldn’t read the image. Copy a supported image within the size limits and try again.
+  zh-CN: 无法读取图片。请复制未超出大小限制的受支持图片后重试。

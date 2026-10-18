@@ -72,7 +72,9 @@ jobs:
             cmake \
             meson \
             nasm \
-            ninja-build
+            ninja-build \
+            xvfb \
+            xauth
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
           components: rustfmt, clippy
@@ -80,6 +82,10 @@ jobs:
       # The root workspace holds core, platform and backend; the Tauri shell has its own workspace below.
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
+      - name: Native clipboard smoke in an isolated X11 session
+        run: xvfb-run -a cargo test --workspace --all-features --lib native_clipboard_round_trips -- --ignored
+      - name: Clipboard URI parsing regressions
+        run: cargo test --manifest-path vendor/arboard/Cargo.toml --locked --lib imgconvert_uri_regressions
   rust-gpui:
     name: GPUI Shell (Linux x86_64)
     runs-on: ubuntu-24.04

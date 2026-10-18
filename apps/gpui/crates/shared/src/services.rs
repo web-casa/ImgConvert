@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use gpui_kit::{App, AppContext as _, Entity, Global};
 use imgconvert_backend::external_codecs;
-use imgconvert_backend::import::ImportScanState;
+use imgconvert_backend::import::{self, ClipboardImportState, ImportScanState};
 use imgconvert_backend::preview::PreviewState;
 use imgconvert_backend::service::{BatchService, ShutdownOutcome};
 
@@ -24,6 +24,7 @@ use crate::settings_model::SettingsModel;
 pub struct Services {
     batch: BatchService,
     import_scan: Arc<ImportScanState>,
+    clipboard: Arc<ClipboardImportState>,
     /// The one current comparison preview; a newer one cancels the previous.
     preview: Arc<PreviewState>,
 }
@@ -37,6 +38,10 @@ impl Services {
 
     pub fn import_scan(&self) -> &Arc<ImportScanState> {
         &self.import_scan
+    }
+
+    pub fn clipboard(&self) -> &Arc<ClipboardImportState> {
+        &self.clipboard
     }
 
     pub fn preview(&self) -> &Arc<PreviewState> {
@@ -87,6 +92,13 @@ impl AppModels {
 /// Registers services and models, loading the settings from the shared
 /// per-channel store. Call once after `gpui_kit::init`.
 pub fn init(cx: &mut App) {
+    if !cx.has_global::<Services>() {
+        cx.background_executor()
+            .spawn(async {
+                import::cleanup_stale_clipboard_temp_dirs_best_effort();
+            })
+            .detach();
+    }
     init_with_settings(cx, || {
         SettingsModel::from_data_dir(Locale::from_environment().app_locale())
     });
@@ -99,6 +111,7 @@ pub fn init_with_settings(cx: &mut App, settings: impl FnOnce() -> SettingsModel
         cx.set_global(Services {
             batch: BatchService::new(),
             import_scan: Arc::new(ImportScanState::default()),
+            clipboard: Arc::new(ClipboardImportState::default()),
             preview: Arc::new(PreviewState::default()),
         });
     }
