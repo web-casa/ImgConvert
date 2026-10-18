@@ -204,6 +204,14 @@ C 编解码器(rav1e/mozjpeg/libaom/dav1d via libavif)在**构建期**需要原�
 
 ---
 
+### 输入动画事实与编码器边界（B2a）
+
+- `ImageProbe.animation` 为 `Static` / `Animated` / `Unknown`。探测只记录容器事实，不因动画本身报错；尺寸头也不完整时仍可返回解码错误。PNG 读 IDAT 前的 acTL，AVIF 独立检查序列轨道的 imageCount（不依赖 major brand 选中的主图），GIF 遍历 image descriptor，WebP 读 has_animation。可用前缀不足以判断时是 Unknown，不能冒充静态。
+- 解码入口拒绝 APNG、多帧 AVIF/GIF 和动画 WebP，统一使用 core `Unsupported`；PNG 使用 image 0.25.10 的 `is_apng()`，AVIF 在 NextImage 前检查帧数；未声明但存在的轨道或不完整容器保留 Unknown，完整解码仍无法确认时返回 Decode 错误。缩略图、预览、普通转换均经过这些入口，不静默丢帧。Unknown 允许进入完整解码，由完整容器再判断。
+- `Format::encoder_capabilities()` 是进程内输出能力表：JPEG 65,500、WebP 16,383、AVIF 65,535、PNG 2³¹−1 的边长上限；全部仍受 64 MP 像素预算约束。PNG 支持 8/16 位输出，其余当前落盘路径为 8 位；JPEG 不含 alpha，其余支持 alpha；均不输出动画。JPEG 上限来自 mozjpeg 的 JPEG_MAX_DIMENSION，AVIF 使用已启用编码器共同可支持的边界，不宣称全容器理论上限。
+- 工作流按显式尺寸规则计算最终尺寸后、生成预览/缩放/编码之前检查编码器边界；不自动缩小。直接编码器入口同样检查，覆盖自动质量和像素调用路径。Tauri 能力矩阵新增 encoders；GPUI/Tauri 共用 backend 的转换预检，在缓存读取前拒绝已知动画与输出越界。
+- 结果缓存语义版本从 v5 升到 v6，避免早先 APNG/AVIF 丢帧结果被复用。测试不打开真实结果缓存。动画 DTO、队列标记及动画计数仍属于 B2b，本片不扩展导入 DTO。
+
 ## 7. 进度 / 取消(全员缺失,我们自建,直接领先)
 
 - **桌面启动互斥**：Tauri 与 GPUI 复用 backend 导出的 `instance_lock` 协议及 `paths::instance_lock_file()`。Tauri 在创建 WebView 和注册 store 前取得独占锁，作为应用状态持有到退出（含批次 shutdown 等待）；锁占用时只显示原生提示后退出，不创建业务服务、不读取共享设置。Tauri 无法定位数据目录或取锁 IO 失败时拒绝启动，避免 store 在无锁状态写入；GPUI 的既有仅内存/错误策略不变。锁文件永久保留，进程退出或崩溃由 OS 释放锁；旧版未实现协议的 Tauri 安装件仍不能受此保护。

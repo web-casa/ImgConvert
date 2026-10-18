@@ -285,6 +285,8 @@ jobs:
 
       - name: Native updater compatibility policy tests
         run: cargo +1.96.0 test -p imgconvert-platform --features update-guard --lib update_policy
+      - name: Core animation and encoder capability regressions
+        run: cargo +1.96.0 test -p imgconvert-core --lib
 
       - name: Atomic output commit tests (platform + backend)
         run: |

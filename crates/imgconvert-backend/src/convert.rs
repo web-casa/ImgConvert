@@ -203,11 +203,24 @@ pub struct Capabilities {
     pub readable: Vec<&'static str>,
     pub writable: Vec<&'static str>,
     pub lossless: Vec<&'static str>,
+    pub encoders: std::collections::BTreeMap<&'static str, EncoderCapability>,
     pub color_pipeline: ColorPipelineCapability,
     /// 主程序不内置 HEIC；可选外部 provider 可在运行时启用 HEIC 导入。
     pub heic: bool,
     /// 可选外部 codec provider。主程序不链接这些 provider 的 codec 库。
     pub codec_providers: Vec<CodecProviderCapability>,
+}
+
+/// Serializable view of the authoritative core encoder table.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EncoderCapability {
+    pub max_side: u32,
+    pub max_pixels: u64,
+    pub bit_depths: &'static [u8],
+    pub alpha: bool,
+    pub animation: bool,
+    pub lossless: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -579,6 +592,24 @@ fn capabilities_with_heic_provider(
         readable,
         writable: format_ids(WRITABLE_FORMATS),
         lossless: format_ids(LOSSLESS_FORMATS),
+        encoders: WRITABLE_FORMATS
+            .iter()
+            .filter_map(|format| {
+                format.encoder_capabilities().map(|caps| {
+                    (
+                        format.id(),
+                        EncoderCapability {
+                            max_side: caps.max_side,
+                            max_pixels: caps.max_pixels,
+                            bit_depths: caps.bit_depths,
+                            alpha: caps.alpha,
+                            animation: caps.animation,
+                            lossless: caps.lossless,
+                        },
+                    )
+                })
+            })
+            .collect(),
         color_pipeline: color_pipeline_capability(),
         heic: !codec_providers.is_empty(),
         codec_providers,
@@ -1545,9 +1576,16 @@ fn convert_with_control(
     let workflow_options = workflow_options_for(opts, target, encode_options)
         .map_err(ConversionError::conversion_failed)?;
     if let Some(probe) = source_probe.as_ref() {
-        workflow_options
+        // Both shells and cache hits share this preflight; Unknown still reaches decoding.
+        probe
+            .ensure_static()
+            .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
+        let (width, height) = workflow_options
             .resize
             .dimensions(probe.width, probe.height)
+            .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
+        target
+            .validate_output_dimensions(width, height)
             .map_err(|error| ConversionError::conversion_failed(error.to_string()))?;
     }
     let wall_clock_timeout =
@@ -3351,7 +3389,7 @@ fn result_cache_key(
 ) -> String {
     let source_hash = blake3::hash(source);
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"imgconvert-result-cache-v5\0");
+    hasher.update(b"imgconvert-result-cache-v6\0");
     hasher.update(source_hash.as_bytes());
     hasher.update(target.id().as_bytes());
     hasher.update(color_management_policy_id(color_policy));
@@ -4075,6 +4113,71 @@ pub(crate) mod tests {
             .unwrap();
         assert_eq!(decoded.rgba8().unwrap(), source_pixels.rgba8().unwrap());
 
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn encoder_capabilities_are_the_core_table_in_the_command_dto() {
+        let caps = capabilities_with_heic_provider(None);
+        for &format in WRITABLE_FORMATS {
+            let core = format.encoder_capabilities().unwrap();
+            let dto = &caps.encoders[format.id()];
+            assert_eq!(dto.max_side, core.max_side);
+            assert_eq!(dto.bit_depths, core.bit_depths);
+            assert_eq!(dto.lossless, caps.lossless.contains(&format.id()));
+        }
+        let json = serde_json::to_value(caps).unwrap();
+        assert_eq!(json["encoders"]["webp"]["maxSide"], 16_383);
+    }
+
+    #[test]
+    fn shared_preflight_rejects_known_animation_before_cache_or_decode() {
+        let dir = unique_test_dir("animation-preflight");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("animated.png");
+        let mut bytes = one_by_one_png()[..33].to_vec();
+        bytes.extend_from_slice(&8u32.to_be_bytes());
+        bytes.extend_from_slice(b"acTL");
+        bytes.extend_from_slice(&2u32.to_be_bytes());
+        bytes.extend_from_slice(&[0; 8]); // loop count and deliberately invalid CRC
+        fs::write(&input, bytes).unwrap();
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.out_dir = Some(dir.join("out").to_string_lossy().to_string());
+        let error = convert(&options).unwrap_err();
+        assert!(error.detail.contains("动画 PNG"), "{error}");
+        assert!(!dir.join("out").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn shared_preflight_rejects_oversize_side_before_decoding_a_header_only_source() {
+        let dir = unique_test_dir("encoder-side-preflight");
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("large.png");
+        let mut bytes = one_by_one_png();
+        bytes[16..20].copy_from_slice(&1000u32.to_be_bytes());
+        bytes[20..24].copy_from_slice(&20_000u32.to_be_bytes());
+        // Deliberately leave the old IHDR CRC: the side preflight must run
+        // before the decoder reports malformed pixel/container data.
+        fs::write(&input, bytes).unwrap();
+        let mut options = test_convert_options(input.to_string_lossy().to_string());
+        options.format = "webp".into();
+        options.out_dir = Some(dir.join("out").to_string_lossy().to_string());
+        let error = convert(&options).unwrap_err();
+        assert!(error.detail.contains("16383"), "{error}");
+        assert!(!dir.join("out").exists());
+        options.resize = Some(ResizeOptions {
+            mode: Some("longestEdge".into()),
+            value: Some(32),
+            width: None,
+            height: None,
+            allow_upscale: false,
+        });
+        let error = convert(&options).unwrap_err();
+        assert!(
+            !error.detail.contains("16383"),
+            "explicit resize should pass the side gate: {error}"
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
