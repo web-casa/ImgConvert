@@ -146,6 +146,9 @@ workflow.cancelling:
 workflow.progress:
   en: "%{done} of %{total} done"
   zh-CN: "已完成 %{done} / %{total}"
+workflow.batch_progress:
+  en: Batch conversion progress
+  zh-CN: 批量转换进度
 workflow.summary:
   en: "%{done} done · %{skipped} skipped · %{failed} failed"
   zh-CN: "完成 %{done} · 跳过 %{skipped} · 失败 %{failed}"
