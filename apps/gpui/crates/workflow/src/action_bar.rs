@@ -253,7 +253,11 @@ impl Render for ActionBar {
                             .child(status_text),
                     )
                     .when(show_progress, |this| {
-                        this.child(Progress::new("workflow-progress").value(percent))
+                        this.child(
+                            Progress::new("workflow-progress")
+                                .accessibility_label(tr("workflow.batch_progress"))
+                                .value(percent),
+                        )
                     }),
             )
             .when(batch_impact, |this| {

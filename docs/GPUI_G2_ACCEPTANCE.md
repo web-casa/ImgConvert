@@ -87,3 +87,25 @@ IME 观察进一步核对：实际鼠标拖动也能复现组合候选停在原�
 自动化须核对实际输入框内容及候选位置；对文本框发送辅助功能 click 不一定聚焦，不能把按键发送成功当成输入成功。候选窗口无名称时，按明确的主窗口标题定位字段，避免把 IME 浮窗当成主窗口。截图采集须等待本次文件更新时间，不能读取前一次成功遗留的图片。
 
 原生首轮补齐后已能朗读文件名、PNG/尺寸和等待状态，但同文案 label+value 导致重复朗读；后续改为静态文本只提供 value，运行 Group 只提供 title、保留命名的数值进度后代。此修复也覆盖共用 Choice、空状态和底栏；以最终实际朗读复测为准。
+
+## 2026-10-19 后续：不可写输出与来源保护
+
+PR #36 已合并到 main `3a66b5a`。其最终开发沙盒候选 `target/tmp/g2-scope/g2-queue-speech/ImgConvertCards.app`（签名后二进制 SHA256 `429011c2bcbf155a85f3217a46ea7c12c804ebde812107cf26746031384a9a0d`）在同一 macOS 13.6 arm64 专用账号补验：
+
+- 原生选择器选择自有 `g2-denied-output`（目录权限 `0500`），4 项转换全部返回本地化的“没有权限写入输出目录：…请…选择文件夹后重试”；目录内无输出和临时文件。这证明启用沙盒时的实际 POSIX 不可写失败，不代表已测试 PowerBox 撤权。
+- 重选自有 `g2-recovered-output`，不重启、不清空队列，直接重试得到 4 个完整 AVIF（580 字节及 3 个 39393 字节文件），完成 4 / 跳过 0 / 失败 0；4 个源文件 hash 不变。
+- 输出选回源夹具目录，PNG、关闭后缀、覆盖模式，重置后开始；实际出现“取消”及“确认覆盖原图”按钮。点击取消后源目录仍只有原 4 个 PNG，hash 不变。16-bit 源 SHA256 `8ec201a3a90d37cca5c5c47e4fad89b25f53c7e28d673444c91506abd2a43d32`；3 个独立 4096×4096 PNG 均为 `a5cca739f3913c048db101b6f6bf172b587f7c7e24f5831c022afdad4b45833f`。操作后已恢复 AVIF、跳过、后缀 `_done`、自动并发及中文。
+
+同次检查发现底栏总进度是无名称 `AXProgressIndicator`（完成批次 value 100）。本片补“批量转换进度”/“Batch conversion progress”，继续保留原数值、生命周期和相邻成功/失败汇总。新增原生只读回归脚本：
+
+```bash
+# 在专用 Mac 上运行；候选须已显示运行中或已结束批次的总进度。
+# PID 换成该 GPUI 候选的进程号，不以其他 Tauri/GPUI 窗口代替。
+osascript scripts/check-gpui-macos-progress.applescript 12345 '批量转换进度'
+# 切换英文、重新读取原生窗口后：
+osascript scripts/check-gpui-macos-progress.applescript 12345 'Batch conversion progress'
+```
+
+脚本明确按 PID 和 `ImgConvert` 主窗口定位（不遍历文件选择器或 IME 浮窗），要求所有原生进度条有名称及 0–100 数值，且恰好一个名称匹配预期的总进度条。旧候选负向执行确实报 `Unnamed native progress indicator`；修复候选的签名 hash、双语正向结果、运行状态及沙盒复测记录在本片 PR。脚本不点击、不授权、不操作文件；未显示进度时应失败，不能用空树充当通过。
+
+这些仍是开发候选证据。实际撤销沙盒访问、完整重启/取消矩阵的最终候选复测、连续录屏及完整 VoiceOver/IME 场景仍需补齐，G2 不关闭。
