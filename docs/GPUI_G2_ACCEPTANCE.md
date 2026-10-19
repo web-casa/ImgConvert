@@ -113,3 +113,40 @@ osascript scripts/check-gpui-macos-progress.applescript 12345 'Batch conversion 
 本片修复候选 `target/tmp/g2-scope/g2-recovery-final/ImgConvertCards.app`，签名后二进制 SHA256 `bed2800f73c589706c05e8aedf8be1ddf2ddb8f0415e9b37a4b159469feb0ec9`；同样禁用 updater/外部 codec、`--no-default-features --locked`，仅 app-sandbox/user-selected.read-write，strict ad-hoc 验签通过。两份改动运行源码 hash 与本地一致。复测自有 `g2-final-denied` 的 4 项权限失败、无半成品，重选 `g2-final-recovered` 后直接重试得到 4 个完整 AVIF，4 个源 hash 仍一致。中英总进度名称与 100 数值通过；运行时同一原生树包含“large-0.png 的转换进度”5 和“批量转换进度”25，结束后 100。错误预期名称的稳定状态负向执行报匹配 0 个，不能误通过。原始日志与最后脚本复核记录在 PR。
 
 这些仍是开发候选证据。实际撤销沙盒访问、完整重启/取消矩阵的最终候选复测、连续录屏及完整 VoiceOver/IME 场景仍需补齐，G2 不关闭。
+
+## 2026-10-19 后续：IME 连续记录与最小复现
+
+PR #37 已合并（main `fd630b2`）。继续使用其未打框架补丁的沙盒候选，主程序 SHA256 `bed2800f73c589706c05e8aedf8be1ddf2ddb8f0415e9b37a4b159469feb0ec9`，同一 macOS 13.6 arm64 专用账号。系统 Screenshot 界面可录到实际窗口，已取得 H.264 3024×1900 连续视频；CLI `screencapture -v` 失败及早期仅输入字母的尝试不计通过。截图助手的二进制及 TCC 授权未被替换。
+
+| 场景 | 实际结果 |
+| --- | --- |
+| 逐键 n/i/h/a/o | 字段 `ni hao`，系统候选含“你好”，字段 (930,560,324,24)，候选 (923,588,410,32)；保存值仍为 `_done` |
+| 退格、继续输入、确认 | `ni hao` → `ni ha` → `ni hao`；Space + Enter 得到“你好”，候选关闭 |
+| 展开与翻页 | 输入 `shi`，PageDown 展开候选网格，再次 PageDown 后可见页首“适/示/狮/始/驶/仕”；Space + Enter 确认“适” |
+| Escape 取消组合 | 组合字段清空，候选关闭；已保存的上一次确认值保留 |
+| 移动、缩小后重新组合 | 窗口 (300,100)、1000×700，字段 (998,575,260,24)，候选 (991,603,410,32) |
+| 设置区滚动后重新组合 | 字段由 y575 到 y495，候选由 y603 到 y523，均上移 80；组合文字及候选正常 |
+| 组合中打开隐私对话框 | **未通过**：AX 激活及物理点击均复现旧候选仍覆盖对话框；字段恢复已保存值，Space 先收起候选，未触发对话框操作 |
+
+上述“移动/滚动后重新组合”不表示“组合中移动”通过，也不替代原有 Cocoa 对照记录。输入法辅助程序报告选中拼音不足以证明目标窗口正在组合；本次也遇到仅得到字母的激活尝试。必须确认标记文字与真实系统候选，再记录结果。
+
+原始视频保存在隔离 Mac 的 `target/tmp/g2-scope/g2-ime-recordings`，本机核验副本在 `artifacts/reviews/g2-ime-2026-10-19`，均不入 Git 或公开上传。`ffprobe` 核验 H.264/分辨率/时长，复制后 SHA256 一致，并抽帧检查实际内容：
+
+| 本机副本 | 时长 | SHA256 | 内容 |
+| --- | --- | --- | --- |
+| `g2-recording-03.mov` | 501.720 s | `a1761d42ade3654cf68ba9ca235197e5b95b366e340eb9d504282f49c37db2fe` | 组合、退格、确认、翻页、取消和弹层问题 |
+| `g2-recording-04.mov` | 82.667 s | `4731548cb852aa9a657a3abbae4c803a14bf8083f9cafced731539edbe5a0762` | 移动/缩小与滚动后重新组合 |
+| `g2-recording-05.mov` | 43.450 s | `377e43fc1977511632ef37ce469e16f1f7fb6cb1527a016b04e736a735958ee2` | 不含业务回调的 Kit 最小程序也复现候选覆盖对话框 |
+
+新增 `scripts/check-gpui-macos-ime.applescript` 只读核对 PID、指定字段精确文本（区分大小写/变音符号）、原生 `InputMethodCandidateList` 的出现/消失并报告 bounds；不输入文字、不改设置、不以坐标自动判断通过。候选列表内所有 AX 按钮不一定等于当前可见页，翻页须结合视频。脚本不能证明焦点归属、保存值或完整 IME 验收。
+
+```bash
+osascript scripts/check-gpui-macos-ime.applescript 12345 '文件名后缀' 'ni hao' present
+osascript scripts/check-gpui-macos-ime.applescript 12345 '文件名后缀' '你好' absent
+```
+
+原生负向测试：保存 `_done` 时预期 `_DONE` 明确失败；没有候选却要求 `present` 明确失败，避免将普通字母输入当作组合输入。只对陈旧原生引用的 `-1728` 限次重取完整状态，语义断言错误立即退出。
+
+最小复现及未采纳的平台实验见 [GPUI_IME_REPRO.md](GPUI_IME_REPRO.md)、[GPUI_PATCHES.md](GPUI_PATCHES.md)。只读评审发现最小程序的版本指引、关窗退出和启动失败退出码问题，已修正后复核；平台实验的清理/重聚焦问题没有被带入产品。当前仍缺焦点切换修复、完整 VoiceOver 连续记录与沙盒撤权等证据，G2 保持开放，不推进阶段 4/5。
+
+修订后的最小程序在 Mac 以原锁 `--locked` 重新构建，本地/远端源码 SHA256 同为 `711f73d89feb5d33e44b6cfdc9af13994b47375a9a47eb3f0768c1bf6e7d97be`；测试 App 主程序 SHA256 `602aa2e89792a032a66db444176c0d577c335da7a1a1e82450f4b6b0f95c4e91`。实际渲染字段后点击唯一窗口的红色关闭按钮，进程退出。测试结束已停止临时例程/对照/平台实验，恢复原未打补丁的沙盒候选、ABC、中文、AVIF、跳过、`_done`、自动并发与原窗口尺寸，VoiceOver 保持关闭；录屏临时目的地偏好也恢复。
