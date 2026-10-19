@@ -1331,3 +1331,13 @@ nav.convert_target:
 nav.settings_target:
   en: Go to appearance settings
   zh-CN: 跳到外观设置
+
+queue.compare_item:
+  en: "Compare %{name}"
+  zh-CN: "对比 %{name}"
+queue.impact_item:
+  en: "Storage scenario for %{name}"
+  zh-CN: "%{name} 的存储情景"
+queue.progress_item:
+  en: "Conversion progress for %{name}"
+  zh-CN: "%{name} 的转换进度"

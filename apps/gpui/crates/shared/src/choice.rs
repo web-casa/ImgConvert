@@ -55,7 +55,6 @@ impl SearchableListItem for ChoiceItem {
             .id(SharedString::from(format!("choice-label:{}", self.id)))
             .test_support()
             .role(Role::Label)
-            .aria_label(self.label.clone())
             .aria_value(self.label.clone())
             .child(self.label.clone())
     }

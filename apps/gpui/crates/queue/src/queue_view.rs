@@ -292,6 +292,7 @@ impl QueueView {
                                 div()
                                     .id("queue-title")
                                     .test_support()
+                                    .role(Role::Heading)
                                     .aria_label(tr("queue.title"))
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
@@ -300,6 +301,13 @@ impl QueueView {
                             .when(count > 0, |this| {
                                 this.child(
                                     div()
+                                        .id("queue-count")
+                                        .test_support()
+                                        .role(Role::Label)
+                                        .aria_value(tr_with(
+                                            "queue.item_count",
+                                            &[("count", &count)],
+                                        ))
                                         .text_xs()
                                         .text_color(cx.theme().muted_foreground)
                                         .child(tr_with("queue.item_count", &[("count", &count)])),
@@ -428,7 +436,8 @@ impl QueueView {
             h_flex()
                 .id("queue-feedback")
                 .test_support()
-                .aria_label(text.clone())
+                .role(Role::Label)
+                .aria_value(text.clone())
                 .px_4()
                 .py_1()
                 .gap_2()
@@ -511,7 +520,6 @@ impl QueueView {
                                     .id("queue-drop-description")
                                     .test_support()
                                     .role(Role::Label)
-                                    .aria_label(tr("queue.drop_alternative"))
                                     .aria_value(tr("queue.drop_alternative"))
                                     .child(tr("queue.drop_alternative")),
                             ),
@@ -574,7 +582,6 @@ impl QueueView {
                                     .id(SharedString::from(format!("input-format:{format}")))
                                     .test_support()
                                     .role(Role::Label)
-                                    .aria_label(format.clone())
                                     .aria_value(format.clone())
                                     .text_xs()
                                     .bg(cx.theme().muted.opacity(0.7))
@@ -707,6 +714,7 @@ impl RenderOnce for QueueRow {
             .ghost()
             .xsmall()
             .label(tr("preview.open"))
+            .accessibility_label(tr_with("queue.compare_item", &[("name", &item.name)]))
             .tooltip(tr("preview.title"))
             .disabled(self.busy)
             .on_click(move |event, window, cx| on_compare(event, window, cx));
@@ -716,6 +724,7 @@ impl RenderOnce for QueueRow {
                 .ghost()
                 .xsmall()
                 .label(tr("impact.open"))
+                .accessibility_label(tr_with("queue.impact_item", &[("name", &item.name)]))
                 .tooltip(tr("impact.title"))
                 .on_click(move |event, window, cx| on_impact(event, window, cx))
         });
@@ -752,6 +761,7 @@ impl RenderOnce for QueueRow {
         v_flex()
             .id(item.key.clone())
             .test_support()
+            .role(Role::Group)
             .aria_label(item.name.clone())
             .tooltip(move |window, cx| Tooltip::new(path.clone()).build(window, cx))
             .h(self.row_height)
@@ -773,6 +783,10 @@ impl RenderOnce for QueueRow {
                             .gap_0p5()
                             .child(
                                 div()
+                                    .id(SharedString::from(format!("name:{}", item.key)))
+                                    .test_support()
+                                    .role(Role::Label)
+                                    .aria_value(item.name.clone())
                                     .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .truncate()
@@ -782,7 +796,8 @@ impl RenderOnce for QueueRow {
                                 div()
                                     .id(SharedString::from(format!("meta:{}", item.key)))
                                     .test_support()
-                                    .aria_label(meta.clone())
+                                    .role(Role::Label)
+                                    .aria_value(meta.clone())
                                     .text_xs()
                                     .text_color(muted)
                                     .truncate()
@@ -798,7 +813,7 @@ impl RenderOnce for QueueRow {
                     .justify_between()
                     .gap_2()
                     .child(format_control(&item, self.busy, cx))
-                    .child(render_status(&item.key, &item.status, &item.warnings, cx)),
+                    .child(render_status(&item, cx)),
             )
     }
 }
@@ -943,33 +958,83 @@ fn render_thumbnail(thumbnail: &ThumbnailState, cx: &App) -> impl IntoElement {
     }
 }
 
-fn render_status(
-    key: &SharedString,
+/// The complete current state is readable without hovering an error or warning.
+/// Keep this text derived at render time so locale and model changes stay in sync.
+fn status_text(
     status: &ItemStatus,
     warnings: &[imgconvert_backend::convert::ConvertWarning],
-    cx: &App,
-) -> impl IntoElement {
-    let lane = h_flex().flex_1().min_w_0().justify_end().gap_2().text_xs();
-    let lane = lane
-        .id(SharedString::from(format!("status:{key}")))
-        .test_support();
-    let lane = match status {
-        ItemStatus::Done { .. } if !warnings.is_empty() => {
-            let text = SharedString::from(
+) -> SharedString {
+    let parts = match status {
+        ItemStatus::Pending => vec![tr("status.pending").to_string()],
+        ItemStatus::Running { percent } => {
+            vec![tr("status.running").to_string(), format!("{percent:.0}%")]
+        }
+        ItemStatus::Done {
+            in_size, out_size, ..
+        } => {
+            let mut parts = vec![
+                tr("status.done").to_string(),
+                tr_with(
+                    "status.saved",
+                    &[
+                        ("before", &format_bytes(*in_size)),
+                        ("after", &format_bytes(*out_size)),
+                    ],
+                )
+                .to_string(),
+            ];
+            parts.extend(
                 warnings
                     .iter()
                     .flat_map(imgconvert_gpui_shared::conversion::warning_texts)
-                    .map(|text| text.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" "),
+                    .map(|text| text.to_string()),
             );
-            lane.aria_label(text.clone())
-                .tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
+            parts
         }
-        ItemStatus::Error { error } | ItemStatus::Skipped { error } => {
-            let text = format_command_error(error);
+        ItemStatus::Skipped { error } => vec![
+            tr("status.skipped").to_string(),
+            format_command_error(error).to_string(),
+        ],
+        ItemStatus::Error { error } => vec![
+            tr("status.error").to_string(),
+            format_command_error(error).to_string(),
+        ],
+    };
+    parts.join(" · ").into()
+}
+
+fn render_status(item: &QueueItem, cx: &App) -> impl IntoElement {
+    let status = &item.status;
+    let warnings = &item.warnings;
+    let text = status_text(status, warnings);
+    let lane = h_flex()
+        .flex_1()
+        .min_w_0()
+        .justify_end()
+        .gap_2()
+        .text_xs()
+        .id(SharedString::from(format!("status:{}", item.key)))
+        .test_support()
+        .role(if matches!(status, ItemStatus::Running { .. }) {
+            Role::Group
+        } else {
+            Role::Label
+        })
+        // Static text is its value. Repeating it as a title makes VoiceOver
+        // speak it twice. The running group has a title and contains the
+        // actual named ProgressIndicator instead.
+        .when(matches!(status, ItemStatus::Running { .. }), |lane| {
             lane.aria_label(text.clone())
-                .tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
+        })
+        .when(!matches!(status, ItemStatus::Running { .. }), |lane| {
+            lane.aria_value(text.clone())
+        });
+    let lane = match status {
+        ItemStatus::Done { .. } if !warnings.is_empty() => {
+            lane.tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
+        }
+        ItemStatus::Error { .. } | ItemStatus::Skipped { .. } => {
+            lane.tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
         }
         _ => lane,
     };
@@ -979,9 +1044,14 @@ fn render_status(
             .child(tr("status.pending")),
         ItemStatus::Running { percent } => lane
             .child(
-                div()
-                    .w_24()
-                    .child(Progress::new("row-progress").value(*percent)),
+                div().w_24().child(
+                    Progress::new("row-progress")
+                        .accessibility_label(tr_with(
+                            "queue.progress_item",
+                            &[("name", &item.name)],
+                        ))
+                        .value(*percent),
+                ),
             )
             .child(
                 div()
