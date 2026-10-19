@@ -350,3 +350,5 @@ GPUI shared 的构建脚本显式追踪 `locales` 目录：本地化宏读取 YA
 队列行是以文件名命名的原生 Group，文件名、来源/尺寸/动画事实、扫描反馈与非运行状态使用可读 Label；运行状态 Group 保留带文件名的 ProgressIndicator。完成状态同时提供完成、输入/输出尺寸与全部本地化告警，失败/跳过同时提供状态和共享错误 formatter 的用户文案，不暴露后端 detail。对比与存储情景操作的无障碍名称包含文件名。所有语义从同一队列快照在渲染时派生，切换语言同步更新；不新增逐行 retained 实体或 Tab 停靠点。静态文本只提供 value，不把相同内容重复设为 label/title，避免 VoiceOver 连读两遍；同样修正 Choice 选项、空队列说明/格式标识和底栏状态。
 
 批次总进度条另有“批量转换进度”/“Batch conversion progress”名称，数值继续由同一 BatchModel 的已结束任务比例派生。100% 表示批次任务已结束，成功/跳过/失败仍由相邻状态文本说明。`scripts/check-gpui-macos-progress.applescript` 在原生主窗口核对进度条名称和数值，可用于运行及完成状态；它只读辅助树，不替代 VoiceOver 朗读或连续录屏。
+
+G2 原生 IME 检查使用 `check-gpui-macos-ime.applescript` 区分精确字段文本及系统候选列表，连续记录核对确认、翻页、取消和布局变化。候选框覆盖对话框的问题已由只含 Kit 的 `g2_ime_repro` 例程复现；当前没有接入框架补丁，业务输入与持久化契约不变。现象、证据和未采纳实验分别见 `GPUI_G2_ACCEPTANCE.md`、`GPUI_IME_REPRO.md`、`GPUI_PATCHES.md`。
