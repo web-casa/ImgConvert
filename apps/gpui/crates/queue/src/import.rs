@@ -17,7 +17,16 @@ use imgconvert_gpui_shared::{AppModels, QueueModel, Services, perf_probe};
 
 /// Opens the platform picker and imports whatever the user selects.
 pub fn pick_and_import(cx: &mut App) {
-    let picker = file_prompt::prompt_paths(PromptKind::ImportPaths, tr("queue.add_files"), cx);
+    pick_paths(PromptKind::ImportPaths, "queue.add_files", cx);
+}
+
+/// Opens the native folder picker; scanning and cancellation use the same import owner.
+pub fn pick_folders_and_import(cx: &mut App) {
+    pick_paths(PromptKind::ImportFolders, "queue.add_folders", cx);
+}
+
+fn pick_paths(kind: PromptKind, label: &str, cx: &mut App) {
+    let picker = file_prompt::prompt_paths(kind, tr(label), cx);
     cx.spawn(async move |cx: &mut AsyncApp| {
         if let Some(paths) = picker.await {
             cx.update(|cx| import_paths(paths, cx));

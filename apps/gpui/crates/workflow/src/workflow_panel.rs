@@ -18,8 +18,8 @@ use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{WindowExt as _, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, Window, div,
+    ParentElement as _, Render, ScrollHandle, SharedString, StatefulInteractiveElement as _,
+    Styled as _, Subscription, TestSupportExt as _, Window, div,
 };
 use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
@@ -80,6 +80,7 @@ pub struct WorkflowPanel {
     /// it down (the dialog callbacks only borrow it).
     pending_start: Option<PendingHandle>,
     notice: Option<Notice>,
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -116,12 +117,33 @@ impl WorkflowPanel {
             output_session_grant: None,
             pending_start: None,
             notice: None,
+            scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
 
     pub fn settings_form(&self) -> &Entity<SettingsForm> {
         &self.settings_form
+    }
+
+    /// Bring the conversion controls into view without changing any settings.
+    pub fn focus_conversion_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.scroll.set_offset(gpui_kit::Point::default());
+        if !self.settings_form.read(cx).is_busy(cx) {
+            self.settings_form.update(cx, |form, cx| {
+                form.focus_format(window, cx);
+            });
+        }
+        cx.notify();
+    }
+
+    /// Reveal and focus appearance settings, retaining the same model and form.
+    pub fn focus_appearance_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.settings_form.update(cx, |form, cx| {
+            form.focus_appearance(window, cx);
+        });
+        self.scroll.scroll_to_bottom();
+        cx.notify();
     }
 
     /// The persisted output folder (`outDir`).
@@ -476,6 +498,10 @@ impl Render for WorkflowPanel {
                     .pb_2()
                     .text_sm()
                     .font_weight(FontWeight::SEMIBOLD)
+                    .id("workflow-heading")
+                    .test_support()
+                    .role(gpui_kit::Role::Heading)
+                    .aria_label(tr("settings.title"))
                     .child(tr("settings.title")),
             )
             .children((animated + unknown > 0).then(|| {
@@ -491,11 +517,14 @@ impl Render for WorkflowPanel {
             .child(
                 v_flex()
                     .id("workflow-scroll")
+                    .test_support()
+                    .track_scroll(&self.scroll)
                     .flex_1()
                     .min_h_0()
                     .px_4()
                     .pb_4()
-                    .overflow_y_scrollbar()
+                    .overflow_y_scroll()
+                    .vertical_scrollbar(&self.scroll)
                     .child(self.settings_form.clone()),
             )
     }

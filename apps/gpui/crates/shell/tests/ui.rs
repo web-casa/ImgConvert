@@ -62,7 +62,7 @@ fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext)
         window.render_frame(cx);
         assert!(window.find("queue-empty").visible());
         assert!(window.find("queue-empty-add").visible());
-        // The decision floats in the action bar with its status beside it.
+        // The fixed footer keeps the decision and its status together.
         assert!(window.find("workflow-action-bar").visible());
         assert!(window.find("workflow-start").visible());
         assert_eq!(
@@ -88,10 +88,10 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
     let (handle, _workspace) = open_workspace(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("queue-title").label(), Some("Queue"));
+        assert_eq!(window.find("nav-queue").label(), Some("Queue"));
         window.click("language-toggle", cx);
         window.render_frame(cx);
-        assert_eq!(window.find("queue-title").label(), Some("队列"));
+        assert_eq!(window.find("nav-queue").label(), Some("队列"));
     })
     .unwrap();
     cx.update(|cx| {
@@ -105,7 +105,7 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
     cx.update(toggle_language);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("queue-title").label(), Some("Queue"));
+        assert_eq!(window.find("nav-queue").label(), Some("Queue"));
     })
     .unwrap();
     cx.update(|cx| {
@@ -2771,4 +2771,221 @@ fn quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy(cx: &mut T
             });
     })
     .unwrap();
+}
+
+#[gpui_kit::test]
+fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    use imgconvert_backend::settings::Theme;
+    use imgconvert_gpui_workflow::Section;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace_sized(cx, size(px(1_280.), px(800.)));
+    for (width, height, theme, locale) in [(760., 480.), (1_000., 640.), (1_280., 800.)]
+        .into_iter()
+        .flat_map(|(width, height)| {
+            [Theme::Light, Theme::Dark]
+                .into_iter()
+                .flat_map(move |theme| {
+                    [Locale::English, Locale::SimplifiedChinese]
+                        .map(move |locale| (width, height, theme, locale))
+                })
+        })
+    {
+        cx.update(|cx| {
+            AppModels::global(cx)
+                .settings()
+                .clone()
+                .update(cx, |settings, cx| {
+                    settings.update(cx, |settings| {
+                        settings.theme = theme;
+                        settings.locale = match locale {
+                            Locale::English => AppLocale::EnUs,
+                            Locale::SimplifiedChinese => AppLocale::ZhCn,
+                        };
+                        settings.format = if theme == Theme::Dark { "png" } else { "avif" }.into();
+                    });
+                });
+            set_locale(locale);
+        });
+        cx.update_window(handle, |_, window, cx| {
+            window.resize(size(px(width), px(height)));
+            // The test platform resizes its bounds without the OS callback.
+            window.bounds_changed(cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        settle_animations(cx, handle);
+        let before = cx.update(|cx| {
+            let settings = AppModels::global(cx).settings().read(cx).settings();
+            (settings.format.clone(), settings.quality, settings.theme)
+        });
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            let content = window.find("workspace-content").bounds();
+            let footer = window.find("workflow-action-bar").bounds();
+            assert!(
+                content.bottom() <= footer.top(),
+                "content must end above the footer"
+            );
+            assert!(
+                footer.bottom() <= px(height),
+                "footer {footer:?} at {width}x{height}"
+            );
+            for id in [
+                "queue-add-files",
+                "queue-add-folders",
+                "queue-paste",
+                "workflow-start",
+            ] {
+                let action = window.find(id);
+                assert!(action.visible(), "{id} at {width}x{height}");
+                let bounds = action.bounds();
+                assert!(
+                    bounds.left() >= px(0.) && bounds.right() <= px(width),
+                    "{id}: {bounds:?}"
+                );
+                assert!(
+                    bounds.top() >= px(0.) && bounds.bottom() <= px(height),
+                    "{id}: {bounds:?}"
+                );
+                if id != "workflow-start" {
+                    assert!(
+                        bounds.top() >= content.top() && bounds.bottom() <= content.bottom(),
+                        "{id} must stay inside the content, clear of the footer: {bounds:?}"
+                    );
+                }
+            }
+            window.click("nav-settings", cx);
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("nav-settings").checked(), Some(true));
+            assert!(window.find("workflow-theme").visible());
+            assert_eq!(window.find("workflow-theme").focused(), Some(true));
+            let before_scroll = window.find("workflow-theme").bounds().origin;
+            window.scroll(
+                "workflow-scroll",
+                gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(80.))),
+                cx,
+            );
+            window.render_frame(cx);
+            let after_scroll = window.find("workflow-theme").bounds().origin;
+            assert_ne!(
+                before_scroll, after_scroll,
+                "manual scrolling must remain available"
+            );
+            window.render_frame(cx);
+            assert_eq!(
+                window.find("workflow-theme").bounds().origin,
+                after_scroll,
+                "navigation must not keep pinning the settings to the bottom"
+            );
+
+            assert_eq!(
+                workspace
+                    .read(cx)
+                    .workflow()
+                    .read(cx)
+                    .settings_form()
+                    .read(cx)
+                    .open_section(),
+                Some(Section::Appearance)
+            );
+            window.click("nav-convert", cx);
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("nav-convert").checked(), Some(true));
+            assert!(window.find("settings-quality").visible());
+            assert_eq!(window.find("workflow-format").focused(), Some(true));
+            window.click("workflow-open-settings", cx);
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.find("workflow-theme").visible());
+            window.click("nav-queue", cx);
+            window.render_frame(cx);
+            assert_eq!(window.find("nav-queue").checked(), Some(true));
+            assert!(workspace.read(cx).focus_handle(cx).is_focused(window));
+        })
+        .unwrap();
+        cx.update(|cx| {
+            let settings = AppModels::global(cx).settings().read(cx).settings();
+            assert_eq!(
+                (settings.format.clone(), settings.quality, settings.theme),
+                before
+            );
+            assert!(AppModels::global(cx).queue().read(cx).is_empty());
+            assert!(!AppModels::global(cx).batch().read(cx).is_active());
+        });
+    }
+}
+
+#[gpui_kit::test]
+fn card_navigation_preserves_a_nonempty_running_batch(cx: &mut TestAppContext) {
+    use imgconvert_backend::progress::BatchId;
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-cards-busy-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let source = dir.join("source.png");
+    std::fs::write(&source, one_by_one_png()).unwrap();
+    let (batch_before, settings_before) = cx.update(|cx| {
+        let models = AppModels::global(cx).clone();
+        models.queue().update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: source.to_string_lossy().into_owned(),
+                key: "card-source".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+        models.batch().update(cx, |batch, cx| {
+            batch.begin(BatchId::new(919), vec!["card-source".into()]);
+            cx.notify();
+        });
+        let settings = models.settings().read(cx).settings();
+        (
+            models.batch().read(cx).clone(),
+            (settings.format.clone(), settings.quality, settings.theme),
+        )
+    });
+    for id in [
+        "nav-settings",
+        "nav-convert",
+        "nav-queue",
+        "workflow-open-settings",
+    ] {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.find("workflow-cancel").visible());
+            window.click(id, cx);
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update(|cx| {
+            let models = AppModels::global(cx);
+            assert_eq!(models.batch().read(cx), &batch_before);
+            let queue = models.queue().read(cx);
+            assert_eq!(queue.len(), 1);
+            assert_eq!(queue.item_at(0).unwrap().key.as_ref(), "card-source");
+            assert_eq!(queue.item_at(0).unwrap().status, ItemStatus::Pending);
+            let settings = models.settings().read(cx).settings();
+            assert_eq!(
+                (settings.format.clone(), settings.quality, settings.theme),
+                settings_before
+            );
+        });
+    }
+    cx.run_until_parked();
+    assert_eq!(std::fs::read(&source).unwrap(), one_by_one_png());
+    std::fs::remove_dir_all(dir).unwrap();
 }

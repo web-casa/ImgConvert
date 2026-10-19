@@ -9,7 +9,7 @@
 //!   and dark) that give every Kit component its colors, radius and shadow;
 //! - the application-owned [`GlassTokens`] Kit has no role for: the blurred
 //!   backdrop, the translucent panel surface with its stroke and specular
-//!   highlight, the floating action bar and the primary button's glow;
+//!   highlight, the fixed action bar and the primary button's glow;
 //! - the bridge from the persisted `theme` / `reduceMotion` settings to Kit
 //!   ([`install`], [`apply`]).
 //!
@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use gpui_kit::component::{ActiveTheme as _, Theme, ThemeMode, ThemeRegistry, ThemeToken};
 use gpui_kit::{
-    App, BoxShadow, Global, Hsla, Pixels, Rems, RenderImage, Rgba, Styled, Subscription, Window,
+    App, BoxShadow, Global, Hsla, Pixels, RenderImage, Rgba, Styled, Subscription, Window,
     WindowAppearance, linear_color_stop, linear_gradient, px, rgba,
 };
 use image::{Frame, RgbaImage};
@@ -33,12 +33,6 @@ use crate::AppModels;
 const THEME_SET: &str = include_str!("../themes/imgconvert-glass.json");
 pub const LIGHT_THEME_NAME: &str = "ImgConvert Glass Light";
 pub const DARK_THEME_NAME: &str = "ImgConvert Glass Dark";
-
-/// Vertical room the floating action bar needs below the content it floats
-/// over (bar height plus its bottom margin and a breathing gap).
-pub const ACTION_BAR_CLEARANCE: Rems = Rems(5.5);
-/// Distance of the floating action bar from the window's bottom edge.
-pub const ACTION_BAR_MARGIN: Rems = Rems(1.25);
 
 /// Keeps the settings observer alive and caches the rendered backdrops so a
 /// mode switch does not upload a new texture every time.
@@ -258,13 +252,13 @@ pub trait GlassStyled: Styled + Sized {
             .shadow(glass.panel_shadows())
     }
 
-    /// The floating pill that carries the window's decision.
+    /// The fixed footer that carries the window's decision.
     fn glass_bar(self, cx: &App) -> Self {
         let glass = cx.glass();
         self.bg(glass.bar_background())
             .border_1()
             .border_color(glass.bar_border())
-            .rounded(cx.theme().radius_full())
+            .rounded(cx.theme().radius_tokens().xl)
             .shadow(glass.bar_shadows())
     }
 }

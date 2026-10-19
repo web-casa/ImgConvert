@@ -18,5 +18,8 @@ thiserror.workspace = true
 serde_json.workspace = true
 image.workspace = true
 
+[dev-dependencies]
+gpui-kit = { workspace = true, features = ["test-support"] }
+
 [lints]
 workspace = true
