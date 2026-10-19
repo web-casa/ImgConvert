@@ -9,6 +9,20 @@ on run argv
     set targetPid to (item 1 of argv) as integer
     set expectedName to item 2 of argv
     if expectedName is "" then error "Expected a nonempty batch progress name"
+    repeat with attempt from 1 to 3
+        try
+            return my inspectProgress(targetPid, expectedName)
+        on error errorMessage number errorNumber
+            -- A running batch can replace a status text node between the
+            -- native tree snapshot and its role read. Reacquire the whole
+            -- tree; never swallow semantic failures or accept partial data.
+            if errorNumber is not -1728 or attempt is 3 then error errorMessage number errorNumber
+            delay 0.1
+        end try
+    end repeat
+end run
+
+on inspectProgress(targetPid, expectedName)
     tell application "System Events"
         set targetProcess to first process whose unix id is targetPid
         if (unix id of targetProcess) is not targetPid then error "Process reference resolved to a different PID"
@@ -33,4 +47,4 @@ on run argv
         if batchCount is not 1 then error "Expected exactly one localized batch progress indicator; found " & batchCount
         return report & "PASS: " & indicatorCount & " named numeric progress indicator(s)"
     end tell
-end run
+end inspectProgress

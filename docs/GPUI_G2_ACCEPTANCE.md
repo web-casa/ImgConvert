@@ -108,4 +108,8 @@ osascript scripts/check-gpui-macos-progress.applescript 12345 'Batch conversion 
 
 脚本明确按 PID 和 `ImgConvert` 主窗口定位（不遍历文件选择器或 IME 浮窗），要求所有原生进度条有名称及 0–100 数值，且恰好一个名称匹配预期的总进度条。旧候选负向执行确实报 `Unnamed native progress indicator`；修复候选的签名 hash、双语正向结果、运行状态及沙盒复测记录在本片 PR。脚本不点击、不授权、不操作文件；未显示进度时应失败，不能用空树充当通过。
 
+运行过程中原生节点可能在读取前被状态更新替换（实测 `-1728`）；脚本仅对此错误重新读取完整树，最多 3 次，仍失败则退出。名称/数值断言失败不重试、不吞错。
+
+本片修复候选 `target/tmp/g2-scope/g2-recovery-final/ImgConvertCards.app`，签名后二进制 SHA256 `bed2800f73c589706c05e8aedf8be1ddf2ddb8f0415e9b37a4b159469feb0ec9`；同样禁用 updater/外部 codec、`--no-default-features --locked`，仅 app-sandbox/user-selected.read-write，strict ad-hoc 验签通过。两份改动运行源码 hash 与本地一致。复测自有 `g2-final-denied` 的 4 项权限失败、无半成品，重选 `g2-final-recovered` 后直接重试得到 4 个完整 AVIF，4 个源 hash 仍一致。中英总进度名称与 100 数值通过；运行时同一原生树包含“large-0.png 的转换进度”5 和“批量转换进度”25，结束后 100。错误预期名称的稳定状态负向执行报匹配 0 个，不能误通过。原始日志与最后脚本复核记录在 PR。
+
 这些仍是开发候选证据。实际撤销沙盒访问、完整重启/取消矩阵的最终候选复测、连续录屏及完整 VoiceOver/IME 场景仍需补齐，G2 不关闭。
