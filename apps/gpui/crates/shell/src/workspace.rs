@@ -2,17 +2,17 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 //! The main window: a soft backdrop, a thin toolbar, the queue card as the
-//! primary region, the settings card on the trailing edge and the floating
+//! primary region, the settings card on the trailing edge and the fixed
 //! action bar with the one decision (design: "Liquid Glass", 2026-10-18).
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
     FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
     Render, Styled as _, StyledImage as _, Subscription, TestSupportExt as _, TitlebarOptions,
-    Window, WindowBounds, WindowOptions, div, img, px, size,
+    Window, WindowBounds, WindowOptions, div, img, px, rems, size,
 };
 use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
@@ -24,11 +24,19 @@ use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, WorkflowPanel};
 
 use crate::toggle_language;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WorkspaceRegion {
+    Queue,
+    Conversion,
+    Settings,
+}
+
 pub struct Workspace {
     queue_view: Entity<QueueView>,
     workflow: Entity<WorkflowPanel>,
     action_bar: Entity<ActionBar>,
     focus_handle: FocusHandle,
+    active_region: WorkspaceRegion,
     /// The dialog owns the preview; this only lets tests and menus find it.
     comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
     plugin_diagnostics: Option<gpui_kit::WeakEntity<PluginDiagnostics>>,
@@ -66,6 +74,9 @@ impl Workspace {
                     ActionBarEvent::BatchImpact => {
                         this.open_environmental_impact(ImpactSubject::Batch, window, cx);
                     }
+                    ActionBarEvent::OpenSettings => {
+                        this.navigate(WorkspaceRegion::Settings, window, cx);
+                    }
                 },
             ),
             // "Follow system" needs the window's appearance, which only the
@@ -80,6 +91,7 @@ impl Workspace {
             workflow,
             action_bar,
             focus_handle,
+            active_region: WorkspaceRegion::Queue,
             comparison_preview: None,
             plugin_diagnostics: None,
             environmental_impact: None,
@@ -157,19 +169,103 @@ impl Workspace {
         &self.action_bar
     }
 
+    fn navigate(&mut self, target: WorkspaceRegion, window: &mut Window, cx: &mut Context<Self>) {
+        self.active_region = target;
+        match target {
+            WorkspaceRegion::Queue => window.focus(&self.focus_handle, cx),
+            WorkspaceRegion::Conversion => self.workflow.update(cx, |panel, cx| {
+                panel.focus_conversion_settings(window, cx);
+            }),
+            WorkspaceRegion::Settings => self.workflow.update(cx, |panel, cx| {
+                panel.focus_appearance_settings(window, cx);
+            }),
+        }
+        cx.notify();
+    }
+
+    fn render_sidebar(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
+        v_flex()
+            .id("workspace-sidebar")
+            .test_support()
+            .flex_none()
+            .when(compact, |sidebar| sidebar.w(rems(3.5)))
+            .when(!compact, |sidebar| sidebar.w(rems(9.)))
+            .border_r_1()
+            .border_color(cx.theme().border)
+            .p_2()
+            .gap_2()
+            .child(
+                h_flex()
+                    .h_12()
+                    .px_2()
+                    .when(compact, |brand| {
+                        brand.justify_center().child(
+                            Icon::new(IconName::GalleryVerticalEnd).text_color(cx.theme().primary),
+                        )
+                    })
+                    .when(!compact, |brand| {
+                        brand.font_weight(FontWeight::BOLD).child(tr("app.title"))
+                    }),
+            )
+            .children(
+                [
+                    (
+                        WorkspaceRegion::Queue,
+                        "nav-queue",
+                        "nav.queue",
+                        IconName::LayoutDashboard,
+                    ),
+                    (
+                        WorkspaceRegion::Conversion,
+                        "nav-convert",
+                        "nav.convert",
+                        IconName::RefreshCw,
+                    ),
+                    (
+                        WorkspaceRegion::Settings,
+                        "nav-settings",
+                        "nav.settings",
+                        IconName::Settings,
+                    ),
+                ]
+                .into_iter()
+                .map(|(target, id, label, icon)| {
+                    let selected = self.active_region == target;
+                    Button::new(id)
+                        .ghost()
+                        .rounded(ButtonRounded::Size(cx.theme().radius_tokens().md))
+                        .h_10()
+                        .w_full()
+                        .icon(icon)
+                        .accessibility_label(tr(label))
+                        .when(compact, |button| button.tooltip(tr(label)))
+                        .when(target == WorkspaceRegion::Conversion, |button| {
+                            button.tooltip(tr("nav.convert_target"))
+                        })
+                        .when(target == WorkspaceRegion::Settings, |button| {
+                            button.tooltip(tr("nav.settings_target"))
+                        })
+                        .toggled(selected)
+                        .when(!compact, |button| button.justify_start().label(tr(label)))
+                        .when(selected, |button| {
+                            button
+                                .bg(cx.theme().primary.opacity(0.12))
+                                .text_color(cx.theme().primary)
+                        })
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.navigate(target, window, cx);
+                        }))
+                }),
+            )
+    }
+
     fn render_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let pill = ButtonRounded::Size(cx.theme().radius_full());
         h_flex()
-            .h_12()
+            .h_10()
             .flex_none()
             .px_4()
             .gap_2()
-            .child(
-                div()
-                    .text_sm()
-                    .font_weight(FontWeight::BOLD)
-                    .child(tr("app.title")),
-            )
             .child(div().flex_1())
             .child(
                 Button::new("plugin-diagnostics")
@@ -234,7 +330,8 @@ impl Focusable for Workspace {
 }
 
 impl Render for Workspace {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let compact = window.viewport_size().width < window.rem_size() * 66.;
         div()
             .id("workspace")
             .test_support()
@@ -248,7 +345,6 @@ impl Render for Workspace {
             .overflow_hidden()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
-            // The soft light behind the glass; it scales to any window size.
             .child(
                 img(ImageSource::Render(cx.glass().backdrop()))
                     .absolute()
@@ -258,55 +354,45 @@ impl Render for Workspace {
             )
             .child(
                 v_flex()
-                    .absolute()
-                    .inset_0()
                     .size_full()
+                    .relative()
                     .child(self.render_toolbar(cx))
                     .child(
                         h_flex()
+                            .id("workspace-content")
+                            .test_support()
                             .flex_1()
                             .min_h_0()
                             .px_3()
-                            .pb_3()
                             .gap_3()
                             .items_stretch()
                             .child(
-                                // Rows scroll under the card's rounded corners.
-                                div()
+                                h_flex()
+                                    .items_stretch()
                                     .flex_1()
                                     .min_w_0()
+                                    .glass_panel(cx)
+                                    .overflow_hidden()
+                                    .child(self.render_sidebar(compact, cx))
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .h_full()
+                                            .child(self.queue_view.clone()),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .w(if compact { rems(20.) } else { rems(24.) })
+                                    .flex_none()
                                     .h_full()
                                     .glass_panel(cx)
                                     .overflow_hidden()
-                                    .child(self.queue_view.clone()),
-                            )
-                            .child(
-                                // The settings card ends above the floating bar.
-                                div()
-                                    .w_96()
-                                    .flex_none()
-                                    .h_full()
-                                    .pb(theme::ACTION_BAR_CLEARANCE)
-                                    .child(
-                                        div()
-                                            .size_full()
-                                            .glass_panel(cx)
-                                            .overflow_hidden()
-                                            .child(self.workflow.clone()),
-                                    ),
+                                    .child(self.workflow.clone()),
                             ),
-                    ),
-            )
-            // Floats over the queue; the wrapper has no hitbox of its own.
-            .child(
-                h_flex()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .bottom_0()
-                    .pb(theme::ACTION_BAR_MARGIN)
-                    .justify_center()
-                    .child(self.action_bar.clone()),
+                    )
+                    .child(div().flex_none().p_3().child(self.action_bar.clone())),
             )
     }
 }

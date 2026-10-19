@@ -23,15 +23,16 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, AsyncApp, ClickEvent, Context, Entity, EventEmitter, ExternalPaths,
     FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
-    Pixels, Render, RenderImage, RenderOnce, SharedString, Size, StatefulInteractiveElement as _,
-    Styled as _, StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, size,
+    Pixels, Render, RenderImage, RenderOnce, Role, SharedString, Size,
+    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
+    TestSupportExt as _, Window, div, img, px, size,
 };
 use imgconvert_gpui_shared::command_error::format_command_error;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
-use imgconvert_gpui_shared::theme;
 use imgconvert_gpui_shared::{
-    AppModels, BatchModel, ItemStatus, QueueItem, QueueModel, ThumbnailState, progress_bridge,
+    AppModels, BatchModel, ItemStatus, QueueItem, QueueModel, Services, ThumbnailState,
+    progress_bridge, tasks,
 };
 
 use crate::import;
@@ -62,6 +63,9 @@ impl EventEmitter<QueueViewEvent> for QueueView {}
 pub struct QueueView {
     queue: Entity<QueueModel>,
     batch: Entity<BatchModel>,
+    input_formats: Vec<SharedString>,
+    formats_revision: u64,
+    helper_path: Option<String>,
     scroll: VirtualListScrollHandle,
     item_sizes: Rc<Vec<Size<Pixels>>>,
     sizes_key: (u64, Pixels),
@@ -76,13 +80,33 @@ impl QueueView {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let models = AppModels::global(cx).clone();
         let subscriptions = vec![
+            cx.observe_global::<Services>(|this, cx| {
+                if this.formats_revision == 0 && Services::global(cx).is_codec_restore_complete() {
+                    this.refresh_input_formats(cx);
+                }
+            }),
             cx.observe(models.queue(), |_, _, cx| cx.notify()),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
-            cx.observe(models.settings(), |_, _, cx| cx.notify()),
+            cx.observe(models.settings(), |this, settings, cx| {
+                let helper_path = settings.read(cx).settings().heic_helper_path.clone();
+                if this.helper_path != helper_path {
+                    this.helper_path = helper_path;
+                    this.refresh_input_formats(cx);
+                }
+                cx.notify();
+            }),
         ];
-        Self {
+        let mut view = Self {
             queue: models.queue().clone(),
             batch: models.batch().clone(),
+            input_formats: Vec::new(),
+            formats_revision: 0,
+            helper_path: models
+                .settings()
+                .read(cx)
+                .settings()
+                .heic_helper_path
+                .clone(),
             scroll: VirtualListScrollHandle::new(),
             item_sizes: Rc::new(Vec::new()),
             sizes_key: (u64::MAX, px(0.)),
@@ -90,7 +114,40 @@ impl QueueView {
             schedule_pending: false,
             inflight: 0,
             _subscriptions: subscriptions,
+        };
+        view.refresh_input_formats(cx);
+        view
+    }
+
+    fn refresh_input_formats(&mut self, cx: &mut Context<Self>) {
+        if !Services::global(cx).is_codec_restore_complete() {
+            return;
         }
+        self.formats_revision = self.formats_revision.wrapping_add(1);
+        let revision = self.formats_revision;
+        let task = tasks::run_blocking("imgconvert-input-formats", cx, || {
+            imgconvert_backend::convert::capabilities()
+                .readable
+                .into_iter()
+                .map(|format| SharedString::from(format.to_uppercase()))
+                .collect()
+        });
+        cx.spawn(async move |this, cx| {
+            let formats = match task.await {
+                Ok(formats) => formats,
+                Err(detail) => {
+                    eprintln!("imgconvert: input formats unavailable: {detail}");
+                    return;
+                }
+            };
+            let _ = this.update(cx, |this, cx| {
+                if this.formats_revision == revision {
+                    this.input_formats = formats;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// Scroll handle of the list, for the perf probe's scroll scenario.
@@ -271,37 +328,39 @@ impl QueueView {
                             }),
                     ),
             )
-            .child(
-                h_flex()
-                    .gap_2()
-                    .justify_end()
-                    .child(
-                        Button::new("queue-clear")
-                            .ghost()
-                            .small()
-                            .label(tr("queue.clear"))
-                            .disabled(count == 0 || batch_busy || queue.is_importing())
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.clear_queue(window, cx)),
-                            ),
-                    )
-                    .child(
-                        Button::new("queue-paste")
-                            .ghost()
-                            .small()
-                            .label(tr("queue.paste"))
-                            .disabled(queue.is_importing())
-                            .on_click(|_, _, cx| crate::clipboard::paste(cx)),
-                    )
-                    .child(
-                        Button::new("queue-add-files")
-                            .small()
-                            .icon(IconName::FolderOpen)
-                            .label(tr("queue.add_files"))
-                            .disabled(queue.is_importing())
-                            .on_click(|_, _, cx| import::pick_and_import(cx)),
-                    ),
-            )
+            .when(count > 0, |toolbar| {
+                toolbar.child(
+                    h_flex()
+                        .gap_2()
+                        .justify_end()
+                        .child(
+                            Button::new("queue-clear")
+                                .ghost()
+                                .small()
+                                .label(tr("queue.clear"))
+                                .disabled(count == 0 || batch_busy || queue.is_importing())
+                                .on_click(
+                                    cx.listener(|this, _, window, cx| this.clear_queue(window, cx)),
+                                ),
+                        )
+                        .child(
+                            Button::new("queue-paste")
+                                .ghost()
+                                .small()
+                                .label(tr("queue.paste"))
+                                .disabled(queue.is_importing())
+                                .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+                        )
+                        .child(
+                            Button::new("queue-add-files")
+                                .small()
+                                .icon(IconName::FolderOpen)
+                                .label(tr("queue.add_files"))
+                                .disabled(queue.is_importing())
+                                .on_click(|_, _, cx| import::pick_and_import(cx)),
+                        ),
+                )
+            })
     }
 
     fn render_feedback(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
@@ -392,39 +451,137 @@ impl QueueView {
     }
 
     fn render_empty(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let importing = self.queue.read(cx).is_importing();
         v_flex()
             .id("queue-empty")
             .test_support()
             .flex_1()
-            .items_center()
-            .justify_center()
-            .gap_2()
-            .p_8()
+            .min_h_0()
+            .gap_3()
+            .p_4()
             .child(
-                Icon::new(IconName::Inbox)
-                    .size_8()
-                    .text_color(cx.theme().muted_foreground),
+                v_flex()
+                    .id("queue-import-card")
+                    .test_support()
+                    .flex_1()
+                    .min_h_0()
+                    .items_center()
+                    .justify_center()
+                    .gap_3()
+                    .p_3()
+                    .rounded(cx.theme().radius_tokens().lg)
+                    .border_1()
+                    .border_color(cx.theme().primary.opacity(0.2))
+                    .bg(cx.theme().primary.opacity(0.025))
+                    .child(
+                        div()
+                            .size_20()
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(cx.theme().radius_2xl())
+                            .bg(cx.theme().primary.opacity(0.08))
+                            .child(
+                                Icon::new(IconName::GalleryVerticalEnd)
+                                    .size_12()
+                                    .text_color(cx.theme().primary),
+                            ),
+                    )
+                    .child(
+                        v_flex()
+                            .gap_1()
+                            .items_center()
+                            .child(
+                                div()
+                                    .id("queue-drop-title")
+                                    .test_support()
+                                    .role(Role::Heading)
+                                    .aria_label(tr("queue.drop_title"))
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_center()
+                                    .child(tr("queue.drop_title")),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .text_center()
+                                    .id("queue-drop-description")
+                                    .test_support()
+                                    .role(Role::Label)
+                                    .aria_label(tr("queue.drop_alternative"))
+                                    .aria_value(tr("queue.drop_alternative"))
+                                    .child(tr("queue.drop_alternative")),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .flex_wrap()
+                            .gap_2()
+                            .justify_center()
+                            .child(
+                                div().id("queue-empty-add").test_support().child(
+                                    Button::new("queue-add-files")
+                                        .outline()
+                                        .small()
+                                        .icon(IconName::File)
+                                        .label(tr("queue.add_files"))
+                                        .disabled(importing)
+                                        .on_click(|_, _, cx| import::pick_and_import(cx)),
+                                ),
+                            )
+                            .child(
+                                Button::new("queue-add-folders")
+                                    .outline()
+                                    .small()
+                                    .icon(IconName::FolderOpen)
+                                    .label(tr("queue.add_folders"))
+                                    .disabled(importing)
+                                    .on_click(|_, _, cx| import::pick_folders_and_import(cx)),
+                            )
+                            .child(
+                                Button::new("queue-paste")
+                                    .outline()
+                                    .small()
+                                    .icon(IconName::Copy)
+                                    .label(tr("queue.paste"))
+                                    .disabled(importing)
+                                    .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+                            ),
+                    ),
             )
             .child(
-                div()
-                    .text_base()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(tr("queue.empty_title")),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .text_center()
-                    .child(tr("queue.empty_description")),
-            )
-            .child(
-                div().mt_2().child(
-                    Button::new("queue-empty-add")
-                        .icon(IconName::FolderOpen)
-                        .label(tr("queue.add_files"))
-                        .on_click(|_, _, cx| import::pick_and_import(cx)),
-                ),
+                v_flex()
+                    .gap_2()
+                    .flex_none()
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(tr("queue.supported_formats")),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .flex_wrap()
+                            .children(self.input_formats.iter().map(|format| {
+                                div()
+                                    .rounded(cx.theme().radius_tokens().sm)
+                                    .px_2()
+                                    .py_1()
+                                    .id(SharedString::from(format!("input-format:{format}")))
+                                    .test_support()
+                                    .role(Role::Label)
+                                    .aria_label(format.clone())
+                                    .aria_value(format.clone())
+                                    .text_xs()
+                                    .bg(cx.theme().muted.opacity(0.7))
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(format.clone())
+                            })),
+                    ),
             )
     }
 
@@ -471,9 +628,7 @@ impl QueueView {
         .flex_1()
         .min_h_0()
         .px_2()
-        // The floating action bar covers the bottom of the card; the last
-        // rows must be able to scroll above it.
-        .pb(theme::ACTION_BAR_CLEARANCE)
+        .pb_2()
     }
 }
 
@@ -491,7 +646,7 @@ impl Render for QueueView {
                 this.import_paths(paths.paths().to_vec(), cx);
             }))
             .drag_over::<ExternalPaths>(|style, _, _, cx| style.bg(cx.theme().drop_target))
-            .child(self.render_toolbar(cx))
+            .when(!is_empty, |view| view.child(self.render_toolbar(cx)))
             .children(self.render_feedback(cx))
             .map(|this| {
                 if is_empty {

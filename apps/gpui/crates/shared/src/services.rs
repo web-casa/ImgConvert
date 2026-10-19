@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui_kit::{App, AppContext as _, Entity, Global};
+use gpui_kit::{App, AppContext as _, BorrowAppContext as _, Entity, Global, Task};
 use imgconvert_backend::external_codecs;
 use imgconvert_backend::import::{self, ClipboardImportState, ImportScanState};
 use imgconvert_backend::preview::PreviewState;
@@ -27,6 +27,7 @@ pub struct Services {
     clipboard: Arc<ClipboardImportState>,
     /// The one current comparison preview; a newer one cancels the previous.
     preview: Arc<PreviewState>,
+    codec_restore_complete: bool,
 }
 
 impl Global for Services {}
@@ -46,6 +47,12 @@ impl Services {
 
     pub fn preview(&self) -> &Arc<PreviewState> {
         &self.preview
+    }
+
+    /// Whether startup helper selection has finished, successfully or otherwise.
+    /// Capability consumers wait for this latch before their first probe.
+    pub fn is_codec_restore_complete(&self) -> bool {
+        self.codec_restore_complete
     }
 
     pub fn global(cx: &App) -> &Self {
@@ -107,12 +114,27 @@ pub fn init(cx: &mut App) {
 /// Like [`init`], but with the settings model the caller provides (tests use
 /// an in-memory model). A second call is a no-op.
 pub fn init_with_settings(cx: &mut App, settings: impl FnOnce() -> SettingsModel) {
+    init_with_restore(cx, settings, |path, cx| {
+        let worker = crate::tasks::run_blocking("imgconvert-restore-heic", cx, move || {
+            external_codecs::set_selected_heic_helper(Some(path)).map(|_| ())
+        });
+        cx.background_executor()
+            .spawn(async move { worker.await.and_then(|result| result) })
+    });
+}
+
+fn init_with_restore(
+    cx: &mut App,
+    settings: impl FnOnce() -> SettingsModel,
+    restore: impl FnOnce(String, &mut App) -> Task<Result<(), String>>,
+) {
     if !cx.has_global::<Services>() {
         cx.set_global(Services {
             batch: BatchService::new(),
             import_scan: Arc::new(ImportScanState::default()),
             clipboard: Arc::new(ClipboardImportState::default()),
             preview: Arc::new(PreviewState::default()),
+            codec_restore_complete: true,
         });
     }
     if !cx.has_global::<AppModels>() {
@@ -129,18 +151,110 @@ pub fn init_with_settings(cx: &mut App, settings: impl FnOnce() -> SettingsModel
         // A manually chosen HEIC helper outside the discovery paths must be
         // selected again in this process; the probe runs off the foreground.
         if let Some(path) = heic_helper {
-            cx.background_executor()
-                .spawn(async move {
-                    if let Err(error) = external_codecs::set_selected_heic_helper(Some(path)) {
-                        eprintln!("imgconvert: persisted HEIC helper not usable: {error}");
-                    }
-                })
-                .detach();
+            cx.update_global::<Services, _>(|services, _| {
+                services.codec_restore_complete = false;
+            });
+            let task = restore(path, cx);
+            cx.spawn(async move |cx| {
+                if let Err(error) = task.await {
+                    eprintln!("imgconvert: persisted HEIC helper not usable: {error}");
+                }
+                // Notify even after an unusable helper: capability probing must
+                // see the settled configuration and is not a permission gate.
+                cx.update_global::<Services, _>(|services, _| {
+                    services.codec_restore_complete = true;
+                });
+            })
+            .detach();
         }
         cx.set_global(AppModels {
             queue,
             batch,
             settings,
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit::TestAppContext;
+    use imgconvert_backend::settings::Settings;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    fn assert_restore_latch(cx: &mut TestAppContext, outcome: Result<(), String>) {
+        let notifications = Rc::new(Cell::new(0));
+        cx.update(|cx| {
+            let mut settings = Settings::default();
+            settings.heic_helper_path = Some("/owned-fixture/helper".into());
+            init_with_restore(
+                cx,
+                || SettingsModel::in_memory(settings),
+                move |path, cx| {
+                    assert_eq!(path, "/owned-fixture/helper");
+                    // Controlled async work; no helper or real filesystem is used.
+                    let delay = cx.background_executor().timer(Duration::from_millis(100));
+                    cx.background_executor().spawn(async move {
+                        delay.await;
+                        outcome
+                    })
+                },
+            );
+            assert!(!Services::global(cx).is_codec_restore_complete());
+            let count = Rc::clone(&notifications);
+            cx.observe_global::<Services>(move |cx| {
+                if Services::global(cx).is_codec_restore_complete() {
+                    count.set(count.get() + 1);
+                }
+            })
+            .detach();
+        });
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.run_until_parked();
+        cx.update(|cx| assert!(!Services::global(cx).is_codec_restore_complete()));
+        assert_eq!(notifications.get(), 0);
+        cx.executor().advance_clock(Duration::from_millis(51));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert!(Services::global(cx).is_codec_restore_complete());
+            init_with_restore(
+                cx,
+                || panic!("settings must not reload"),
+                |_, _| {
+                    panic!("helper must not restore twice");
+                },
+            );
+        });
+        assert_eq!(
+            notifications.get(),
+            1,
+            "one completion notification wakes capability consumers"
+        );
+    }
+
+    #[gpui_kit::test]
+    fn codec_capabilities_wait_for_restore_and_receive_completion(cx: &mut TestAppContext) {
+        assert_restore_latch(cx, Ok(()));
+    }
+
+    #[gpui_kit::test]
+    fn failed_codec_restore_also_releases_capability_consumers(cx: &mut TestAppContext) {
+        assert_restore_latch(cx, Err("fixture helper unavailable".into()));
+    }
+
+    #[gpui_kit::test]
+    fn no_manual_helper_does_not_delay_capability_consumers(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            init_with_restore(
+                cx,
+                || SettingsModel::in_memory(Settings::default()),
+                |_, _| {
+                    panic!("no helper path must not dispatch a restore");
+                },
+            );
+            assert!(Services::global(cx).is_codec_restore_complete());
         });
     }
 }

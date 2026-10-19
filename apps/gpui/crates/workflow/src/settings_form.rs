@@ -2,7 +2,7 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 //! The conversion settings form (port of the Svelte `SettingsBar` and
-//! `WorkflowSettings`): format and quality always visible, then ten
+//! `WorkflowSettings`): preset, format and quality always visible, then eleven
 //! collapsible sections (output, compression, color, cache, format
 //! parameters, presets, PDF, resize, target size, metadata), one open at a
 //! time. Section headers are Kit `Button`s so every section is a Tab stop;
@@ -650,6 +650,23 @@ impl SettingsForm {
         self.open_section
     }
 
+    /// Focus the format selector, including formats whose quality slider is disabled.
+    pub fn focus_format(&self, window: &mut Window, cx: &mut App) {
+        self.format
+            .state()
+            .update(cx, |select, cx| select.focus(window, cx));
+    }
+
+    /// Application settings shortcut: expose the appearance section and its select.
+    pub fn focus_appearance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_open_section(Some(Section::Appearance), cx);
+        if !self.is_busy(cx) {
+            self.theme
+                .state()
+                .update(cx, |select, cx| select.focus(window, cx));
+        }
+    }
+
     pub fn set_open_section(&mut self, section: Option<Section>, cx: &mut Context<Self>) {
         if self.open_section != section {
             self.open_section = section;
@@ -1281,15 +1298,41 @@ impl SettingsForm {
         v_flex()
             .gap_3()
             .child(
-                v_flex()
-                    .gap_1()
-                    .child(Self::field_label(tr("settings.target_format"), cx))
+                h_flex()
+                    .gap_2()
                     .child(
-                        Select::new(self.format.state())
-                            .id("workflow-format")
-                            .small()
-                            .accessibility_label(tr("settings.target_format"))
-                            .disabled(busy),
+                        div()
+                            .w_24()
+                            .flex_none()
+                            .child(Self::field_label(tr("workflow.preset"), cx)),
+                    )
+                    .child(
+                        div().flex_1().min_w_0().child(
+                            Select::new(self.preset.state())
+                                .id("workflow-preset")
+                                .small()
+                                .accessibility_label(tr("workflow.preset"))
+                                .disabled(busy),
+                        ),
+                    ),
+            )
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .w_24()
+                            .flex_none()
+                            .child(Self::field_label(tr("settings.target_format"), cx)),
+                    )
+                    .child(
+                        div().flex_1().min_w_0().child(
+                            Select::new(self.format.state())
+                                .id("workflow-format")
+                                .small()
+                                .accessibility_label(tr("settings.target_format"))
+                                .disabled(busy),
+                        ),
                     ),
             )
             .child(self.slider_field(
@@ -1321,7 +1364,12 @@ impl SettingsForm {
                     .child(
                         Collapsible::new()
                             .open(open)
-                            .motion_id(SharedString::from(format!("{}-body", section.id())))
+                            // Navigation to appearance is immediate so its focused
+                            // controls and the scroll destination share one layout.
+                            .when(section != Section::Appearance, |collapse| {
+                                collapse
+                                    .motion_id(SharedString::from(format!("{}-body", section.id())))
+                            })
                             .content(v_flex().px_3().pb_3().pt_1().children(body)),
                     ),
             );
@@ -1952,18 +2000,7 @@ impl SettingsForm {
         let name_valid = workflow_presets::normalize_preset_name(&name_text).is_some();
         v_flex()
             .gap_3()
-            .child(
-                v_flex()
-                    .gap_1()
-                    .child(
-                        Select::new(self.preset.state())
-                            .id("workflow-preset")
-                            .small()
-                            .accessibility_label(tr("workflow.preset"))
-                            .disabled(busy),
-                    )
-                    .children(description.map(|text| Self::hint(text, false, cx))),
-            )
+            .children(description.map(|text| Self::hint(text, false, cx)))
             .child(
                 v_flex()
                     .gap_1()
@@ -2254,14 +2291,7 @@ impl Render for SettingsForm {
         v_flex()
             .id("settings-form")
             .test_support()
-            .gap_4()
-            .child(
-                div()
-                    .text_xs()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(cx.theme().muted_foreground)
-                    .child(tr("settings.core_section")),
-            )
+            .gap_3()
             .child(self.render_core(&settings, busy, cx))
             .child(self.render_sections(&settings, busy, cx))
     }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! The floating action bar: the window's one decision (Start / Cancel) with
-//! the output folder and the batch status beside it. The shell floats it
-//! over the queue; the behaviour stays in [`WorkflowPanel`], which the bar
+//! The fixed bottom action bar: the window's one decision (Start / Cancel) with
+//! the output folder and the batch status beside it. The shell places it
+//! below the content; the behaviour stays in [`WorkflowPanel`], which the bar
 //! drives and observes.
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
@@ -32,6 +32,8 @@ use crate::workflow_panel::WorkflowPanel;
 pub enum ActionBarEvent {
     /// Open the storage and environmental scenario for the finished batch.
     BatchImpact,
+    /// Focus the application appearance settings in the existing inspector.
+    OpenSettings,
 }
 
 impl EventEmitter<ActionBarEvent> for ActionBar {}
@@ -140,18 +142,6 @@ impl Render for ActionBar {
             || tr("workflow.output_not_chosen"),
             |dir| SharedString::from(dir.to_string_lossy().into_owned()),
         );
-        // The folder's own name; a root (`/`, a drive) has none and shows whole.
-        let output_name: SharedString = output_dir.as_deref().map_or_else(
-            || tr("workflow.output_not_chosen"),
-            |dir| {
-                SharedString::from(
-                    dir.file_name()
-                        .unwrap_or(dir.as_os_str())
-                        .to_string_lossy()
-                        .into_owned(),
-                )
-            },
-        );
         let choose_output_name: SharedString =
             format!("{}: {output_path}", tr("workflow.choose_output")).into();
         let (status_text, status_danger) = self.status(cx);
@@ -168,20 +158,23 @@ impl Render for ActionBar {
                 )
             });
         let muted = cx.theme().muted_foreground;
-        let pill = ButtonRounded::Size(cx.theme().radius_full());
+        let rounded = ButtonRounded::Size(cx.theme().radius_tokens().lg);
 
         h_flex()
             .id("workflow-action-bar")
             .test_support()
             .glass_bar(cx)
-            .p_1p5()
+            .w_full()
+            .p_3()
             .gap_3()
             .items_center()
             .child(
                 Button::new("workflow-choose-output")
                     .ghost()
-                    .rounded(pill)
+                    .rounded(rounded)
                     .h_11()
+                    .w_64()
+                    .min_w_0()
                     .px_3()
                     .tooltip(output_path.clone())
                     .accessibility_label(choose_output_name)
@@ -204,12 +197,12 @@ impl Render for ActionBar {
                                         div()
                                             .id("workflow-output-dir")
                                             .test_support()
-                                            .aria_label(output_path)
+                                            .aria_label(output_path.clone())
                                             .text_sm()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .max_w_48()
                                             .truncate()
-                                            .child(output_name),
+                                            .child(output_path.clone()),
                                     ),
                             ),
                     )
@@ -218,11 +211,22 @@ impl Render for ActionBar {
                             .update(cx, |panel, cx| panel.choose_output_dir(window, cx));
                     })),
             )
+            .child(
+                Button::new("workflow-open-settings")
+                    .ghost()
+                    .rounded(rounded)
+                    .icon(IconName::Settings)
+                    .accessibility_label(tr("nav.settings"))
+                    .tooltip(tr("nav.settings"))
+                    .on_click(cx.listener(|_, _, _, cx| {
+                        cx.emit(ActionBarEvent::OpenSettings);
+                    })),
+            )
             .child(div().w_px().h_8().bg(cx.theme().border))
             .child(
                 v_flex()
-                    .min_w_40()
-                    .max_w_72()
+                    .flex_1()
+                    .min_w_0()
                     .gap_0p5()
                     .child(
                         div()
@@ -234,6 +238,8 @@ impl Render for ActionBar {
                         div()
                             .id("workflow-status")
                             .test_support()
+                            .role(gpui_kit::Role::Label)
+                            .aria_value(status_text.clone())
                             .aria_label(status_text.clone())
                             // Long errors and summaries truncate; the full
                             // text is one hover or focus away.
@@ -256,7 +262,7 @@ impl Render for ActionBar {
                     Button::new("workflow-impact")
                         .ghost()
                         .small()
-                        .rounded(pill)
+                        .rounded(rounded)
                         .label(tr("impact.batch_open"))
                         .tooltip(tr("impact.title"))
                         .on_click(cx.listener(|_, _, _, cx| {
@@ -268,7 +274,7 @@ impl Render for ActionBar {
                 Button::new("workflow-cancel")
                     .danger()
                     .large()
-                    .rounded(pill)
+                    .rounded(rounded)
                     .px_6()
                     .label(if cancelling {
                         tr("workflow.cancelling")
@@ -284,7 +290,7 @@ impl Render for ActionBar {
                 Button::new("workflow-start")
                     .primary()
                     .large()
-                    .rounded(pill)
+                    .rounded(rounded)
                     .px_6()
                     .label(start_label)
                     .disabled(!can_start)

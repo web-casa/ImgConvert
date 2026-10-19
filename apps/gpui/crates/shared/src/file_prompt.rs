@@ -14,6 +14,8 @@ use gpui_kit::{App, PathPromptOptions, SharedString};
 pub enum PromptKind {
     /// Files and folders to import, many at once.
     ImportPaths,
+    /// Folders to scan recursively, many at once.
+    ImportFolders,
     /// One output folder.
     OutputFolder,
     /// One file, such as a helper executable.
@@ -24,6 +26,12 @@ pub fn options_for(kind: PromptKind, prompt: SharedString) -> PathPromptOptions 
     match kind {
         PromptKind::ImportPaths => PathPromptOptions {
             files: true,
+            directories: true,
+            multiple: true,
+            prompt: Some(prompt),
+        },
+        PromptKind::ImportFolders => PathPromptOptions {
+            files: false,
             directories: true,
             multiple: true,
             prompt: Some(prompt),
@@ -67,6 +75,8 @@ mod tests {
     fn import_prompt_allows_many_files_and_folders() {
         let options = options_for(PromptKind::ImportPaths, "Add".into());
         assert!(options.files && options.directories && options.multiple);
+        let folders = options_for(PromptKind::ImportFolders, "Add folders".into());
+        assert!(!folders.files && folders.directories && folders.multiple);
         let options = options_for(PromptKind::OutputFolder, "Choose".into());
         assert!(!options.files && options.directories && !options.multiple);
         let options = options_for(PromptKind::SingleFile, "Choose".into());
