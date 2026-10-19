@@ -36,3 +36,9 @@ Kit Assets 当前只启用应用使用的图标；示例字体不由应用引入
 真实组件 UI 测试核对：完整政策和完整许可尾部可复制，键入/删除/粘贴不改变政策，不向背后队列导入，最小窗口下正文和关闭按钮可达，中英文切换、Escape 及关闭后的焦点恢复。负向验证和最终 CI 证据记录于本片 PR。此记录不关闭 G1/G2/G3 或最终发布门槛。
 
 本片验收结果：GPUI 72 项通过（shell 22 项 UI，app-settings 另有真实正文滚动/缩放测试），隐私键盘流程以 SEED=7 复跑通过。许可正向复现及完整 license:check 通过；临时破坏图标归属时 --check 明确报生成物过期，恢复后再次通过。core.autocrlf=true 的真实 checkout-index 模拟验证 22 份文档/来源文件保持 LF 且逐字节相同。支持链接采用有键盘语义的 Base Link，并以局部动作覆盖 Dialog 的默认 Enter；正文只读 Tab 动作转发标准焦点遍历。首轮 Codex 2P2/1P3 已修，两次复核无新增 P1/P2/P3。原始记录在本地 artifacts/reviews/codex-s11-*，CI 证据在 PR。
+
+## macOS IME 源码覆盖的归属复核（2026-10-19）
+
+默认 GPUI 构建使用 `apps/gpui/vendor` 中两个 Apache-2.0 包 `gpui-pre` / `gpui-pre-macos` 0.3.8 的运行时源码覆盖。116 个保留文件包括原始 `LICENSE-APACHE`、`Cargo.toml.orig`、运行时代码与 Windows 构建资源；未复制整个 Kit 框架或无关示例/媒体。版本、原始归档 SHA256、差分及完整文件清单由 `patches/gpui-ime-focus` 固定；`verify.py --archives` 逐字节重建来源，正常 Cargo metadata 验证实际选中路径。上游报告和删除条件见 `GPUI_PATCHES.md`。
+
+启用后重新执行 `pnpm run license:gpui:verify` 通过：898 个依赖包、210 份许可正文、281 份补充文本，生成物逐字节不变。来源覆盖没有新增依赖版本或许可；最终发布物的渠道签名与包审计仍按 G3/G4/G5 执行。

@@ -195,3 +195,26 @@ PR #38 已按用户授权合并（main `a00e9e1`）。本片继续 G2，不推�
 本片没有正式启用补丁。G2 剩余完整 VoiceOver 连续记录、沙盒撤权等原生矩阵，以及候选的正式来源/许可证/构建接入仍待完成；不据此关闭 G2，也不进入 D1a/C1 或阶段 4/5。
 
 最终源码与 manifest 校验后，独立 Kit harness 再次跑满预期名称的 13 项 macOS 回归，全部通过；Python 工具 13 项通过。只读 review 中的 owner、最终焦点选择、补帧阶段、首次无旧 client 恢复、Unicode TOML、替换测试入口误通过及符号链接输出越界均已修复并复核，最终无新增 P1/P2/P3。测试结束核对专用设置与开始前逐字段一致，ABC、VoiceOver 关闭及录屏三项目的地偏好恢复；Cocoa/最小例程进程已退出，原未打补丁的预览继续运行，既有其他开发实例未动。
+
+## 2026-10-19 正式源码接入：普通开发构建
+
+PR #39 已按用户授权合并 main `03c54cf`（7 个必需 CI 作业通过）。本片把上面最终候选的同一份运行时代码接入正常 GPUI workspace；不再要求额外 Cargo config、改写锁文件或临时替换 registry 源码。仅对 `gpui-pre` / `gpui-pre-macos` 0.3.8 使用本地来源覆盖，Kit 五包保持 0.7.1；其他平台包仍来自 registry。
+
+- 保留 116 个必要运行时、构建资源、原始 manifest 与完整许可文件，共约 3.7 MiB；不复制上游示例/测试媒体或整个 Kit 框架。必要 Windows manifest 资源保留。
+- 新锁 SHA256 `3b7fc3c9646e8d4c22f47018bdc2f4d7b4fff6d22a2c3cfcf2fcf324699a5a3a`；补回这两个原有 source/checksum 后严格恢复旧锁 SHA256 `3c0ef2dbf7b91fd868acdf79bf48f85e0b295f50242ed763708a9188f63afed1`，没有新增或升级依赖。
+- `verify.py --archives` 按已锁定的原始发布归档加差分逐字节重建全部保留文件；`--metadata` 核对普通产品构建实际选中路径、版本和八个自有 workspace 成员。来源审计接入架构护栏，metadata 审计接入 CI。真实 `core.autocrlf=true` checkout-index 验证 116 文件及锁逐字节一致；保留上游注释空白，不以格式化改写归档字节。
+- 工具 19 项测试通过，覆盖额外文件、源码/Windows 资源漂移、重定向链接、registry 回退、错误路径及首次临时目录创建；护栏负向加入直接 `gpui-pre` 依赖时明确失败，恢复后通过。
+- 许可证重新生成核验通过：898 包、210 正文、281 补充文本，入库生成物逐字节不变。两轮 Codex 只读评审无确证 P1/P2/P3；评审不代替实际测试。
+
+Mac 独立 Kit harness 用 `--active` 指向实际产品覆盖源码，13 项 owner/调度回归全部通过。Linux GPUI fmt/clippy 及 95 项测试通过；首次并行链接因 SIGKILL 失败，改为 `-j1` 后全部通过。根 workspace fmt/clippy、397 项测试（另 1 项原生测试 ignored）、前端 check/161 项、全仓格式、完整许可证、文档/成本/架构护栏通过。Mac 普通 `cargo build --release --locked`（无额外 config，`--no-default-features`）已构建应用和最小例程，锁文件逐字节不变；两 App 以既有 ad-hoc runtime 签名通过 deep/strict 验签，主应用使用既有最小沙盒 entitlements。主程序 SHA256 `c96e5bde22143282e8baf3206cbdc10e7a4df41c2428abcbe7e89d493e53691c`，最小例程 `cdfa60b4cc677be844b44b6745208111aae111532bc52f4b5c992222ddb7b3e8`。普通产品 workspace 无额外 config 的十项 macOS 控件回归也全部通过，锁保持不变；现有探针口径的 CGS/SLS 未定义符号与 PrivateFrameworks 链接扫描为零命中。最终 CI 以本片 PR 为准。此接入不关闭 G2：完整 VoiceOver 连续记录、沙盒撤权等矩阵仍须完成，不进入 D1a/C1 或阶段 4/5。
+
+普通构建的原生复测再次通过上表同一矩阵：最小例程 AX 候选关闭、首个 Escape、直接 `shi` 确认“适”、连续三次直接重入、后台 GPUI 动作保留 Cocoa 的 `ni hao` 与候选、组合中关闭进程正常退出；沙盒主应用 AX 恢复 `_done` 且候选关闭，首个 Escape 关闭隐私，直接新组合确认“适”并保存。旧版对照仍保留候选且首个 Escape 只消候选。两版 CG 鼠标路径同样保存原始 `nihao`，没有改写既有保存策略。随后真实组合确认“你好”通过。
+
+连续记录已复制并逐字节核对 SHA256，ffprobe 均为 H.264 / 3024×1900；对话框期间抽帧可见新版无候选、旧版仍有候选。媒体只保存在忽略目录，不上传 Git / 上游：
+
+| 副本 | 时长 | SHA256 | 内容 |
+| --- | --- | --- | --- |
+| `active-recording-01.mov` | 63.567 s | `3463acc2667b82324a21bd1b53c70dc49a321c894150d0dcf52a0fa257be4af4` | 普通构建最小例程 AX、直接返回/三次重入、独立上下文、组合中关闭 |
+| `active-recording-02.mov` | 130.400 s | `2d27654ed3167f68dc6d165593a2fbc0714783573a339afb6ce03a1daaef63b7` | 普通构建沙盒主应用 AX/CG 与旧版对照、Escape、重新组合确认与保存 |
+
+结束后专用设置与开始前逐字段一致，ABC、VoiceOver 关闭及录屏三项目的地偏好恢复；Cocoa/最小例程已退出，恢复原预览，其他既有开发实例未动。构建缓存中保留当前正式接入的普通产物，没有回写旧版源码/锁。仍观察到既有后缀校验反馈在恢复保存值后可能残留 Required 文案，留待独立修正；本片不改变 blur 的保存策略。完整 G2 原生矩阵仍保持开放。

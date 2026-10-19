@@ -46,6 +46,11 @@ class CheckerTests(unittest.TestCase):
                 check.check(self.stage, True)
             run.assert_called_once()
 
+    def test_active_mode_rejects_accidentally_selected_staged_sources(self):
+        with patch.object(check.subprocess, "run", return_value=self.response(self.metadata)):
+            with self.assertRaisesRegex(ValueError, "unexpected source"):
+                check.check(self.stage, True, active=True)
+
     def test_zero_tests_cannot_pass_native_acceptance(self):
         empty = subprocess.CompletedProcess(["cargo"], 0, "test result: ok. 0 passed; 0 failed;\n", "")
         with patch.object(check.sys, "platform", "darwin"):
