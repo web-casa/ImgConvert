@@ -66,7 +66,7 @@ fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext)
         assert!(window.find("workflow-action-bar").visible());
         assert!(window.find("workflow-start").visible());
         assert_eq!(
-            window.find("workflow-status").label(),
+            window.find("workflow-status").value(),
             Some("Add files to begin")
         );
         assert_eq!(
@@ -832,7 +832,7 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
     cx.update(toggle_language);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("workflow-status").label(), Some("先添加文件"));
+        assert_eq!(window.find("workflow-status").value(), Some("先添加文件"));
     })
     .unwrap();
     cx.update(toggle_language);
@@ -1391,7 +1391,7 @@ fn clipboard_bitmap_button_imports_metadata_and_clears_only_managed_files(cx: &m
     assert_eq!(std::fs::read(&path).unwrap(), one_by_one_png());
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("queue-feedback").label(), Some("Added 1 files"));
+        assert_eq!(window.find("queue-feedback").value(), Some("Added 1 files"));
         window.click("queue-clear", cx);
     })
     .unwrap();
@@ -1497,7 +1497,7 @@ fn clipboard_empty_invalid_partial_and_cancelled_imports_leave_a_usable_queue(
         assert!(
             window
                 .find("queue-feedback")
-                .label()
+                .value()
                 .unwrap()
                 .contains("Copy an image")
         );
@@ -1736,7 +1736,7 @@ fn clipboard_partial_path_errors_are_visible_and_modals_do_not_import(cx: &mut T
         assert!(
             window
                 .find("queue-feedback")
-                .label()
+                .value()
                 .unwrap()
                 .contains("1 个路径无法读取")
         );
@@ -2108,7 +2108,7 @@ fn parity_scan_reports_failures_and_stop_preserves_existing_queue(cx: &mut TestA
     wait_for_import(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        let text = window.find("queue-feedback").label().unwrap().to_owned();
+        let text = window.find("queue-feedback").value().unwrap().to_owned();
         assert!(
             text.contains("Added 1 files") && text.contains("1 paths couldn’t be read"),
             "{text}"
@@ -2118,7 +2118,7 @@ fn parity_scan_reports_failures_and_stop_preserves_existing_queue(cx: &mut TestA
         assert!(
             window
                 .find("queue-feedback")
-                .label()
+                .value()
                 .unwrap()
                 .contains("1 个路径无法读取")
         );
@@ -2138,7 +2138,7 @@ fn parity_scan_reports_failures_and_stop_preserves_existing_queue(cx: &mut TestA
         assert!(
             window
                 .find("queue-feedback")
-                .label()
+                .value()
                 .unwrap()
                 .contains("Added 0 files")
         );
@@ -2188,14 +2188,14 @@ fn parity_structured_errors_retranslate_and_remove_preserves_sources(cx: &mut Te
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         assert_eq!(
-            window.find("status:parity-source").label(),
-            Some("File not found: /no-real-data/source.png")
+            window.find("status:parity-source").value(),
+            Some("Failed · File not found: /no-real-data/source.png")
         );
         toggle_language(cx);
         window.render_frame(cx);
         assert_eq!(
-            window.find("status:parity-source").label(),
-            Some("找不到文件：/no-real-data/source.png")
+            window.find("status:parity-source").value(),
+            Some("失败 · 找不到文件：/no-real-data/source.png")
         );
         let row = window.find("parity-source").bounds();
         let remove = window.find("remove:parity-source").bounds();
@@ -2251,7 +2251,7 @@ fn parity_pdf_import_metadata_and_source_format_menu(cx: &mut TestAppContext) {
         toggle_language(cx);
         window.render_frame(cx);
         let meta_id = gpui_kit::SharedString::from(format!("meta:{pdf_key}"));
-        assert!(window.find(meta_id).label().unwrap().contains("PDF"));
+        assert!(window.find(meta_id).value().unwrap().contains("PDF"));
         window.click(
             gpui_kit::SharedString::from(format!("item-format:{png_key}")),
             cx,
@@ -2495,7 +2495,7 @@ fn animation_facts_mark_rows_and_count_pending_inputs_before_decode(cx: &mut Tes
         assert!(
             window
                 .find(gpui_kit::SharedString::from(format!("meta:{animated}")))
-                .label()
+                .value()
                 .unwrap()
                 .contains("Animated · unsupported")
         );
@@ -2511,7 +2511,7 @@ fn animation_facts_mark_rows_and_count_pending_inputs_before_decode(cx: &mut Tes
         assert!(
             window
                 .find(gpui_kit::SharedString::from(format!("meta:{unknown}")))
-                .label()
+                .value()
                 .unwrap()
                 .contains("动画状态未确认")
         );
@@ -2593,14 +2593,14 @@ fn precision_warnings_survive_queue_completion_and_retranslate(cx: &mut TestAppC
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         let id = gpui_kit::SharedString::from(format!("status:{key}"));
-        let text = window.find(id.clone()).label().unwrap().to_owned();
+        let text = window.find(id.clone()).value().unwrap().to_owned();
         assert!(
             text.contains("16-bit to 8-bit") && text.contains("opaque background"),
             "{text}"
         );
         toggle_language(cx);
         window.render_frame(cx);
-        let text = window.find(id).label().unwrap().to_owned();
+        let text = window.find(id).value().unwrap().to_owned();
         assert!(
             text.contains("16 位降至 8 位") && text.contains("不透明背景"),
             "{text}"
@@ -2655,7 +2655,11 @@ fn settings_controls_expose_native_names_roles_and_toggle_state(cx: &mut TestApp
             window.render_frame(cx);
             let png_label = window.find("choice-label:png");
             assert_eq!(png_label.role(), Some(gpui_kit::Role::Label));
-            assert_eq!(png_label.label(), Some("PNG"));
+            assert_eq!(
+                png_label.label(),
+                None,
+                "static text must not repeat its value as a title"
+            );
             assert_eq!(png_label.value(), Some("PNG"));
             window.click("choice-label:png", cx);
         })
@@ -2988,4 +2992,228 @@ fn card_navigation_preserves_a_nonempty_running_batch(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(std::fs::read(&source).unwrap(), one_by_one_png());
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// Semantic roles are necessary: a test-only label alone is not a native AX node.
+#[gpui_kit::test]
+fn queue_content_exposes_names_metadata_and_every_result_state(cx: &mut TestAppContext) {
+    use gpui_kit::{Role, SharedString};
+    use imgconvert_backend::command_error::CommandError;
+    use imgconvert_backend::convert::{
+        BatchProgressEvent, BatchProgressStage, ConvertResult, ConvertWarning,
+    };
+    use imgconvert_backend::import::{ImportAnimation, ImportImageMetadata, ImportScanFile};
+    use imgconvert_gpui_shared::i18n::{tr, tr_with};
+
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    let keys = [
+        SharedString::from("readable-first"),
+        SharedString::from("readable-second"),
+    ];
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.add_files(
+                    keys.iter()
+                        .enumerate()
+                        .map(|(index, key)| ImportScanFile {
+                            key: key.to_string(),
+                            path: format!("/no-real-data/photo-{index}.png"),
+                            relative_dir: None,
+                            metadata: Some(ImportImageMetadata {
+                                animation: if index == 0 {
+                                    ImportAnimation::Animated
+                                } else {
+                                    ImportAnimation::Unknown
+                                },
+                                format: "png".into(),
+                                width: 2,
+                                height: 3,
+                                dpi_x: None,
+                                dpi_y: None,
+                                page_count: None,
+                            }),
+                        })
+                        .collect(),
+                );
+                cx.notify();
+            });
+    });
+    let failure =
+        CommandError::file_not_found("/no-real-data/photo-0.png", "PRIVATE backend detail");
+    let states = [
+        (None, "status.pending", None),
+        (
+            Some(BatchProgressEvent::FileProgress {
+                index: 0,
+                percent: 42.,
+                stage: BatchProgressStage::ReadingAndConverting,
+            }),
+            "status.running",
+            Some("42%"),
+        ),
+        (
+            Some(BatchProgressEvent::FileFinished {
+                index: 0,
+                result: ConvertResult {
+                    input: "fixture".into(),
+                    output: "fixture-output".into(),
+                    in_size: 2048,
+                    out_size: 1024,
+                    environment_comparable: true,
+                    warning: None,
+                    warnings: vec![],
+                    output_count: 1,
+                    skipped_output_count: 0,
+                },
+            }),
+            "status.done",
+            Some("2.0 KB → 1.0 KB"),
+        ),
+        (
+            Some(BatchProgressEvent::FileFinished {
+                index: 0,
+                result: ConvertResult {
+                    input: "fixture".into(),
+                    output: "fixture-output".into(),
+                    in_size: 2048,
+                    out_size: 1024,
+                    environment_comparable: true,
+                    warning: None,
+                    warnings: vec![
+                        ConvertWarning::BitDepthReduced { from: 16, to: 8 },
+                        ConvertWarning::AlphaFlattened,
+                    ],
+                    output_count: 1,
+                    skipped_output_count: 0,
+                },
+            }),
+            "status.done",
+            None,
+        ),
+        (
+            Some(BatchProgressEvent::FileSkipped {
+                index: 0,
+                input: "fixture".into(),
+                error: failure.clone(),
+            }),
+            "status.skipped",
+            None,
+        ),
+        (
+            Some(BatchProgressEvent::FileError {
+                index: 0,
+                input: "fixture".into(),
+                error: failure,
+            }),
+            "status.error",
+            None,
+        ),
+    ];
+    for locale in [Locale::English, Locale::SimplifiedChinese] {
+        cx.update(|cx| {
+            set_locale(locale);
+            cx.refresh_windows();
+        });
+        for (event, state_key, detail) in &states {
+            cx.update(|cx| {
+                AppModels::global(cx)
+                    .queue()
+                    .clone()
+                    .update(cx, |queue, cx| {
+                        queue.reset_statuses(&keys);
+                        if let Some(event) = event {
+                            queue.apply_batch_event(event, &keys);
+                        }
+                        cx.notify();
+                    });
+            });
+            cx.update_window(handle, |_, window, cx| {
+                window.render_frame(cx);
+                assert_eq!(window.find("queue-title").role(), Some(Role::Heading));
+                assert_eq!(
+                    window.find("queue-count").value(),
+                    Some(tr_with("queue.item_count", &[("count", &2)]).as_ref())
+                );
+                for (index, key) in keys.iter().enumerate() {
+                    let name = format!("photo-{index}.png");
+                    assert_eq!(window.find(key.clone()).role(), Some(Role::Group));
+                    let label = window.find(SharedString::from(format!("name:{key}")));
+                    assert_eq!(label.role(), Some(Role::Label));
+                    assert_eq!(label.value(), Some(name.as_str()));
+                    assert_eq!(label.label(), None);
+                    let metadata = window.find(SharedString::from(format!("meta:{key}")));
+                    assert_eq!(metadata.role(), Some(Role::Label));
+                    assert_eq!(metadata.label(), None);
+                    assert!(metadata.value().unwrap().contains("PNG"));
+                    let animation = if index == 0 {
+                        "queue.animated"
+                    } else {
+                        "queue.animation_unknown"
+                    };
+                    assert!(
+                        metadata.value().unwrap().contains(tr(animation).as_ref()),
+                        "{metadata:?}"
+                    );
+                    assert_eq!(
+                        window
+                            .find(SharedString::from(format!("compare:{key}")))
+                            .label(),
+                        Some(tr_with("queue.compare_item", &[("name", &name)]).as_ref())
+                    );
+                }
+                let state = window.find("status:readable-first");
+                assert_eq!(
+                    state.role(),
+                    Some(if *state_key == "status.running" {
+                        Role::Group
+                    } else {
+                        Role::Label
+                    })
+                );
+                let message = if *state_key == "status.running" {
+                    assert_eq!(state.value(), None);
+                    state.label().unwrap()
+                } else {
+                    assert_eq!(state.label(), None, "avoid duplicate VoiceOver speech");
+                    state.value().unwrap()
+                };
+                assert!(message.starts_with(tr(state_key).as_ref()), "{message}");
+                assert!(!message.contains("PRIVATE"));
+                if let Some(detail) = detail {
+                    assert!(message.contains(detail), "{message}");
+                }
+                if *state_key == "status.done" {
+                    assert_eq!(
+                        window.find("impact:readable-first").label(),
+                        Some(tr_with("queue.impact_item", &[("name", &"photo-0.png")]).as_ref())
+                    );
+                    if let Some(BatchProgressEvent::FileFinished { result, .. }) = event
+                        && !result.warnings.is_empty()
+                    {
+                        assert!(
+                            message.contains(if locale == Locale::English {
+                                "16-bit to 8-bit"
+                            } else {
+                                "16 位降至 8 位"
+                            }),
+                            "{message}"
+                        );
+                        assert!(
+                            message.contains(tr("warning.alpha_flattened").as_ref()),
+                            "{message}"
+                        );
+                    }
+                }
+                assert_eq!(
+                    window.find("status:readable-second").value(),
+                    Some(tr("status.pending").as_ref())
+                );
+            })
+            .unwrap();
+        }
+    }
 }

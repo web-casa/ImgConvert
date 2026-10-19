@@ -13,7 +13,7 @@
 
 沿用 GPUI Kit 0.7.1，组件负责交互，产品主题负责颜色与圆角；同时检查明暗主题、中英文字和最小窗口。原生窗口装饰和系统选择器继续使用平台行为。新增布局不代表 G2 收口，IME、VoiceOver 和沙盒完整验收仍按 `GPUI_G2_ACCEPTANCE.md` 执行。
 
-实现分支 `feat/gpui-card-layout` 基于尚未合并的 PR #34，单独 review；不得为重排自动合并上一 PR。最终截图、review 和 CI 记录补入对应 PR。
+实现分支 `feat/gpui-card-layout` 基于 PR #34，单独 review；PR #34/#35 已于 2026-10-19 按用户明确授权依次合并（main `ee24b3a`）。截图、原生验证、review 和 CI 记录见 PR #35。后续先推进 G2 非视觉验收，布局调整暂停。
 
 ## 回归检查
 

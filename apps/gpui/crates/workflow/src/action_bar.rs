@@ -240,7 +240,6 @@ impl Render for ActionBar {
                             .test_support()
                             .role(gpui_kit::Role::Label)
                             .aria_value(status_text.clone())
-                            .aria_label(status_text.clone())
                             // Long errors and summaries truncate; the full
                             // text is one hover or focus away.
                             .tooltip({
