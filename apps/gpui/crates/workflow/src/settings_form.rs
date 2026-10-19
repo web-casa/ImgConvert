@@ -1000,6 +1000,10 @@ impl SettingsForm {
         if normalize_output_suffix_input(&typed).value.is_empty() {
             self.edit(cx, |s| s.output_suffix = DEFAULT_OUTPUT_SUFFIX.to_string());
             self.suffix_feedback = Some(SuffixFeedback::Required);
+        } else if self.suffix_feedback == Some(SuffixFeedback::Required) {
+            // Preedit does not emit Change. Blur restores the saved suffix, so
+            // an earlier empty draft must not leave an error on that value.
+            self.suffix_feedback = None;
         }
         let stored = self.snapshot(cx).output_suffix;
         self.set_input_text(&self.output_suffix.clone(), &stored, window, cx);
@@ -1649,18 +1653,23 @@ impl SettingsForm {
                             .child(Self::hint(tr("settings.output_suffix_hint"), false, cx))
                             .children(suffix_feedback.map(
                                 |feedback| {
+                                    let text = match feedback {
+                                        SuffixFeedback::Adjusted => {
+                                            tr("settings.output_suffix_adjusted")
+                                        }
+                                        SuffixFeedback::Required => {
+                                            tr("settings.output_suffix_required")
+                                        }
+                                    };
                                     Self::hint(
-                                        match feedback {
-                                            SuffixFeedback::Adjusted => {
-                                                tr("settings.output_suffix_adjusted")
-                                            }
-                                            SuffixFeedback::Required => {
-                                                tr("settings.output_suffix_required")
-                                            }
-                                        },
+                                        text.clone(),
                                         feedback == SuffixFeedback::Required,
                                         cx,
                                     )
+                                    .id("settings-output-suffix-feedback")
+                                    .test_support()
+                                    .role(Role::Label)
+                                    .aria_value(text)
                                 },
                             )),
                         )

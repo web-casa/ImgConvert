@@ -575,6 +575,8 @@ workflow 处置表：
 
 ## 9. 修订记录
 
+2026-10-20（G2 后缀反馈）：#40 已合并 main `924a550`，CI 与 Windows 双架构 GPUI 探针整体通过。继续修复真实 IME 失焦恢复有效后缀后 Required 残留，保留空值回退与归一化保存策略，补反馈的原生可读名称及真实组件负向回归。证据见 `GPUI_G2_ACCEPTANCE.md`；这不关闭完整 VoiceOver/沙盒验收门槛，不提前推进后续阶段。
+
 2026-10-19（G2 IME 正式源码接入）：#39 已获授权合并 main `03c54cf`。正常 GPUI workspace 选中两个本地运行时源码覆盖，保持 core/macOS 0.3.8 与 Kit 五包 0.7.1；仅复制必要源码、构建资源、manifest 和许可，不引入整个 Kit 框架。来源按原始发布归档加已评审差分逐字节核验，锁版本不变；实际路径/版本检查接入 CI。普通构建与原生回归证据见 `GPUI_G2_ACCEPTANCE.md`，来源/退出条件见 `GPUI_PATCHES.md`。这完成修复接入，仍不代替完整 VoiceOver、沙盒撤权等 G2 验收，不提前启动后续阶段。
 
 2026-10-19（G2 owner / 原生会话调查）：PR #38 已按用户授权合并；上游最小复现已获明确授权提交为 [longbridge/gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605)，不附账号路径或原始媒体。新增隔离差分、锁定矩阵与 13 项 macOS owner/补帧回归；系统候选框需独立验证，产品尚未启用本地框架补丁。实验版本、真实失败与后续原生结果见 `GPUI_G2_ACCEPTANCE.md` / `GPUI_PATCHES.md`；G2 不因无头测试通过或报告提交而关闭。

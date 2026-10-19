@@ -1588,6 +1588,164 @@ fn clipboard_paste_in_a_settings_input_edits_text_without_importing(cx: &mut Tes
     });
 }
 
+fn open_output_suffix_editor(cx: &mut TestAppContext) -> gpui_kit::AnyWindowHandle {
+    let (handle, workspace) = open_workspace_sized(cx, size(px(1_000.), px(1_400.)));
+    cx.update_window(handle, |_, window, cx| {
+        let form = workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone();
+        form.update(cx, |form, cx| {
+            form.set_open_section(Some(imgconvert_gpui_workflow::Section::Output), cx);
+        });
+        window.render_frame(cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.activate_window();
+        window.click("settings-output-suffix", cx);
+        window.press("secondary-a", cx);
+    })
+    .unwrap();
+    handle
+}
+
+#[gpui_kit::test]
+fn suffix_feedback_clears_when_blur_restores_saved_text_after_preedit(cx: &mut TestAppContext) {
+    use gpui_kit::EntityInputHandler as _;
+    let _locale = locale_guard();
+    let handle = open_output_suffix_editor(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.press("backspace", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let feedback = window.find("settings-output-suffix-feedback");
+        assert!(feedback.visible());
+        assert_eq!(feedback.role(), Some(gpui_kit::Role::Label));
+        assert_eq!(
+            feedback.value(),
+            Some("Enter at least one character, or turn this switch off to omit the suffix.")
+        );
+        let input = window
+            .focused_input(cx)
+            .unwrap()
+            .as_input()
+            .unwrap()
+            .clone();
+        input.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(None, "ni hao", Some(6..6), window, cx);
+            assert!(input.marked_text_range(window, cx).is_some());
+        });
+        assert_eq!(input.read(cx).value().as_ref(), "ni hao");
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .output_suffix,
+            "_done"
+        );
+        window.click("privacy-open", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("settings-output-suffix").value(), Some("_done"));
+        assert!(window.try_find("settings-output-suffix-feedback").is_none());
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .output_suffix,
+            "_done"
+        );
+        window.press("escape", cx);
+        window.click("settings-output-suffix", cx);
+        window.press("secondary-a", cx);
+        window.input("确定", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .output_suffix,
+            "确定"
+        );
+    });
+}
+
+#[gpui_kit::test]
+fn suffix_feedback_preserves_empty_draft_default_fallback(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let handle = open_output_suffix_editor(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.press("backspace", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| window.click("privacy-open", cx))
+        .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("settings-output-suffix").value(), Some("_done"));
+        assert!(window.find("settings-output-suffix-feedback").visible());
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .output_suffix,
+            "_done"
+        );
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
+fn suffix_feedback_preserves_adjustment_when_confirming_safe_text(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let handle = open_output_suffix_editor(cx);
+    cx.update(|cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string("bad/".into())));
+    cx.update_window(handle, |_, window, cx| window.press("secondary-v", cx))
+        .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| window.press("enter", cx))
+        .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("settings-output-suffix").value(), Some("bad_"));
+        assert_eq!(
+            window.find("settings-output-suffix-feedback").value(),
+            Some(
+                "Unsupported path characters were replaced and the safe length limit was applied."
+            )
+        );
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .output_suffix,
+            "bad_"
+        );
+    })
+    .unwrap();
+}
+
 #[gpui_kit::test]
 fn clipboard_stop_after_worker_completion_prevents_commit_and_cleans_the_bitmap(
     cx: &mut TestAppContext,

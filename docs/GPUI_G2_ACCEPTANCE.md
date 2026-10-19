@@ -218,3 +218,15 @@ Mac 独立 Kit harness 用 `--active` 指向实际产品覆盖源码，13 项 ow
 | `active-recording-02.mov` | 130.400 s | `2d27654ed3167f68dc6d165593a2fbc0714783573a339afb6ce03a1daaef63b7` | 普通构建沙盒主应用 AX/CG 与旧版对照、Escape、重新组合确认与保存 |
 
 结束后专用设置与开始前逐字段一致，ABC、VoiceOver 关闭及录屏三项目的地偏好恢复；Cocoa/最小例程已退出，恢复原预览，其他既有开发实例未动。构建缓存中保留当前正式接入的普通产物，没有回写旧版源码/锁。仍观察到既有后缀校验反馈在恢复保存值后可能残留 Required 文案，留待独立修正；本片不改变 blur 的保存策略。完整 G2 原生矩阵仍保持开放。
+
+## 2026-10-20 后缀 Required 反馈修复
+
+#40 已获用户授权合并 main `924a550`：同一 head 的 CI run 39282414018 与 Windows x64/ARM64 GPUI Probe run 39282425362 整体 completed/success。GitHub 故障期间部分 job 详情的陈旧状态已在 PR 评论记录；CI/探针结果不再是待运行。
+
+本片修复上段记录的旧 Required 提示：清空草稿产生 Required，IME preedit 不发普通 Change，打开隐私导致 blur 恢复已保存 `_done` 时旧错误仍留下。现在仅在非空草稿提交/恢复时清除旧 Required；真正空草稿的默认值回退和 Required 提示、归一化的 Adjusted 提示保留原行为。反馈本身增加原生 Label 和双语名称，布局不变。
+
+真实组件三项回归覆盖组合 marked range、清空时有效错误、隐私对话框失焦恢复、保存值不变、返回后输入确认、空值回退和一次粘贴的归一化/Enter；测试明确激活窗口以取得真实焦点事件。移除清理逻辑后，失焦回归在旧反馈残留断言失败，还原后三项通过。无头组合直接驱动真实 InputState 的输入 handler，不宣称系统候选框通过；修复后 GPUI 98 项、clippy/fmt、根 workspace 397 项（另 1 项 ignored）、前端 check/161 项及完整格式/许可/文档/成本/架构检查通过。原生复测发现仅设置 `aria_label` 的静态文字在 Mac 上值为空，已复用队列反馈的 `aria_value` 写法，并加强组件断言；修正版已完成下面的原生复测；只读首轮评审与属性修正复核均无确证 P1/P2/P3，不能用无头可读名称替代原生文字值。
+
+修正版普通 `--release --locked --no-default-features` 构建与最小 entitlement 的 ad-hoc runtime deep/strict 验签通过，主程序 SHA256 `09a8df50ec87aa8d2f91b7d62dbf65df49f15ae4a932d4803cb18dbc0e68685e`。在同一专用沙盒容器取得真实 `ni hao` + 系统候选后，Required 原生文字值数量为 1；AX 打开隐私后字段/保存值恢复 `_done`，候选为 0、Required 为 0，首个 Escape 关闭隐私。直接返回、不切换输入法或借其他输入框预热时，`shi` 真实候选确认“适”并保存；空草稿失焦仍回退 `_done` 且保留原 Required 提示；输入 `bad/` 后的 `bad_` 及 Adjusted 原生文字值也通过。
+
+连续视频 `suffix-feedback-recording.mov` 已复制核对 SHA256 `fb353a00a3dd6cc033a063b50ce61ddd9f215be5ee81d10ffa5eddd638b29988`，ffprobe 为 H.264 / 3024×1900 / 85.750 s；抽帧核对组合时的候选和红色提示、隐私打开后两者消失。媒体只保存在本地忽略目录。结束后逐字段核对专用设置恢复，ABC、VoiceOver 关闭与录屏三项偏好恢复，临时 Cocoa 已退出、原预览恢复，其他既有开发实例未动。这是原生 AX/IME 证据，不替代完整 VoiceOver 朗读记录、正式 MAS 签名或沙盒撤权矩阵。最终同 head CI 结果见本片 PR。
