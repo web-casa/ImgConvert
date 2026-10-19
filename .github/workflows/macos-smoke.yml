@@ -129,6 +129,9 @@ jobs:
 
       - name: Native updater compatibility policy tests
         run: cargo +1.96.0 test -p imgconvert-platform --features update-guard --lib update_policy
+      - name: Native security-scoped resource status tests
+        run: cargo +1.96.0 test -p imgconvert-platform --lib macos_security -- --nocapture
+
       - name: Core animation and encoder capability regressions
         run: cargo +1.96.0 test -p imgconvert-core --lib
 

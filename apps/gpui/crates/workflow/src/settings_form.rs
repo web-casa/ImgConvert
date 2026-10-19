@@ -29,10 +29,10 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, AppContext as _, Context, Div, Entity, FocusHandle, Focusable as _, FontWeight,
-    InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement as _, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    transparent_black,
+    AccessibleAction, App, AppContext as _, Context, Div, Entity, FocusHandle, Focusable as _,
+    FontWeight, InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement as _, Render,
+    Role, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, Window, div, transparent_black,
 };
 use imgconvert_backend::conversion_request::{
     self, PdfPageRangeError, effective_quality_for, quality_floor_for,
@@ -837,20 +837,37 @@ impl SettingsForm {
         self.edit(cx, |s| kind.apply(s, value));
     }
 
-    fn slider_key(&mut self, kind: SliderKind, event: &KeyDownEvent, cx: &mut Context<Self>) {
-        let (min, max) = kind.range();
+    fn step_slider(&mut self, kind: SliderKind, delta: f32, cx: &mut Context<Self>) {
         let current = kind.value(&self.snapshot(cx));
-        let page = ((max - min) / 10.).max(1.).round();
-        let next = match event.keystroke.key.as_str() {
-            "left" | "down" => current - 1.,
-            "right" | "up" => current + 1.,
-            "pagedown" => current - page,
-            "pageup" => current + page,
-            "home" => min,
-            "end" => max,
-            _ => return,
+        let next = if kind == SliderKind::QualityFloor && current == 0. && delta > 0. {
+            // Valid floors are Off or 30..=100: do not get stuck repeatedly
+            // requesting 1, which the shared settings policy normalizes to Off.
+            delta.max(30.)
+        } else {
+            current + delta
         };
         self.apply_slider(kind, next, cx);
+    }
+
+    fn slider_key(&mut self, kind: SliderKind, event: &KeyDownEvent, cx: &mut Context<Self>) {
+        let (min, max) = kind.range();
+        let page = ((max - min) / 10.).max(1.).round();
+        let delta = match event.keystroke.key.as_str() {
+            "left" | "down" => -1.,
+            "right" | "up" => 1.,
+            "pagedown" => -page,
+            "pageup" => page,
+            "home" => {
+                self.apply_slider(kind, min, cx);
+                return;
+            }
+            "end" => {
+                self.apply_slider(kind, max, cx);
+                return;
+            }
+            _ => return,
+        };
+        self.step_slider(kind, delta, cx);
     }
 
     /// Parses and clamps a numeric field like the Svelte `setNumber`:
@@ -1182,27 +1199,61 @@ impl SettingsForm {
     ) -> Div {
         let control = self.slider(kind);
         let ring = cx.theme().ring;
+        let (min, max) = kind.range();
+        let current = kind.value(&self.snapshot(cx));
+        let increment = cx.entity().downgrade();
+        let decrement = increment.clone();
         v_flex()
             .gap_1()
             .when(disabled, |this| this.opacity(0.6))
-            .child(Self::labeled_value(label.clone(), value, cx))
+            .child(Self::labeled_value(label.clone(), value.clone(), cx))
             .child(
                 // Only an enabled slider is a Tab stop and takes keys.
                 div()
                     .id(kind.id())
                     .test_support()
+                    .role(Role::Slider)
                     .aria_label(label)
+                    .aria_value(value)
+                    .aria_numeric_value(f64::from(current))
+                    .aria_min_numeric_value(f64::from(min))
+                    .aria_max_numeric_value(f64::from(max))
+                    .aria_numeric_value_step(1.)
+                    .a11y_synthetic_children(move |builder| {
+                        if disabled {
+                            builder.parent_node().set_disabled();
+                        }
+                    })
                     .rounded_md()
                     .border_1()
                     .border_color(transparent_black())
                     .when(!disabled, |this| {
                         this.track_focus(&control.focus)
+                            .on_a11y_action(AccessibleAction::Increment, move |_, _, cx| {
+                                let _ = increment.update(cx, |this, cx| {
+                                    this.step_slider(kind, 1., cx);
+                                });
+                            })
+                            .on_a11y_action(AccessibleAction::Decrement, move |_, _, cx| {
+                                let _ = decrement.update(cx, |this, cx| {
+                                    this.step_slider(kind, -1., cx);
+                                });
+                            })
                             .focus_visible(move |style| style.border_color(ring))
                             .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                                 this.slider_key(kind, event, cx);
                             }))
                     })
-                    .child(Slider::new(&control.state).disabled(disabled)),
+                    .child(
+                        // Kit 0.7.1 has no slider-label API. The named keyboard
+                        // wrapper owns native actions; keep the visual slider's
+                        // duplicate, unnamed AX node out of the native subtree.
+                        div()
+                            .id(SharedString::from(format!("{}-presentation", kind.id())))
+                            .role(Role::Group)
+                            .a11y_synthetic_children(|builder| builder.parent_node().set_hidden())
+                            .child(Slider::new(&control.state).disabled(disabled)),
+                    ),
             )
     }
 
@@ -1302,6 +1353,8 @@ impl SettingsForm {
             .ghost()
             .w_full()
             .tooltip(tr(section.title_key()))
+            .accessibility_label(tr(section.title_key()))
+            .toggled(open)
             .child(
                 h_flex()
                     .w_full()
