@@ -11,7 +11,8 @@ use std::sync::Arc;
 use gpui_kit::{RenderImage, SharedString};
 use imgconvert_backend::command_error::CommandError;
 use imgconvert_backend::convert::BatchProgressEvent;
-use imgconvert_backend::import::ImportScanFile;
+use imgconvert_backend::convert::ConvertWarning;
+use imgconvert_backend::import::{ImportAnimation, ImportScanFile};
 
 /// Budget for decoded-thumbnail bytes (width × height × 4) held by the model.
 /// Entries past the budget are evicted least-recently-shown first (plan
@@ -81,6 +82,8 @@ pub struct QueueItem {
     /// Session-only override; `None` follows the global workflow format.
     pub target_format: Option<SharedString>,
     pub status: ItemStatus,
+    pub animation: ImportAnimation,
+    pub warnings: Vec<ConvertWarning>,
     pub thumbnail: ThumbnailState,
 }
 
@@ -124,6 +127,11 @@ impl QueueItem {
             |name| name.to_string_lossy().into_owned(),
         );
         Self {
+            animation: file
+                .metadata
+                .as_ref()
+                .map_or(ImportAnimation::Unknown, |metadata| metadata.animation),
+            warnings: Vec::new(),
             key: SharedString::from(file.key),
             path: SharedString::from(file.path),
             name: SharedString::from(name),
@@ -289,6 +297,7 @@ impl QueueModel {
         let item = &mut self.items[ix];
         item.target_format = normalized.map(SharedString::from);
         item.status = ItemStatus::Pending;
+        item.warnings.clear();
         self.conversion_revision += 1;
         true
     }
@@ -306,9 +315,23 @@ impl QueueModel {
         for item in &mut self.items {
             item.target_format = None;
             item.status = ItemStatus::Pending;
+            item.warnings.clear();
         }
         self.conversion_revision += 1;
         true
+    }
+
+    /// Animated inputs are rejected by backend preflight; Unknown inputs
+    /// must proceed to full decode before their convertibility is known.
+    pub fn animation_counts(&self) -> (usize, usize) {
+        self.items
+            .iter()
+            .filter(|item| item.is_pending_conversion())
+            .fold((0, 0), |(animated, unknown), item| match item.animation {
+                ImportAnimation::Static => (animated, unknown),
+                ImportAnimation::Animated => (animated + 1, unknown),
+                ImportAnimation::Unknown => (animated, unknown + 1),
+            })
     }
 
     pub fn is_importing(&self) -> bool {
@@ -428,6 +451,7 @@ impl QueueModel {
         for key in jobs {
             if let Some(item) = self.item_mut(key) {
                 item.status = ItemStatus::Pending;
+                item.warnings.clear();
             }
         }
     }
@@ -546,16 +570,26 @@ impl QueueModel {
                     percent: *percent as f32,
                 },
             ),
-            BatchProgressEvent::FileFinished { index, result } => self.set_status(
-                job_key(*index),
-                ItemStatus::Done {
-                    in_size: result.in_size,
-                    out_size: result.out_size,
-                    comparable: result.environment_comparable
-                        && result.output_count == 1
-                        && result.skipped_output_count == 0,
-                },
-            ),
+            BatchProgressEvent::FileFinished { index, result } => {
+                let key = job_key(*index);
+                if let Some(item) = key.as_ref().and_then(|key| self.item_mut(key)) {
+                    item.warnings = if result.warnings.is_empty() {
+                        result.warning.iter().cloned().collect()
+                    } else {
+                        result.warnings.clone()
+                    };
+                }
+                self.set_status(
+                    key,
+                    ItemStatus::Done {
+                        in_size: result.in_size,
+                        out_size: result.out_size,
+                        comparable: result.environment_comparable
+                            && result.output_count == 1
+                            && result.skipped_output_count == 0,
+                    },
+                )
+            }
             BatchProgressEvent::FileSkipped { index, error, .. } => self.set_status(
                 job_key(*index),
                 ItemStatus::Skipped {
@@ -575,6 +609,7 @@ impl QueueModel {
                         && matches!(item.status, ItemStatus::Running { .. })
                     {
                         item.status = ItemStatus::Pending;
+                        item.warnings.clear();
                         changed = true;
                     }
                 }

@@ -18,14 +18,14 @@ use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{WindowExt as _, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, Styled as _, Subscription, TestSupportExt as _,
-    Window, div,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, div,
 };
 use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
 use imgconvert_gpui_shared::conversion::options_for_item;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
-use imgconvert_gpui_shared::i18n::tr;
+use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
 use imgconvert_gpui_shared::tasks;
 use imgconvert_gpui_shared::{AppModels, QueueItem, QueueModel, SettingsModel};
@@ -448,7 +448,22 @@ impl WorkflowPanel {
 }
 
 impl Render for WorkflowPanel {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let queue = self.queue.read(cx);
+        let (animated, unknown) = queue.animation_counts();
+        let count = queue
+            .items()
+            .iter()
+            .filter(|item| item.is_pending_conversion())
+            .count();
+        let summary = tr_with(
+            "workflow.animation_summary",
+            &[
+                ("count", &count),
+                ("animated", &animated),
+                ("unknown", &unknown),
+            ],
+        );
         v_flex()
             .id("workflow-panel")
             .test_support()
@@ -463,6 +478,16 @@ impl Render for WorkflowPanel {
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(tr("settings.title")),
             )
+            .children((animated + unknown > 0).then(|| {
+                div()
+                    .id("workflow-animation-check")
+                    .test_support()
+                    .aria_label(summary.clone())
+                    .text_xs()
+                    .px_4()
+                    .pb_2()
+                    .child(summary)
+            }))
             .child(
                 v_flex()
                     .id("workflow-scroll")

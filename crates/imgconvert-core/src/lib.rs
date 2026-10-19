@@ -304,6 +304,7 @@ fn convert_image_to_srgb(img: &ImageData) -> Result<ImageData> {
     };
 
     Ok(ImageData {
+        decode_bit_depth_loss: img.decode_bit_depth_loss,
         width: img.width,
         height: img.height,
         pixels,
@@ -514,6 +515,9 @@ pub fn normalize_metadata_semantics(metadata: RawMetadata) -> RawMetadata {
 /// 统一中间像素表示:RGBA,行优先,长度 = width*height*4。
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImageData {
+    // Actual decoder-side precision loss; AVIF currently materializes RGBA8.
+    // Kept separately from the pixel encoding, including across transforms.
+    decode_bit_depth_loss: Option<(u8, u8)>,
     pub width: u32,
     pub height: u32,
     pub pixels: PixelBuffer,
@@ -536,6 +540,7 @@ impl ImageData {
     pub fn from_pixels(width: u32, height: u32, pixels: PixelBuffer) -> Result<Self> {
         pixels.validate_dimensions(width, height)?;
         Ok(Self {
+            decode_bit_depth_loss: None,
             width,
             height,
             pixels,
@@ -1397,6 +1402,12 @@ fn convert_decoded_workflow_inner(
     deadline: Option<&EncodeDeadline>,
     cancelled: Option<&dyn Fn() -> bool>,
 ) -> Result<WorkflowResult> {
+    let decode_bit_depth_loss = image.decode_bit_depth_loss;
+    let source_depth = match image.pixel_encoding() {
+        PixelEncoding::Rgba8 => 8,
+        PixelEncoding::Rgba16 => 16,
+        PixelEncoding::RgbaF32 => 32,
+    };
     let (output_width, output_height) = options.resize.dimensions(image.width, image.height)?;
     target.validate_output_dimensions(output_width, output_height)?;
     // A malformed profile that is being preserved must not make preview fail
@@ -1459,6 +1470,16 @@ fn convert_decoded_workflow_inner(
         encoder.preserve_metadata = preserve_metadata;
     }
 
+    let alpha_flattened = target == Format::Jpeg
+        && match &image.pixels {
+            PixelBuffer::Rgba8(samples) => samples.chunks_exact(4).any(|pixel| pixel[3] != u8::MAX),
+            PixelBuffer::Rgba16(samples) => {
+                samples.chunks_exact(4).any(|pixel| pixel[3] != u16::MAX)
+            }
+            PixelBuffer::RgbaF32(samples) => samples
+                .chunks_exact(4)
+                .any(|pixel| !pixel[3].is_finite() || pixel[3] < 1.0),
+        };
     let (bytes, selected_quality, target_size_met) = if let Some(target_size) = options.target_size
     {
         let (bytes, quality, met) = encode_target_size_with_control(
@@ -1494,6 +1515,29 @@ fn convert_decoded_workflow_inner(
     };
 
     let mut warnings = Vec::new();
+    if let Some((from, to)) = decode_bit_depth_loss {
+        warnings.push(WorkflowWarning::BitDepthReduced { from, to });
+    }
+    // Inspect the selected output, not the candidate settings. PNG may select
+    // a preserved 16-bit candidate over an 8-bit quantized candidate. Palette
+    // index depth is not channel precision, so all non-16-bit PNGs count as 8.
+    let output_depth = if target == Format::Png && bytes.get(24) == Some(&16) {
+        16
+    } else {
+        8
+    };
+    if source_depth > output_depth {
+        let warning = WorkflowWarning::BitDepthReduced {
+            from: source_depth,
+            to: output_depth,
+        };
+        if !warnings.contains(&warning) {
+            warnings.push(warning);
+        }
+    }
+    if alpha_flattened {
+        warnings.push(WorkflowWarning::AlphaFlattened);
+    }
     if forced_profile_conversion && !invalid_profile_discarded {
         warnings.push(WorkflowWarning::ColorProfileConvertedForResize);
     }
@@ -2526,6 +2570,7 @@ pub fn resize_linear(img: &ImageData, dst_width: u32, dst_height: u32) -> Result
     };
 
     Ok(ImageData {
+        decode_bit_depth_loss: img.decode_bit_depth_loss,
         width: dst_width,
         height: dst_height,
         pixels,
@@ -5301,6 +5346,9 @@ impl Codec for AvifCodec {
             let metadata = metadata.normalized_orientation();
             let (width, height, rgba) = apply_rgba8_orientation(width, height, rgba, orientation)?;
             let mut id = ImageData::new(width, height, rgba)?;
+            let depth = u8::try_from((*image).depth)
+                .map_err(|_| Error::Decode("AVIF bit depth exceeds u8".into()))?;
+            id.decode_bit_depth_loss = (depth > 8).then_some((depth, 8));
             id.icc = metadata.icc;
             id.exif = metadata.exif;
             id.xmp = metadata.xmp;
@@ -7233,6 +7281,7 @@ mod tests {
     fn bad_invariant_errors_not_panics() {
         // 绕过 new() 直接构造破坏不变量的 ImageData,编码入口应返回 Err 而非 panic。
         let bad = ImageData {
+            decode_bit_depth_loss: None,
             width: 4,
             height: 4,
             pixels: PixelBuffer::Rgba8(vec![0u8; 10]),
@@ -7831,6 +7880,154 @@ mod tests {
             target_size: None,
             color_policy: ColorManagementPolicy::PreserveEmbeddedProfile,
             preview_max_edge: None,
+        }
+    }
+
+    #[test]
+    fn precision_warnings_follow_selected_output_and_actual_alpha() {
+        let image = ImageData::from_pixels(
+            16,
+            16,
+            PixelBuffer::Rgba16([513, 27113, 61001, 65534].repeat(256)),
+        )
+        .unwrap();
+        let source = PngCodec.encode(&image, &EncodeOptions::default()).unwrap();
+        for target in [Format::Jpeg, Format::WebP, Format::Avif, Format::Png] {
+            for quantize in [false, true] {
+                let encoder = EncodeOptions {
+                    png_lossy_quantize: quantize,
+                    avif_speed: 10,
+                    ..EncodeOptions::default()
+                };
+                let result = convert_workflow(
+                    &source,
+                    target,
+                    &workflow_options(encoder, MetadataPolicy::StripAll),
+                    None,
+                )
+                .unwrap();
+                let reduction = target != Format::Png || quantize;
+                assert_eq!(
+                    result
+                        .warnings
+                        .contains(&WorkflowWarning::BitDepthReduced { from: 16, to: 8 }),
+                    reduction,
+                    "{target:?} quantize={quantize}"
+                );
+                assert_eq!(
+                    result.warnings.contains(&WorkflowWarning::AlphaFlattened),
+                    target == Format::Jpeg
+                );
+            }
+        }
+        let opaque = ImageData::new(2, 2, [15, 27, 49, 255].repeat(4)).unwrap();
+        let result = convert_decoded_workflow_inner(
+            opaque,
+            Format::Jpeg,
+            &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(result.warnings.is_empty());
+        // This 2x2 flat source has a smaller preserved 16-bit encoding.
+        // Exercise both candidate orders so a losing quantizer cannot set warnings.
+        let tiny =
+            ImageData::from_pixels(2, 2, PixelBuffer::Rgba16([0, 0, 0, 65535].repeat(4))).unwrap();
+        let source = PngCodec.encode(&tiny, &EncodeOptions::default()).unwrap();
+        let preserved = EncodeOptions::default();
+        let quantized = EncodeOptions {
+            png_lossy_quantize: true,
+            ..preserved
+        };
+        assert!(
+            PngCodec.encode(&tiny, &preserved).unwrap().len()
+                < PngCodec.encode(&tiny, &quantized).unwrap().len()
+        );
+        for encoders in [vec![preserved, quantized], vec![quantized, preserved]] {
+            let mut options = workflow_options(preserved, MetadataPolicy::StripAll);
+            options.encoders = encoders;
+            let result = convert_workflow(&source, Format::Png, &options, None).unwrap();
+            assert_eq!(result.bytes[24], 16);
+            assert!(!result
+                .warnings
+                .contains(&WorkflowWarning::BitDepthReduced { from: 16, to: 8 }));
+        }
+    }
+
+    fn high_bit_depth_avif(depth: u32) -> Vec<u8> {
+        // SAFETY: owned guards bound native allocations and encoded output.
+        unsafe {
+            let image = ImageGuard(avif::avifImageCreate(
+                16,
+                16,
+                depth,
+                avif::AVIF_PIXEL_FORMAT_YUV444,
+            ));
+            assert!(!image.0.is_null());
+            assert_eq!(
+                avif::avifImageAllocatePlanes(image.0, avif::AVIF_PLANES_YUV),
+                avif::AVIF_RESULT_OK
+            );
+            for plane in 0..3 {
+                for y in 0..16 {
+                    let row = (*image.0).yuvPlanes[plane]
+                        .add(y * (*image.0).yuvRowBytes[plane] as usize)
+                        .cast::<u16>();
+                    for x in 0..16 {
+                        *row.add(x) = (1 << (depth - 1)) + 1;
+                    }
+                }
+            }
+            let encoder = EncoderGuard(avif::avifEncoderCreate());
+            assert!(!encoder.0.is_null());
+            (*encoder.0).codecChoice = avif::AVIF_CODEC_CHOICE_AOM;
+            (*encoder.0).maxThreads = 1;
+            (*encoder.0).speed = 10;
+            let mut output = RwDataGuard(avif::avifRWData::default());
+            assert_eq!(
+                avif::avifEncoderWrite(encoder.0, image.0, &mut output.0),
+                avif::AVIF_RESULT_OK
+            );
+            std::slice::from_raw_parts(output.0.data, output.0.size).to_vec()
+        }
+    }
+
+    #[test]
+    fn precision_warnings_include_ten_and_twelve_bit_avif_decode_even_for_png() {
+        for depth in [10, 12] {
+            let source = high_bit_depth_avif(depth);
+            let result = convert_workflow(
+                &source,
+                Format::Png,
+                &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                result.warnings,
+                vec![WorkflowWarning::BitDepthReduced {
+                    from: depth as u8,
+                    to: 8
+                }]
+            );
+            let decoded = AvifCodec.decode(&source).unwrap();
+            let resized = resize_linear(&decoded, 8, 8).unwrap();
+            let result = convert_decoded_workflow_inner(
+                resized,
+                Format::Png,
+                &workflow_options(EncodeOptions::default(), MetadataPolicy::StripAll),
+                None,
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                result.warnings,
+                vec![WorkflowWarning::BitDepthReduced {
+                    from: depth as u8,
+                    to: 8
+                }]
+            );
         }
     }
 

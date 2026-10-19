@@ -86,9 +86,30 @@ pub struct ImportScanFile {
     pub metadata: Option<ImportImageMetadata>,
 }
 
+/// Locale-neutral import facts. Core's probe type intentionally has no serde.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ImportAnimation {
+    Static,
+    Animated,
+    #[default]
+    Unknown,
+}
+
+impl From<imgconvert_core::AnimationStatus> for ImportAnimation {
+    fn from(value: imgconvert_core::AnimationStatus) -> Self {
+        match value {
+            imgconvert_core::AnimationStatus::Static => Self::Static,
+            imgconvert_core::AnimationStatus::Animated => Self::Animated,
+            imgconvert_core::AnimationStatus::Unknown => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportImageMetadata {
+    pub animation: ImportAnimation,
     pub format: String,
     pub width: u32,
     pub height: u32,
@@ -398,6 +419,7 @@ pub fn import_clipboard_image(
                 key: key.to_string_lossy().to_string(),
                 relative_dir: None,
                 metadata: Some(ImportImageMetadata {
+                    animation: info.animation.into(),
                     format: info.format.id().to_string(),
                     width: info.width,
                     height: info.height,
@@ -842,6 +864,7 @@ fn probe_file_metadata(
         let document = pdf::PdfDocument::load(bytes).ok()?;
         let dimensions = document.first_page_dimensions_at_default_dpi().ok()?;
         return Some(ImportImageMetadata {
+            animation: ImportAnimation::Static,
             format: "pdf".to_string(),
             width: dimensions.width,
             height: dimensions.height,
@@ -861,6 +884,7 @@ fn probe_file_metadata(
         .ok()?;
     let info = probe(&bytes).ok()?;
     Some(ImportImageMetadata {
+        animation: info.animation.into(),
         format: info.format.id().to_string(),
         width: info.width,
         height: info.height,
@@ -1217,6 +1241,46 @@ mod tests {
             }
         }
         png.extend_from_slice(&(!crc).to_be_bytes());
+    }
+
+    #[test]
+    fn import_animation_dto_preserves_all_three_probe_facts_and_prefix_unknown() {
+        let dir = unique_test_dir("animation-dto");
+        fs::create_dir_all(&dir).unwrap();
+        let png = png_with_dimensions(2, 2);
+        fs::write(dir.join("static.png"), &png).unwrap();
+        let mut animated = png[..33].to_vec();
+        append_png_chunk(&mut animated, b"acTL", &[0, 0, 0, 2, 0, 0, 0, 0]);
+        animated.extend_from_slice(&png[33..]);
+        fs::write(dir.join("animated.png"), animated).unwrap();
+        fs::write(dir.join("prefix.png"), &png[..33]).unwrap();
+        let mut budget = png[..33].to_vec();
+        append_png_chunk(&mut budget, b"teST", &vec![0; PROBE_MAX_BYTES as usize]);
+        append_png_chunk(&mut budget, b"acTL", &[0, 0, 0, 2, 0, 0, 0, 0]);
+        budget.extend_from_slice(&png[33..]);
+        assert_eq!(
+            probe(&budget).unwrap().animation,
+            imgconvert_core::AnimationStatus::Animated
+        );
+        fs::write(dir.join("budget.png"), budget).unwrap();
+        let result = scan(options(vec![dir.clone()]));
+        for (name, expected) in [
+            ("static.png", "static"),
+            ("animated.png", "animated"),
+            ("prefix.png", "unknown"),
+            ("budget.png", "unknown"),
+        ] {
+            let file = result
+                .files
+                .iter()
+                .find(|file| file.path.ends_with(name))
+                .unwrap();
+            assert_eq!(
+                serde_json::to_value(file.metadata.as_ref().unwrap()).unwrap()["animation"],
+                expected
+            );
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

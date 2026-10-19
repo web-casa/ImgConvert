@@ -2428,6 +2428,7 @@ mod tests {
                     path: format!("/fixture/{key}.pdf"),
                     relative_dir: None,
                     metadata: Some(imgconvert_backend::import::ImportImageMetadata {
+                        animation: imgconvert_backend::import::ImportAnimation::Static,
                         format: "pdf".into(),
                         width: 150,
                         height: 150,

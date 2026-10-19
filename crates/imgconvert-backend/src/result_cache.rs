@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime};
 
-const CACHE_RECORD_VERSION: &str = "v3";
+const CACHE_RECORD_VERSION: &str = "v4";
 const CACHE_RECORD_EXTENSION: &str = "txt";
 const MAX_CACHE_RECORD_BYTES: usize = 4 * 1024;
 const MAX_CACHE_RECORDS: usize = 4_096;
@@ -30,6 +30,8 @@ struct ResultCacheRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CachedWorkflowStatus {
+    pub bit_depth_reduced: Option<(u8, u8)>,
+    pub alpha_flattened: bool,
     pub width: u32,
     pub height: u32,
     pub selected_quality: Option<u8>,
@@ -81,17 +83,7 @@ pub(crate) fn write_record(
     if fs::create_dir_all(parent).is_err() || !trusted_cache_directory(parent) {
         return;
     }
-    let record = format!(
-        "{CACHE_RECORD_VERSION}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
-        blake3::hash(output).to_hex(),
-        output_size,
-        workflow.width,
-        workflow.height,
-        option_u8_record(workflow.selected_quality),
-        option_bool_record(workflow.target_size_met),
-        u8::from(workflow.color_profile_converted_for_resize),
-        u8::from(workflow.invalid_color_profile_discarded),
-    );
+    let record = format_record(output, output_size, workflow);
     if write_record_file(&path, &record)
         && WRITES_SINCE_START.fetch_add(1, Ordering::Relaxed) % CACHE_PRUNE_INTERVAL
             == CACHE_PRUNE_INTERVAL - 1
@@ -103,6 +95,23 @@ pub(crate) fn write_record(
             MAX_CACHE_RECORDS,
         );
     }
+}
+
+fn format_record(output: &[u8], output_size: u64, workflow: CachedWorkflowStatus) -> String {
+    format!(
+        "{CACHE_RECORD_VERSION}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
+        blake3::hash(output).to_hex(),
+        output_size,
+        workflow.width,
+        workflow.height,
+        option_u8_record(workflow.selected_quality),
+        option_bool_record(workflow.target_size_met),
+        u8::from(workflow.color_profile_converted_for_resize),
+        u8::from(workflow.invalid_color_profile_discarded),
+        option_u8_record(workflow.bit_depth_reduced.map(|depth| depth.0)),
+        option_u8_record(workflow.bit_depth_reduced.map(|depth| depth.1)),
+        u8::from(workflow.alpha_flattened),
+    )
 }
 
 /// Replace only an existing regular record, then create the new file exclusively. `create_new`
@@ -204,6 +213,22 @@ fn parse_record(data: &str) -> Option<ResultCacheRecord> {
         "1" => true,
         _ => return None,
     };
+    let from = parse_option_u8(lines.next()?.trim())?;
+    let to = parse_option_u8(lines.next()?.trim())?;
+    let bit_depth_reduced = match (from, to) {
+        (None, None) => None,
+        (Some(from), Some(to))
+            if from > to && matches!(from, 10 | 12 | 16 | 32) && matches!(to, 8 | 16) =>
+        {
+            Some((from, to))
+        }
+        _ => return None,
+    };
+    let alpha_flattened = match lines.next()?.trim() {
+        "0" => false,
+        "1" => true,
+        _ => return None,
+    };
     if (color_profile_converted_for_resize && invalid_color_profile_discarded)
         || (target_size_met.is_some() && selected_quality.is_none())
     {
@@ -225,6 +250,8 @@ fn parse_record(data: &str) -> Option<ResultCacheRecord> {
             target_size_met,
             color_profile_converted_for_resize,
             invalid_color_profile_discarded,
+            bit_depth_reduced,
+            alpha_flattened,
         },
     })
 }
@@ -421,9 +448,10 @@ mod tests {
     }
 
     #[test]
-    fn record_parser_rejects_malformed_data() {
-        let valid_hash = "a".repeat(64);
+    fn record_parser_round_trips_precision_warnings_and_rejects_invalid_records() {
         let workflow = CachedWorkflowStatus {
+            bit_depth_reduced: Some((16, 8)),
+            alpha_flattened: true,
             width: 320,
             height: 200,
             selected_quality: Some(82),
@@ -431,22 +459,33 @@ mod tests {
             color_profile_converted_for_resize: true,
             invalid_color_profile_discarded: false,
         };
-        let valid = format!("v3\n{valid_hash}\n42\n320\n200\n82\n0\n1\n0\n");
+        let valid = format_record(b"cached-output", 42, workflow);
+        assert_eq!(parse_record(&valid).unwrap().workflow, workflow);
+        for invalid in [
+            valid.replacen("v4", "v3", 1),
+            valid.replace("\n320\n", "\n0\n"),
+            valid.replace("\n16\n8\n", "\n8\n16\n"),
+            valid.replace("\n16\n8\n", "\n-\n8\n"),
+            valid.replace("\n16\n8\n", "\n16\n-\n"),
+            valid.replace("\n16\n8\n", "\n64\n8\n"),
+            valid.replace("\n0\n1\n0\n", "\n0\n1\n1\n"),
+            valid.replace("\n82\n0\n", "\n-\n0\n"),
+            format!("{valid}extra\n"),
+            valid[..valid.len() - 3].to_owned(),
+        ] {
+            assert!(parse_record(&invalid).is_none(), "{invalid}");
+        }
+        let plain = CachedWorkflowStatus {
+            bit_depth_reduced: None,
+            alpha_flattened: false,
+            ..workflow
+        };
         assert_eq!(
-            parse_record(&valid),
-            Some(ResultCacheRecord {
-                output_hash: valid_hash,
-                output_size: 42,
-                workflow,
-            })
+            parse_record(&format_record(b"plain", 5, plain))
+                .unwrap()
+                .workflow,
+            plain
         );
-        assert!(parse_record("v0\nabc\n42\n").is_none());
-        assert!(parse_record("v3\nnot-hex\n42\n1\n1\n-\n-\n0\n0\n").is_none());
-        assert!(parse_record("v3\nabc\nsize\n1\n1\n-\n-\n0\n0\n").is_none());
-        assert!(parse_record(&format!("v3\n{}\n42\n1\n1\n0\n-\n0\n0\n", "a".repeat(64))).is_none());
-        assert!(parse_record(&format!("v3\n{}\n42\n1\n1\n-\n1\n0\n0\n", "a".repeat(64))).is_none());
-        assert!(parse_record(&format!("v3\n{}\n42\n1\n1\n-\n-\n1\n1\n", "a".repeat(64))).is_none());
-        assert!(parse_record(&format!("v3\n{}\n42\n0\n1\n-\n-\n0\n0\n", "a".repeat(64))).is_none());
     }
 
     #[test]

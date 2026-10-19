@@ -10,6 +10,7 @@ import {
   effectiveQualityFor,
   fmtSize,
   formatFromExt,
+  formatConvertWarning,
   formatImportSummary,
   formatLabel,
   hasInvalidPdfConfiguration,
@@ -33,6 +34,31 @@ import {
 import { setAppLocale } from "../src/lib/i18n";
 
 describe("state helpers", () => {
+  it("translates precision warnings and safely presents unknown future warning codes", async () => {
+    for (const [locale, depth, alpha, unknown] of [
+      [
+        "en-US",
+        "Precision reduced from 16-bit to 8-bit.",
+        "Transparency was composited onto an opaque background.",
+        "Conversion completed with an unrecognized warning.",
+      ],
+      [
+        "zh-CN",
+        "精度已从 16 位降至 8 位。",
+        "透明区域已合成到不透明背景。",
+        "转换已完成，但有一项无法识别的告警。",
+      ],
+    ] as const) {
+      await setAppLocale(locale);
+      expect(formatConvertWarning({ code: "bitDepthReduced", from: 16, to: 8 })).toEqual([depth]);
+      expect(formatConvertWarning({ code: "alphaFlattened" })).toEqual([alpha]);
+      expect(
+        formatConvertWarning({ code: "futureWarning" } as unknown as Parameters<
+          typeof formatConvertWarning
+        >[0]),
+      ).toEqual([unknown]);
+    }
+  });
   beforeEach(() => {
     clearQueue();
     capabilities.readable = ["jpeg", "png", "webp", "avif", "svg", "gif", "bmp"];

@@ -180,6 +180,8 @@ export interface ConvertResult {
   skippedOutputCount?: number;
 }
 export type ConvertWarning =
+  | { code: "bitDepthReduced"; from: number; to: number }
+  | { code: "alphaFlattened" }
   | {
       code: "previousOutputBackupRetained";
       path: string;
@@ -237,6 +239,7 @@ export interface ImportScanFile {
   temporary?: boolean;
 }
 export interface ImageMetadata {
+  animation?: "static" | "animated" | "unknown";
   format: string;
   width: number;
   height: number;
@@ -2512,6 +2515,10 @@ export function conversionWarnings(
 
 export function formatConvertWarning(warning: ConvertWarning): string[] {
   switch (warning.code) {
+    case "bitDepthReduced":
+      return [translate("state.bitDepthReduced", { from: warning.from, to: warning.to })];
+    case "alphaFlattened":
+      return [translate("state.alphaFlattened")];
     case "previousOutputBackupRetained":
       return [translate("state.outputBackupRetained", { path: warning.path })];
     case "modifiedTimeNotPreserved":
@@ -2545,6 +2552,8 @@ export function formatConvertWarning(warning: ConvertWarning): string[] {
       ];
     case "temporaryFileRetained":
       return [translate("state.temporaryFileRetained", { path: warning.path })];
+    default:
+      return [translate("state.unknownConvertWarning")];
   }
 }
 
