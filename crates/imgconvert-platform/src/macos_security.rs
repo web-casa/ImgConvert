@@ -33,11 +33,15 @@ impl ScopedResource {
         }
     }
 
-    /// Whether a security-scoped access session is active for this resource.
+    /// Whether Core Foundation actually started a security-scoped session.
+    ///
+    /// A plain file URL may exist without carrying a scope. `false` is not an
+    /// access-denied result: NSOpenPanel can grant sandbox access independently,
+    /// and direct builds need no security scope. Do not use this as a file I/O gate.
     pub fn started(&self) -> bool {
         #[cfg(target_os = "macos")]
         {
-            self.inner.is_some()
+            self.inner.as_ref().is_some_and(|resource| resource.started)
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -112,6 +116,36 @@ mod macos {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn allocated_url_without_start_does_not_report_an_active_session() {
+            // Allocate a real CFURL but deliberately do not start a scope.
+            // No file needs to exist and Drop must only release the URL.
+            let bytes = b"/imgconvert-unstarted-scope-fixture";
+            let url = unsafe {
+                CFURLCreateFromFileSystemRepresentation(
+                    std::ptr::null(),
+                    bytes.as_ptr(),
+                    bytes.len() as CFIndex,
+                    0,
+                )
+            };
+            let resource = super::super::ScopedResource {
+                inner: Some(SecurityScopedUrl {
+                    url: NonNull::new(url.cast_mut()).expect("native CFURL allocation"),
+                    started: false,
+                }),
+            };
+            assert!(
+                !resource.started(),
+                "an allocated URL is not a started session"
+            );
+        }
+    }
 }
 
 #[cfg(all(test, not(target_os = "macos")))]
@@ -123,5 +157,45 @@ mod tests {
     fn scoped_resource_is_noop_off_macos() {
         let scope = ScopedResource::start(Path::new("/tmp"));
         assert!(!scope.started());
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    #[test]
+    fn reported_status_matches_the_native_start_result() {
+        // Core Foundation may return true or false for a plain file URL across
+        // macOS versions. Report its actual result; do not infer it from the path.
+        let directory = std::env::temp_dir().join(format!(
+            "imgconvert-scope-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("owned-fixture.txt");
+        std::fs::write(&path, b"scope regression fixture").unwrap();
+        let resource = ScopedResource::start(&path);
+        let expected = resource
+            .inner
+            .as_ref()
+            .expect("native CFURL allocation")
+            .started;
+        let reported = resource.started();
+        // The reporting API is observational and must not prevent ordinary I/O.
+        let contents = std::fs::read(&path).unwrap();
+        drop(resource);
+        std::fs::remove_dir_all(directory).unwrap();
+        assert_eq!(reported, expected);
+        assert_eq!(contents, b"scope regression fixture");
+    }
+
+    #[test]
+    fn empty_path_does_not_report_an_active_security_scope() {
+        assert!(!ScopedResource::start(Path::new("")).started());
     }
 }

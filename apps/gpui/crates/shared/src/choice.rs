@@ -8,7 +8,10 @@
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::SelectState;
-use gpui_kit::{App, AppContext as _, Entity, SharedString, Window};
+use gpui_kit::{
+    App, AppContext as _, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Role,
+    SharedString, StatefulInteractiveElement as _, TestSupportExt as _, Window, div,
+};
 
 /// One option: a stable id as the value, a translated label as the text.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +46,18 @@ impl SearchableListItem for ChoiceItem {
 
     fn value(&self) -> &Self::Value {
         &self.id
+    }
+
+    fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        // Plain strings have no native AX node. Keep Kit's row selection and
+        // click handling while giving its presentation a readable text node.
+        div()
+            .id(SharedString::from(format!("choice-label:{}", self.id)))
+            .test_support()
+            .role(Role::Label)
+            .aria_label(self.label.clone())
+            .aria_value(self.label.clone())
+            .child(self.label.clone())
     }
 }
 

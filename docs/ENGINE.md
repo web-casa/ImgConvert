@@ -325,3 +325,15 @@ GPUI 对照 Tauri 生产状态机的 17 个命令完成入口核对，证据及�
 Workflow 新增 `BitDepthReduced { from, to }` 与 `AlphaFlattened`，通过原有 backend 告警通道传给两壳。JPEG/WebP/AVIF 的 8-bit 输出与 PNG 量化降位深按选中的实际输出记录；保留 16-bit 的 PNG 不报降位深，未获选的量化候选不决定告警。AVIF 解码器在 RGBA8 化时保留原始 10/12-bit 降位深记录，颜色转换、缩放与 PNG 输出不会丢掉这个记录。透明合成仅在 JPEG 实际待编码像素含非不透明 alpha 时产生，包含 16-bit alpha 不能先量化成 8-bit 再作判定。告警描述表示精度通道的降低，不是对视觉损失或减排的估计。
 
 GPUI 成功项目保留告警并提供完整 tooltip/辅助文本，语言切换重译；Tauri 同步双语 formatter，并对未来未知 code 显示通用告警。结果缓存键升级 v7，纳入动画事实与新告警语义；记录升级 v4，保存位深/透明告警，缓存命中与首次执行保持同样的告警顺序。旧记录安全视为 miss，不做用户缓存迁移或清除。
+
+## Security scope 状态与 G2 原生验收
+
+`ScopedResource::started()` 在 macOS 返回底层 `CFURLStartAccessingSecurityScopedResource` 的实际结果，URL 分配成功本身不表示 session 已启动。该状态不作为文件 I/O 权限 gate：PowerBox 的进程内选择器授权与 security-scoped bookmark session 是不同机制，direct 运行也可能不需要 scope。仅成功 start 的 session 在 Drop 时 stop，所有已创建 URL 仍释放。原生回归覆盖已创建但未调用 start 的 CFURL、独立临时夹具上的实际 start 返回值及空路径；不假定各 macOS 版本对普通文件 URL 返回相同结果；macOS Smoke 显式运行该回归。
+
+设置分组按钮显式提供双语名称和 toggled 状态。Kit 0.7.1 的 Slider 没有名称 API，因此既有键盘包装承担原生 Slider 角色、范围、数值及增减动作，隐藏内部重复的无名称辅助节点，鼠标仍由 Kit Slider 处理。原生动作与键盘共用步进入口，最低质量在 Off 与 30–100 的有效值之间变化，忙碌期间仍拒绝修改。共享 ChoiceItem 通过 Kit 的 render 扩展提供可读文本节点，保留框架的选择、点击和键盘行为。
+
+G2/R11 的原生朗读、IME 与签名沙盒授权执行步骤和证据要求见 `GPUI_G2_ACCEPTANCE.md`。无头测试与 Tauri Smoke 不替代 GPUI 实际候选验收；缺少证据时门槛保持未关闭。
+
+按用户确认的文案规则（2026-10-19），顶部信息入口显示“插件诊断 / 隐私 / 关于”（英文 Plugin diagnostics / Privacy / About），不加省略号；这是对 Kit 弹窗入口默认标点规则的产品例外。添加文件、选择输出目录等仍需后续选择的命令保留省略号。
+
+GPUI shared 的构建脚本显式追踪 `locales` 目录：本地化宏读取 YAML 本身不会让普通增量构建感知文件变化，目录内容变化必须重新生成嵌入翻译，避免源码已改但运行程序仍显示旧文案。

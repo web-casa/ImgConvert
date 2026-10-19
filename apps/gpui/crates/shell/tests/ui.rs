@@ -2609,3 +2609,166 @@ fn precision_warnings_survive_queue_completion_and_retranslate(cx: &mut TestAppC
     .unwrap();
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[gpui_kit::test]
+fn settings_controls_expose_native_names_roles_and_toggle_state(cx: &mut TestAppContext) {
+    use imgconvert_gpui_shared::i18n::{Locale, tr};
+    use imgconvert_gpui_workflow::Section;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    for locale in [Locale::English, Locale::SimplifiedChinese] {
+        cx.update(|cx| {
+            imgconvert_gpui_shared::i18n::set_locale(locale);
+            cx.refresh_windows();
+        });
+        cx.update_window(handle, |_, window, cx| {
+            form.update(cx, |form, cx| {
+                form.set_format("jpeg", window, cx);
+                form.set_open_section(None, cx);
+            });
+            window.render_frame(cx);
+            for section in Section::ALL {
+                let header = window.find(section.id());
+                assert!(
+                    header.label().is_some_and(|label| !label.is_empty()),
+                    "{section:?}"
+                );
+                assert_eq!(header.checked(), Some(false));
+            }
+            assert_eq!(
+                window.find(Section::Output.id()).label(),
+                Some(tr("settings.output_section").as_ref())
+            );
+            let quality = window.find("settings-quality");
+            assert_eq!(quality.role(), Some(gpui_kit::Role::Slider));
+            assert_eq!(quality.label(), Some(tr("settings.quality").as_ref()));
+            window.click("workflow-format", cx);
+            window.render_frame(cx);
+            let png_label = window.find("choice-label:png");
+            assert_eq!(png_label.role(), Some(gpui_kit::Role::Label));
+            assert_eq!(png_label.label(), Some("PNG"));
+            assert_eq!(png_label.value(), Some("PNG"));
+            window.click("choice-label:png", cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("workflow-format").value(), Some("PNG"));
+            assert_eq!(
+                AppModels::global(cx).settings().read(cx).settings().format,
+                "png"
+            );
+            window.click("workflow-format", cx);
+            window.render_frame(cx);
+            window.press("up", cx);
+            window.press("enter", cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("workflow-format").value(), Some("JPEG"));
+            assert_eq!(
+                AppModels::global(cx).settings().read(cx).settings().format,
+                "jpeg"
+            );
+            form.update(cx, |form, cx| {
+                form.set_open_section(Some(Section::Output), cx);
+            });
+            window.render_frame(cx);
+            assert_eq!(window.find(Section::Output.id()).checked(), Some(true));
+        })
+        .unwrap();
+    }
+}
+
+#[gpui_kit::test]
+fn quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy(cx: &mut TestAppContext) {
+    use imgconvert_gpui_workflow::{Section, SliderKind};
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace_sized(cx, size(px(1000.), px(2400.)));
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    cx.update_window(handle, |_, window, cx| {
+        form.update(cx, |form, cx| {
+            form.set_format("jpeg", window, cx);
+            form.set_open_section(Some(Section::FormatParameters), cx);
+            form.apply_slider(SliderKind::QualityFloor, 0., cx);
+            form.focus_slider(SliderKind::QualityFloor, window, cx);
+        });
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find(SliderKind::QualityFloor.id()).visible());
+        for (key, expected) in [
+            ("right", 30),
+            ("right", 31),
+            ("left", 30),
+            ("left", 0),
+            ("pageup", 30),
+            ("home", 0),
+            ("end", 100),
+            ("right", 100),
+            ("left", 99),
+            ("home", 0),
+            ("left", 0),
+        ] {
+            window.press(key, cx);
+            assert_eq!(
+                AppModels::global(cx)
+                    .settings()
+                    .read(cx)
+                    .settings()
+                    .jpeg_quality_floor,
+                expected,
+                "{key}"
+            );
+        }
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.set_importing(true);
+                cx.notify();
+            });
+        form.update(cx, |form, cx| {
+            form.apply_slider(SliderKind::QualityFloor, 31., cx);
+        });
+        window.render_frame(cx);
+        window.press("right", cx);
+        assert_eq!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .jpeg_quality_floor,
+            0
+        );
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.set_importing(false);
+                cx.notify();
+            });
+    })
+    .unwrap();
+}
