@@ -1,6 +1,6 @@
 # macOS IME candidate popup survives a Kit dialog
 
-Upstream report draft; not posted. G2 remains open. The reproduction uses only GPUI Kit and does not initialize ImgConvert settings, services, or file access.
+Upstream report: [longbridge/gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605), posted with explicit user authorization on 2026-10-19. G2 remains open. The reproduction uses only GPUI Kit and does not initialize ImgConvert settings, services, or file access.
 
 ## Environment
 
@@ -21,12 +21,12 @@ For an upstream checkout, copy the source into an existing Kit example that uses
 
 1. Focus the `Composition` field and select Simplified Chinese Pinyin.
 2. Physically type `n`, `i`, `h`, `a`, `o`. Check that the field shows marked `ni hao` and that the native candidate list includes `你好`; literal `nihao` without a candidate list is not this state.
-3. Click `Open dialog` without confirming or cancelling the composition.
+3. Activate `Open dialog` with its accessibility `AXPress` action without confirming or cancelling the composition. Test an actual CoreGraphics mouse click separately; it is a control path, not a reliably failing reproduction.
 4. Observe the dialog and the old native candidate popup together.
 
 Expected: moving focus to the non-text dialog ends the previous native conversion session; its candidate popup is no longer displayed over the dialog. The dialog should receive its first keyboard command.
 
-Actual (reproduced on 2026-10-19): `Close` is present, the original field still reports `ni hao`, and an unnamed native window still contains a list with `AXIdentifier=InputMethodCandidateList`. The old candidate popup remains over the dialog. The same issue occurs with a physical click in ImgConvert's privacy dialog; its blur callback restores the saved suffix while the old candidate popup stays visible. Space then dismisses the candidate without acting on the dialog.
+Actual (reproduced on 2026-10-19): `Close` is present, the original field still reports `ni hao`, and an unnamed native window still contains a list with `AXIdentifier=InputMethodCandidateList`. The old candidate popup remains over the dialog. The same issue reliably occurs with accessibility activation of ImgConvert's privacy dialog; its blur callback restores the saved suffix while the old candidate popup stays visible. Space/Escape then dismisses the candidate without acting on the dialog. The final CoreGraphics mouse control commits raw Pinyin and closes the popup in both unpatched and patched builds; earlier click observations did not establish this input-delivery distinction. Do not require the CG control to fail or attribute its precommit behavior to the patch.
 
 ## Investigation boundary
 
@@ -35,3 +35,5 @@ Actual (reproduced on 2026-10-19): `Close` is present, the original field still 
 Apple's installed `NSTextInputContext.h` documents `discardMarkedText` as discarding the current conversion session and requires the client to clear its marked range. A patch must respect the input owner, UI-thread reentrancy, window lifetime, and focus gained again before deferred cleanup. It must also verify typing after returning from the dialog. The patch must not globally cancel another window's input context.
 
 Window movement during an existing composition is a separate observation: the same stale popup position occurred in a native Cocoa `NSTextField` control on this Mac. Do not present that observation as a GPUI-specific regression or claim this focus issue fixes it.
+
+A downstream experimental patch and explicit regression harness are now prepared in [`patches/gpui-ime-focus`](../patches/gpui-ime-focus/README.md). They are inactive and do not change this unpatched reproduction. The initial owner-aware discard-only revision still left the native popup after accessibility `AXPress`, despite restoring the saved field value. The later revision also resets this view's active native context with lifetime/ownership guards. Its no-log native candidates pass the specific AX/CG, first-Escape, direct recomposition, independent Cocoa context and composing-close cases recorded in [GPUI_G2_ACCEPTANCE.md](GPUI_G2_ACCEPTANCE.md). This is an inactive downstream candidate, not an upstream fix or completed G2 gate. The upstream report is posted; product activation remains pending. Headless state checks alone do not establish native session cleanup.

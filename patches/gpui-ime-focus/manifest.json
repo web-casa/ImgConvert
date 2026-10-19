@@ -1,0 +1,24 @@
+{
+  "workspace_lock_sha256": "3c0ef2dbf7b91fd868acdf79bf48f85e0b295f50242ed763708a9188f63afed1",
+  "crates": {
+    "gpui-pre": {
+      "version": "0.3.8",
+      "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
+      "patch_sha256": "d87d4337092e3280410be7abc11979a736cb3acb4f865adb7ee8c40854deb2a3",
+      "patched_files": {
+        "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
+        "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
+        "src/window.rs": "2b5ac8699182ffc854d0ef58e865acb230080ef9dcfdbaf52599b33e06bfa86e",
+        "src/app/test_context.rs": "576871bbb7c6c0a844dbed9a4f03c7df9082051bf77c17d66fafc073e7891785"
+      }
+    },
+    "gpui-pre-macos": {
+      "version": "0.3.8",
+      "archive_sha256": "0d756813ff1cd741a502af60fd18869e0677795936d7349642b41c49f43120c0",
+      "patch_sha256": "3b42cd67de7dbf52b524ea9674e8f37809728c1a830158f503b4260c9e606c7b",
+      "patched_files": {
+        "src/window.rs": "d1c6f20bef9b345591674a11acf2f97d9d62fdb0344f3ac0ab0a60fadf282134"
+      }
+    }
+  }
+}
