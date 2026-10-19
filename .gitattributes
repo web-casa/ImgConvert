@@ -9,3 +9,7 @@
 /apps/gpui/crates/shell/tests/fixtures/*.png binary
 # Patch checksums require LF; blank context lines carry one diff marker space.
 /patches/gpui-ime-focus/*.patch text eol=lf whitespace=-blank-at-eol
+
+# Preserve verified upstream whitespace, source bytes and the frozen lock on Windows.
+/apps/gpui/vendor/** text eol=lf whitespace=-blank-at-eol linguist-vendored
+/apps/gpui/Cargo.lock text eol=lf

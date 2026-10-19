@@ -575,6 +575,8 @@ workflow 处置表：
 
 ## 9. 修订记录
 
+2026-10-19（G2 IME 正式源码接入）：#39 已获授权合并 main `03c54cf`。正常 GPUI workspace 选中两个本地运行时源码覆盖，保持 core/macOS 0.3.8 与 Kit 五包 0.7.1；仅复制必要源码、构建资源、manifest 和许可，不引入整个 Kit 框架。来源按原始发布归档加已评审差分逐字节核验，锁版本不变；实际路径/版本检查接入 CI。普通构建与原生回归证据见 `GPUI_G2_ACCEPTANCE.md`，来源/退出条件见 `GPUI_PATCHES.md`。这完成修复接入，仍不代替完整 VoiceOver、沙盒撤权等 G2 验收，不提前启动后续阶段。
+
 2026-10-19（G2 owner / 原生会话调查）：PR #38 已按用户授权合并；上游最小复现已获明确授权提交为 [longbridge/gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605)，不附账号路径或原始媒体。新增隔离差分、锁定矩阵与 13 项 macOS owner/补帧回归；系统候选框需独立验证，产品尚未启用本地框架补丁。实验版本、真实失败与后续原生结果见 `GPUI_G2_ACCEPTANCE.md` / `GPUI_PATCHES.md`；G2 不因无头测试通过或报告提交而关闭。
 
 v0.12（S8 实现，验证中）：新增可禁用的 app-settings 更新对话框、共享 OS/GPU 护栏、latest-v2 清单生成器与旧 latest.json 版本护栏。Linux AppImage 下载有限且验签后原子替换；双架构内部 SDK 测试用 cargo-packager 包与临时密钥，不修改生产端点。macOS/Windows 当前仅手动更新提示；不据此关闭 G1/G3 或最终发布门槛，详见 UPDATER.md。

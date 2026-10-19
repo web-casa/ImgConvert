@@ -13,7 +13,7 @@ import sys
 import prepare
 
 
-def check(stage, metadata_only):
+def check(stage, metadata_only, active=False):
     stage = stage.resolve()
     allowed = prepare.owned_tmp()
     if stage == allowed or not stage.is_relative_to(allowed):
@@ -21,12 +21,17 @@ def check(stage, metadata_only):
     if sys.platform != "darwin" and not metadata_only:
         raise ValueError("native candidate regressions require macOS; metadata-only proves no native behavior")
     manifest = json.loads((prepare.HERE / "manifest.json").read_text(encoding="utf-8"))
+    sources = stage
+    if active:
+        import verify
+        verify.verify_sources()
+        sources = verify.VENDOR
     lock = prepare.REPO / "apps/gpui/Cargo.lock"
     if prepare.sha256(lock.read_bytes()) != manifest["workspace_lock_sha256"]:
         raise ValueError("product lock differs from the verified matrix")
     for name, crate in manifest["crates"].items():
         for filename, digest in crate["patched_files"].items():
-            if prepare.sha256((stage / name / filename).read_bytes()) != digest:
+            if prepare.sha256((sources / name / filename).read_bytes()) != digest:
                 raise ValueError(f"candidate source differs: {name}/{filename}")
     fixtures = {
         stage / "harness/src/controls.rs": prepare.REPO / "apps/gpui/crates/shell/examples/g2_ime_focus_regression.rs",
@@ -49,7 +54,12 @@ def check(stage, metadata_only):
     if len(expected_tests) != 13:
         raise ValueError("expected 13 named regression fixtures")
     harness = stage / "harness/Cargo.toml"
-    common = ["--manifest-path", str(harness), "--config", str(stage / "candidate.toml"), "--offline"]
+    config = ["--config", str(stage / "candidate.toml")]
+    if active:
+        config = []
+        for name in manifest["crates"]:
+            config.extend(["--config", f'patch.crates-io.{name}.path={json.dumps(str(sources / name), ensure_ascii=False)}'])
+    common = ["--manifest-path", str(harness), *config, "--offline"]
     resolved = subprocess.run(["cargo", "metadata", *common, "--format-version", "1"],
                               capture_output=True, text=True, check=True)
     data = json.loads(resolved.stdout)
@@ -68,7 +78,7 @@ def check(stage, metadata_only):
         if name == "gpui-ime-focus-regression":
             expected = harness
         elif name in manifest["crates"]:
-            expected = stage / name / "Cargo.toml"
+            expected = sources / name / "Cargo.toml"
         else:
             if source is None:
                 raise ValueError(f"unexpected additional path dependency: {name}")
@@ -109,9 +119,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--metadata-only", action="store_true")
+    parser.add_argument("--active", action="store_true",
+                        help="test the active product overrides, not the staged crate copies")
     args = parser.parse_args()
     try:
-        check(args.candidate, args.metadata_only)
+        check(args.candidate, args.metadata_only, active=args.active)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Candidate verification failed: {error}\n")
 

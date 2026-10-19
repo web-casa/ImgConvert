@@ -116,8 +116,8 @@ def main():
         config = prepare(args.cache_directory, args.output)
     except (OSError, ValueError, tarfile.TarError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Cannot prepare candidate: {error}\n")
-    print(f"Prepared inactive candidate config: {config}")
-    print("Use it only in a disposable checkout; no product manifest or lock was changed.")
+    print(f"Prepared isolated regression config: {config}")
+    print("No product manifest or lock was changed; use the harness for isolated regressions.")
 
 
 if __name__ == "__main__":

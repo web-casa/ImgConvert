@@ -13,6 +13,9 @@ members = [
     "crates/app-settings",
 ]
 
+# Third-party source patches are dependencies, never application workspace members.
+exclude = ["vendor/gpui-pre", "vendor/gpui-pre-macos"]
+
 [workspace.package]
 version = "0.4.0-poc.1"
 edition = "2024"
@@ -80,3 +83,7 @@ opt-level = 2
 [patch.crates-io]
 # Narrow file-list fixes; origin and patch notes are in vendor/arboard/IMGCONVERT_PATCHES.md.
 arboard = { path = "../../vendor/arboard" }
+
+# macOS IME client/session lifecycle; provenance and removal: docs/GPUI_PATCHES.md.
+gpui-pre = { path = "vendor/gpui-pre" }
+gpui-pre-macos = { path = "vendor/gpui-pre-macos" }

@@ -524,13 +524,28 @@ function checkGpuiShellLayering() {
     "gpui-fast",
     "gpui_platform",
   ];
+  // Source overrides are not direct UI dependencies. Package-level metadata
+  // checks below still reject dependency aliases that bypass gpui-kit.
+  const dependencyToml = workspaceToml
+    .split(/(?=^\[)/mu)
+    .filter((section) => !section.startsWith("[patch."))
+    .join("");
   for (const crateName of forbiddenUiCrates) {
     const direct = new RegExp(`^${crateName.replaceAll("-", "[-_]")}\\s*=`, "mu");
-    if (direct.test(workspaceToml)) {
+    if (direct.test(dependencyToml)) {
       failures.push(
         `apps/gpui must reach ${crateName} through gpui-kit, not as a direct dependency`,
       );
     }
+  }
+  try {
+    execFileSync(
+      process.platform === "win32" ? "python" : "python3",
+      ["patches/gpui-ime-focus/verify.py"],
+      { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+  } catch (error) {
+    failures.push(`GPUI source override verification failed: ${String(error)}`);
   }
   const crates = {
     shared: "apps/gpui/crates/shared/Cargo.toml",
