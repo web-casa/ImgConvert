@@ -238,6 +238,8 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 
 ### 4.2 进度
 
+G2 后缀反馈修复（2026-10-20，分支 `fix/gpui-suffix-feedback`）：#40 已按用户授权合并 main `924a550`，同 head CI 与 Windows x64/ARM64 GPUI 探针整体通过。修复真实 IME 组合失焦后字段恢复已保存值、Required 却残留的问题，仅清理旧空草稿的错误；保留空草稿默认值回退和 Adjusted 行为，并为实际反馈补原生 Label。三项真实组件回归通过，移除修复时失焦回归明确失败；Mac 继续用正常构建的专用沙盒候选复测。最终测试、原生证据及只读 review/CI 以本片 PR 和 `GPUI_G2_ACCEPTANCE.md` 为准；G2 的 VoiceOver 连续记录与剩余沙盒矩阵仍开放，不进入 D1a/C1 或阶段 4/5。
+
 G2 IME 正式源码接入（2026-10-19，分支 `fix/gpui-ime-patch-integration`）：PR #39 已按用户授权合并（main `03c54cf`，7 个必需 CI 作业通过）。本片把已验证的 owner / AppKit 上下文修复接入正常 GPUI Cargo workspace，无需实验性配置；仅保留两个 0.3.8 包的 116 个运行时/构建/许可文件，Kit 五包仍为 0.7.1，锁文件只改变两个来源。新增原始归档加差分的逐字节来源审计、完整文件清单与实际 metadata 路径检查，接入架构护栏和 CI；独立回归增加 `--active`，强制对实际产品源码运行。来源、许可证、工具测试及原生普通构建的结果见 `GPUI_G2_ACCEPTANCE.md`；只读 review 和最终 CI 以本片 PR 为准。完整 VoiceOver 连续记录与剩余沙盒矩阵未齐，G2 不关闭，不进入 D1a/C1 或阶段 4/5。
 
 G2 IME owner 焦点修复候选（2026-10-19，分支 `fix/gpui-ime-focus-lifecycle`）：PR #38 按用户授权合并 main `a00e9e1`。实现隔离差分候选，保存注册时的焦点/实体身份，在绘制后、安装新处理器前清理旧 owner 及本窗口原生组合会话；覆盖绘制中转移、输入消失、缓存、同焦点换实体与首次延迟聚焦的一次恢复。准备工具核对包/补丁/源码校验值，仅写 `target/tmp`；产品依赖与锁不变。评审发现的 owner、候选选择与补帧问题逐项修正；具体验证见 `GPUI_G2_ACCEPTANCE.md` 与候选 README。上游最小复现已获用户明确授权提交为 longbridge/gpui-kit#3605；早期 discard-only 版本原生 AXPress 仍失败；后续上下文重置候选已通过真实最小例程/沙盒应用新旧对照、首个 Escape、直接返回组合及独立窗口输入保护，补丁未正式接入，G2 保持开放。
