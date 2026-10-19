@@ -352,3 +352,5 @@ GPUI shared 的构建脚本显式追踪 `locales` 目录：本地化宏读取 YA
 批次总进度条另有“批量转换进度”/“Batch conversion progress”名称，数值继续由同一 BatchModel 的已结束任务比例派生。100% 表示批次任务已结束，成功/跳过/失败仍由相邻状态文本说明。`scripts/check-gpui-macos-progress.applescript` 在原生主窗口核对进度条名称和数值，可用于运行及完成状态；它只读辅助树，不替代 VoiceOver 朗读或连续录屏。
 
 G2 原生 IME 检查使用 `check-gpui-macos-ime.applescript` 区分精确字段文本及系统候选列表，连续记录核对确认、翻页、取消和布局变化。候选框覆盖对话框的问题已由只含 Kit 的 `g2_ime_repro` 例程复现；当前没有接入框架补丁，业务输入与持久化契约不变。现象、证据和未采纳实验分别见 `GPUI_G2_ACCEPTANCE.md`、`GPUI_IME_REPRO.md`、`GPUI_PATCHES.md`。
+
+IME 焦点清理候选保存在 `patches/gpui-ime-focus`，仅提供版本锁定的差分与隔离准备工具，未被正常构建启用。候选在绘制后按实际 handler 的焦点/实体身份结束旧 client 的组合，再清理该窗口原生上下文；不把 Kit 行为补到业务表单。独立 Kit 测试工程通过既有 test-support 层的窄观察接口覆盖输入状态、缓存、焦点和补帧，仍须单独取得系统候选框原生证据。上游最小复现已获授权提交为 longbridge/gpui-kit#3605；上下文重置候选已通过指定原生 AX/CG 及独立窗口输入对照，正式接入仍须来源/许可证与构建验证，不改变当前已发布或默认开发构建的输入行为。

@@ -1,0 +1,271 @@
+--- a/src/input.rs
++++ b/src/input.rs
+@@ -143,6 +143,10 @@
+ }
+ 
+ impl<V: EntityInputHandler> InputHandler for ElementInputHandler<V> {
++    fn input_client_id(&self) -> Option<crate::EntityId> {
++        Some(self.view.entity_id())
++    }
++
+     fn selected_text_range(
+         &mut self,
+         ignore_disabled_input: bool,
+--- a/src/platform.rs
++++ b/src/platform.rs
+@@ -1175,6 +1175,10 @@
+     fn capslock(&self) -> Capslock;
+     fn set_input_handler(&mut self, input_handler: PlatformInputHandler);
+     fn take_input_handler(&mut self) -> Option<PlatformInputHandler>;
++
++    /// End this window's native composition after its previous client has
++    /// cleared its marked range. Called with no platform handler installed.
++    fn discard_marked_text(&self) {}
+     /// Apply the focused text region's [`TextInputConfiguration`] to the
+     /// platform's text input session (e.g. attributes of the hidden editable
+     /// element on web). Called only when the configuration changes, because
+@@ -1930,6 +1934,8 @@
+ pub struct PlatformInputHandler {
+     cx: AsyncWindowContext,
+     handler: Box<dyn InputHandler>,
++    #[cfg(target_os = "macos")]
++    focus_id: Option<crate::FocusId>,
+ }
+ 
+ #[expect(missing_docs)]
+@@ -1942,7 +1948,12 @@
+ )]
+ impl PlatformInputHandler {
+     pub fn new(cx: AsyncWindowContext, handler: Box<dyn InputHandler>) -> Self {
+-        Self { cx, handler }
++        Self {
++            cx,
++            handler,
++            #[cfg(target_os = "macos")]
++            focus_id: None,
++        }
+     }
+ 
+     pub fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
+@@ -2014,6 +2025,21 @@
+         self.cx
+             .update(|window, cx| self.handler.unmark_text(window, cx))
+             .ok();
++    }
++
++    #[cfg(target_os = "macos")]
++    pub(crate) fn set_focus_id(&mut self, focus_id: crate::FocusId) {
++        self.focus_id = Some(focus_id);
++    }
++
++    #[cfg(target_os = "macos")]
++    pub(crate) fn client_id(&self) -> (Option<crate::FocusId>, Option<crate::EntityId>) {
++        (self.focus_id, self.handler.input_client_id())
++    }
++
++    #[cfg(target_os = "macos")]
++    pub(crate) fn unmark_text_in_window(&mut self, window: &mut Window, cx: &mut App) {
++        self.handler.unmark_text(window, cx);
+     }
+ 
+     pub fn paste(&mut self, item: ClipboardItem) {
+@@ -2185,6 +2211,13 @@
+ ///
+ /// <https://developer.apple.com/documentation/appkit/nstextinputclient>
+ pub trait InputHandler: 'static {
++    /// Identity of the retained input client, when entity-backed. This lets
++    /// macOS distinguish replacement clients sharing one focus handle. Custom
++    /// handlers without an entity identity fall back to their focus handle.
++    fn input_client_id(&self) -> Option<crate::EntityId> {
++        None
++    }
++
+     /// Get the range of the user's currently selected text, if any
+     /// Corresponds to [selectedRange()](https://developer.apple.com/documentation/appkit/nstextinputclient/1438242-selectedrange)
+     ///
+--- a/src/window.rs
++++ b/src/window.rs
+@@ -1195,6 +1195,8 @@
+     /// input session can restart the IME connection).
+     last_text_input_configuration: Option<TextInputConfiguration>,
+     focused_text_input_active: bool,
++    #[cfg(target_os = "macos")]
++    input_focus_recovery: Option<FocusId>,
+     pub(crate) image_cache_stack: Vec<AnyImageCache>,
+     pub(crate) rendered_frame: Frame,
+     pub(crate) next_frame: Frame,
+@@ -2087,6 +2089,8 @@
+             requested_autoscroll: None,
+             last_text_input_configuration: None,
+             focused_text_input_active: false,
++            #[cfg(target_os = "macos")]
++            input_focus_recovery: None,
+             rendered_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
+             next_frame: Frame::new(DispatchTree::new(cx.keymap.clone(), cx.actions.clone())),
+             next_frame_callbacks,
+@@ -3327,7 +3331,13 @@
+         // Place it back into a None slot (left by a previous .take()) so that
+         // cached paint_range indices in reuse_paint find the handler at the
+         // expected position.
++        #[cfg(target_os = "macos")]
++        let mut previous_input_client = None;
+         if let Some(input_handler) = self.platform_window.take_input_handler() {
++            #[cfg(target_os = "macos")]
++            {
++                previous_input_client = Some(input_handler.client_id());
++            }
+             if let Some(slot) = self
+                 .rendered_frame
+                 .input_handlers
+@@ -3340,6 +3350,8 @@
+                 self.rendered_frame.input_handlers.push(Some(input_handler));
+             }
+         }
++        #[cfg(target_os = "macos")]
++        let focus_before_paint = self.focus_generation;
+         if !cx.mode.skip_drawing() {
+             self.draw_roots(cx);
+             #[cfg(feature = "profiler")]
+@@ -3361,13 +3373,81 @@
+         // paint_range indices remain valid for reuse_paint on the next frame.
+         // Search backwards to find the last Some entry, since reuse_paint may
+         // have copied None slots from the previous frame. (Fixes #50456)
+-        let focused_text_input_active = if let Some(mut input_handler) = self
++        #[cfg(target_os = "macos")]
++        let mut text_input_cleanup = false;
++        let mut input_handler = self
+             .next_frame
+             .input_handlers
+             .iter_mut()
+             .rev()
+-            .find_map(|h| h.take())
++            .find_map(|slot| {
++                #[cfg(target_os = "macos")]
++                if !slot
++                    .as_ref()
++                    .is_some_and(|handler| handler.client_id().0 == self.focus)
++                {
++                    return None;
++                }
++                slot.take()
++            });
++        #[cfg(target_os = "macos")]
+         {
++            // A late first focus may have no installed predecessor. Retry once
++            // per missing target, so an off-tree target cannot cause a draw loop.
++            if input_handler.is_some() || self.focus.is_none() {
++                self.input_focus_recovery = None;
++            } else if self.input_focus_recovery != self.focus
++                && (self.focus_generation != focus_before_paint
++                    || self.next_frame.input_handlers.iter().any(Option::is_some))
++            {
++                self.input_focus_recovery = self.focus;
++                text_input_cleanup = true;
++            }
++            // Compare actual registered clients after painting: render/prepaint
++            // may transfer focus or remove the previous input entirely.
++            let next_client = input_handler.as_ref().map(|handler| handler.client_id());
++            let next_is_focused = next_client.is_some_and(|client| client.0 == self.focus);
++            if let Some(previous_client) = previous_input_client
++                && (Some(previous_client) != next_client || !next_is_focused)
++            {
++                // Cached paint may have moved the old handler to next_frame or
++                // selected it above. Keep vector lengths/None slots unchanged.
++                let mut previous_handler = if next_client == Some(previous_client) {
++                    input_handler.take()
++                } else {
++                    self.rendered_frame
++                        .input_handlers
++                        .iter_mut()
++                        .chain(self.next_frame.input_handlers.iter_mut())
++                        .find_map(|slot| {
++                            if slot
++                                .as_ref()
++                                .is_some_and(|handler| handler.client_id() == previous_client)
++                            {
++                                slot.take()
++                            } else {
++                                None
++                            }
++                        })
++                };
++                if let Some(handler) = previous_handler.as_mut() {
++                    handler.unmark_text_in_window(self, cx);
++                }
++                // No native handler is installed during callbacks, so AppKit
++                // cannot send unmark/insert callbacks to the replacement client.
++                self.platform_window.discard_marked_text();
++                text_input_cleanup = true;
++            }
++            // A focus change during paint must not install a stale handler.
++            if input_handler
++                .as_ref()
++                .is_some_and(|handler| handler.client_id().0 != self.focus)
++            {
++                input_handler = None;
++                text_input_cleanup = true;
++            }
++        }
++        let focused_text_input_active = if let Some(mut input_handler) = input_handler {
+             let accepts_text_input = input_handler.accepts_text_input(self, cx);
+             self.platform_window.set_input_handler(input_handler);
+             accepts_text_input
+@@ -3441,6 +3521,11 @@
+         // schedule another frame here to render the new focus state and dispatch the
+         // resulting focus events.
+         if self.focus != focus_before_listeners {
++            self.refresh();
++        }
++        // Cleanup happened after paint; refresh only after leaving draw phases.
++        #[cfg(target_os = "macos")]
++        if text_input_cleanup {
+             self.refresh();
+         }
+         self.needs_present.set(true);
+@@ -5260,9 +5345,10 @@
+ 
+         if focus_handle.is_focused(self) {
+             let cx = self.to_async(cx);
+-            self.next_frame
+-                .input_handlers
+-                .push(Some(PlatformInputHandler::new(cx, Box::new(input_handler))));
++            let mut input_handler = PlatformInputHandler::new(cx, Box::new(input_handler));
++            #[cfg(target_os = "macos")]
++            input_handler.set_focus_id(focus_handle.id);
++            self.next_frame.input_handlers.push(Some(input_handler));
+         }
+     }
+ 
+--- a/src/app/test_context.rs
++++ b/src/app/test_context.rs
+@@ -614,6 +614,30 @@
+             window.dispatch_keystroke(keystroke, cx)
+         })
+         .unwrap();
++    }
++
++    /// Captures a counter that can be read during a window update without
++    /// borrowing App again or forcing a draw. The observer owns the test handle.
++    pub fn frame_wake_observer(&self, window: AnyWindowHandle) -> impl Fn() -> usize + use<> {
++        let platform = self.test_window(window);
++        move || platform.frame_wake_count()
++    }
++
++    /// Captures an observer of the currently installed test-platform handler.
++    /// It preserves the handler and neither borrows App nor refreshes the window.
++    pub fn text_input_handler_observer(
++        &self,
++        window: AnyWindowHandle,
++    ) -> impl Fn() -> bool + use<> {
++        let platform = self.test_window(window);
++        move || {
++            let mut platform = platform.clone();
++            let Some(handler) = crate::PlatformWindow::take_input_handler(&mut platform) else {
++                return false;
++            };
++            crate::PlatformWindow::set_input_handler(&mut platform, handler);
++            true
++        }
+     }
+ 
+     /// Returns the `TestWindow` backing the given handle.

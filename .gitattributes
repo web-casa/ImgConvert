@@ -7,3 +7,5 @@
 # PDF xref offsets require byte-identical test fixtures.
 /apps/gpui/crates/shell/tests/fixtures/*.pdf binary
 /apps/gpui/crates/shell/tests/fixtures/*.png binary
+# Patch checksums require LF; blank context lines carry one diff marker space.
+/patches/gpui-ime-focus/*.patch text eol=lf whitespace=-blank-at-eol
