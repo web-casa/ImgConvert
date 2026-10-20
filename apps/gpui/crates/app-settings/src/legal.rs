@@ -110,6 +110,7 @@ impl Render for LegalDialog {
         let height = (window.viewport_size().height * 0.45).min(window.rem_size() * 24.);
         let document_focus = self.document.focus_handle(cx);
         let accessible_value = window.is_a11y_active().then(|| self.text(cx));
+        let synthetic_value = accessible_value.clone();
         v_flex()
             .id("legal-dialog")
             .test_support()
@@ -141,7 +142,26 @@ impl Render for LegalDialog {
                     .when_some(accessible_value, |document, value| {
                         document.aria_value(value)
                     })
-                    .a11y_synthetic_children(|builder| builder.parent_node().set_read_only())
+                    // VoiceOver treats a value-only read-only text node as
+                    // empty. Expose the document as a synthetic text run so
+                    // its characters and UTF-8 offsets are available for
+                    // speech without making the field editable.
+                    .a11y_synthetic_children(move |builder| {
+                        builder.parent_node().set_read_only();
+                        let Some(value) = synthetic_value else {
+                            return;
+                        };
+                        let mut run = gpui_kit::accesskit::Node::new(Role::TextRun);
+                        run.set_value(value.to_string());
+                        run.set_character_lengths(
+                            value
+                                .chars()
+                                .map(|c| c.len_utf8() as u8)
+                                .collect::<Vec<_>>(),
+                        );
+                        let id = builder.synthetic_node_id(0);
+                        builder.push_child(id, run);
+                    })
                     // The input context binds Tab to indentation even when
                     // read-only. Route those actions to normal dialog traversal.
                     .on_action(|_: &IndentInline, window, cx| {

@@ -302,3 +302,12 @@ Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-h
 ### 2026-10-20 21:40：Mac GUI 会话阻塞
 
 尝试用 `screencapture`/Screenshot 继续实际 VO 正文朗读与连续录屏时，专用 Mac 的 console 登录会话在 21:40 结束：`/dev/console` 归 `root`，`launchctl print gui/501` 返回 “Domain does not support specified action”，`open` 返回 `RBSRequestErrorDomain Code=5`，无法再启动候选或旧预览。该次尝试没有取得可用的正文朗读视频，不记通过；此前正常构建上的 AX 正文焦点、键盘正反循环与 Escape 返回结果仍然有效。需要重新登录专用测试账号后才能继续 VO 朗读/连续录屏、IME 与沙盒矩阵。
+
+
+### 正文朗读修复：synthetic TextRun
+
+只给只读文档包装节点设置 `aria_value` 时，VoiceOver 进入正文后读“空的 / 文本的结尾”；实际 AX 值虽有全文，但文本接口不完整。本片在包装节点上增加 synthetic `TextRun`（正文 value + 按 UTF-8 字节的 character lengths），保留只读语义。
+
+在 v24 候选（同 PR 代码 + 该修复）上实际复测：VO cursor 进入 `隐私与支持` 后，`last phrase` 为“隐私与支持 编辑文本 在文本的开头插入的内容。 # ImgConvert 隐私政策……”；继续用 VO 向右可读到“GitHub 项目支持 link”“关闭 button”“Close button”。这证明正文开头、支持链接和关闭按钮可被 VoiceOver 实际朗读，不再只说“空的”。
+
+限制：在 VO 交互（VO+Shift+Down）时系统仍会弹出“你要启用‘听写’吗？”提示并抢走焦点；本次没有启用听写，也没有把该轮当作连续录屏证据。实际正文连续朗读、连续录屏和剩余矩阵仍开放。
