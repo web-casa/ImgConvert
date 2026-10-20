@@ -311,3 +311,20 @@ Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-h
 在 v24 候选（同 PR 代码 + 该修复）上实际复测：VO cursor 进入 `隐私与支持` 后，`last phrase` 为“隐私与支持 编辑文本 在文本的开头插入的内容。 # ImgConvert 隐私政策……”；继续用 VO 向右可读到“GitHub 项目支持 link”“关闭 button”“Close button”。这证明正文开头、支持链接和关闭按钮可被 VoiceOver 实际朗读，不再只说“空的”。
 
 限制：在 VO 交互（VO+Shift+Down）时系统仍会弹出“你要启用‘听写’吗？”提示并抢走焦点；本次没有启用听写，也没有把该轮当作连续录屏证据。实际正文连续朗读、连续录屏和剩余矩阵仍开放。
+
+
+### 模态 VoiceOver 连续录屏（中英）
+
+在 v24 候选（SHA256 `f84fc4f85b0b076615a81abc5285eb19897dcee5a13edc74519706ebabc1c363`）上补录两段连续屏幕视频，保留本地忽略目录 `artifacts/reviews/g2-modal-native-2026-10-20/`：
+
+| 语言 | 文件 | 时长 | 视频 | SHA256 |
+|---|---|---|---|---|
+| 中文 | `modal-vo-video.mov` | 9.75 s | h264 3024x1900 | `f3dea97f342bf65d76644e8ef17e98263e56d8ce89919633b12ddf1994527754` |
+| 英文 | `modal-vo-video-en.mov` | 14.10 s | h264 3024x1900 | `8d6c109675af03927dfed47a5c166a8b285f3232895350277db5882a6b161426` |
+
+两段视频都在弹窗打开、VO 光标已进入正文后开始录制；随后用 VO+Shift+F4 把光标移回键盘焦点，再以 VO+Down 遍历。没有在打开后强制回到首项。实际帧：
+- 中文 2 s：字幕“隐私与支持 编辑文本 在文本的开头插入的内容。 # ImgConvert 隐私政策”；5 s 与 8 s：焦点在“关闭”按钮，字幕“关闭, button”
+- 英文 2 s：字幕“Privacy and support 编辑文本 在文本的开头插入的内容。 # ImgConvert Privacy Policy”；6 s：焦点在“Close”，字幕“Close, button”
+- 两段结束时界面语言恢复为中文，原预览恢复，VoiceOver 关闭
+
+这补齐了模态标题、正文开头和关闭按钮的双语连续录屏；实际 AX 焦点标记在本轮新会话中仍为 `NONE`（与语音证据分开记录），完整正文滚动朗读、IME 矩阵和沙盒矩阵仍开放。
