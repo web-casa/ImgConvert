@@ -297,3 +297,8 @@ Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-h
 - 探针结束时关闭 VoiceOver、恢复中文界面与原预览（PID `18684`），未修改 TCC/SIP 或系统权限；测试只使用专用账号及合成文档。
 
 这次正常构建原生复验补上了正文 AX 焦点、键盘进入/离开/反向循环和 Escape 返回触发入口；实际 VO 标题/正文朗读记录、连续录屏及剩余 IME/沙盒矩阵仍开放，G2 不关闭。
+
+
+### 2026-10-20 21:40：Mac GUI 会话阻塞
+
+尝试用 `screencapture`/Screenshot 继续实际 VO 正文朗读与连续录屏时，专用 Mac 的 console 登录会话在 21:40 结束：`/dev/console` 归 `root`，`launchctl print gui/501` 返回 “Domain does not support specified action”，`open` 返回 `RBSRequestErrorDomain Code=5`，无法再启动候选或旧预览。该次尝试没有取得可用的正文朗读视频，不记通过；此前正常构建上的 AX 正文焦点、键盘正反循环与 Escape 返回结果仍然有效。需要重新登录专用测试账号后才能继续 VO 朗读/连续录屏、IME 与沙盒矩阵。
