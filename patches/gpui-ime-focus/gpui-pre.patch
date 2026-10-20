@@ -269,3 +269,18 @@
      }
  
      /// Returns the `TestWindow` backing the given handle.
+
+--- a/src/tab_stop.rs
++++ b/src/tab_stop.rs
+@@ -85,6 +85,10 @@
+             tab_stop: focus_handle.tab_stop,
+             path,
+         };
+-        self.by_id.insert(focus_handle.id, order.clone());
++        // Re-registering a focus handle moves its one tab stop. Keep the
++        // ordered tree consistent with the last-registration lookup map.
++        if let Some(previous) = self.by_id.insert(focus_handle.id, order.clone()) {
++            self.order.remove(&previous, ());
++        }
+         self.order.insert_or_replace(order, ());
+     }

@@ -662,3 +662,6 @@ v0.5（按 `gpui-kit`、`gpui-kit-design-guides`、`rust-best-practices` skill �
 - 修正：i18n 接入方式（`i18n!` 位置、`extend!` 先于 `init`、`ui.yml` `_version: 2`、`refresh_windows`、占位符语法待核对）（§3.4）。
 - 补充：Kit 打包文档的立场与 `LSMinimumSystemVersion` 必须显式设置（§3.6）。
 - 新增：阶段 2 的 `ImageCache`、alpha/HiDPI、lavapipe、CJK 探针；阶段 3 的无障碍清单与设计评审清单门禁；三条新风险与四条未核实事项。
+
+
+2026-10-20（G2 模态焦点修复，开发中）：#42 已授权合并 main `e858689`。文档 AX/键盘焦点分离及共享 handle 的 Shift-Tab 排序 P2 已定位；最小复现经用户授权提交为 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)，见 `GPUI_TAB_STOP_REPRO.md`。正式 vendor 已接入一行 TabStopMap 修复，差分/manifest/文件清单同步更新；原始共享 handle 与缓存重放两项回归在未修源码上失败、接入后通过，法律弹窗反向循环 UI 测试同样转为通过；Tab stop 状态切换作为不变量两边均通过。正常构建的原生复验、完整 VO/模态证据及最终 PR/CI 仍待完成，见 `GPUI_G2_ACCEPTANCE.md`。G2 不关闭，后续阶段不提前启动。

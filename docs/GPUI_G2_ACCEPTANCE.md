@@ -263,3 +263,22 @@ Mac 独立 Kit harness 用 `--active` 指向实际产品覆盖源码，13 项 ow
 本地根 workspace fmt/clippy 与 397 项测试（另 1 项 ignored）、GPUI fmt/clippy 与 98 项测试（shell UI 37）、前端 check/161 项、全仓格式、完整许可证（898 包 / 210 正文 / 281 补充）及文档/成本/架构护栏通过。候选测试结束后专用设置逐字段恢复，原未打补丁预览恢复为 PID `13304`，VoiceOver 关闭、字幕原开启状态及录屏三项偏好恢复；后续仅在该专用预览上复核采集工具拒绝路径，不能当作当前产品候选的新增行为验收。最终同 head CI 及拒绝路径复核结果见本片 PR。
 
 拒绝路径最终复核已完成：在专用原预览上用实际 VO 菜单栏快捷键重新建立上下文，记录到状态菜单矩形 `{1173,-3,1195,26}`；早期脚本继续返回 0，最终脚本在初始矩形检查明确报 `VoiceOver cursor is outside the candidate window`，移回键盘焦点后又正常采集。字幕关闭、原生 Open 选择器聚焦、无效 PID、步数 101、错误模式及 VO 关闭均以非零退出且无成功输出；窗口内正例正常记录。`guards-recheck-final.log` / `results.json` 保留实际结果。拒绝路径复核结束后设置仍逐字段相同、VoiceOver 关闭、字幕偏好保持原开启值，录屏三项偏好恢复。此正反例验证的是采集工具，不补算产品模态或转换场景通过。
+
+
+## 2026-10-20：模态焦点修复（无头回归已接入）
+
+#42 已按用户授权合并 main `e858689`。实际 VO 复查发现旧自动流程可能把陈旧的 `last phrase` 当作当前按钮身份；改为等待实际 cursor 稳定并检查真实弹窗与语言持久化后，两种语言的激活/关闭及语言往返可以完成，但文档初始朗读仍不稳定。因此这些自动操作失败不能直接归因于产品按钮失效，也不能把历史 phrase 当作通过证据。
+
+Kit 0.7.1 的 Textarea 将有辅助角色的 frame 与真正编辑控件分别绑定到不同焦点 handle；真实键盘聚焦编辑器后，原生 `AXFocusedUIElement` 仍可能为窗口。应用候选在原有文档包装上绑定真实编辑焦点与只读文本角色，取消内部重复辅助节点，打开后一次聚焦正文，并在模态存在时隐藏背景辅助子树。只读输入的 Tab/Shift-Tab 转发 Kit 已注册的 `root::Tab` / `root::TabPrev`，复用 Root 的焦点约束；不在 render 中强制抢焦点。
+
+review 随后发现共享 handle 触发底层 TabStopMap 的独立 P2：lookup 保留最后注册，排序树却保留此前注册，反向切换反复遇到同一 handle。`tests/tab_stop.rs` 在原源码实跑失败；仅在隔离路径删除同 ID 的旧排序项后实跑通过。最小代码、版本、步骤与候选差分见 `GPUI_TAB_STOP_REPRO.md`。按迁移方案 §3.1，正式接入前先向上游提交最小复现。用户明确授权后，已提交 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)；正式 vendor 已接入同一行修复，`patches/gpui-ime-focus` 的差分、manifest 与文件清单同步更新，锁文件与依赖版本不变。未修源码上原始回归与法律弹窗循环失败，接入后通过。
+
+Mac 初版候选确认模态期间背景入口从 2 个变为 0，关闭后恢复 2 个；中文曾进入文档，英文仍停在窗口，故不判定完整通过。一次 macOS 听写系统提示干扰已通过“以后”取消，未启用听写或变更系统权限；该次失败保留、不计入通过。最新语义绑定与底层修复已在正式 vendor 接入，仍需用正常产品构建重做原生复验。全部原始媒体和探针留在本地忽略目录 `artifacts/reviews/g2-vo-modal-2026-10-20/`；完整 G2、后续运行/完成/告警朗读及沙盒矩阵继续开放。
+
+
+正式 vendor 接入后本地 GPUI 全部 102 项及 `clippy --workspace --all-targets -- -D warnings` 通过，包含 38 项 shell UI、3 项 `tab_stop` 边界回归、两种离线文档的初始复制、四个控件的完整反向循环与关闭后返回触发入口。原支持链接测试把 Tab/Enter 放在同一事件中，因 Root 延后分发而失败；拆成实际独立按键事件后完整重跑通过。首轮 readonly review 未发现 P1/P2，提出 4 项 P3：两份文档的旧状态、测试计数、无头测试对只读值/隐藏子树的覆盖不足，以及补丁文件 EOF 空行。旧状态、计数和 EOF 已修正；UI 测试补充了可访问名称断言，只读值、`set_hidden` 后的原生树与完整朗读仍只能由原生证据确认。共享 handle、缓存重放与 `tab_stop` 状态切换已用 3 项 `tab_stop` 回归覆盖，未另增原生覆盖。
+
+Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-hoc 沙盒 deep/strict 验签，主程序 SHA256 `a74bd4f37fb4cd6bbf4c42cb70f897c334ee49d378beaea164bc93c871d4c715`，锁文件保持原字节。首次探针在弹窗刚出现即断言 `AXFocusedUIElement=AXTextArea`，实际仍为 AXWindow，未通过。复测等待稳定后，实际 VO cursor 连续四次分别为“隐私与支持 编辑文本”与“Privacy and support 编辑文本”；没有在打开后调用 AXRaise、移至第一项或重定位 cursor。实际 Escape 后模态消失且背景入口恢复；精确 current 正例和错误大小写拒绝均有原始记录。字幕 `last phrase` 此时为空、原生 focus 属性仍为 AXWindow，因此仅确认双语 VO 光标进入文档，不据此声称完整朗读/原生焦点验收通过。
+
+
+最新复测最终因附加键盘步骤在 45 次 Tab 内未从进程的 `AXFocusedUIElement` 观察到 Privacy 而退出失败，不能证明原生键盘返回入口。此前双语实际 cursor、真实模态关闭与语言往返的记录保留，但整段探针不记为通过。finally 已逐字段核对专用设置恢复、关闭 VoiceOver、恢复字幕与录屏偏好、退出候选并重新启动原预览 PID `14937`。原始结果已取回本地 `modal-native18-retry.log`。改动已提交为 `7cc6080` 并创建 PR #43；正式补丁已通过本地来源/差分核验与 102 项无头回归。上面的 Mac 证据来自隔离候选，不是接入补丁后的正式 `--locked` 构建；正常构建的原生复验及最终 PR/CI 尚未完成。

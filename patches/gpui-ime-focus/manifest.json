@@ -4,12 +4,13 @@
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "d87d4337092e3280410be7abc11979a736cb3acb4f865adb7ee8c40854deb2a3",
+      "patch_sha256": "c5ee3f5935bcf351d4201fd974b365f14239597582826c5a61fcf1fdb6a79ec3",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
         "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
         "src/window.rs": "2b5ac8699182ffc854d0ef58e865acb230080ef9dcfdbaf52599b33e06bfa86e",
-        "src/app/test_context.rs": "576871bbb7c6c0a844dbed9a4f03c7df9082051bf77c17d66fafc073e7891785"
+        "src/app/test_context.rs": "576871bbb7c6c0a844dbed9a4f03c7df9082051bf77c17d66fafc073e7891785",
+        "src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1"
       }
     },
     "gpui-pre-macos": {

@@ -100,7 +100,7 @@
   "gpui-pre/src/styled.rs": "c6e62fe136bedf887ee755c886df5466d5fe0b398a004b35d1a3530fef809c8d",
   "gpui-pre/src/subscription.rs": "cca3b5138cb23084932772c8e009cce8a08562c2c00b69f3e0d4b1676b88087a",
   "gpui-pre/src/svg_renderer.rs": "fb12dae87c0cd4c5f5a1fbbd2f9548d52fde9440c21e3d576dfeb0233eda88a6",
-  "gpui-pre/src/tab_stop.rs": "7f742d6d6b7e5cd6fc634f2764fc3937e1cdebcf086d4b7c166379724edd1881",
+  "gpui-pre/src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1",
   "gpui-pre/src/taffy.rs": "dd561fcc6b693cfcd15b343b5e2935b9cff2ee8fb373d5e7166ca71ff1f74880",
   "gpui-pre/src/test.rs": "205f9f481fe843470dca43972853f4d64b23ddd03ee9b26eebbf2a2508a9c65f",
   "gpui-pre/src/text_system.rs": "b39e05a8a8f7b36e13ffe1211d2c2993f68f2ce4cada87ad3414492a42e927b4",
