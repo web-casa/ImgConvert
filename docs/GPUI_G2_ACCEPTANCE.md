@@ -359,3 +359,18 @@ Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-h
 | 恢复后重试 | `chmod 755` 后再次开始，完成 638 B → 109 B，输出 `a-precision16.png`（109 B）写入成功 |
 
 确认框的正文是自绘区域，原生 AX 只暴露“取消 / 继续转换”两个按钮；本轮以按钮动作、文件 hash、错误文本和实际输出为证据，没有连续录屏。沙盒撤权重授权仍以重启授权路径覆盖，正式 MAS/TestFlight 仍属 G3。
+
+### 许可弹窗 VoiceOver 连续录屏
+
+在同一 v24 候选上补录许可弹窗（“关于与开源许可” / “About and licenses”）：
+
+| 语言 | 文件 | 时长 | 视频 | SHA256 |
+|---|---|---|---|---|
+| 中文 | `license-vo-video-zh2.mov` | 13.28 s | h264 3024x1900 | `3001e010aad462c8e4dfd52172d49f3392a9180ab1ac9eead16c22bb6e07647b` |
+| 英文 | `license-vo-video-en.mov` | 17.60 s | h264 3024x1900 | `c634a063a7bc3713eb0140c1046a09869d0c1629cd8b3a067b4d2479f0bb3cad` |
+
+- 英文 2 s 字幕为“About and licenses 编辑文本 在文本的开头插入的内容。 # GPU Third-Party Licenses”；5 s 为“Close, button”
+- 中文 2 s 字幕为“关于与开源许可 编辑文本 在文本的开头插入的内容。 # GPUI Third-Party Licenses”；4 s 为“向内 编辑文本 # GPUI Third-Party Licenses”
+- 两段结束都恢复原语言和原预览；英文段包含标题、正文开头和关闭按钮，中文段包含标题与正文开头。中文许可的完整正文滚动和关闭按钮未在这段视频中单独确认，不记作通过
+
+许可弹窗的标题/正文开头已双语覆盖；完整正文滚动仍待补，G2 继续开放。
