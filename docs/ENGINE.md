@@ -358,3 +358,8 @@ G2 原生 IME 检查使用 `check-gpui-macos-ime.applescript` 区分精确字段
 IME 焦点清理差分及来源核验工具保存在 `patches/gpui-ime-focus`；正常 GPUI workspace 通过 `[patch.crates-io]` 使用两个保留完整许可的本地运行时源码包 `gpui-pre` / `gpui-pre-macos` 0.3.8。Kit 五包保持 0.7.1，其余依赖版本不变；无需额外 Cargo 配置。候选在绘制后按实际 handler 的焦点/实体身份结束旧 client 的组合，再清理该窗口原生上下文；不把 Kit 行为补到业务表单。独立 Kit 测试工程通过既有 test-support 层的窄观察接口覆盖输入状态、缓存、焦点和补帧，仍须单独取得系统候选框原生证据。上游最小复现已获授权提交为 longbridge/gpui-kit#3605；上下文重置候选已通过指定原生 AX/CG 及独立窗口输入对照，正式接入保留 116 个必要源码、构建资源、manifest 与许可文件，来源核验按原始发布归档加差分逐字节复现，CI 检查实际选中的来源与版本。已发布的 Tauri 线不受影响；默认 GPUI 开发构建使用此修复，完整 G2 仍待剩余原生矩阵。
 
 后缀草稿清空后若进入未确认的 IME 组合，失焦仍按既有策略恢复已保存后缀；现在同时清除旧空草稿留下的 Required 提示。真正空草稿的默认值回退及提示、非法路径字符的归一化及 Adjusted 提示保持原行为。后缀反馈用原生 Label 暴露当前双语文字，不改变表单布局；组件回归分别核对未提交组合、普通空值回退及一次粘贴的归一化。
+
+
+## GPUI 模态语义焦点（已接入）
+
+文档只读控件把辅助角色绑定到实际编辑焦点，并复用 Kit Root 的 Tab/Shift-Tab 焦点约束；弹窗外的工作区辅助子树在模态存在期间隐藏。共享焦点的底层排序问题已由原始失败、接入后通过的回归固定：同一 `FocusId` 的旧排序项在再次注册时删除，避免反向 Tab 卡在同一 handle。上游报告为 longbridge/gpui-kit#3612，复现与差分见 `GPUI_TAB_STOP_REPRO.md`，补丁来源与校验见 `patches/gpui-ime-focus`。这些是无头交互结果，不替代原生键盘/VoiceOver 验收；当前证据和剩余工作见 `GPUI_G2_ACCEPTANCE.md`。

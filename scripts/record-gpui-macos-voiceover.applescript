@@ -3,17 +3,23 @@
 
 -- Collect actual VoiceOver output on the dedicated macOS acceptance account.
 -- Start a simultaneous full-screen recording and enable the caption panel first.
--- Usage: osascript scripts/record-gpui-macos-voiceover.applescript PID STEPS first|continue
+-- Usage: osascript scripts/record-gpui-macos-voiceover.applescript PID STEPS first|continue|current [EXACT_CURSOR]
 -- This navigates the VO cursor; it does not invoke controls or enable VoiceOver.
 -- Repeated phrases can mean the end of the current container, not extra coverage.
 on run argv
-    if (count of argv) is not 3 then error "Expected candidate PID, steps (1..100), and first|continue"
+    if (count of argv) < 3 or (count of argv) > 4 then error "Expected PID, steps, first|continue|current, and optional exact cursor"
     set targetPid to (item 1 of argv) as integer
     set stepCount to (item 2 of argv) as integer
     set startMode to item 3 of argv
     if targetPid < 1 then error "Expected a positive candidate PID"
     if stepCount < 1 or stepCount > 100 then error "Expected steps in 1..100"
-    if startMode is not "first" and startMode is not "continue" then error "Expected first|continue"
+    if startMode is not "first" and startMode is not "continue" and startMode is not "current" then error "Expected first|continue|current"
+    set expectedCursor to missing value
+    if (count of argv) is 4 then
+        if startMode is not "current" or stepCount is not 1 then error "Exact cursor requires one current observation"
+        set expectedCursor to item 4 of argv
+        if expectedCursor is "" then error "Expected a nonempty exact cursor"
+    end if
     my checkCandidate(targetPid)
     tell application "System Events"
         if not (exists process "VoiceOver") then error "Enable VoiceOver before collecting output"
@@ -29,12 +35,16 @@ on run argv
         tell application "VoiceOver"
             if stepIndex > 1 or startMode is "continue" then tell vo cursor to move right
             delay 0.5
-            set cursorText to text under cursor of vo cursor
-            set spokenText to content of last phrase
         end tell
-        set cursorBounds to my checkCursor(targetPid)
-        if cursorText is missing value then set cursorText to "[missing cursor text]"
-        if spokenText is missing value or spokenText is "" then error "VoiceOver returned no last phrase"
+        set observation to my stableObservation(targetPid)
+        set cursorText to item 1 of observation
+        set spokenText to item 2 of observation
+        set cursorBounds to item 3 of observation
+        if expectedCursor is not missing value then
+            considering case, diacriticals
+                if cursorText is not expectedCursor then error "Unexpected VoiceOver cursor: " & cursorText
+            end considering
+        end if
         set report to report & stepIndex & " | bounds: " & (item 1 of cursorBounds) & "," & (item 2 of cursorBounds) & "," & (item 3 of cursorBounds) & "," & (item 4 of cursorBounds) & " | cursor: " & cursorText & linefeed & "phrase: " & spokenText & linefeed
     end repeat
     my checkCandidate(targetPid)
@@ -79,3 +89,31 @@ on checkCursor(targetPid)
     if cursorRight > ((item 1 of windowPosition) + (item 1 of windowSize)) or cursorBottom > ((item 2 of windowPosition) + (item 2 of windowSize)) then error "VoiceOver cursor is outside the candidate window"
     return cursorBounds
 end checkCursor
+
+-- last phrase is speech history, not the selected control's identity. Wait for
+-- a nonempty, stable cursor/rectangle; retain speech as separate evidence.
+-- Stability does not establish that the last phrase is new or belongs to it.
+on stableObservation(targetPid)
+    set previousObservation to missing value
+    repeat 20 times
+        my checkCandidate(targetPid)
+        tell application "VoiceOver"
+            set cursorText to text under cursor of vo cursor
+            set spokenText to content of last phrase
+        end tell
+        set cursorBounds to my checkCursor(targetPid)
+        if cursorText is not missing value and cursorText is not "" and spokenText is not missing value and spokenText is not "" then
+            set currentObservation to {cursorText, cursorBounds}
+            if previousObservation is not missing value then
+                considering case, diacriticals
+                    if currentObservation is previousObservation then return {cursorText, spokenText, cursorBounds}
+                end considering
+            end if
+            set previousObservation to currentObservation
+        else
+            set previousObservation to missing value
+        end if
+        delay 0.25
+    end repeat
+    error "VoiceOver cursor did not stabilize"
+end stableObservation

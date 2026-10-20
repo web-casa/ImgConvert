@@ -2134,6 +2134,116 @@ fn copy_legal_document(cx: &mut TestAppContext, handle: gpui_kit::AnyWindowHandl
 }
 
 #[gpui_kit::test]
+fn legal_dialogs_focus_the_reading_control_on_open_and_restore_the_trigger(
+    cx: &mut TestAppContext,
+) {
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    for (trigger, expected, expected_label) in [
+        (
+            "privacy-open",
+            include_str!("../../../../../PRIVACY.en.md"),
+            "Privacy and support",
+        ),
+        (
+            "licenses-open",
+            include_str!("../../../THIRD_PARTY_LICENSES.md"),
+            "About and licenses",
+        ),
+    ] {
+        cx.update_window(handle, |_, window, cx| {
+            window.activate_window();
+            window.render_frame(cx);
+            for _ in 0..40 {
+                if window.find(trigger).focused() == Some(true) {
+                    break;
+                }
+                window.press("tab", cx);
+                window.render_frame(cx);
+            }
+            assert_eq!(window.find(trigger).focused(), Some(true));
+            cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string("before opening".into()));
+            window.press("enter", cx);
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx));
+            assert_eq!(
+                window.find("legal-document").role(),
+                Some(gpui_kit::Role::MultilineTextInput)
+            );
+            assert_eq!(window.find("legal-document").label(), Some(expected_label));
+            assert_eq!(window.find("legal-document").focused(), Some(true));
+            // No click or Tab to focus the body: opening owns initial focus.
+            window.press("secondary-a", cx);
+            window.press("secondary-c", cx);
+            assert_eq!(
+                cx.read_from_clipboard()
+                    .and_then(|item| item.text())
+                    .as_deref(),
+                Some(expected)
+            );
+        })
+        .unwrap();
+        // Root action dispatch is deferred. End each platform event before
+        // inspecting the resulting frame, as a native key event does.
+        for (key, expected_document) in [("tab", false), ("shift-tab", true), ("shift-tab", false)]
+        {
+            cx.update_window(handle, |_, window, cx| window.press(key, cx))
+                .unwrap();
+            cx.update_window(handle, |_, window, cx| {
+                window.render_frame(cx);
+                assert_eq!(
+                    window.find("legal-document").focused(),
+                    Some(expected_document)
+                );
+                let trap = gpui_kit::base::active_focus_trap(window, cx)
+                    .expect("focus must stay inside the legal dialog");
+                assert!(trap.contains_focused(window, cx));
+            })
+            .unwrap();
+        }
+        let first = cx
+            .update_window(handle, |_, window, cx| window.focused(cx).unwrap())
+            .unwrap();
+        let mut visited = vec![first.clone()];
+        let mut completed_cycle = false;
+        for _ in 0..8 {
+            cx.update_window(handle, |_, window, cx| window.press("shift-tab", cx))
+                .unwrap();
+            let focused = cx
+                .update_window(handle, |_, window, cx| {
+                    window.render_frame(cx);
+                    assert!(gpui_kit::base::active_focus_trap(window, cx).is_some());
+                    window.focused(cx).unwrap()
+                })
+                .unwrap();
+            assert_ne!(visited.last(), Some(&focused), "reverse Tab must move");
+            if focused == first {
+                completed_cycle = true;
+                break;
+            }
+            assert!(
+                !visited.contains(&focused),
+                "only the cycle start may repeat"
+            );
+            visited.push(focused);
+        }
+        assert!(completed_cycle, "reverse Tab must complete a modal cycle");
+        assert_eq!(visited.len(), 4, "both close buttons, document and support");
+        cx.update_window(handle, |_, window, cx| {
+            window.press("escape", cx);
+            window.render_frame(cx);
+            assert!(!window.has_active_dialog(cx));
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update_window(handle, |_, window, _| {
+            assert_eq!(window.find(trigger).focused(), Some(true));
+        })
+        .unwrap();
+    }
+}
+
+#[gpui_kit::test]
 fn privacy_policy_is_offline_readonly_localized_and_restores_focus(cx: &mut TestAppContext) {
     let _locale = locale_guard();
     let (handle, _) = open_workspace_sized(cx, size(px(760.), px(480.)));
@@ -2175,8 +2285,9 @@ fn privacy_policy_is_offline_readonly_localized_and_restores_focus(cx: &mut Test
         cx.opened_url().is_none(),
         "opening a local document does not open a browser"
     );
+    cx.update_window(handle, |_, window, cx| window.press("tab", cx))
+        .unwrap();
     cx.update_window(handle, |_, window, cx| {
-        window.press("tab", cx);
         window.render_frame(cx);
         window.press("enter", cx);
     })

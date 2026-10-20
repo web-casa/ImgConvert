@@ -8,9 +8,10 @@ use gpui_kit::base::Link;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::input::{IndentInline, OutdentInline, Textarea, TextareaState};
 use gpui_kit::component::{ActiveTheme as _, WindowExt as _, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
+    App, AppContext as _, Context, Entity, Focusable as _, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, Role, SharedString, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, Window, div,
 };
 use gpui_kit::{Global, KeyBinding};
@@ -107,6 +108,8 @@ impl Render for LegalDialog {
         // window size, while rem bounds its comfortable size and follows zoom.
         let ring = cx.theme().ring;
         let height = (window.viewport_size().height * 0.45).min(window.rem_size() * 24.);
+        let document_focus = self.document.focus_handle(cx);
+        let accessible_value = window.is_a11y_active().then(|| self.text(cx));
         v_flex()
             .id("legal-dialog")
             .test_support()
@@ -127,16 +130,39 @@ impl Render for LegalDialog {
                 div()
                     .id("legal-document")
                     .test_support()
+                    // Kit 0.7.1 paints the textarea frame and its editor as
+                    // separate nodes. The wrapper carries the single announced
+                    // text node bound to the editor's real keyboard focus; the
+                    // inner textarea is presentational, and the wrapper is
+                    // explicitly read-only. Input behavior is unchanged.
+                    .role(Role::MultilineTextInput)
+                    .track_focus(&document_focus)
                     .aria_label(self.kind.title())
+                    .when_some(accessible_value, |document, value| {
+                        document.aria_value(value)
+                    })
+                    .a11y_synthetic_children(|builder| builder.parent_node().set_read_only())
                     // The input context binds Tab to indentation even when
                     // read-only. Route those actions to normal dialog traversal.
-                    .on_action(|_: &IndentInline, window, cx| window.focus_next(cx))
-                    .on_action(|_: &OutdentInline, window, cx| window.focus_prev(cx))
+                    .on_action(|_: &IndentInline, window, cx| {
+                        if let Ok(action) = cx.build_action("root::Tab", None) {
+                            window.dispatch_action(action, cx);
+                        } else {
+                            window.focus_next(cx);
+                        }
+                    })
+                    .on_action(|_: &OutdentInline, window, cx| {
+                        if let Ok(action) = cx.build_action("root::TabPrev", None) {
+                            window.dispatch_action(action, cx);
+                        } else {
+                            window.focus_prev(cx);
+                        }
+                    })
                     .child(
                         Textarea::new(&self.document)
                             .readonly(true)
                             .h(height)
-                            .aria_label(self.kind.title()),
+                            .role(None::<Role>),
                     ),
             )
             .child(
@@ -183,6 +209,13 @@ fn open(kind: DocumentKind, window: &mut Window, cx: &mut App) -> Entity<LegalDi
                     .label(tr("legal.close"))
                     .on_click(|_, window, cx| window.close_dialog(cx)),
             )
+    });
+    // The modal host's focus handle has no readable content. Put initial
+    // keyboard/AX focus on the retained reading control after Root saves the
+    // trigger, so VoiceOver enters the document and dismissal restores it.
+    view.update(cx, |view, cx| {
+        view.document
+            .update(cx, |document, cx| document.focus(window, cx));
     });
     view
 }

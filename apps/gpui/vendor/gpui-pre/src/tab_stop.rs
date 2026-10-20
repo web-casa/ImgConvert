@@ -85,7 +85,11 @@ impl TabStopMap {
             tab_stop: focus_handle.tab_stop,
             path,
         };
-        self.by_id.insert(focus_handle.id, order.clone());
+        // Re-registering a focus handle moves its one tab stop. Keep the
+        // ordered tree consistent with the last-registration lookup map.
+        if let Some(previous) = self.by_id.insert(focus_handle.id, order.clone()) {
+            self.order.remove(&previous, ());
+        }
         self.order.insert_or_replace(order, ());
     }
 

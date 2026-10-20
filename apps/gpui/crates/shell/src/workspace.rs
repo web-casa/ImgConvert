@@ -6,13 +6,16 @@
 //! action bar with the one decision (design: "Liquid Glass", 2026-10-18).
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, Icon, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
     FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
-    Render, Styled as _, StyledImage as _, Subscription, TestSupportExt as _, TitlebarOptions,
-    Window, WindowBounds, WindowOptions, div, img, px, rems, size,
+    Render, Role, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
+    TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div, img, px, rems,
+    size,
 };
 use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
@@ -335,6 +338,15 @@ impl Render for Workspace {
         div()
             .id("workspace")
             .test_support()
+            // Root renders its dialogs outside this subtree. Keyboard trapping
+            // alone does not prevent VO from walking the background controls.
+            .when(window.has_active_dialog(cx), |workspace| {
+                workspace
+                    .role(Role::Group)
+                    .a11y_synthetic_children(|builder| {
+                        builder.parent_node().set_hidden();
+                    })
+            })
             .key_context("Workspace")
             .on_action(|_: &gpui_kit::component::input::Paste, _, cx| {
                 imgconvert_gpui_queue::clipboard::paste(cx);
