@@ -403,4 +403,4 @@ v1（2026-10-18）：首版。
 | 21 | P3 | “不进入任何 Release”限定阶段；S8 内部渠道 | 采纳 |
 
 
-2026-10-20（G2 模态焦点修复，开发中）：#42 已授权合并 main `e858689`。文档 AX/键盘焦点分离及共享 handle 的 Shift-Tab 排序 P2 已定位；最小复现经用户授权提交为 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)，见 `GPUI_TAB_STOP_REPRO.md`。正式 vendor 已接入一行 TabStopMap 修复，差分/manifest/文件清单同步更新；原始共享 handle 与缓存重放两项回归在未修源码上失败、接入后通过，法律弹窗反向循环 UI 测试同样转为通过；Tab stop 状态切换作为不变量两边均通过。同 head CI 与 Windows/macOS probe 已完成；正常构建的原生复验及完整 VO/模态证据仍待完成，见 `GPUI_G2_ACCEPTANCE.md`。G2 不关闭，后续阶段不提前启动。
+2026-10-20（G2 模态焦点修复，开发中）：#42 已授权合并 main `e858689`。文档 AX/键盘焦点分离及共享 handle 的 Shift-Tab 排序 P2 已定位；最小复现经用户授权提交为 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)，见 `GPUI_TAB_STOP_REPRO.md`。正式 vendor 已接入一行 TabStopMap 修复，差分/manifest/文件清单同步更新；原始共享 handle 与缓存重放两项回归在未修源码上失败、接入后通过，法律弹窗反向循环 UI 测试同样转为通过；Tab stop 状态切换作为不变量两边均通过。同 head CI 与 Windows/macOS probe 已完成；正式接入候选的正常构建原生复验已取得双语正文 AX 焦点、正向/反向四控件循环、Escape 返回触发入口，实际 VO 正文朗读及完整矩阵仍待完成，见 `GPUI_G2_ACCEPTANCE.md`。G2 不关闭，后续阶段不提前启动。

@@ -281,4 +281,19 @@ Mac 初版候选确认模态期间背景入口从 2 个变为 0，关闭后恢�
 Mac 隔离构建（显式 `--config`，不是正式源码接入）已完成 ad-hoc 沙盒 deep/strict 验签，主程序 SHA256 `a74bd4f37fb4cd6bbf4c42cb70f897c334ee49d378beaea164bc93c871d4c715`，锁文件保持原字节。首次探针在弹窗刚出现即断言 `AXFocusedUIElement=AXTextArea`，实际仍为 AXWindow，未通过。复测等待稳定后，实际 VO cursor 连续四次分别为“隐私与支持 编辑文本”与“Privacy and support 编辑文本”；没有在打开后调用 AXRaise、移至第一项或重定位 cursor。实际 Escape 后模态消失且背景入口恢复；精确 current 正例和错误大小写拒绝均有原始记录。字幕 `last phrase` 此时为空、原生 focus 属性仍为 AXWindow，因此仅确认双语 VO 光标进入文档，不据此声称完整朗读/原生焦点验收通过。
 
 
-最新复测最终因附加键盘步骤在 45 次 Tab 内未从进程的 `AXFocusedUIElement` 观察到 Privacy 而退出失败，不能证明原生键盘返回入口。此前双语实际 cursor、真实模态关闭与语言往返的记录保留，但整段探针不记为通过。finally 已逐字段核对专用设置恢复、关闭 VoiceOver、恢复字幕与录屏偏好、退出候选并重新启动原预览 PID `14937`。原始结果已取回本地 `modal-native18-retry.log`。改动已提交为 `5bcc62f` 并创建 PR #43；正式补丁已通过本地来源/差分核验与 102 项无头回归。同 head CI run 39402451663 全部必需作业通过；Windows probe run 39402722966（x64/arm64）与 macOS probe run 39405422780（x64/arm64）通过。上面的 Mac 证据来自隔离候选，不是接入补丁后的正式 `--locked` 构建；正常构建的原生复验尚未完成；无头/构建 CI 与 Windows/macOS probe 已完成，详见 PR #43。
+最新复测最终因附加键盘步骤在 45 次 Tab 内未从进程的 `AXFocusedUIElement` 观察到 Privacy 而退出失败，不能证明原生键盘返回入口。此前双语实际 cursor、真实模态关闭与语言往返的记录保留，但整段探针不记为通过。finally 已逐字段核对专用设置恢复、关闭 VoiceOver、恢复字幕与录屏偏好、退出候选并重新启动原预览 PID `14937`。原始结果已取回本地 `modal-native18-retry.log`。改动已提交为 `5bcc62f` 并创建 PR #43；正式补丁已通过本地来源/差分核验与 102 项无头回归。同 head CI run 39402451663 全部必需作业通过；Windows probe run 39402722966（x64/arm64）与 macOS probe run 39405422780（x64/arm64）通过。上面较早的 Mac 证据来自隔离候选；正式接入候选的正常构建原生复验已在下节记录。无头/构建 CI 与 Windows/macOS probe 已完成，详见 PR #43。
+
+
+## 2026-10-20：正式接入候选 Mac 原生模态焦点与键盘复验
+
+在专用 macOS 13.6 / arm64 测试账号，用 PR #43 的提交 `7285d43` 做正常 `cargo build --release --locked --no-default-features -p imgconvert-gpui`（无额外 config；`IMGCONVERT_DISABLE_EXTERNAL_CODECS=1`、`IMGCONVERT_DISABLE_UPDATER=1`），再以 ad-hoc runtime 签名、最小 entitlements（`com.apple.security.app-sandbox`、`com.apple.security.files.user-selected.read-write`）做 deep/strict 验签。主程序 SHA256 `79fd63feb08b76f743d7628ee630a3a6f5d951de2bc1a01ba31be1504099e7d7`；`legal.rs` / `workspace.rs` / `tab_stop.rs` / 锁文件 hash 与提交一致，补丁前的隔离构建和实验性 `div.rs` 改动未用于本候选。
+
+实际结果（中英各一次，中文在前）：
+
+- 原生 AX 树中正文节点为 `AXTextArea|隐私与支持` 与 `AXTextArea|Privacy and support`，`focused=true`；进程级 `AXFocusedUIElement` 仍返回 `AXWindow`，属于该 API 的读取差异（正文节点自身 focus 属性为真），不再据此判焦点失败。
+- 实际 VO cursor 连续三次分别读到“隐私与支持 编辑文本”和“Privacy and support 编辑文本”；`last phrase` 仍为“你当前在‘窗口’中。”，不是正文朗读，因此仅确认光标/焦点进入正文，不声称完整 VO 朗读通过。
+- 键盘正向循环：正文 → 支持链接 → 页脚关闭 → 标题栏关闭 → 正文；反向循环为严格逆序，两种语言均通过。`AXButton|关闭` 与 `AXButton|Close` 的两个关闭控件用屏幕位置区分。
+- `Escape` 关闭弹窗并返回触发按钮（`AXButton|隐私` / `AXButton|Privacy`）；`Return` 重新打开后正文再次获得焦点。
+- 探针结束时关闭 VoiceOver、恢复中文界面与原预览（PID `18684`），未修改 TCC/SIP 或系统权限；测试只使用专用账号及合成文档。
+
+这次正常构建原生复验补上了正文 AX 焦点、键盘进入/离开/反向循环和 Escape 返回触发入口；实际 VO 标题/正文朗读记录、连续录屏及剩余 IME/沙盒矩阵仍开放，G2 不关闭。
