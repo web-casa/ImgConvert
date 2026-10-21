@@ -5,7 +5,10 @@
 
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::test::TestWindowExt;
-use gpui_kit::{AppContext, Bounds, TestAppContext, WindowBounds, WindowOptions, px, size};
+use gpui_kit::{
+    AppContext, Bounds, ExternalPaths, FileDropEvent, InputEvent, TestAppContext, WindowBounds,
+    WindowOptions, point, px, size,
+};
 use imgconvert_backend::settings::{AppLocale, Settings};
 use imgconvert_gpui::{Workspace, init_app, toggle_language};
 use imgconvert_gpui_shared::i18n::{Locale, set_locale};
@@ -80,6 +83,117 @@ fn empty_queue_shows_the_next_action_and_disables_start(cx: &mut TestAppContext)
     cx.update(|cx| {
         assert!(!AppModels::global(cx).batch().read(cx).is_active());
     });
+}
+
+#[gpui_kit::test]
+fn external_file_drop_imports_a_png_into_an_empty_queue(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-gpui-drop-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("dropped.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    let paths = ExternalPaths([input.clone()].into_iter().collect());
+
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let position = point(px(400.), px(300.));
+        window.dispatch_event(
+            FileDropEvent::Entered {
+                position,
+                paths: paths.clone(),
+            }
+            .to_platform_input(),
+            cx,
+        );
+        window.dispatch_event(FileDropEvent::Pending { position }.to_platform_input(), cx);
+        window.dispatch_event(FileDropEvent::Submit { position }.to_platform_input(), cx);
+    })
+    .unwrap();
+    wait_for_import(cx);
+
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        let item = &queue.items()[0];
+        assert_eq!(item.name.as_ref(), "dropped.png");
+        assert_eq!(item.path.as_ref(), input.to_string_lossy());
+        assert!(
+            matches!(item.status, ItemStatus::Pending),
+            "{:?}",
+            item.status
+        );
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+fn external_file_drop_is_ignored_while_a_modal_is_open(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir =
+        std::env::temp_dir().join(format!("imgconvert-gpui-drop-modal-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("behind-dialog.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    let paths = ExternalPaths([input.clone()].into_iter().collect());
+
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("privacy-open", cx);
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx));
+        let position = point(px(400.), px(300.));
+        window.dispatch_event(
+            FileDropEvent::Entered { position, paths }.to_platform_input(),
+            cx,
+        );
+        window.dispatch_event(FileDropEvent::Pending { position }.to_platform_input(), cx);
+        window.dispatch_event(FileDropEvent::Submit { position }.to_platform_input(), cx);
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx));
+    })
+    .unwrap();
+    wait_for_import(cx);
+
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert!(
+            queue.is_empty(),
+            "modal must shield the queue from file drops"
+        );
+    });
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[gpui_kit::test]
+fn external_file_drag_exit_does_not_import(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let dir =
+        std::env::temp_dir().join(format!("imgconvert-gpui-drop-exit-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("cancelled.png");
+    std::fs::write(&input, one_by_one_png()).unwrap();
+    let paths = ExternalPaths([input.clone()].into_iter().collect());
+
+    cx.update_window(handle, |_, window, cx| {
+        window.dispatch_event(
+            FileDropEvent::Entered {
+                position: point(px(20.), px(30.)),
+                paths,
+            }
+            .to_platform_input(),
+            cx,
+        );
+        window.dispatch_event(FileDropEvent::Exited.to_platform_input(), cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().read(cx);
+        assert!(queue.is_empty(), "drag exit must not import");
+    });
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[gpui_kit::test]
