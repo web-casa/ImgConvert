@@ -6940,7 +6940,7 @@
     },
     {
       "name": "rustls-webpki",
-      "version": "0.103.15",
+      "version": "0.103.16",
       "license": "ISC",
       "authors": [],
       "repository": "https://github.com/rustls/webpki",
@@ -11750,5 +11750,5 @@
       "sha256": "efa1224931b98468f5005f77285457f8d2eab0a77a15941aa10abbab1ae9a74e"
     }
   ],
-  "documentSha256": "885a3f08c2525a2b1a4145204079e0fdcfad8f4327c52d929eeef902416298b0"
+  "documentSha256": "fbd1d9d10013d5e2ff8d0df123c151397acc0288a2b6071c1c6598d9016586ee"
 }
