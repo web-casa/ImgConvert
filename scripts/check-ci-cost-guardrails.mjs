@@ -215,15 +215,16 @@ function checkAutomaticLinuxCiWorkflow() {
   }
   const rustCacheAction = "Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6";
   const rustCacheCount = ci.split(rustCacheAction).length - 1;
-  if (rustCacheCount !== 3) {
+  if (rustCacheCount !== 4) {
     failures.push(
-      `ci.yml must cache the fuzz, Tauri desktop and GPUI shell jobs with pinned rust-cache (found ${rustCacheCount})`,
+      `ci.yml must cache the fuzz, Tauri desktop, GPUI shell and GPUI macOS pixel jobs with pinned rust-cache (found ${rustCacheCount})`,
     );
   }
   for (const marker of [
     "shared-key: ubuntu-fuzz-corpus",
     "shared-key: ubuntu-tauri-backend-e2e",
     "shared-key: ubuntu-gpui-shell",
+    "shared-key: macos-gpui-pixels",
     "src-tauri/fuzz -> target",
     "cache-bin: true",
   ]) {
