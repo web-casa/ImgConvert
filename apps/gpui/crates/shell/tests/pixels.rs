@@ -33,6 +33,20 @@ fn pixel_tests_enabled() -> bool {
     std::env::var("IMGCONVERT_PIXEL_TESTS").as_deref() == Ok("1")
 }
 
+/// GPUI's macOS platform must be created on the process main thread. The Rust
+/// test harness runs each test on a worker thread, so macOS needs a custom
+/// main-thread harness before these pixel checks can run there.
+fn main_thread_available() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        std::thread::current().name() == Some("main")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
 #[test]
 fn headless_renderer_captures_a_solid_red_frame() {
     if !pixel_tests_enabled() {
@@ -40,6 +54,10 @@ fn headless_renderer_captures_a_solid_red_frame() {
         return;
     }
     let platform = gpui_kit::platform::current_platform(false);
+    if !main_thread_available() {
+        eprintln!("skipping pixel test: macOS needs a main-thread harness");
+        return;
+    }
     if !matches!(gpui_kit::platform::current_headless_renderer(), Ok(Some(_))) {
         eprintln!("skipping pixel test: no headless renderer on this platform");
         return;
@@ -73,6 +91,10 @@ fn headless_renderer_captures_the_workspace_surface() {
         eprintln!(
             "skipping workspace pixel test: set IMGCONVERT_PIXEL_TESTS=1 on a GPU-capable runner"
         );
+        return;
+    }
+    if !main_thread_available() {
+        eprintln!("skipping workspace pixel test: macOS needs a main-thread harness");
         return;
     }
     if !matches!(gpui_kit::platform::current_headless_renderer(), Ok(Some(_))) {
