@@ -810,7 +810,7 @@ project documentation (docs/LEGAL.md).
 - rustls-native-certs@0.8.5 — Apache-2.0 OR ISC OR MIT — https://github.com/rustls/rustls-native-certs
 - rustls-pemfile@2.2.0 — Apache-2.0 OR ISC OR MIT — https://github.com/rustls/pemfile
 - rustls-pki-types@1.15.1 — MIT OR Apache-2.0 — https://github.com/rustls/pki-types
-- rustls-webpki@0.103.15 — ISC — https://github.com/rustls/webpki
+- rustls-webpki@0.103.16 — ISC — https://github.com/rustls/webpki
 - rustls@0.23.46 — Apache-2.0 OR ISC OR MIT — https://github.com/rustls/rustls
 - rustversion@1.0.23 — MIT OR Apache-2.0 — Authors: David Tolnay <dtolnay@gmail.com> — https://github.com/dtolnay/rustversion
 - rusty-fork@0.3.1 — MIT OR Apache-2.0 — Authors: Jason Lingle — https://github.com/altsysrq/rusty-fork
@@ -13596,7 +13596,7 @@ We are required to state that
 ### ISC
 
 Used by:
-- rustls-webpki@0.103.15
+- rustls-webpki@0.103.16
 
 Except as otherwise noted, this project is licensed under the following
 (ISC-style) terms:
