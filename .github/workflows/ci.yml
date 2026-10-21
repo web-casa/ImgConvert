@@ -106,6 +106,9 @@ jobs:
             libxcb1-dev \
             libfontconfig1-dev \
             libvulkan-dev \
+            libvulkan1 \
+            mesa-vulkan-drivers \
+            xvfb \
             libssl-dev
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
         with:
@@ -118,6 +121,15 @@ jobs:
       - run: cargo fmt --manifest-path apps/gpui/Cargo.toml --all --check
       - run: cargo clippy --manifest-path apps/gpui/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path apps/gpui/Cargo.toml --workspace --locked
+      - name: Run headless pixel tests with lavapipe
+        env:
+          IMGCONVERT_PIXEL_TESTS: "1"
+          WGPU_BACKEND: vulkan
+        run: |
+          icd="$(find /usr/share/vulkan/icd.d -maxdepth 1 -name 'lvp_icd*.json' | head -n 1)"
+          test -n "${icd}"
+          export VK_ICD_FILENAMES="${icd}"
+          timeout 180s xvfb-run -a cargo test --manifest-path apps/gpui/Cargo.toml -p imgconvert-gpui --test pixels --locked
       - name: Verify active IME source overrides and locked dependency matrix
         run: python3 patches/gpui-ime-focus/verify.py --metadata
 
