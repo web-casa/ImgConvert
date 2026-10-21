@@ -133,6 +133,28 @@ jobs:
       - name: Verify active IME source overrides and locked dependency matrix
         run: python3 patches/gpui-ime-focus/verify.py --metadata
 
+  gpui-pixels-macos:
+    name: GPUI Pixels (macOS arm64)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install native build tools
+        run: brew install cmake meson ninja
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: macos-gpui-pixels
+          workspaces: apps/gpui -> target
+      # GPUI's macOS platform must be created on the process main thread, so
+      # these run through the harness=false pixels_macos target.
+      - name: Run headless pixel tests on Metal
+        env:
+          IMGCONVERT_PIXEL_TESTS: "1"
+          IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+          IMGCONVERT_DISABLE_UPDATER: "1"
+        run: cargo test --manifest-path apps/gpui/Cargo.toml --no-default-features -p imgconvert-gpui --test pixels_macos --locked
+
   fuzz-corpus:
     name: Fuzz Corpus Replay
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.fuzz_corpus }}

@@ -36,3 +36,8 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "pixels_macos"
+path = "tests/pixels_macos.rs"
+harness = false
