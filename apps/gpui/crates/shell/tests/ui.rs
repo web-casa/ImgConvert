@@ -277,7 +277,7 @@ fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut Tes
 #[gpui_kit::test]
 fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
     use imgconvert_backend::settings::ResizeMode;
-    use imgconvert_gpui_workflow::{NumberField, Section, SliderKind};
+    use imgconvert_gpui_workflow::{NumberField, Section, SettingsTab, SliderKind};
 
     let _locale = locale_guard();
 
@@ -296,7 +296,7 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
         cx.update_window(handle, |_, window, cx| {
             form.update(cx, |form, cx| form.set_format(format, window, cx));
             for section in Section::ALL {
-                form.update(cx, |form, cx| form.set_open_section(Some(section), cx));
+                form.update(cx, |form, cx| form.show_section(section, cx));
                 window.render_frame(cx);
             }
         })
@@ -307,7 +307,7 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
     // accordion body springs open, so the clock advances until it settled.
     cx.update(|cx| {
         form.update(cx, |form, cx| {
-            form.set_open_section(Some(Section::Compression), cx);
+            form.show_section(Section::Compression, cx);
         });
     });
     settle_animations(cx, handle);
@@ -418,7 +418,7 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
     // Sliders are keyboard-operable: focus the quality wrapper, press keys.
     cx.update_window(handle, |_, window, cx| {
         form.update(cx, |form, cx| {
-            form.set_open_section(None, cx);
+            form.set_tab(SettingsTab::Format, cx);
             form.focus_slider(SliderKind::Quality, window, cx);
         });
         window.render_frame(cx);
@@ -441,8 +441,27 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
     cx.update_window(handle, |_, window, cx| {
         form.update(cx, |form, cx| form.set_format("avif", window, cx));
         assert!(form.read(cx).has_invalid_configuration(cx));
+        // The warning is findable from another tab: the Processing tab names it.
+        form.update(cx, |form, cx| form.set_tab(SettingsTab::Format, cx));
+        window.render_frame(cx);
+        let processing = imgconvert_gpui_shared::i18n::tr(SettingsTab::Processing.title_key());
+        assert_eq!(
+            window.find(SettingsTab::Processing.id()).label(),
+            Some(
+                imgconvert_gpui_shared::i18n::tr_with(
+                    "settings.tab_has_issue",
+                    &[("tab", &processing)],
+                )
+                .as_ref()
+            )
+        );
+        assert_eq!(
+            window.find(SettingsTab::Output.id()).label(),
+            Some(imgconvert_gpui_shared::i18n::tr(SettingsTab::Output.title_key()).as_ref()),
+            "a tab without a refused value carries no warning"
+        );
         form.update(cx, |form, cx| {
-            form.set_open_section(Some(Section::TargetSize), cx);
+            form.show_section(Section::TargetSize, cx);
         });
         window.render_frame(cx);
     })
@@ -853,7 +872,6 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
     use gpui_kit::component::{ActiveTheme as _, Theme, ThemeMode};
     use imgconvert_backend::settings::Theme as ThemePreference;
     use imgconvert_gpui_shared::theme::{ActiveGlass as _, DARK_THEME_NAME, LIGHT_THEME_NAME};
-    use imgconvert_gpui_workflow::Section;
 
     fn edit(cx: &mut TestAppContext, apply: impl FnOnce(&mut Settings)) {
         cx.update(|cx| {
@@ -868,7 +886,7 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
 
     let _locale = locale_guard();
     // Tall enough for the appearance section, the last one, to be clickable.
-    let (handle, workspace) = open_workspace_sized(cx, size(px(1_000.), px(1_400.)));
+    let (handle, _workspace) = open_workspace_sized(cx, size(px(1_000.), px(1_400.)));
 
     // "System" (the default) under the test platform's light appearance.
     cx.update(|cx| {
@@ -926,24 +944,46 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
     });
     cx.update(|cx| Theme::update(cx, |theme| theme.radius = px(10.)));
 
-    // The appearance section's switch writes the record, and the record
-    // drives GPUI's reduced-motion flag.
-    let form = cx.update(|cx| {
-        workspace
-            .read(cx)
-            .workflow()
-            .read(cx)
-            .settings_form()
-            .clone()
-    });
-    cx.update(|cx| {
-        form.update(cx, |form, cx| {
-            form.set_open_section(Some(Section::Appearance), cx);
-        });
-    });
+    // The Appearance popover's controls write the record, and the record
+    // drives the theme and GPUI's reduced-motion flag.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("workspace-appearance", cx);
+    })
+    .unwrap();
     settle_animations(cx, handle);
     cx.update_window(handle, |_, window, cx| {
-        assert!(window.find("workflow-theme").visible());
+        window.render_frame(cx);
+        assert!(window.find("appearance-panel").visible());
+        assert_eq!(window.find("appearance-theme-light").checked(), Some(true));
+        window.click("appearance-theme-dark", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| assert!(cx.theme().is_dark(), "the popover switches the theme"));
+    // The theme group is one Tab stop; a click focuses it and arrows move.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(window.find("appearance-theme").focused(), Some(true));
+        window.press("left", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        assert_eq!(
+            AppModels::global(cx).settings().read(cx).settings().theme,
+            ThemePreference::Light
+        );
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.press("right", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| assert!(cx.theme().is_dark()));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
         assert!(window.find("switch-reduce-motion").visible());
         window.click("switch-reduce-motion", cx);
     })
@@ -1722,7 +1762,7 @@ fn clipboard_paste_in_a_settings_input_edits_text_without_importing(cx: &mut Tes
             .settings_form()
             .clone();
         form.update(cx, |form, cx| {
-            form.set_open_section(Some(Section::Output), cx);
+            form.show_section(Section::Output, cx);
         });
         window.render_frame(cx);
     })
@@ -1758,7 +1798,7 @@ fn open_output_suffix_editor(cx: &mut TestAppContext) -> gpui_kit::AnyWindowHand
             .settings_form()
             .clone();
         form.update(cx, |form, cx| {
-            form.set_open_section(Some(imgconvert_gpui_workflow::Section::Output), cx);
+            form.show_section(imgconvert_gpui_workflow::Section::Output, cx);
         });
         window.render_frame(cx);
     })
@@ -3042,7 +3082,7 @@ fn precision_warnings_survive_queue_completion_and_retranslate(cx: &mut TestAppC
 #[gpui_kit::test]
 fn settings_controls_expose_native_names_roles_and_toggle_state(cx: &mut TestAppContext) {
     use imgconvert_gpui_shared::i18n::{Locale, tr};
-    use imgconvert_gpui_workflow::Section;
+    use imgconvert_gpui_workflow::{Section, SettingsTab};
 
     let _locale = locale_guard();
     let (handle, workspace) = open_workspace(cx);
@@ -3060,68 +3100,130 @@ fn settings_controls_expose_native_names_roles_and_toggle_state(cx: &mut TestApp
             cx.refresh_windows();
         });
         cx.update_window(handle, |_, window, cx| {
-            form.update(cx, |form, cx| {
-                form.set_format("jpeg", window, cx);
-                form.set_open_section(None, cx);
-            });
-            window.render_frame(cx);
+            form.update(cx, |form, cx| form.set_format("jpeg", window, cx));
             for section in Section::ALL {
-                let header = window.find(section.id());
+                form.update(cx, |form, cx| form.show_section(section, cx));
+                window.render_frame(cx);
+                let heading = window.find(section.id());
+                assert_eq!(heading.role(), Some(gpui_kit::Role::Heading), "{section:?}");
                 assert!(
-                    header.label().is_some_and(|label| !label.is_empty()),
+                    heading.label().is_some_and(|label| !label.is_empty()),
                     "{section:?}"
                 );
-                assert_eq!(header.checked(), Some(false));
+                let tab = window.find(section.tab().id());
+                assert_eq!(tab.role(), Some(gpui_kit::Role::Tab), "{section:?}");
+                assert_eq!(tab.checked(), Some(true), "{section:?}");
             }
+            form.update(cx, |form, cx| form.show_section(Section::Output, cx));
+            window.render_frame(cx);
             assert_eq!(
                 window.find(Section::Output.id()).label(),
                 Some(tr("settings.output_section").as_ref())
             );
+            assert_eq!(window.find(SettingsTab::Format.id()).checked(), Some(false));
+            form.update(cx, |form, cx| form.set_tab(SettingsTab::Format, cx));
+            window.render_frame(cx);
             let quality = window.find("settings-quality");
             assert_eq!(quality.role(), Some(gpui_kit::Role::Slider));
             assert_eq!(quality.label(), Some(tr("settings.quality").as_ref()));
-            window.click("workflow-format", cx);
-            window.render_frame(cx);
-            let png_label = window.find("choice-label:png");
-            assert_eq!(png_label.role(), Some(gpui_kit::Role::Label));
-            assert_eq!(
-                png_label.label(),
-                None,
-                "static text must not repeat its value as a title"
-            );
-            assert_eq!(png_label.value(), Some("PNG"));
-            window.click("choice-label:png", cx);
+            let group = window.find("workflow-format");
+            assert_eq!(group.role(), Some(gpui_kit::Role::RadioGroup));
+            assert_eq!(group.label(), Some(tr("settings.target_format").as_ref()));
+            let png = window.find("format-card:png");
+            assert_eq!(png.role(), Some(gpui_kit::Role::RadioButton));
+            assert_eq!(png.label(), Some("PNG"));
+            assert_eq!(png.checked(), Some(false));
+            window.click("format-card:png", cx);
         })
         .unwrap();
         cx.run_until_parked();
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
-            assert_eq!(window.find("workflow-format").value(), Some("PNG"));
+            assert_eq!(window.find("format-card:png").checked(), Some(true));
             assert_eq!(
                 AppModels::global(cx).settings().read(cx).settings().format,
                 "png"
             );
-            window.click("workflow-format", cx);
+            // The card group is one Tab stop; arrows move the selection.
+            assert_eq!(window.find("workflow-format").focused(), Some(true));
+            window.press("left", cx);
             window.render_frame(cx);
-            window.press("up", cx);
-            window.press("enter", cx);
-        })
-        .unwrap();
-        cx.run_until_parked();
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            assert_eq!(window.find("workflow-format").value(), Some("JPEG"));
+            assert_eq!(window.find("format-card:jpeg").checked(), Some(true));
             assert_eq!(
                 AppModels::global(cx).settings().read(cx).settings().format,
                 "jpeg"
             );
-            form.update(cx, |form, cx| {
-                form.set_open_section(Some(Section::Output), cx);
-            });
+            window.press("end", cx);
+            assert_eq!(
+                AppModels::global(cx).settings().read(cx).settings().format,
+                "avif"
+            );
+            window.press("left", cx);
+            assert_eq!(
+                AppModels::global(cx).settings().read(cx).settings().format,
+                "webp"
+            );
+            form.update(cx, |form, cx| form.set_format("jpeg", window, cx));
+            window.click(SettingsTab::Output.id(), cx);
             window.render_frame(cx);
-            assert_eq!(window.find(Section::Output.id()).checked(), Some(true));
+            assert_eq!(window.find(SettingsTab::Output.id()).checked(), Some(true));
+            assert!(window.find(Section::Output.id()).visible());
+            // A click keeps focus on the tab list, which takes arrow keys.
+            assert_eq!(window.find("settings-tabs").focused(), Some(true));
+            window.press("right", cx);
+            window.render_frame(cx);
+            assert_eq!(
+                window.find(SettingsTab::Processing.id()).checked(),
+                Some(true)
+            );
+            window.press("home", cx);
+            window.render_frame(cx);
+            assert_eq!(window.find(SettingsTab::Format.id()).checked(), Some(true));
+            // The format group is a real Tab stop between the tabs and quality.
+            window.press("tab", cx);
+            window.render_frame(cx);
+            assert_ne!(window.find("settings-tabs").focused(), Some(true));
+            form.update(cx, |form, cx| form.focus_format(window, cx));
+            window.render_frame(cx);
+            window.press("tab", cx);
+            window.render_frame(cx);
+            assert_eq!(window.find("settings-quality").focused(), Some(true));
+            window.press("shift-tab", cx);
+            window.render_frame(cx);
+            assert_eq!(window.find("workflow-format").focused(), Some(true));
         })
         .unwrap();
+        // A batch that starts while the group has focus keeps that focus;
+        // keys wait until the batch ends.
+        cx.update(|cx| {
+            AppModels::global(cx)
+                .batch()
+                .clone()
+                .update(cx, |batch, cx| {
+                    batch.begin(imgconvert_backend::progress::BatchId::new(31), Vec::new());
+                    cx.notify();
+                });
+        });
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(window.find("workflow-format").focused(), Some(true));
+            window.press("right", cx);
+            assert_eq!(
+                AppModels::global(cx).settings().read(cx).settings().format,
+                "jpeg",
+                "keys are ignored while busy"
+            );
+        })
+        .unwrap();
+        cx.update(|cx| {
+            AppModels::global(cx)
+                .batch()
+                .clone()
+                .update(cx, |batch, cx| {
+                    *batch = imgconvert_gpui_shared::BatchModel::default();
+                    cx.notify();
+                });
+        });
     }
 }
 
@@ -3141,7 +3243,7 @@ fn quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy(cx: &mut T
     cx.update_window(handle, |_, window, cx| {
         form.update(cx, |form, cx| {
             form.set_format("jpeg", window, cx);
-            form.set_open_section(Some(Section::FormatParameters), cx);
+            form.show_section(Section::FormatParameters, cx);
             form.apply_slider(SliderKind::QualityFloor, 0., cx);
             form.focus_slider(SliderKind::QualityFloor, window, cx);
         });
@@ -3209,10 +3311,9 @@ fn quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy(cx: &mut T
 #[gpui_kit::test]
 fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut TestAppContext) {
     use imgconvert_backend::settings::Theme;
-    use imgconvert_gpui_workflow::Section;
 
     let _locale = locale_guard();
-    let (handle, workspace) = open_workspace_sized(cx, size(px(1_280.), px(800.)));
+    let (handle, _workspace) = open_workspace_sized(cx, size(px(1_280.), px(800.)));
     for (width, height, theme, locale) in [(760., 480.), (1_000., 640.), (1_280., 800.)]
         .into_iter()
         .flat_map(|(width, height)| {
@@ -3307,35 +3408,24 @@ fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut
         settle_animations(cx, handle);
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
-            assert!(window.find("workflow-theme").visible());
-            assert_eq!(window.find("workflow-theme").focused(), Some(true));
-            let before_scroll = window.find("workflow-theme").bounds().origin;
-            window.scroll(
-                "workflow-scroll",
-                gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(80.))),
-                cx,
+            let panel = window.find("appearance-panel");
+            assert!(panel.visible(), "the popover opens at {width}x{height}");
+            let bounds = panel.bounds();
+            assert!(
+                bounds.left() >= px(0.)
+                    && bounds.right() <= px(width)
+                    && bounds.bottom() <= px(height),
+                "the popover stays in the window: {bounds:?}"
             );
+            window.press("escape", cx);
+        })
+        .unwrap();
+        settle_animations(cx, handle);
+        cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
-            let after_scroll = window.find("workflow-theme").bounds().origin;
-            assert_ne!(
-                before_scroll, after_scroll,
-                "manual scrolling must remain available"
-            );
-            window.render_frame(cx);
-            assert_eq!(
-                window.find("workflow-theme").bounds().origin,
-                after_scroll,
-                "the command must not keep pinning the settings to the bottom"
-            );
-            assert_eq!(
-                workspace
-                    .read(cx)
-                    .workflow()
-                    .read(cx)
-                    .settings_form()
-                    .read(cx)
-                    .open_section(),
-                Some(Section::Appearance)
+            assert!(
+                window.try_find("appearance-panel").is_none(),
+                "Escape dismisses the popover"
             );
         })
         .unwrap();

@@ -230,15 +230,6 @@ settings.file_name_template_hint:
 settings.compression_section:
   en: Compression policies
   zh-CN: 压缩策略
-settings.enabled_count:
-  en: "%{count} enabled"
-  zh-CN: "已启用 %{count} 项"
-settings.enabled:
-  en: Enabled
-  zh-CN: 已开启
-settings.disabled:
-  en: Disabled
-  zh-CN: 未开启
 settings.lossless_label:
   en: Lossless
   zh-CN: 无损压缩
@@ -299,12 +290,6 @@ settings.clear_result_cache_failed:
 settings.format_parameters:
   en: Format parameters
   zh-CN: 格式参数
-settings.jpeg_progressive_mode:
-  en: Progressive
-  zh-CN: 渐进式
-settings.jpeg_baseline_mode:
-  en: Baseline
-  zh-CN: 基线式
 settings.progressive_jpeg:
   en: Progressive JPEG
   zh-CN: 渐进式 JPEG
@@ -404,12 +389,6 @@ workflow.presets.private_sharing_description:
 workflow.pdf_section:
   en: PDF to images
   zh-CN: PDF 转图片
-workflow.pdf_all_pages:
-  en: All pages
-  zh-CN: 全部页面
-workflow.pdf_selected_pages:
-  en: Selected pages
-  zh-CN: 指定页面
 workflow.pdf_pages:
   en: Page range (leave empty for all)
   zh-CN: 页面范围（留空表示全部）
@@ -494,9 +473,6 @@ workflow.target_enable:
 workflow.target_kib:
   en: Target size (KiB)
   zh-CN: 目标体积（KiB）
-workflow.target_summary:
-  en: "%{kib} KiB"
-  zh-CN: "%{kib} KiB"
 workflow.target_hint:
   en: Available for lossy JPEG/WebP. Current quality is the ceiling and minimum quality is respected.
   zh-CN: 仅支持有损 JPEG/WebP；以当前质量作为上限，并遵守最低质量。
@@ -932,9 +908,6 @@ diagnostics.messages.windows_heif_install_hint:
 diagnostics.messages.unknown:
   en: "Diagnostic %{code}: %{detail}"
   zh-CN: "诊断 %{code}：%{detail}"
-workflow.status:
-  en: Status
-  zh-CN: 状态
 workflow.ready:
   en: "%{count} files ready"
   zh-CN: "%{count} 个文件待转换"
@@ -1327,3 +1300,39 @@ queue.impact_item:
 queue.progress_item:
   en: "Conversion progress for %{name}"
   zh-CN: "%{name} 的转换进度"
+settings.tab_format:
+  en: Format
+  zh-CN: 格式
+settings.tab_output:
+  en: Output
+  zh-CN: 输出
+settings.tab_processing:
+  en: Processing
+  zh-CN: 处理
+settings.tab_privacy:
+  en: Privacy
+  zh-CN: 隐私
+settings.tab_has_issue:
+  en: "%{tab}, needs attention"
+  zh-CN: "%{tab}，有需要处理的设置"
+settings.format_hint_jpeg:
+  en: Opens everywhere
+  zh-CN: 兼容所有设备
+settings.format_hint_png:
+  en: Lossless, keeps transparency
+  zh-CN: 无损，保留透明
+settings.format_hint_webp:
+  en: Made for the web
+  zh-CN: 网页通用
+settings.format_hint_avif:
+  en: Smallest files
+  zh-CN: 体积最小
+settings.format_is_source:
+  en: Same as a queued source
+  zh-CN: 与队列中的源格式相同
+workflow.preset_manage:
+  en: Save and manage presets
+  zh-CN: 保存与管理预设
+settings.cache_section:
+  en: Cache
+  zh-CN: 缓存

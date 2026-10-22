@@ -6,8 +6,8 @@
 //! glass panels. The queue panel is the primary region and carries the
 //! floating action capsule with the one decision; the settings panel sits on
 //! the trailing edge. Both panels are always present, so the earlier
-//! navigation rail is gone; appearance lives behind the header's Appearance
-//! command.
+//! navigation rail is gone; theme and reduced motion live in the header's
+//! Appearance popover.
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
@@ -164,15 +164,6 @@ impl Workspace {
         &self.action_bar
     }
 
-    /// Reveals and focuses the appearance settings (the header's
-    /// Appearance command); the settings stay in their existing form.
-    pub fn open_appearance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.workflow.update(cx, |panel, cx| {
-            panel.focus_appearance_settings(window, cx);
-        });
-        cx.notify();
-    }
-
     fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let glass = cx.glass();
         let pill = ButtonRounded::Size(cx.theme().radius_full());
@@ -273,18 +264,7 @@ impl Workspace {
                             // Same command as the `ToggleLanguage` action and menu item.
                             .on_click(|_, _, cx| toggle_language(cx)),
                     )
-                    .child(
-                        Button::new("workspace-appearance")
-                            .ghost()
-                            .small()
-                            .rounded(pill)
-                            .icon(IconName::Palette)
-                            .accessibility_label(tr("settings.appearance_section"))
-                            .tooltip(tr("settings.appearance_section"))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.open_appearance(window, cx);
-                            })),
-                    ),
+                    .child(crate::appearance::appearance_popover(cx)),
             )
     }
 }
