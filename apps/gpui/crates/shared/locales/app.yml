@@ -1318,7 +1318,6 @@ queue.supported_formats:
   en: Input formats
   zh-CN: 支持导入的格式
 
-
 queue.compare_item:
   en: "Compare %{name}"
   zh-CN: "对比 %{name}"
