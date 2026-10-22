@@ -683,9 +683,33 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
 
     // Ask again, this time "Overwrite": the file is replaced.
     click_start_and_wait_for_prompt(cx, handle, &workflow);
-    cx.update_window(handle, |_, window, cx| window.click("ok", cx))
-        .unwrap();
-    wait_for_batch_to_settle(cx);
+    let previous = current_batch_id(cx);
+    cx.update_window(handle, |_, window, cx| {
+        assert!(window.find("ok").visible(), "the Overwrite prompt is shown");
+        window.click("ok", cx);
+    })
+    .unwrap();
+    wait_for_batch_after_explained(cx, previous, |cx| {
+        let dialog = cx.update(|cx| window_has_dialog(cx, handle));
+        cx.update(|cx| {
+            let panel = workflow.read(cx);
+            let batch = AppModels::global(cx).batch().read(cx);
+            let status = AppModels::global(cx)
+                .queue()
+                .read(cx)
+                .item(&"one".into())
+                .map(|item| item.status.clone());
+            format!(
+                "(dialog open: {dialog}, planning: {}, notice: {:?}, batch: {:?} {:?}, \
+                 bridge busy: {}, item: {status:?})",
+                panel.is_planning(),
+                panel.notice_text(),
+                batch.id(),
+                batch.phase(),
+                progress_bridge::is_busy(cx),
+            )
+        })
+    });
     cx.update(|cx| {
         let queue = AppModels::global(cx).queue().read(cx);
         let status = &queue.item(&"one".into()).unwrap().status;
@@ -713,9 +737,10 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
         workflow.update(cx, |workflow, cx| workflow.set_output_dir(dir.clone(), cx));
     });
     click_start_and_wait_for_prompt(cx, handle, &workflow);
+    let previous = current_batch_id(cx);
     cx.update_window(handle, |_, window, cx| window.click("ok", cx))
         .unwrap();
-    wait_for_batch_to_settle(cx);
+    wait_for_batch_after(cx, previous);
     cx.update(|cx| {
         let queue = AppModels::global(cx).queue().read(cx);
         let status = &queue.item(&"one".into()).unwrap().status;
@@ -735,12 +760,13 @@ fn start_walks_the_output_safety_prompts(cx: &mut TestAppContext) {
             workflow.set_output_dir(fresh.clone(), cx);
         });
     });
+    let previous = current_batch_id(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         window.click("workflow-start", cx);
     })
     .unwrap();
-    wait_for_batch_to_settle(cx);
+    wait_for_batch_after(cx, previous);
     cx.update(|cx| {
         assert!(!workflow.read(cx).is_planning());
         let queue = AppModels::global(cx).queue().read(cx);
@@ -1206,6 +1232,7 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
 
     // Explicitly retry the completed item. The handoff must not drop the
     // previous bridge early, and the existing output is skipped, not clobbered.
+    let previous = current_batch_id(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         window.click("queue-reset-formats", cx);
@@ -1213,7 +1240,7 @@ fn queued_items_render_rows_and_let_start_run(cx: &mut TestAppContext) {
         window.click("workflow-start", cx);
     })
     .unwrap();
-    wait_for_batch_to_settle(cx);
+    wait_for_batch_after(cx, previous);
     cx.update(|cx| {
         let queue = AppModels::global(cx).queue().read(cx);
         let status = &queue.item(&"one".into()).unwrap().status;
@@ -1452,6 +1479,31 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
 /// Pumps the test executor until the batch and its bridge are done. The
 /// backend runs on OS threads, so wall-clock waiting is unavoidable here.
 fn wait_for_batch_to_settle(cx: &mut TestAppContext) {
+    wait_for_batch_after(cx, None);
+}
+
+fn current_batch_id(cx: &mut TestAppContext) -> Option<imgconvert_backend::progress::BatchId> {
+    cx.update(|cx| AppModels::global(cx).batch().read(cx).id())
+}
+
+/// Waits for a batch other than `previous` to start and settle. A test that
+/// runs a second batch must pass the first one's id: otherwise the finished
+/// first batch already counts as "started" and the wait returns before the
+/// second one runs.
+fn wait_for_batch_after(
+    cx: &mut TestAppContext,
+    previous: Option<imgconvert_backend::progress::BatchId>,
+) {
+    wait_for_batch_after_explained(cx, previous, |_| String::new());
+}
+
+/// [`wait_for_batch_after`] that adds `explain`'s account of the window to
+/// the failure, so a batch that never starts says why.
+fn wait_for_batch_after_explained(
+    cx: &mut TestAppContext,
+    previous: Option<imgconvert_backend::progress::BatchId>,
+    explain: impl Fn(&mut TestAppContext) -> String,
+) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
     loop {
         // The bridge polls on a timer; the test clock only moves when advanced.
@@ -1460,12 +1512,18 @@ fn wait_for_batch_to_settle(cx: &mut TestAppContext) {
         cx.run_until_parked();
         let (started, busy) = cx.update(|cx| {
             let batch = AppModels::global(cx).batch().read(cx);
-            (batch.id().is_some(), progress_bridge::is_busy(cx))
+            (
+                batch.id().is_some() && batch.id() != previous,
+                progress_bridge::is_busy(cx),
+            )
         });
         if started && !busy {
             break;
         }
-        assert!(std::time::Instant::now() < deadline, "batch never settled");
+        if std::time::Instant::now() >= deadline {
+            let context = explain(cx);
+            panic!("batch never settled {context}");
+        }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
 }
@@ -2854,12 +2912,13 @@ fn parity_next_batch_keeps_completed_items_and_converts_only_new_inputs(cx: &mut
     .unwrap();
     cx.update(|cx| imgconvert_gpui_queue::import::import_paths(vec![dir.join("next.png")], cx));
     wait_for_import(cx);
+    let previous = current_batch_id(cx);
     cx.update(|cx| {
         workflow.update(cx, |panel, cx| {
             panel.start_with_output_dir(dir.join("out"), None, cx);
         });
     });
-    wait_for_batch_to_settle(cx);
+    wait_for_batch_after(cx, previous);
     cx.update(|cx| {
         let models = AppModels::global(cx);
         assert_eq!(models.batch().read(cx).total(), 1);
@@ -2891,12 +2950,13 @@ fn parity_next_batch_keeps_completed_items_and_converts_only_new_inputs(cx: &mut
         imgconvert_gpui_queue::import::import_paths(vec![collision], cx);
     });
     wait_for_import(cx);
+    let previous = current_batch_id(cx);
     cx.update(|cx| {
         workflow.update(cx, |panel, cx| {
             panel.start_with_output_dir(dir.clone(), None, cx);
         });
     });
-    wait_for_batch_to_settle(cx);
+    wait_for_batch_after(cx, previous);
     cx.update(|cx| {
         let models = AppModels::global(cx);
         assert_eq!(models.batch().read(cx).total(), 1);
