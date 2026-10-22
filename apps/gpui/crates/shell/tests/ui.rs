@@ -1079,6 +1079,20 @@ fn click_start_and_wait_for_prompt(
         );
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
+    settle_dialog_motion(cx, handle);
+}
+
+/// Lets a just-opened dialog finish Kit's slide-in. That animation runs on
+/// the wall clock, not the test clock: on a loaded runner a click issued
+/// mid-slide can land its mouse-down and mouse-up on different positions
+/// of the moving button and be lost.
+fn settle_dialog_motion(cx: &mut TestAppContext, handle: gpui_kit::AnyWindowHandle) {
+    // The first frame that draws the dialog starts its animation.
+    cx.update_window(handle, |_, window, cx| window.render_frame(cx))
+        .unwrap();
+    std::thread::sleep(
+        *gpui_kit::component::dialog::ANIMATION_DURATION + std::time::Duration::from_millis(50),
+    );
     cx.update_window(handle, |_, window, cx| window.render_frame(cx))
         .unwrap();
 }
