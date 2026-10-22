@@ -1093,12 +1093,79 @@ pub use imgconvert_gpui_shared::images::format_bytes;
 
 #[cfg(test)]
 mod tests {
-    use super::format_bytes;
+    use super::{QueueModel, ThumbnailState, apply_thumbnail_result, format_bytes};
+    use gpui_kit::{AppContext as _, RenderImage, SharedString, TestAppContext};
+    use image::{Frame, ImageBuffer, Rgba};
+    use imgconvert_backend::import::ImportScanFile;
+    use imgconvert_gpui_shared::queue_model::ThumbnailTicket;
+    use std::sync::Arc;
 
     #[test]
     fn sizes_are_formatted_with_binary_units() {
         assert_eq!(format_bytes(512), "512 B");
         assert_eq!(format_bytes(1536), "1.5 KB");
         assert_eq!(format_bytes(3 * 1024 * 1024), "3.0 MB");
+    }
+
+    fn scan_file(key: &str) -> ImportScanFile {
+        ImportScanFile {
+            path: format!("/photos/{key}.png"),
+            key: key.to_string(),
+            relative_dir: None,
+            metadata: None,
+        }
+    }
+
+    /// A render image of `pixels` pixels (4 bytes each), 1 px tall.
+    fn image(pixels: u32) -> Arc<RenderImage> {
+        Arc::new(RenderImage::new(vec![Frame::new(ImageBuffer::from_pixel(
+            pixels,
+            1,
+            Rgba([0, 0, 0, 0]),
+        ))]))
+    }
+
+    #[gpui_kit::test]
+    fn evicted_thumbnail_is_released_by_the_view(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let queue = cx.new(|_| QueueModel::with_thumbnail_budget(250));
+            queue.update(cx, |queue, cx| {
+                queue.add_files(vec![scan_file("a"), scan_file("b"), scan_file("c")]);
+                cx.notify();
+            });
+            let tickets: Vec<ThumbnailTicket> = queue.update(cx, |queue, _| {
+                ["a", "b", "c"]
+                    .into_iter()
+                    .map(|key| {
+                        queue
+                            .mark_thumbnail_loading(&SharedString::from(key))
+                            .expect("claim")
+                    })
+                    .collect()
+            });
+
+            let first = image(25);
+            let second = image(25);
+            apply_thumbnail_result(&queue, &tickets[0], Ok(Some(Arc::clone(&first))), cx);
+            apply_thumbnail_result(&queue, &tickets[1], Ok(Some(Arc::clone(&second))), cx);
+            queue.update(cx, |queue, _| queue.touch_thumbnails([tickets[0].key()]));
+
+            let third = image(25);
+            apply_thumbnail_result(&queue, &tickets[2], Ok(Some(Arc::clone(&third))), cx);
+
+            assert_eq!(
+                Arc::strong_count(&second),
+                1,
+                "the evicted image must be released by the view"
+            );
+            let queue = queue.read(cx);
+            assert!(matches!(
+                queue.item(&"b".into()).unwrap().thumbnail,
+                ThumbnailState::NotRequested
+            ));
+            assert_eq!(queue.thumbnail_bytes(), 200);
+            drop(first);
+            drop(third);
+        });
     }
 }
