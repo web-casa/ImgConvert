@@ -21,7 +21,8 @@ use gpui_kit::{
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{
-    AppModels, BatchModel, BatchPhase, QueueModel, SettingsModel, progress_bridge,
+    AppModels, BatchModel, BatchPhase, ItemStatus, QueueItem, QueueModel, SettingsModel,
+    progress_bridge,
 };
 
 use crate::workflow_panel::WorkflowPanel;
@@ -100,18 +101,71 @@ impl ActionBar {
                 "workflow.summary_cancelled",
                 &[("done", &summary.completed), ("total", &summary.total)],
             ),
-            BatchPhase::Finished(summary) => tr_with(
-                "workflow.summary",
-                &[
-                    ("done", &summary.completed),
-                    ("skipped", &summary.skipped),
-                    ("failed", &summary.failed),
-                ],
-            ),
+            BatchPhase::Finished(summary) => {
+                // Zero skipped or failed counts are left out: the capsule has
+                // room for what happened, not for what did not.
+                let mut parts = vec![tr_with(
+                    "workflow.summary_done",
+                    &[("count", &summary.completed)],
+                )];
+                if summary.skipped > 0 {
+                    parts.push(tr_with(
+                        "workflow.summary_skipped",
+                        &[("count", &summary.skipped)],
+                    ));
+                }
+                if summary.failed > 0 {
+                    parts.push(tr_with(
+                        "workflow.summary_failed",
+                        &[("count", &summary.failed)],
+                    ));
+                }
+                let counts: SharedString = parts
+                    .iter()
+                    .map(SharedString::as_ref)
+                    .collect::<Vec<_>>()
+                    .join(" · ")
+                    .into();
+                match net_saving(self.queue.read(cx).items(), batch.jobs()) {
+                    Some(saved) => tr_with(
+                        "workflow.summary_saved",
+                        &[
+                            ("summary", &counts),
+                            (
+                                "saved",
+                                &imgconvert_gpui_shared::images::format_bytes(saved),
+                            ),
+                        ],
+                    ),
+                    None => counts,
+                }
+            }
             BatchPhase::Failed(_detail) => tr("errors.batchFailed"),
         };
         (text, matches!(batch.phase(), BatchPhase::Failed(_)))
     }
+}
+
+/// The net bytes this batch saved: finished rows of its own jobs whose
+/// outputs were all written in this run (rows kept from an earlier batch and
+/// partial multi-output rows have no saving to report). `None` when the
+/// outputs did not shrink overall or the sum cannot be represented.
+pub fn net_saving(items: &[QueueItem], jobs: &[SharedString]) -> Option<u64> {
+    let mut before = 0u64;
+    let mut after = 0u64;
+    for item in items.iter().filter(|item| jobs.contains(&item.key)) {
+        if let ItemStatus::Done {
+            in_size,
+            out_size,
+            complete: true,
+            ..
+        } = item.status
+        {
+            before = before.checked_add(in_size)?;
+            after = after.checked_add(out_size)?;
+        }
+    }
+    before.checked_sub(after).filter(|saved| *saved > 0)
 }
 
 impl Render for ActionBar {
@@ -146,6 +200,22 @@ impl Render for ActionBar {
         let output_path: SharedString = output_dir.as_ref().map_or_else(
             || tr("workflow.output_not_chosen"),
             |dir| SharedString::from(dir.to_string_lossy().into_owned()),
+        );
+        // The capsule shows the folder and its parent; the full path is the
+        // tooltip and the accessible name, so the batch status keeps room.
+        let output_short: SharedString = output_dir.as_ref().map_or_else(
+            || tr("workflow.output_not_chosen"),
+            |dir| {
+                let name = |path: &std::path::Path| {
+                    path.file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                };
+                match (dir.parent().and_then(&name), name(dir)) {
+                    (Some(parent), Some(leaf)) => format!("{parent} / {leaf}").into(),
+                    (None, Some(leaf)) => leaf.into(),
+                    _ => SharedString::from(dir.to_string_lossy().into_owned()),
+                }
+            },
         );
         let choose_output_name: SharedString =
             format!("{}: {output_path}", tr("workflow.choose_output")).into();
@@ -239,7 +309,7 @@ impl Render for ActionBar {
                                                 }
                                             })
                                             .truncate()
-                                            .child(output_path.clone()),
+                                            .child(output_short),
                                     ),
                             ),
                     )
@@ -331,5 +401,76 @@ impl Render for ActionBar {
                         this.panel.update(cx, |panel, cx| panel.start(window, cx));
                     }))
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use imgconvert_backend::import::ImportScanFile;
+    use imgconvert_gpui_shared::QueueModel;
+
+    fn queue(rows: &[(&str, ItemStatus)]) -> Vec<QueueItem> {
+        let mut model = QueueModel::default();
+        model.add_files(
+            rows.iter()
+                .map(|(key, _)| ImportScanFile {
+                    key: (*key).into(),
+                    path: format!("/no-real-data/{key}.png"),
+                    relative_dir: None,
+                    metadata: None,
+                })
+                .collect(),
+        );
+        let mut items = model.items().to_vec();
+        for (item, (_, status)) in items.iter_mut().zip(rows) {
+            item.status = status.clone();
+        }
+        items
+    }
+
+    fn done(in_size: u64, out_size: u64, complete: bool) -> ItemStatus {
+        ItemStatus::Done {
+            in_size,
+            out_size,
+            comparable: complete,
+            complete,
+        }
+    }
+
+    #[test]
+    fn saving_counts_only_complete_rows_of_this_batch() {
+        let items = queue(&[
+            ("earlier", done(10_000_000, 0, true)),
+            ("grew", done(1_000, 2_000, true)),
+            ("shrank", done(5_000, 1_000, true)),
+            ("partial-pdf", done(9_000, 100, false)),
+            ("failed", ItemStatus::Pending),
+        ]);
+        let jobs: Vec<SharedString> = ["grew", "shrank", "partial-pdf", "failed"]
+            .into_iter()
+            .map(SharedString::from)
+            .collect();
+        // 6,000 in, 3,000 out: the earlier batch's row and the partial PDF
+        // are not part of this batch's saving.
+        assert_eq!(net_saving(&items, &jobs), Some(3_000));
+    }
+
+    #[test]
+    fn no_saving_when_outputs_grow_are_equal_or_nothing_finished() {
+        let jobs: Vec<SharedString> = vec!["a".into()];
+        assert_eq!(net_saving(&queue(&[("a", done(1, 2, true))]), &jobs), None);
+        assert_eq!(net_saving(&queue(&[("a", done(5, 5, true))]), &jobs), None);
+        assert_eq!(
+            net_saving(&queue(&[("a", ItemStatus::Pending)]), &jobs),
+            None
+        );
+    }
+
+    #[test]
+    fn an_unrepresentable_sum_reports_no_saving() {
+        let items = queue(&[("a", done(u64::MAX, 0, true)), ("b", done(1, 0, true))]);
+        let jobs: Vec<SharedString> = vec!["a".into(), "b".into()];
+        assert_eq!(net_saving(&items, &jobs), None);
     }
 }

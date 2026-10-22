@@ -1283,6 +1283,7 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
                 in_size,
                 out_size,
                 comparable,
+                ..
             } => {
                 assert!(*comparable, "a single static PNG is comparable");
                 (*in_size, *out_size)
@@ -3718,4 +3719,175 @@ fn queue_content_exposes_names_metadata_and_every_result_state(cx: &mut TestAppC
             .unwrap();
         }
     }
+}
+
+/// This batch's finished sizes, whether a job failed, the expected saving.
+type SavingCase<'a> = (&'a [(u64, u64)], bool, Option<u64>);
+
+/// The finished capsule names this batch's net saving from its own rows'
+/// measured sizes: rows kept from an earlier batch do not count, zero
+/// counts are left out, and nothing is said about a saving when the outputs
+/// grew.
+#[gpui_kit::test]
+fn finished_batch_summary_names_the_net_saving(cx: &mut TestAppContext) {
+    use gpui_kit::SharedString;
+    use imgconvert_backend::command_error::CommandError;
+    use imgconvert_backend::convert::{BatchProgressEvent, BatchSummary, ConvertResult};
+    use imgconvert_backend::import::{ImportImageMetadata, ImportScanFile};
+    use imgconvert_backend::progress::BatchId;
+    use imgconvert_gpui_shared::images::format_bytes;
+
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    let finished = |index: usize, in_size: u64, out_size: u64| BatchProgressEvent::FileFinished {
+        index,
+        result: ConvertResult {
+            input: "fixture".into(),
+            output: "fixture-output".into(),
+            in_size,
+            out_size,
+            environment_comparable: true,
+            warning: None,
+            warnings: vec![],
+            output_count: 1,
+            skipped_output_count: 0,
+        },
+    };
+    let scan = |key: &str| ImportScanFile {
+        key: key.to_string(),
+        path: format!("/no-real-data/{key}.png"),
+        relative_dir: None,
+        metadata: Some(ImportImageMetadata {
+            animation: imgconvert_backend::import::ImportAnimation::Static,
+            format: "png".into(),
+            width: 2,
+            height: 2,
+            dpi_x: None,
+            dpi_y: None,
+            page_count: None,
+        }),
+    };
+    let cases: [SavingCase; 3] = [
+        (&[(2048, 1024), (1000, 1500)], false, Some(524)),
+        (&[(100, 200), (300, 300)], false, None),
+        (&[(1000, 1100)], true, None),
+    ];
+    for (sizes, with_failure, expect_saving) in cases {
+        let mut jobs: Vec<SharedString> = (0..sizes.len())
+            .map(|index| SharedString::from(format!("saving-{index}")))
+            .collect();
+        if with_failure {
+            jobs.push("saving-failed".into());
+        }
+        let earlier: Vec<SharedString> = vec!["earlier".into()];
+        cx.update(|cx| {
+            let models = AppModels::global(cx).clone();
+            models.queue().update(cx, |queue, cx| {
+                queue.clear();
+                queue.add_files(earlier.iter().chain(&jobs).map(|key| scan(key)).collect());
+                // A row finished by an earlier batch with a large saving.
+                queue.apply_batch_event(&finished(0, 10_000_000, 1), &earlier);
+                for (index, (in_size, out_size)) in sizes.iter().enumerate() {
+                    queue.apply_batch_event(&finished(index, *in_size, *out_size), &jobs);
+                }
+                if with_failure {
+                    queue.apply_batch_event(
+                        &BatchProgressEvent::FileError {
+                            index: jobs.len() - 1,
+                            input: "fixture".into(),
+                            error: CommandError::file_not_found("/no-real-data/x.png", "detail"),
+                        },
+                        &jobs,
+                    );
+                }
+                cx.notify();
+            });
+            models.batch().update(cx, |batch, cx| {
+                batch.begin(BatchId::new(77), jobs.clone());
+                batch.finish_without_summary(Some(BatchSummary {
+                    total: jobs.len(),
+                    completed: sizes.len(),
+                    skipped: 0,
+                    failed: usize::from(with_failure),
+                    cancelled: false,
+                }));
+                cx.notify();
+            });
+        });
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            let status = window.find("workflow-status").value().unwrap().to_owned();
+            assert!(
+                status.starts_with(&format!("{} done", sizes.len())),
+                "{status}"
+            );
+            assert!(
+                !status.contains("skipped"),
+                "zero counts are left out: {status}"
+            );
+            assert_eq!(status.contains("1 failed"), with_failure, "{status}");
+            match expect_saving {
+                Some(bytes) => assert!(
+                    status.ends_with(&format!("saved {}", format_bytes(bytes))),
+                    "{status}"
+                ),
+                None => assert!(!status.contains("saved"), "{status}"),
+            }
+        })
+        .unwrap();
+    }
+}
+
+/// A long failure reason truncates inside the row's result lane at the
+/// minimum window size and an enlarged base font; it never runs into the
+/// command lane.
+#[gpui_kit::test]
+fn long_failure_reasons_stay_clear_of_the_row_commands(cx: &mut TestAppContext) {
+    use gpui_kit::SharedString;
+    use imgconvert_backend::command_error::CommandError;
+    use imgconvert_backend::convert::BatchProgressEvent;
+    use imgconvert_backend::import::ImportScanFile;
+
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace_sized(cx, size(px(760.), px(480.)));
+    let jobs: Vec<SharedString> = vec!["long-reason".into()];
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .queue()
+            .clone()
+            .update(cx, |queue, cx| {
+                queue.add_files(vec![ImportScanFile {
+                    key: "long-reason".into(),
+                    path: "/no-real-data/a-photo-with-a-rather-long-name.png".into(),
+                    relative_dir: None,
+                    metadata: None,
+                }]);
+                queue.apply_batch_event(
+                    &BatchProgressEvent::FileError {
+                        index: 0,
+                        input: "fixture".into(),
+                        error: CommandError::file_not_found(
+                            "/no-real-data/a/very/long/path/that/keeps/going/and/going/photo.png",
+                            "detail",
+                        ),
+                    },
+                    &jobs,
+                );
+                cx.notify();
+            });
+        let font = gpui_kit::component::Theme::global(cx).font_size;
+        gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font * 1.15);
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let row = window.find("long-reason").bounds();
+        let status = window.find("status:long-reason").bounds();
+        let compare = window.find("compare:long-reason").bounds();
+        assert!(
+            status.right() <= compare.left(),
+            "the lane {status:?} must end before the commands {compare:?}"
+        );
+        assert!(status.left() >= row.left() && compare.right() <= row.right());
+    })
+    .unwrap();
 }

@@ -202,6 +202,9 @@ pub struct GlassTokens {
     lift_shadows: Vec<BoxShadow>,
     well: Hsla,
     well_border: Hsla,
+    accent_soft: Hsla,
+    accent_edge: Hsla,
+    illustration: [Hsla; 2],
     primary_shadows: Vec<BoxShadow>,
 }
 
@@ -267,6 +270,21 @@ impl GlassTokens {
 
     pub fn well_border(&self) -> Hsla {
         self.well_border
+    }
+
+    /// A faint accent fill for a selected card or an in-progress notice.
+    pub fn accent_soft(&self) -> Hsla {
+        self.accent_soft
+    }
+
+    /// The stroke that goes with [`Self::accent_soft`].
+    pub fn accent_edge(&self) -> Hsla {
+        self.accent_edge
+    }
+
+    /// The two tinted sheets of the empty-queue illustration.
+    pub fn illustration(&self) -> [Hsla; 2] {
+        self.illustration
     }
 
     /// The glow under the one primary button of the window.
@@ -341,6 +359,9 @@ struct GlassPalette {
     lift: Option<Hsla>,
     well: Hsla,
     well_border: Hsla,
+    accent_soft: Hsla,
+    accent_edge: Hsla,
+    illustration: [Hsla; 2],
     primary_glow: (Pixels, Pixels, Hsla),
 }
 
@@ -369,6 +390,9 @@ impl GlassPalette {
                 lift: None,
                 well: hsla(0xffff_ff12),
                 well_border: hsla(0x0000_0000),
+                accent_soft: hsla(0x3b9d_ff1f),
+                accent_edge: hsla(0x3b9d_ff47),
+                illustration: [hsla(0x3b9d_ff2e), hsla(0x5ee6_a02e)],
                 primary_glow: (px(6.), px(18.), hsla(0x2b93_ff73)),
             }
         } else {
@@ -395,6 +419,9 @@ impl GlassPalette {
                 lift: Some(hsla(0x1420_3c14)),
                 well: hsla(0xffff_ffb3),
                 well_border: hsla(0x1420_3c0f),
+                accent_soft: hsla(0x0a64_f014),
+                accent_edge: hsla(0x0a64_f033),
+                illustration: [hsla(0x0a64_f024), hsla(0x1278_4a24)],
                 primary_glow: (px(6.), px(16.), hsla(0x0a74_ff52)),
             }
         }
@@ -429,6 +456,9 @@ impl GlassPalette {
                 .unwrap_or_default(),
             well: self.well,
             well_border: self.well_border,
+            accent_soft: self.accent_soft,
+            accent_edge: self.accent_edge,
+            illustration: self.illustration,
             primary_shadows: vec![drop(self.primary_glow)],
         }
     }
