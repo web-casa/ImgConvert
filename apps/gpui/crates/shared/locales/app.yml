@@ -149,9 +149,6 @@ workflow.progress:
 workflow.batch_progress:
   en: Batch conversion progress
   zh-CN: 批量转换进度
-workflow.summary:
-  en: "%{done} done · %{skipped} skipped · %{failed} failed"
-  zh-CN: "完成 %{done} · 跳过 %{skipped} · 失败 %{failed}"
 workflow.summary_cancelled:
   en: "Cancelled after %{done} of %{total}"
   zh-CN: "已取消，完成 %{done} / %{total}"
@@ -1281,12 +1278,6 @@ status.warnings:
 queue.add_folders:
   en: Add folders…
   zh-CN: 添加文件夹…
-queue.drop_title:
-  en: Drop images or folders
-  zh-CN: 拖入图片或文件夹
-queue.drop_alternative:
-  en: Or add them using an option below
-  zh-CN: 或使用以下方式添加
 queue.supported_formats:
   en: Input formats
   zh-CN: 支持导入的格式
@@ -1327,12 +1318,36 @@ settings.format_hint_webp:
 settings.format_hint_avif:
   en: Smallest files
   zh-CN: 体积最小
-settings.format_is_source:
-  en: Same as a queued source
-  zh-CN: 与队列中的源格式相同
 workflow.preset_manage:
   en: Save and manage presets
   zh-CN: 保存与管理预设
 settings.cache_section:
   en: Cache
   zh-CN: 缓存
+status.smaller_percent:
+  en: "−%{percent}%"
+  zh-CN: "节省 %{percent}%"
+status.larger_percent:
+  en: "+%{percent}%"
+  zh-CN: "增加 %{percent}%"
+workflow.summary_saved:
+  en: "%{summary} · saved %{saved}"
+  zh-CN: "%{summary} · 节省 %{saved}"
+workflow.summary_done:
+  en: "%{count} done"
+  zh-CN: "完成 %{count}"
+workflow.summary_skipped:
+  en: "%{count} skipped"
+  zh-CN: "跳过 %{count}"
+workflow.summary_failed:
+  en: "%{count} failed"
+  zh-CN: "失败 %{count}"
+status.same_size:
+  en: Same size
+  zh-CN: 大小不变
+status.smaller_under_one:
+  en: "−<1%"
+  zh-CN: "节省不到 1%"
+status.larger_under_one:
+  en: "+<1%"
+  zh-CN: "增加不到 1%"

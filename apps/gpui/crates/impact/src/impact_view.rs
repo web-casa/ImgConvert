@@ -249,6 +249,7 @@ impl ImpactView {
                     in_size,
                     out_size,
                     comparable,
+                    ..
                 } = item.status
                 else {
                     return None;
@@ -548,6 +549,7 @@ fn batch_pairs(queue: &QueueModel) -> (Vec<(u64, u64)>, usize) {
             in_size,
             out_size,
             comparable,
+            ..
         } = item.status
         {
             done += 1;

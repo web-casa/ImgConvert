@@ -52,7 +52,7 @@ use imgconvert_backend::workflow_presets::{
 };
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
-use imgconvert_gpui_shared::theme::GlassStyled as _;
+use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, SettingsModel};
 
 /// Sentinel id of the preset select when no preset matches.
@@ -1392,6 +1392,7 @@ impl SettingsForm {
     ) -> impl IntoElement {
         let ring = cx.theme().ring;
         let primary = cx.theme().primary;
+        let accent_soft = cx.glass().accent_soft();
         let muted = cx.theme().muted_foreground;
         let queue = AppModels::global(cx).queue().read(cx);
         let is_source = |format: &str| {
@@ -1416,12 +1417,17 @@ impl SettingsForm {
             .iter()
             .map(|format| {
                 let selected = settings.format == *format;
-                let hint = if is_source(format) {
-                    tr("settings.format_is_source")
+                let hint = format_hint(format);
+                // A format some queued source already has is marked on its
+                // name, like the per-row format menu does.
+                let name: SharedString = if is_source(format) {
+                    tr_with(
+                        "queue.source_format",
+                        &[("format", &format.to_ascii_uppercase())],
+                    )
                 } else {
-                    format_hint(format)
+                    format.to_ascii_uppercase().into()
                 };
-                let name: SharedString = format.to_ascii_uppercase().into();
                 let target = format.clone();
                 Button::new(SharedString::from(format!("format-card:{format}")))
                     .outline()
@@ -1437,9 +1443,7 @@ impl SettingsForm {
                     .py_2()
                     .justify_start()
                     .rounded(cx.theme().radius_lg)
-                    .when(selected, |card| {
-                        card.border_color(primary).bg(primary.opacity(0.08))
-                    })
+                    .when(selected, |card| card.border_color(primary).bg(accent_soft))
                     .child(
                         v_flex()
                             .items_start()
@@ -2452,6 +2456,7 @@ mod tests {
             in_size: 1,
             out_size: 1,
             comparable: false,
+            complete: true,
         };
         assert!(pdf_range_error_for_items(&settings, &items).is_none());
         items[0].status = imgconvert_gpui_shared::ItemStatus::Pending;

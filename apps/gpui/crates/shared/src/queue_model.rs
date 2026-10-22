@@ -32,6 +32,11 @@ pub enum ItemStatus {
         /// storage scenario may compare them (`environment_comparable`
         /// and exactly one written output).
         comparable: bool,
+        /// This run wrote every output the item has: no existing output was
+        /// kept. A partial multi-output item (a PDF whose earlier pages were
+        /// skipped) reports only the pages it wrote in `out_size`, so it
+        /// cannot be counted toward a saving.
+        complete: bool,
     },
     Skipped {
         error: CommandError,
@@ -587,6 +592,7 @@ impl QueueModel {
                         comparable: result.environment_comparable
                             && result.output_count == 1
                             && result.skipped_output_count == 0,
+                        complete: result.skipped_output_count == 0,
                     },
                 )
             }
@@ -757,6 +763,7 @@ mod tests {
             in_size: 10,
             out_size: 5,
             comparable: true,
+            complete: true,
         };
         assert!(queue.set_target_format(&key, Some("png")));
         assert_eq!(queue.item(&key).unwrap().status, ItemStatus::Pending);
@@ -842,6 +849,7 @@ mod tests {
                 in_size: 10,
                 out_size: 4,
                 comparable: true,
+                complete: true,
             }
         );
         assert!(model.apply_batch_event(

@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui_kit::base::{VirtualListScrollHandle, v_virtual_list};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::spinner::Spinner;
@@ -30,6 +30,7 @@ use gpui_kit::{
 use imgconvert_gpui_shared::command_error::format_command_error;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
+use imgconvert_gpui_shared::theme::ActiveGlass as _;
 use imgconvert_gpui_shared::{
     AppModels, BatchModel, ItemStatus, QueueItem, QueueModel, Services, ThumbnailState,
     progress_bridge, tasks,
@@ -39,7 +40,7 @@ use crate::import;
 use crate::thumbnails;
 
 /// Row height in rem so the list follows application zoom.
-const ROW_HEIGHT_REM: f32 = 5.25;
+const ROW_HEIGHT_REM: f32 = 4.25;
 /// Thumbnails decoding at once; matches the backend's thumbnail concurrency.
 const MAX_INFLIGHT_THUMBNAILS: usize = 4;
 /// Rows beyond the viewport that get thumbnails ahead of scrolling.
@@ -274,101 +275,108 @@ impl QueueView {
     fn render_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let queue = self.queue.read(cx);
         let count = queue.len();
+        let importing = queue.is_importing();
         let batch_busy = self.batch.read(cx).is_active() || progress_bridge::is_busy(cx);
-        v_flex()
-            .py_2()
-            .px_4()
-            .gap_1()
-            .border_b_1()
-            .border_color(cx.theme().border)
+        let glass = cx.glass();
+        let pill = ButtonRounded::Size(cx.theme().radius_full());
+        // One band: the title with its count, the quiet queue commands, then
+        // the import commands. It wraps rather than clipping when narrow.
+        h_flex()
+            .flex_wrap()
+            .gap_2()
+            .items_center()
+            .px_5()
+            .pt_4()
+            .pb_3()
             .child(
                 h_flex()
                     .gap_2()
+                    .items_center()
                     .child(
-                        h_flex()
-                            .gap_2()
-                            .items_baseline()
-                            .child(
-                                div()
-                                    .id("queue-title")
-                                    .test_support()
-                                    .role(Role::Heading)
-                                    .aria_label(tr("queue.title"))
-                                    .text_sm()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(tr("queue.title")),
-                            )
-                            .when(count > 0, |this| {
-                                this.child(
-                                    div()
-                                        .id("queue-count")
-                                        .test_support()
-                                        .role(Role::Label)
-                                        .aria_value(tr_with(
-                                            "queue.item_count",
-                                            &[("count", &count)],
-                                        ))
-                                        .text_xs()
-                                        .text_color(cx.theme().muted_foreground)
-                                        .child(tr_with("queue.item_count", &[("count", &count)])),
-                                )
-                            }),
+                        div()
+                            .id("queue-title")
+                            .test_support()
+                            .role(Role::Heading)
+                            .aria_label(tr("queue.title"))
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(tr("queue.title")),
                     )
-                    .child(div().flex_1())
-                    .child(
-                        Button::new("queue-reset-formats")
-                            .ghost()
-                            .xsmall()
-                            .label(tr("queue.reset_formats"))
-                            .disabled(count == 0 || batch_busy || queue.is_importing())
-                            .on_click(|_, _, cx| {
-                                if format_edit_busy(cx) {
-                                    return;
-                                }
-                                AppModels::global(cx)
-                                    .queue()
-                                    .clone()
-                                    .update(cx, |queue, cx| {
-                                        if queue.reset_target_formats() {
-                                            cx.notify();
-                                        }
-                                    });
-                            }),
-                    ),
+                    .when(count > 0, |this| {
+                        this.child(
+                            div()
+                                .id("queue-count")
+                                .test_support()
+                                .role(Role::Label)
+                                .aria_value(tr_with("queue.item_count", &[("count", &count)]))
+                                .px_2()
+                                .py_0p5()
+                                .rounded(cx.theme().radius_full())
+                                .bg(glass.chip())
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(tr_with("queue.item_count", &[("count", &count)])),
+                        )
+                    }),
             )
-            .when(count > 0, |toolbar| {
-                toolbar.child(
-                    h_flex()
-                        .gap_2()
-                        .justify_end()
-                        .child(
-                            Button::new("queue-clear")
-                                .ghost()
-                                .small()
-                                .label(tr("queue.clear"))
-                                .disabled(count == 0 || batch_busy || queue.is_importing())
-                                .on_click(
-                                    cx.listener(|this, _, window, cx| this.clear_queue(window, cx)),
-                                ),
-                        )
-                        .child(
-                            Button::new("queue-paste")
-                                .ghost()
-                                .small()
-                                .label(tr("queue.paste"))
-                                .disabled(queue.is_importing())
-                                .on_click(|_, _, cx| crate::clipboard::paste(cx)),
-                        )
-                        .child(
-                            Button::new("queue-add-files")
-                                .small()
-                                .icon(IconName::FolderOpen)
-                                .label(tr("queue.add_files"))
-                                .disabled(queue.is_importing())
-                                .on_click(|_, _, cx| import::pick_and_import(cx)),
-                        ),
-                )
-            })
+            .child(div().flex_1())
+            .child(
+                Button::new("queue-reset-formats")
+                    .ghost()
+                    .small()
+                    .rounded(pill)
+                    .label(tr("queue.reset_formats"))
+                    .disabled(count == 0 || batch_busy || importing)
+                    .on_click(|_, _, cx| {
+                        if format_edit_busy(cx) {
+                            return;
+                        }
+                        AppModels::global(cx)
+                            .queue()
+                            .clone()
+                            .update(cx, |queue, cx| {
+                                if queue.reset_target_formats() {
+                                    cx.notify();
+                                }
+                            });
+                    }),
+            )
+            .child(
+                Button::new("queue-clear")
+                    .ghost()
+                    .small()
+                    .rounded(pill)
+                    .label(tr("queue.clear"))
+                    .disabled(count == 0 || batch_busy || importing)
+                    .on_click(cx.listener(|this, _, window, cx| this.clear_queue(window, cx))),
+            )
+            .child(
+                Button::new("queue-add-files")
+                    .small()
+                    .rounded(pill)
+                    .icon(IconName::Plus)
+                    .label(tr("queue.add_files"))
+                    .disabled(importing)
+                    .on_click(|_, _, cx| import::pick_and_import(cx)),
+            )
+            .child(
+                Button::new("queue-add-folders")
+                    .small()
+                    .rounded(pill)
+                    .icon(IconName::FolderOpen)
+                    .label(tr("queue.add_folders"))
+                    .disabled(importing)
+                    .on_click(|_, _, cx| import::pick_folders_and_import(cx)),
+            )
+            .child(
+                Button::new("queue-paste")
+                    .small()
+                    .rounded(pill)
+                    .icon(IconName::Copy)
+                    .label(tr("queue.paste"))
+                    .disabled(importing)
+                    .on_click(|_, _, cx| crate::clipboard::paste(cx)),
+            )
     }
 
     fn render_feedback(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
@@ -432,19 +440,32 @@ impl QueueView {
                 ImportFeedback::Failed(error) => format_command_error(error),
             }
         };
+        let glass = cx.glass();
         Some(
             h_flex()
                 .id("queue-feedback")
                 .test_support()
                 .role(Role::Label)
                 .aria_value(text.clone())
-                .px_4()
-                .py_1()
+                .mx_4()
+                .mb_2()
+                .px_3()
+                .py_1p5()
                 .gap_2()
+                .items_center()
+                .rounded(cx.theme().radius_lg)
                 .text_xs()
                 .text_color(cx.theme().muted_foreground)
-                .when(importing, |this| this.child(Spinner::new().xsmall()))
-                .child(text)
+                // An import in progress is a banner; a finished import's
+                // summary is a quiet line.
+                .when(importing, |this| {
+                    this.bg(glass.accent_soft())
+                        .border_1()
+                        .border_color(glass.accent_edge())
+                        .text_color(cx.theme().foreground)
+                        .child(Spinner::new().xsmall())
+                })
+                .child(div().flex_1().min_w_0().child(text))
                 .when(importing, |this| {
                     this.child(
                         Button::new("queue-cancel-import")
@@ -461,12 +482,16 @@ impl QueueView {
 
     fn render_empty(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let importing = self.queue.read(cx).is_importing();
+        let glass = cx.glass();
+        let muted = cx.theme().muted_foreground;
+        let [tint_a, tint_b] = glass.illustration();
+        // The whole queue region is the drop target; the dashed frame says
+        // so, and the buttons are the keyboard path to the same imports.
         v_flex()
             .id("queue-empty")
             .test_support()
             .flex_1()
             .min_h_0()
-            .gap_3()
             .p_4()
             .child(
                 v_flex()
@@ -476,52 +501,92 @@ impl QueueView {
                     .min_h_0()
                     .items_center()
                     .justify_center()
-                    .gap_3()
-                    .p_3()
-                    .rounded(cx.theme().radius_tokens().lg)
-                    .border_1()
-                    .border_color(cx.theme().primary.opacity(0.2))
-                    .bg(cx.theme().primary.opacity(0.025))
+                    .gap_5()
+                    .p_6()
+                    .rounded(cx.theme().radius_2xl())
+                    .border_2()
+                    .border_dashed()
+                    .border_color(cx.theme().border)
                     .child(
+                        // Two tinted sheets behind a raised one: a stack of
+                        // images about to be added.
                         div()
-                            .size_20()
+                            .relative()
+                            .w_32()
+                            .h_24()
                             .flex_none()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded(cx.theme().radius_2xl())
-                            .bg(cx.theme().primary.opacity(0.08))
                             .child(
-                                Icon::new(IconName::GalleryVerticalEnd)
-                                    .size_12()
-                                    .text_color(cx.theme().primary),
+                                div()
+                                    .absolute()
+                                    .left_0()
+                                    .top_4()
+                                    .size_16()
+                                    .rounded(cx.theme().radius_tokens().xl)
+                                    .bg(tint_a),
+                            )
+                            .child(
+                                div()
+                                    .absolute()
+                                    .right_0()
+                                    .top_4()
+                                    .size_16()
+                                    .rounded(cx.theme().radius_tokens().xl)
+                                    .bg(tint_b),
+                            )
+                            .child(
+                                div()
+                                    .absolute()
+                                    .left_6()
+                                    .top_0()
+                                    .w_20()
+                                    .h_24()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(cx.theme().radius_2xl())
+                                    .bg(glass.chip_strong())
+                                    .shadow(glass.panel_shadows())
+                                    .child(
+                                        div()
+                                            .size_10()
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .rounded(cx.theme().radius_full())
+                                            .bg(cx.theme().tokens.primary)
+                                            .child(
+                                                Icon::new(IconName::ArrowUp)
+                                                    .small()
+                                                    .text_color(cx.theme().primary_foreground),
+                                            ),
+                                    ),
                             ),
                     )
                     .child(
                         v_flex()
-                            .gap_1()
+                            .gap_1p5()
                             .items_center()
                             .child(
                                 div()
                                     .id("queue-drop-title")
                                     .test_support()
                                     .role(Role::Heading)
-                                    .aria_label(tr("queue.drop_title"))
-                                    .text_lg()
+                                    .aria_label(tr("queue.empty_title"))
+                                    .text_xl()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_center()
-                                    .child(tr("queue.drop_title")),
+                                    .child(tr("queue.empty_title")),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
+                                    .text_color(muted)
                                     .text_center()
                                     .id("queue-drop-description")
                                     .test_support()
                                     .role(Role::Label)
-                                    .aria_value(tr("queue.drop_alternative"))
-                                    .child(tr("queue.drop_alternative")),
+                                    .aria_value(tr("queue.empty_description"))
+                                    .child(tr("queue.empty_description")),
                             ),
                     )
                     .child(
@@ -532,9 +597,8 @@ impl QueueView {
                             .child(
                                 div().id("queue-empty-add").test_support().child(
                                     Button::new("queue-add-files")
-                                        .outline()
-                                        .small()
-                                        .icon(IconName::File)
+                                        .rounded(ButtonRounded::Size(cx.theme().radius_full()))
+                                        .icon(IconName::Plus)
                                         .label(tr("queue.add_files"))
                                         .disabled(importing)
                                         .on_click(|_, _, cx| import::pick_and_import(cx)),
@@ -542,8 +606,7 @@ impl QueueView {
                             )
                             .child(
                                 Button::new("queue-add-folders")
-                                    .outline()
-                                    .small()
+                                    .rounded(ButtonRounded::Size(cx.theme().radius_full()))
                                     .icon(IconName::FolderOpen)
                                     .label(tr("queue.add_folders"))
                                     .disabled(importing)
@@ -551,43 +614,40 @@ impl QueueView {
                             )
                             .child(
                                 Button::new("queue-paste")
-                                    .outline()
-                                    .small()
+                                    .rounded(ButtonRounded::Size(cx.theme().radius_full()))
                                     .icon(IconName::Copy)
                                     .label(tr("queue.paste"))
                                     .disabled(importing)
                                     .on_click(|_, _, cx| crate::clipboard::paste(cx)),
                             ),
-                    ),
-            )
-            .child(
-                v_flex()
-                    .gap_2()
-                    .flex_none()
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(tr("queue.supported_formats")),
                     )
                     .child(
-                        h_flex()
-                            .gap_1()
-                            .flex_wrap()
-                            .children(self.input_formats.iter().map(|format| {
+                        v_flex()
+                            .gap_2()
+                            .items_center()
+                            .child(
                                 div()
-                                    .rounded(cx.theme().radius_tokens().sm)
-                                    .px_2()
-                                    .py_1()
-                                    .id(SharedString::from(format!("input-format:{format}")))
-                                    .test_support()
-                                    .role(Role::Label)
-                                    .aria_value(format.clone())
                                     .text_xs()
-                                    .bg(cx.theme().muted.opacity(0.7))
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(format.clone())
-                            })),
+                                    .text_color(muted)
+                                    .child(tr("queue.supported_formats")),
+                            )
+                            .child(h_flex().gap_1().flex_wrap().justify_center().children(
+                                self.input_formats.iter().map(|format| {
+                                    div()
+                                        .rounded(cx.theme().radius_full())
+                                        .px_2()
+                                        .py_0p5()
+                                        .id(SharedString::from(format!("input-format:{format}")))
+                                        .test_support()
+                                        .role(Role::Label)
+                                        .aria_value(format.clone())
+                                        .text_xs()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .bg(glass.chip())
+                                        .text_color(muted)
+                                        .child(format.clone())
+                                }),
+                            )),
                     ),
             )
     }
@@ -713,7 +773,7 @@ impl RenderOnce for QueueRow {
         let compare = Button::new(SharedString::from(format!("compare:{}", item.key)))
             .ghost()
             .xsmall()
-            .label(tr("preview.open"))
+            .icon(IconName::Eye)
             .accessibility_label(tr_with("queue.compare_item", &[("name", &item.name)]))
             .tooltip(tr("preview.title"))
             .disabled(self.busy)
@@ -723,7 +783,7 @@ impl RenderOnce for QueueRow {
             Button::new(SharedString::from(format!("impact:{}", item.key)))
                 .ghost()
                 .xsmall()
-                .label(tr("impact.open"))
+                .icon(IconName::ChartPie)
                 .accessibility_label(tr_with("queue.impact_item", &[("name", &item.name)]))
                 .tooltip(tr("impact.title"))
                 .on_click(move |event, window, cx| on_impact(event, window, cx))
@@ -758,7 +818,9 @@ impl RenderOnce for QueueRow {
                 }
             });
         let path = item.path.clone();
-        v_flex()
+        // Thumbnail, then a text column of two lines (name and result; facts
+        // and target format), then the row's commands in a fixed lane.
+        h_flex()
             .id(item.key.clone())
             .test_support()
             .role(Role::Group)
@@ -767,53 +829,62 @@ impl RenderOnce for QueueRow {
             .h(self.row_height)
             .w_full()
             .px_3()
-            .py_1()
-            .gap_1()
-            .justify_center()
+            .gap_3()
+            .items_center()
             .rounded(cx.theme().radius_lg)
             .hover(|style| style.bg(cx.theme().list_hover))
+            .child(render_thumbnail(&item.thumbnail, cx))
             .child(
-                h_flex()
-                    .gap_3()
-                    .child(render_thumbnail(&item.thumbnail, cx))
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_1()
                     .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap_0p5()
+                        h_flex()
+                            .gap_3()
+                            .items_center()
                             .child(
                                 div()
                                     .id(SharedString::from(format!("name:{}", item.key)))
                                     .test_support()
                                     .role(Role::Label)
                                     .aria_value(item.name.clone())
+                                    .flex_1()
+                                    .min_w_0()
                                     .text_sm()
                                     .font_weight(FontWeight::MEDIUM)
                                     .truncate()
                                     .child(item.name.clone()),
                             )
+                            .child(render_status(&item, cx)),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_3()
+                            .items_center()
                             .child(
                                 div()
                                     .id(SharedString::from(format!("meta:{}", item.key)))
                                     .test_support()
                                     .role(Role::Label)
                                     .aria_value(meta.clone())
+                                    .flex_1()
+                                    .min_w_0()
                                     .text_xs()
                                     .text_color(muted)
                                     .truncate()
                                     .child(meta),
-                            ),
-                    )
-                    .children(impact)
-                    .child(compare)
-                    .child(remove),
+                            )
+                            .child(format_control(&item, self.busy, cx)),
+                    ),
             )
             .child(
                 h_flex()
-                    .justify_between()
-                    .gap_2()
-                    .child(format_control(&item, self.busy, cx))
-                    .child(render_status(&item, cx)),
+                    .flex_none()
+                    .gap_0p5()
+                    .children(impact)
+                    .child(compare)
+                    .child(remove),
             )
     }
 }
@@ -857,8 +928,9 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
     let selected = item.target_format.clone();
     let source = item.source_format_hint().map(SharedString::from);
     Button::new(SharedString::from(format!("item-format:{key}")))
-        .ghost()
+        .outline()
         .xsmall()
+        .rounded(ButtonRounded::Size(cx.theme().radius_full()))
         .flex_none()
         .accessibility_label(tr_with(
             "queue.item_format_label",
@@ -936,8 +1008,8 @@ fn row_meta(item: &QueueItem) -> SharedString {
 fn render_thumbnail(thumbnail: &ThumbnailState, cx: &App) -> impl IntoElement {
     let slot = div()
         .flex_none()
-        .size_10()
-        .rounded(cx.theme().radius)
+        .size_11()
+        .rounded(cx.theme().radius_lg)
         .bg(cx.theme().muted)
         .overflow_hidden()
         .flex()
@@ -1003,15 +1075,41 @@ fn status_text(
     parts.join(" · ").into()
 }
 
+/// The change in size, in whole percent of the source; equal sizes and
+/// changes under one percent are said as such rather than rounded to 0%.
+fn size_change(in_size: u64, out_size: u64) -> SharedString {
+    if in_size == 0 {
+        return SharedString::default();
+    }
+    if in_size == out_size {
+        return tr("status.same_size");
+    }
+    let ratio = out_size as f64 / in_size as f64;
+    let percent = ((1. - ratio).abs() * 100.).round();
+    match (out_size < in_size, percent < 1.) {
+        (true, true) => tr("status.smaller_under_one"),
+        (true, false) => tr_with("status.smaller_percent", &[("percent", &percent)]),
+        (false, true) => tr("status.larger_under_one"),
+        (false, false) => tr_with("status.larger_percent", &[("percent", &percent)]),
+    }
+}
+
+/// The row's result lane. It shows a compact form (the output size and the
+/// change, a short state or the reason); the complete text is the lane's
+/// accessible value, and a tooltip where the compact form is cut short.
 fn render_status(item: &QueueItem, cx: &App) -> impl IntoElement {
     let status = &item.status;
     let warnings = &item.warnings;
     let text = status_text(status, warnings);
+    // The lane shrinks with the text column; a long reason truncates
+    // instead of running into the command lane.
     let lane = h_flex()
-        .flex_1()
+        .flex_shrink(1.)
+        .max_w_56()
         .min_w_0()
         .justify_end()
-        .gap_2()
+        .items_center()
+        .gap_1p5()
         .text_xs()
         .id(SharedString::from(format!("status:{}", item.key)))
         .test_support()
@@ -1044,7 +1142,7 @@ fn render_status(item: &QueueItem, cx: &App) -> impl IntoElement {
             .child(tr("status.pending")),
         ItemStatus::Running { percent } => lane
             .child(
-                div().w_24().child(
+                div().w_20().child(
                     Progress::new("row-progress")
                         .accessibility_label(tr_with(
                             "queue.progress_item",
@@ -1060,32 +1158,57 @@ fn render_status(item: &QueueItem, cx: &App) -> impl IntoElement {
             ),
         ItemStatus::Done {
             in_size, out_size, ..
-        } => lane
-            .text_color(cx.theme().muted_foreground)
-            .child(
+        } => {
+            let smaller = out_size < in_size;
+            lane.child(
                 Icon::new(IconName::CircleCheck)
-                    .small()
+                    .xsmall()
                     .text_color(cx.theme().success),
             )
             .when(!warnings.is_empty(), |lane| {
-                lane.child(div().flex_none().child(tr("status.warnings")))
+                lane.child(
+                    div()
+                        .flex_none()
+                        .text_color(cx.theme().warning)
+                        .child(tr("status.warnings")),
+                )
             })
-            .child(div().truncate().child(tr_with(
-                "status.saved",
-                &[
-                    ("before", &format_bytes(*in_size)),
-                    ("after", &format_bytes(*out_size)),
-                ],
-            ))),
+            .child(
+                div()
+                    .flex_none()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(format_bytes(*out_size)),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .text_color(if smaller {
+                        cx.theme().success
+                    } else {
+                        cx.theme().muted_foreground
+                    })
+                    .child(size_change(*in_size, *out_size)),
+            )
+        }
         ItemStatus::Skipped { error } => lane
-            .text_color(cx.theme().muted_foreground)
-            .child(div().truncate().child(format_command_error(error)))
-            .child(tr("status.skipped")),
+            .text_color(cx.theme().warning)
+            .child(div().flex_none().child(tr("status.skipped")))
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .child(format_command_error(error)),
+            ),
         ItemStatus::Error { error } => lane
             .text_color(cx.theme().danger)
-            .child(Icon::new(IconName::CircleX).small())
-            .child(div().truncate().child(format_command_error(error)))
-            .child(tr("status.error")),
+            .child(Icon::new(IconName::CircleX).xsmall())
+            .child(div().flex_none().child(tr("status.error")))
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .child(format_command_error(error)),
+            ),
     }
 }
 
@@ -1093,12 +1216,30 @@ pub use imgconvert_gpui_shared::images::format_bytes;
 
 #[cfg(test)]
 mod tests {
-    use super::{QueueModel, ThumbnailState, apply_thumbnail_result, format_bytes};
+    use super::{
+        QueueModel, ThumbnailState, apply_thumbnail_result, format_bytes, size_change, tr, tr_with,
+    };
     use gpui_kit::{AppContext as _, RenderImage, SharedString, TestAppContext};
     use image::{Frame, ImageBuffer, Rgba};
     use imgconvert_backend::import::ImportScanFile;
     use imgconvert_gpui_shared::queue_model::ThumbnailTicket;
     use std::sync::Arc;
+
+    #[test]
+    fn size_change_names_equal_and_sub_percent_changes() {
+        assert_eq!(size_change(0, 10), SharedString::default());
+        assert_eq!(size_change(1000, 1000), tr("status.same_size"));
+        assert_eq!(size_change(100_000, 99_900), tr("status.smaller_under_one"));
+        assert_eq!(size_change(100_000, 100_100), tr("status.larger_under_one"));
+        assert_eq!(
+            size_change(2048, 1024),
+            tr_with("status.smaller_percent", &[("percent", &50.)])
+        );
+        assert_eq!(
+            size_change(1000, 1290),
+            tr_with("status.larger_percent", &[("percent", &29.)])
+        );
+    }
 
     #[test]
     fn sizes_are_formatted_with_binary_units() {
