@@ -1,13 +1,13 @@
 # GPUI G3-3 UI test coverage matrix
 
-Status: 2026-10-22. Scope: the GPUI shell's dialogs and main flows, plus the
+Status: 2026-10-23 (after the Clear Glass 2.0 redesign, #50–#53). Scope: the GPUI shell's dialogs and main flows, plus the
 headless drag/drop, thumbnail-eviction and pixel checks required by G3-3.
 This file records what is automated, what was deliberately left to another
 gate, and which checks still need a harness change.
 
 ## Evidence baseline
 
-- `apps/gpui/crates/shell/tests/ui.rs`: 41 headless Kit UI tests in the real
+- `apps/gpui/crates/shell/tests/ui.rs`: 43 headless Kit UI tests in the real
   workspace.
 - `apps/gpui/crates/shared/src/queue_model.rs`: thumbnail budget, replacement
   and stale-ticket tests, including release-once assertions.
@@ -41,7 +41,8 @@ gate, and which checks still need a harness change.
 | Empty queue / start disabled | `empty_queue_shows_the_next_action_and_disables_start` | Covered |
 | Language toggle | `language_toggle_rewrites_visible_labels` | Covered |
 | Persisted format/folder edits | `persisted_format_and_folder_drive_the_panel_and_follow_its_edits` | Covered |
-| Settings sections and controls | `settings_form_sections_render_and_edit_the_record`, `settings_controls_expose_native_names_roles_and_toggle_state` | Covered |
+| Settings tabs, sections and controls | `settings_form_sections_render_and_edit_the_record` (incl. the cross-tab warning), `settings_controls_expose_native_names_roles_and_toggle_state` (tab and format-card roles, selected state, tab-list and card-group arrow keys, Tab order, focus kept while busy) | Covered |
+| Appearance popover | `theme_preference_and_reduced_motion_follow_the_settings_record` (popover theme group, arrow keys, reduce motion), `glass_layout_keeps_actions_visible_and_appearance_preserves_settings` (opens in the window, Escape closes) | Covered |
 | Settings write coalescing | `settings_edits_coalesce_into_one_write_and_flush_on_demand` | Covered |
 | External file drop import | `external_file_drop_imports_a_png_into_an_empty_queue` | Covered |
 | Drop cancel (exit) | `external_file_drag_exit_does_not_import` | Covered |
@@ -50,14 +51,16 @@ gate, and which checks still need a harness change.
 | Output suffix feedback | `suffix_feedback_*` (3 tests) | Covered |
 | Per-item formats | `item_formats_menu_drives_mixed_outputs_and_reset` | Covered |
 | Start / finish / retry / next batch | `queued_items_render_rows_and_let_start_run`, `parity_next_batch_keeps_completed_items_and_converts_only_new_inputs` | Covered |
+| Finished summary and net saving | `finished_batch_summary_names_the_net_saving` (earlier rows and failures; `net_saving` and `size_change` unit tests) | Covered |
+| Long failure reason at the minimum size | `long_failure_reasons_stay_clear_of_the_row_commands` | Covered |
 | Scan failures / stop / partial errors | `parity_scan_reports_failures_and_stop_preserves_existing_queue`, `parity_structured_errors_retranslate_and_remove_preserves_sources` | Covered |
 | PDF import and source format menu | `parity_pdf_import_metadata_and_source_format_menu` | Covered |
 | Remove / cleanup source | `parity_remove_clipboard_item_cleans_only_its_registered_file` | Covered |
 | Animation / precision warnings | `animation_facts_mark_rows_and_count_pending_inputs_before_decode`, `precision_warnings_survive_queue_completion_and_retranslate` | Covered |
-| Running-batch navigation / busy protection | `card_navigation_preserves_a_nonempty_running_batch` | Covered |
+| Running-batch appearance command / busy protection | `appearance_command_preserves_a_nonempty_running_batch` | Covered |
 | Quality floor keyboard limits | `quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy` | Covered |
 | Queue item roles/metadata/result states | `queue_content_exposes_names_metadata_and_every_result_state` | Covered |
-| Small-window card layout | `card_layout_keeps_actions_visible_and_shortcuts_preserve_settings` | Covered |
+| Small-window glass layout (760×480 … 1280×800, light/dark, en/zh, 115% font for the capsule) | `glass_layout_keeps_actions_visible_and_appearance_preserves_settings`, `finished_items_open_the_storage_scenario_dialog` | Covered |
 
 ## Nonfunctional paths required by G3-3
 
@@ -91,8 +94,11 @@ gate, and which checks still need a harness change.
    fixture.
 6. **10k queue memory observation (R6).** Unit-level eviction is covered;
    no 10k-row memory measurement is automated.
-7. **Glass decision and 760 px screenshot review (R8).** Design decision and
-   screenshot comparison, not a headless assertion.
+7. **Glass decision and 760 px screenshot review (R8).** Done for Clear Glass
+   2.0 (`GPUI_GLASS_LAYOUT.md`): the user chose the design on 2026-10-22 and
+   every slice was reviewed in real Xvfb windows in both themes; the layout
+   invariants at 760×480 are asserted headlessly. Native macOS screenshots
+   from an SSH session need screen-recording consent and stay a G2/G3 item.
 
 ## Native G2 items deliberately excluded
 
