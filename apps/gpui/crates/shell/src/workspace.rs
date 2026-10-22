@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! The main window: a soft backdrop, a thin toolbar, the queue card as the
-//! primary region, the settings card on the trailing edge and the fixed
-//! action bar with the one decision (design: "Liquid Glass", 2026-10-18).
+//! The main window (design "Clear Glass 2.0", 2026-10-22): a soft backdrop,
+//! a header with the brand and a capsule of window-level commands, and two
+//! glass panels. The queue panel is the primary region and carries the
+//! floating action capsule with the one decision; the settings panel sits on
+//! the trailing edge. Both panels are always present, so the earlier
+//! navigation rail is gone; appearance lives behind the header's Appearance
+//! command.
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
@@ -23,23 +27,15 @@ use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
-use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, WorkflowPanel};
+use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, COMPACT_WIDTH_REM, WorkflowPanel};
 
 use crate::toggle_language;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum WorkspaceRegion {
-    Queue,
-    Conversion,
-    Settings,
-}
 
 pub struct Workspace {
     queue_view: Entity<QueueView>,
     workflow: Entity<WorkflowPanel>,
     action_bar: Entity<ActionBar>,
     focus_handle: FocusHandle,
-    active_region: WorkspaceRegion,
     /// The dialog owns the preview; this only lets tests and menus find it.
     comparison_preview: Option<gpui_kit::WeakEntity<ComparisonPreview>>,
     plugin_diagnostics: Option<gpui_kit::WeakEntity<PluginDiagnostics>>,
@@ -77,9 +73,6 @@ impl Workspace {
                     ActionBarEvent::BatchImpact => {
                         this.open_environmental_impact(ImpactSubject::Batch, window, cx);
                     }
-                    ActionBarEvent::OpenSettings => {
-                        this.navigate(WorkspaceRegion::Settings, window, cx);
-                    }
                 },
             ),
             // "Follow system" needs the window's appearance, which only the
@@ -94,7 +87,6 @@ impl Workspace {
             workflow,
             action_bar,
             focus_handle,
-            active_region: WorkspaceRegion::Queue,
             comparison_preview: None,
             plugin_diagnostics: None,
             environmental_impact: None,
@@ -172,156 +164,127 @@ impl Workspace {
         &self.action_bar
     }
 
-    fn navigate(&mut self, target: WorkspaceRegion, window: &mut Window, cx: &mut Context<Self>) {
-        self.active_region = target;
-        match target {
-            WorkspaceRegion::Queue => window.focus(&self.focus_handle, cx),
-            WorkspaceRegion::Conversion => self.workflow.update(cx, |panel, cx| {
-                panel.focus_conversion_settings(window, cx);
-            }),
-            WorkspaceRegion::Settings => self.workflow.update(cx, |panel, cx| {
-                panel.focus_appearance_settings(window, cx);
-            }),
-        }
+    /// Reveals and focuses the appearance settings (the header's
+    /// Appearance command); the settings stay in their existing form.
+    pub fn open_appearance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.workflow.update(cx, |panel, cx| {
+            panel.focus_appearance_settings(window, cx);
+        });
         cx.notify();
     }
 
-    fn render_sidebar(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
-            .id("workspace-sidebar")
-            .test_support()
-            .flex_none()
-            .when(compact, |sidebar| sidebar.w(rems(3.5)))
-            .when(!compact, |sidebar| sidebar.w(rems(9.)))
-            .border_r_1()
-            .border_color(cx.theme().border)
-            .p_2()
-            .gap_2()
-            .child(
-                h_flex()
-                    .h_12()
-                    .px_2()
-                    .when(compact, |brand| {
-                        brand.justify_center().child(
-                            Icon::new(IconName::GalleryVerticalEnd).text_color(cx.theme().primary),
-                        )
-                    })
-                    .when(!compact, |brand| {
-                        brand.font_weight(FontWeight::BOLD).child(tr("app.title"))
-                    }),
-            )
-            .children(
-                [
-                    (
-                        WorkspaceRegion::Queue,
-                        "nav-queue",
-                        "nav.queue",
-                        IconName::LayoutDashboard,
-                    ),
-                    (
-                        WorkspaceRegion::Conversion,
-                        "nav-convert",
-                        "nav.convert",
-                        IconName::RefreshCw,
-                    ),
-                    (
-                        WorkspaceRegion::Settings,
-                        "nav-settings",
-                        "nav.settings",
-                        IconName::Settings,
-                    ),
-                ]
-                .into_iter()
-                .map(|(target, id, label, icon)| {
-                    let selected = self.active_region == target;
-                    Button::new(id)
-                        .ghost()
-                        .rounded(ButtonRounded::Size(cx.theme().radius_tokens().md))
-                        .h_10()
-                        .w_full()
-                        .icon(icon)
-                        .accessibility_label(tr(label))
-                        .when(compact, |button| button.tooltip(tr(label)))
-                        .when(target == WorkspaceRegion::Conversion, |button| {
-                            button.tooltip(tr("nav.convert_target"))
-                        })
-                        .when(target == WorkspaceRegion::Settings, |button| {
-                            button.tooltip(tr("nav.settings_target"))
-                        })
-                        .toggled(selected)
-                        .when(!compact, |button| button.justify_start().label(tr(label)))
-                        .when(selected, |button| {
-                            button
-                                .bg(cx.theme().primary.opacity(0.12))
-                                .text_color(cx.theme().primary)
-                        })
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.navigate(target, window, cx);
-                        }))
-                }),
-            )
-    }
-
-    fn render_toolbar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let glass = cx.glass();
         let pill = ButtonRounded::Size(cx.theme().radius_full());
         h_flex()
-            .h_10()
+            .id("workspace-header")
+            .test_support()
+            .h_12()
             .flex_none()
-            .px_4()
-            .gap_2()
+            .px_5()
+            .gap_3()
+            .items_center()
+            .child(
+                div()
+                    .size_7()
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(cx.theme().radius_tokens().md)
+                    .bg(cx.theme().tokens.primary)
+                    .shadow(glass.primary_shadows())
+                    .child(
+                        Icon::new(IconName::RefreshCw)
+                            .small()
+                            .text_color(cx.theme().primary_foreground),
+                    ),
+            )
+            .child(
+                div()
+                    .id("workspace-title")
+                    .test_support()
+                    .role(Role::Heading)
+                    .aria_label(tr("app.title"))
+                    .text_base()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(tr("app.title")),
+            )
             .child(div().flex_1())
             .child(
-                Button::new("plugin-diagnostics")
-                    .ghost()
-                    .small()
-                    .rounded(pill)
-                    .label(tr("diagnostics.open"))
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.open_plugin_diagnostics(window, cx);
-                    })),
-            )
-            .when(imgconvert_gpui_app_settings::is_visible(), |bar| {
-                bar.child(
-                    Button::new("updates-open")
-                        .ghost()
-                        .small()
-                        .rounded(pill)
-                        .label(tr("update.open"))
-                        .on_click(|_, window, cx| {
-                            imgconvert_gpui_app_settings::open_updates(window, cx);
-                        }),
-                )
-            })
-            .child(
-                Button::new("privacy-open")
-                    .ghost()
-                    .small()
-                    .rounded(pill)
-                    .label(tr("legal.privacy_open"))
-                    .on_click(|_, window, cx| {
-                        imgconvert_gpui_app_settings::legal::open_privacy(window, cx);
-                    }),
-            )
-            .child(
-                Button::new("licenses-open")
-                    .ghost()
-                    .small()
-                    .rounded(pill)
-                    .label(tr("legal.licenses_open"))
-                    .on_click(|_, window, cx| {
-                        imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
-                    }),
-            )
-            .child(
-                Button::new("language-toggle")
-                    .ghost()
-                    .small()
-                    .rounded(pill)
-                    .icon(IconName::Globe)
-                    .label(tr("app.language_toggle"))
-                    .tooltip(tr("app.language_toggle_tooltip"))
-                    // Same command as the `ToggleLanguage` action and menu item.
-                    .on_click(|_, _, cx| toggle_language(cx)),
+                h_flex()
+                    .id("workspace-commands")
+                    .test_support()
+                    .flex_none()
+                    .p_0p5()
+                    .gap_0p5()
+                    .items_center()
+                    .glass_capsule(cx)
+                    .child(
+                        Button::new("plugin-diagnostics")
+                            .ghost()
+                            .small()
+                            .rounded(pill)
+                            .label(tr("diagnostics.open"))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.open_plugin_diagnostics(window, cx);
+                            })),
+                    )
+                    .when(imgconvert_gpui_app_settings::is_visible(), |bar| {
+                        bar.child(
+                            Button::new("updates-open")
+                                .ghost()
+                                .small()
+                                .rounded(pill)
+                                .label(tr("update.open"))
+                                .on_click(|_, window, cx| {
+                                    imgconvert_gpui_app_settings::open_updates(window, cx);
+                                }),
+                        )
+                    })
+                    .child(
+                        Button::new("privacy-open")
+                            .ghost()
+                            .small()
+                            .rounded(pill)
+                            .label(tr("legal.privacy_open"))
+                            .on_click(|_, window, cx| {
+                                imgconvert_gpui_app_settings::legal::open_privacy(window, cx);
+                            }),
+                    )
+                    .child(
+                        Button::new("licenses-open")
+                            .ghost()
+                            .small()
+                            .rounded(pill)
+                            .label(tr("legal.licenses_open"))
+                            .on_click(|_, window, cx| {
+                                imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
+                            }),
+                    )
+                    .child(
+                        Button::new("language-toggle")
+                            .ghost()
+                            .small()
+                            .rounded(pill)
+                            .icon(IconName::Globe)
+                            .label(tr("app.language_toggle"))
+                            .tooltip(tr("app.language_toggle_tooltip"))
+                            // Same command as the `ToggleLanguage` action and menu item.
+                            .on_click(|_, _, cx| toggle_language(cx)),
+                    )
+                    .child(
+                        Button::new("workspace-appearance")
+                            .ghost()
+                            .small()
+                            .rounded(pill)
+                            .icon(IconName::Palette)
+                            .accessibility_label(tr("settings.appearance_section"))
+                            .tooltip(tr("settings.appearance_section"))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.open_appearance(window, cx);
+                            })),
+                    ),
             )
     }
 }
@@ -334,7 +297,7 @@ impl Focusable for Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let compact = window.viewport_size().width < window.rem_size() * 66.;
+        let compact = window.viewport_size().width < window.rem_size() * COMPACT_WIDTH_REM;
         div()
             .id("workspace")
             .test_support()
@@ -368,43 +331,43 @@ impl Render for Workspace {
                 v_flex()
                     .size_full()
                     .relative()
-                    .child(self.render_toolbar(cx))
+                    .child(self.render_header(cx))
                     .child(
                         h_flex()
                             .id("workspace-content")
                             .test_support()
                             .flex_1()
                             .min_h_0()
-                            .px_3()
+                            .px_4()
+                            .pb_4()
                             .gap_3()
                             .items_stretch()
                             .child(
-                                h_flex()
-                                    .items_stretch()
+                                v_flex()
+                                    .id("workspace-queue-panel")
+                                    .test_support()
                                     .flex_1()
                                     .min_w_0()
                                     .glass_panel(cx)
                                     .overflow_hidden()
-                                    .child(self.render_sidebar(compact, cx))
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .min_w_0()
-                                            .h_full()
-                                            .child(self.queue_view.clone()),
-                                    ),
+                                    .child(div().flex_1().min_h_0().child(self.queue_view.clone()))
+                                    // The capsule floats at the panel's foot;
+                                    // the list ends above it, so no row hides
+                                    // behind it.
+                                    .child(div().flex_none().p_3().child(self.action_bar.clone())),
                             )
                             .child(
                                 div()
-                                    .w(if compact { rems(20.) } else { rems(24.) })
+                                    .id("workspace-settings-panel")
+                                    .test_support()
+                                    .w(if compact { rems(20.) } else { rems(23.) })
                                     .flex_none()
                                     .h_full()
                                     .glass_panel(cx)
                                     .overflow_hidden()
                                     .child(self.workflow.clone()),
                             ),
-                    )
-                    .child(div().flex_none().p_3().child(self.action_bar.clone())),
+                    ),
             )
     }
 }

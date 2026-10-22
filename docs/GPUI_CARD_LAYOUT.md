@@ -1,5 +1,7 @@
 # GPUI 卡片分栏设计
 
+> 2026-10-22 起本布局已由 [清透玻璃 2.0](GPUI_GLASS_LAYOUT.md) 取代；以下内容保留为历史记录。
+
 2026-10-19 用户以本机 `~/jietu/001.png` 的“卡片分栏”方案指定设计方向。参考图快照保存在忽略目录 `artifacts/reviews/g2-native-2026-10-19/design-reference-cards.png`。
 
 ## 布局与行为
