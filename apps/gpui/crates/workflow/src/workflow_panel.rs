@@ -14,12 +14,17 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::scroll::ScrollableElement as _;
-use gpui_kit::component::{WindowExt as _, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
+};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, ScrollHandle, SharedString, StatefulInteractiveElement as _,
-    Styled as _, Subscription, TestSupportExt as _, Window, div,
+    App, AppContext as _, Context, Entity, FocusHandle, FontWeight, InteractiveElement as _,
+    IntoElement, KeyDownEvent, ParentElement as _, Render, Role, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    transparent_black,
 };
 use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
@@ -28,10 +33,11 @@ use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
 use imgconvert_gpui_shared::tasks;
+use imgconvert_gpui_shared::theme::ActiveGlass as _;
 use imgconvert_gpui_shared::{AppModels, QueueItem, QueueModel, SettingsModel};
 
 use crate::output_safety;
-use crate::settings_form::SettingsForm;
+use crate::settings_form::{SettingsForm, SettingsTab};
 
 /// Semantic notices, translated at render time so a locale switch re-renders them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,6 +87,8 @@ pub struct WorkflowPanel {
     pending_start: Option<PendingHandle>,
     notice: Option<Notice>,
     scroll: ScrollHandle,
+    /// The settings tab list is one Tab stop; arrows switch tabs.
+    tabs_focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -118,6 +126,7 @@ impl WorkflowPanel {
             pending_start: None,
             notice: None,
             scroll: ScrollHandle::new(),
+            tabs_focus: cx.focus_handle().tab_stop(true),
             _subscriptions: subscriptions,
         }
     }
@@ -126,7 +135,8 @@ impl WorkflowPanel {
         &self.settings_form
     }
 
-    /// Bring the conversion controls into view without changing any settings.
+    /// Bring the format cards into view and focus them without changing any
+    /// settings.
     pub fn focus_conversion_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.scroll.set_offset(gpui_kit::Point::default());
         if !self.settings_form.read(cx).is_busy(cx) {
@@ -134,15 +144,6 @@ impl WorkflowPanel {
                 form.focus_format(window, cx);
             });
         }
-        cx.notify();
-    }
-
-    /// Reveal and focus appearance settings, retaining the same model and form.
-    pub fn focus_appearance_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.settings_form.update(cx, |form, cx| {
-            form.focus_appearance(window, cx);
-        });
-        self.scroll.scroll_to_bottom();
         cx.notify();
     }
 
@@ -469,6 +470,94 @@ impl WorkflowPanel {
     }
 }
 
+impl WorkflowPanel {
+    /// Moves between tabs with the arrow, Home and End keys.
+    fn tabs_key(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
+        let tabs = SettingsTab::ALL;
+        let current = self.settings_form.read(cx).active_tab();
+        let index = tabs.iter().position(|tab| *tab == current).unwrap_or(0);
+        let last = tabs.len() - 1;
+        let next = match event.keystroke.key.as_str() {
+            "left" => index.checked_sub(1).unwrap_or(last),
+            "right" => (index + 1) % tabs.len(),
+            "home" => 0,
+            "end" => last,
+            _ => return,
+        };
+        cx.stop_propagation();
+        self.settings_form
+            .update(cx, |form, cx| form.set_tab(tabs[next], cx));
+    }
+
+    /// The segmented tab bar over the settings. Kit's `Tab` takes no
+    /// keyboard focus in 0.7.1, so the tab list is one Tab stop with its
+    /// own focus handle (arrow, Home and End keys switch tabs) and each tab
+    /// is a Button with the tab role and its selected state. A click also
+    /// focuses the list, so focus never falls out of a tab that unmounts.
+    fn render_tabs(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let form = self.settings_form.read(cx);
+        let active = form.active_tab();
+        let glass = cx.glass();
+        let pill = ButtonRounded::Size(cx.theme().radius_full());
+        let tabs: Vec<_> = SettingsTab::ALL
+            .into_iter()
+            .map(|tab| {
+                let selected = tab == active;
+                let title = tr(tab.title_key());
+                let issue = form.tab_has_issue(tab, cx);
+                let target = self.settings_form.downgrade();
+                let list_focus = self.tabs_focus.clone();
+                Button::new(tab.id())
+                    .ghost()
+                    .small()
+                    .role(Role::Tab)
+                    .tab_stop(false)
+                    .rounded(pill)
+                    .flex_1()
+                    .min_w_0()
+                    .toggled(selected)
+                    .label(title.clone())
+                    .when(issue, |button| {
+                        button
+                            .icon(IconName::TriangleAlert)
+                            .accessibility_label(tr_with(
+                                "settings.tab_has_issue",
+                                &[("tab", &title)],
+                            ))
+                    })
+                    .when(selected, |button| {
+                        button
+                            .bg(glass.chip_strong())
+                            .shadow(glass.lift_shadows())
+                            .font_weight(FontWeight::SEMIBOLD)
+                    })
+                    .on_click(move |_, window, cx| {
+                        let _ = target.update(cx, |form, cx| form.set_tab(tab, cx));
+                        window.focus(&list_focus, cx);
+                    })
+            })
+            .collect();
+        let ring = cx.theme().ring;
+        h_flex()
+            .id("settings-tabs")
+            .test_support()
+            .role(Role::TabList)
+            .aria_label(tr("settings.title"))
+            .track_focus(&self.tabs_focus)
+            .border_1()
+            .border_color(transparent_black())
+            .focus_visible(move |style| style.border_color(ring))
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                this.tabs_key(event, cx);
+            }))
+            .p_0p5()
+            .gap_0p5()
+            .rounded(cx.theme().radius_full())
+            .bg(glass.chip())
+            .children(tabs)
+    }
+}
+
 impl Render for WorkflowPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let queue = self.queue.read(cx);
@@ -491,19 +580,7 @@ impl Render for WorkflowPanel {
             .test_support()
             .size_full()
             .min_h_0()
-            .child(
-                div()
-                    .px_4()
-                    .pt_4()
-                    .pb_2()
-                    .text_sm()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .id("workflow-heading")
-                    .test_support()
-                    .role(gpui_kit::Role::Heading)
-                    .aria_label(tr("settings.title"))
-                    .child(tr("settings.title")),
-            )
+            .child(div().px_4().pt_4().pb_3().child(self.render_tabs(cx)))
             .children((animated + unknown > 0).then(|| {
                 div()
                     .id("workflow-animation-check")
@@ -650,6 +727,8 @@ mod tests {
                 SettingsModel::in_memory(Settings::default())
             });
             gpui_kit::init(cx);
+            // The panel paints with the product's glass tokens, as in the app.
+            imgconvert_gpui_shared::theme::install(cx);
             let (_, panel) =
                 gpui_kit::open_window(gpui_kit::WindowOptions::default(), cx, |window, cx| {
                     cx.new(|cx| WorkflowPanel::new(window, cx))

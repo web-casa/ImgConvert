@@ -5,6 +5,7 @@
 //! actions and the perf-probe driver. Feature logic lives in the queue and
 //! workflow crates; this crate only composes them.
 
+pub mod appearance;
 pub mod blocked;
 pub mod probe_driver;
 pub mod workspace;

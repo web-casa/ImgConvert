@@ -2,12 +2,15 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 //! The conversion settings form (port of the Svelte `SettingsBar` and
-//! `WorkflowSettings`): preset, format and quality always visible, then eleven
-//! collapsible sections (output, compression, color, cache, format
-//! parameters, presets, PDF, resize, target size, metadata), one open at a
-//! time. Section headers are Kit `Button`s so every section is a Tab stop;
-//! sliders get a focus handle and arrow keys because Kit's `Slider` is
-//! pointer-only in 0.7.1.
+//! `WorkflowSettings`), split into four tabs (design "Clear Glass 2.0"):
+//! Format (preset, format cards, quality, compression, format parameters),
+//! Output (output behaviour, result cache), Processing (resize, target size,
+//! PDF, color) and Privacy (metadata). Each tab shows its sections as titled
+//! wells; a tab whose settings Start would refuse carries a warning mark.
+//! The format cards and the sliders are keyboard groups with their own focus
+//! handle and arrow keys, because Kit's `Slider` is pointer-only and its
+//! `Tab` is not focusable in 0.7.1. Appearance lives in the shell's
+//! Appearance popover, not here.
 //!
 //! Every control is controlled by the persisted [`SettingsModel`]: a control
 //! reports a requested value, the model is updated (which schedules the
@@ -18,7 +21,6 @@
 //! reconcile that one field themselves.
 
 use gpui_kit::component::button::{Button, ButtonVariant, ButtonVariants as _};
-use gpui_kit::component::collapsible::Collapsible;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::select::{Select, SelectEvent};
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
@@ -43,19 +45,71 @@ use imgconvert_backend::settings::{
     AvifSubsample, ColorManagementPolicy, DEFAULT_OUTPUT_SUFFIX, MAX_CUSTOM_PRESETS, MAX_PDF_DPI,
     MAX_PDF_PAGE_RANGE_CHARS, MAX_RESIZE_PERCENT, MAX_TARGET_SIZE_KIB, MIN_PDF_DPI,
     MIN_TARGET_SIZE_KIB, MetadataPolicy, OverwriteMode, ResizeMode, Settings,
-    Theme as ThemePreference, normalize_output_suffix_input,
+    normalize_output_suffix_input,
 };
 use imgconvert_backend::workflow_presets::{
     self, CUSTOM_PRESET_ID_PREFIX, builtin_workflow_presets,
 };
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, SettingsModel};
 
 /// Sentinel id of the preset select when no preset matches.
 const CUSTOM_PRESET_VALUE: &str = "__custom";
 
-/// Sections of the form, in display order. One is open at a time.
+/// Tabs of the settings panel, in display order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsTab {
+    Format,
+    Output,
+    Processing,
+    Privacy,
+}
+
+impl SettingsTab {
+    pub const ALL: [Self; 4] = [Self::Format, Self::Output, Self::Processing, Self::Privacy];
+
+    /// Element id of the tab's button.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Format => "settings-tab-format",
+            Self::Output => "settings-tab-output",
+            Self::Processing => "settings-tab-processing",
+            Self::Privacy => "settings-tab-privacy",
+        }
+    }
+
+    pub fn title_key(self) -> &'static str {
+        match self {
+            Self::Format => "settings.tab_format",
+            Self::Output => "settings.tab_output",
+            Self::Processing => "settings.tab_processing",
+            Self::Privacy => "settings.tab_privacy",
+        }
+    }
+
+    /// The sections the tab shows below its own controls, in order.
+    pub fn sections(self) -> &'static [Section] {
+        match self {
+            Self::Format => &[
+                Section::Presets,
+                Section::Compression,
+                Section::FormatParameters,
+            ],
+            Self::Output => &[Section::Output, Section::Cache],
+            Self::Processing => &[
+                Section::Resize,
+                Section::TargetSize,
+                Section::Pdf,
+                Section::Color,
+            ],
+            Self::Privacy => &[Section::Metadata],
+        }
+    }
+}
+
+/// Sections of the form; each belongs to one [`SettingsTab`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
     Output,
@@ -68,11 +122,10 @@ pub enum Section {
     Resize,
     TargetSize,
     Metadata,
-    Appearance,
 }
 
 impl Section {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 10] = [
         Self::Output,
         Self::Compression,
         Self::Color,
@@ -83,10 +136,17 @@ impl Section {
         Self::Resize,
         Self::TargetSize,
         Self::Metadata,
-        Self::Appearance,
     ];
 
-    /// Element id of the section's header button.
+    /// The tab that shows the section.
+    pub fn tab(self) -> SettingsTab {
+        SettingsTab::ALL
+            .into_iter()
+            .find(|tab| tab.sections().contains(&self))
+            .expect("every section belongs to a tab")
+    }
+
+    /// Element id of the section's heading.
     pub fn id(self) -> &'static str {
         match self {
             Self::Output => "section-output",
@@ -99,7 +159,6 @@ impl Section {
             Self::Resize => "section-resize",
             Self::TargetSize => "section-target-size",
             Self::Metadata => "section-metadata",
-            Self::Appearance => "section-appearance",
         }
     }
 
@@ -108,14 +167,13 @@ impl Section {
             Self::Output => "settings.output_section",
             Self::Compression => "settings.compression_section",
             Self::Color => "settings.color_section",
-            Self::Cache => "settings.result_cache_label",
+            Self::Cache => "settings.cache_section",
             Self::FormatParameters => "settings.format_parameters",
-            Self::Presets => "workflow.preset",
+            Self::Presets => "workflow.preset_manage",
             Self::Pdf => "workflow.pdf_section",
             Self::Resize => "workflow.resize_section",
             Self::TargetSize => "workflow.target_section",
             Self::Metadata => "workflow.metadata_section",
-            Self::Appearance => "settings.appearance_section",
         }
     }
 }
@@ -282,17 +340,17 @@ pub struct SettingsForm {
     capabilities: FormatCapabilities,
     locale: Locale,
     syncing: bool,
-    open_section: Option<Section>,
+    tab: SettingsTab,
     suffix_feedback: Option<SuffixFeedback>,
     cache_clear: CacheClear,
 
-    format: Choice,
+    /// The format cards are one Tab stop; arrows move the selection.
+    format_focus: FocusHandle,
     preset: Choice,
     overwrite: Choice,
     resize_mode: Choice,
     metadata_policy: Choice,
     avif_subsample: Choice,
-    theme: Choice,
 
     /// In `SliderKind::ALL` order.
     sliders: Vec<SliderControl>,
@@ -319,12 +377,6 @@ impl SettingsForm {
         let settings = models.settings().read(cx).settings().clone();
         let locale = Locale::current();
 
-        let format = Choice::new(
-            format_items(&capabilities.writable, models.queue().read(cx).items()),
-            &settings.format,
-            window,
-            cx,
-        );
         let preset = Choice::new(
             preset_items(&settings),
             &active_preset_id(&settings),
@@ -350,7 +402,6 @@ impl SettingsForm {
             window,
             cx,
         );
-        let theme = Choice::new(theme_items(), settings.theme.as_str(), window, cx);
 
         let sliders: Vec<SliderControl> = SliderKind::ALL
             .into_iter()
@@ -425,15 +476,6 @@ impl SettingsForm {
 
         // Selects: the confirmed value is the option id.
         subscriptions.push(cx.subscribe(
-            format.state(),
-            |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
-                let SelectEvent::Confirm(value) = event;
-                if let Some(format) = value.clone() {
-                    this.edit(cx, |s| s.format = format);
-                }
-            },
-        ));
-        subscriptions.push(cx.subscribe(
             preset.state(),
             |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
                 let SelectEvent::Confirm(value) = event;
@@ -478,15 +520,6 @@ impl SettingsForm {
                 let SelectEvent::Confirm(value) = event;
                 if let Some(subsample) = value.as_deref().and_then(AvifSubsample::parse) {
                     this.edit(cx, |s| s.avif_subsample = subsample);
-                }
-            },
-        ));
-        subscriptions.push(cx.subscribe(
-            theme.state(),
-            |this, _, event: &SelectEvent<Vec<ChoiceItem>>, cx| {
-                let SelectEvent::Confirm(value) = event;
-                if let Some(theme) = value.as_deref().and_then(ThemePreference::parse) {
-                    this.edit(cx, |s| s.theme = theme);
                 }
             },
         ));
@@ -572,16 +605,15 @@ impl SettingsForm {
             capabilities,
             locale,
             syncing: false,
-            open_section: None,
+            tab: SettingsTab::Format,
             suffix_feedback: None,
             cache_clear: CacheClear::Idle,
-            format,
+            format_focus: cx.focus_handle().tab_stop(true),
             preset,
             overwrite,
             resize_mode,
             metadata_policy,
             avif_subsample,
-            theme,
             sliders,
             output_suffix,
             file_name_template,
@@ -645,32 +677,58 @@ impl SettingsForm {
             .1
     }
 
-    /// The open section (one at a time).
-    pub fn open_section(&self) -> Option<Section> {
-        self.open_section
+    /// The tab the panel shows.
+    pub fn active_tab(&self) -> SettingsTab {
+        self.tab
     }
 
-    /// Focus the format selector, including formats whose quality slider is disabled.
-    pub fn focus_format(&self, window: &mut Window, cx: &mut App) {
-        self.format
-            .state()
-            .update(cx, |select, cx| select.focus(window, cx));
-    }
-
-    /// Application settings shortcut: expose the appearance section and its select.
-    pub fn focus_appearance(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.set_open_section(Some(Section::Appearance), cx);
-        if !self.is_busy(cx) {
-            self.theme
-                .state()
-                .update(cx, |select, cx| select.focus(window, cx));
+    pub fn set_tab(&mut self, tab: SettingsTab, cx: &mut Context<Self>) {
+        if self.tab != tab {
+            self.tab = tab;
+            cx.notify();
         }
     }
 
-    pub fn set_open_section(&mut self, section: Option<Section>, cx: &mut Context<Self>) {
-        if self.open_section != section {
-            self.open_section = section;
-            cx.notify();
+    /// Switches to the tab that shows `section`.
+    pub fn show_section(&mut self, section: Section, cx: &mut Context<Self>) {
+        self.set_tab(section.tab(), cx);
+    }
+
+    /// Whether a section on `tab` holds a value Start would refuse; the tab
+    /// carries a warning mark so the problem is findable from any tab.
+    pub fn tab_has_issue(&self, tab: SettingsTab, cx: &App) -> bool {
+        let settings = self.settings.read(cx).settings();
+        tab.sections()
+            .iter()
+            .any(|section| self.section_error(*section, settings, cx))
+    }
+
+    /// Focus the format cards (switching to the Format tab), including
+    /// formats whose quality slider is disabled.
+    pub fn focus_format(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_tab(SettingsTab::Format, cx);
+        window.focus(&self.format_focus, cx);
+    }
+
+    /// Moves the format selection with the arrow, Home and End keys.
+    fn format_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.is_busy(cx) {
+            return;
+        }
+        let formats = self.capabilities.writable.clone();
+        let current = self.snapshot(cx).format;
+        let index = formats.iter().position(|f| *f == current).unwrap_or(0);
+        let last = formats.len().saturating_sub(1);
+        let next = match event.keystroke.key.as_str() {
+            "left" | "up" => index.checked_sub(1).unwrap_or(last),
+            "right" | "down" => (index + 1) % formats.len().max(1),
+            "home" => 0,
+            "end" => last,
+            _ => return,
+        };
+        cx.stop_propagation();
+        if let Some(format) = formats.get(next) {
+            self.set_format(&format.clone(), window, cx);
         }
     }
 
@@ -1059,15 +1117,6 @@ impl SettingsForm {
         self.locale = Locale::current();
         self.syncing = true;
 
-        self.format.sync(
-            format_items(
-                &self.capabilities.writable,
-                AppModels::global(cx).queue().read(cx).items(),
-            ),
-            &settings.format,
-            window,
-            cx,
-        );
         self.preset.sync(
             preset_items(&settings),
             &active_preset_id(&settings),
@@ -1094,8 +1143,6 @@ impl SettingsForm {
             window,
             cx,
         );
-        self.theme
-            .sync(theme_items(), settings.theme.as_str(), window, cx);
 
         for control in &self.sliders {
             let value = control.kind.value(&settings);
@@ -1300,7 +1347,7 @@ impl SettingsForm {
             settings.quality.to_string().into()
         };
         v_flex()
-            .gap_3()
+            .gap_4()
             .child(
                 h_flex()
                     .gap_2()
@@ -1321,23 +1368,10 @@ impl SettingsForm {
                     ),
             )
             .child(
-                h_flex()
+                v_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .w_24()
-                            .flex_none()
-                            .child(Self::field_label(tr("settings.target_format"), cx)),
-                    )
-                    .child(
-                        div().flex_1().min_w_0().child(
-                            Select::new(self.format.state())
-                                .id("workflow-format")
-                                .small()
-                                .accessibility_label(tr("settings.target_format"))
-                                .disabled(busy),
-                        ),
-                    ),
+                    .child(Self::field_label(tr("settings.target_format"), cx))
+                    .child(self.render_format_cards(settings, busy, cx)),
             )
             .child(self.slider_field(
                 SliderKind::Quality,
@@ -1348,211 +1382,176 @@ impl SettingsForm {
             ))
     }
 
-    fn render_sections(&self, settings: &Settings, busy: bool, cx: &mut Context<Self>) -> Div {
-        let mut list = v_flex().id("settings-sections").gap_2();
-        for section in Section::ALL {
-            let open = self.open_section == Some(section);
-            let (summary, error) = self.section_summary(section, settings, cx);
-            let body = if open {
-                Some(self.render_section_body(section, settings, busy, cx))
-            } else {
-                None
-            };
-            let header = self.section_header(section, summary, error, open, cx);
-            list = list.child(
-                v_flex()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .child(header)
+    /// The format cards: a radio group with one Tab stop. Arrow, Home and
+    /// End keys move the selection; a click picks a card directly.
+    fn render_format_cards(
+        &self,
+        settings: &Settings,
+        busy: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let ring = cx.theme().ring;
+        let primary = cx.theme().primary;
+        let muted = cx.theme().muted_foreground;
+        let queue = AppModels::global(cx).queue().read(cx);
+        let is_source = |format: &str| {
+            queue
+                .items()
+                .iter()
+                .any(|item| item.source_format_hint() == Some(format))
+        };
+        // The group's value names the selection like the former select did,
+        // including the marker for a format some queued source already has.
+        let selected_value: SharedString = if is_source(&settings.format) {
+            tr_with(
+                "queue.source_format",
+                &[("format", &settings.format.to_ascii_uppercase())],
+            )
+        } else {
+            settings.format.to_ascii_uppercase().into()
+        };
+        let cards: Vec<_> = self
+            .capabilities
+            .writable
+            .iter()
+            .map(|format| {
+                let selected = settings.format == *format;
+                let hint = if is_source(format) {
+                    tr("settings.format_is_source")
+                } else {
+                    format_hint(format)
+                };
+                let name: SharedString = format.to_ascii_uppercase().into();
+                let target = format.clone();
+                Button::new(SharedString::from(format!("format-card:{format}")))
+                    .outline()
+                    .role(Role::RadioButton)
+                    .tab_stop(false)
+                    .toggled(selected)
+                    .disabled(busy)
+                    .accessibility_label(name.clone())
+                    .tooltip(hint.clone())
+                    .w_full()
+                    .h_auto()
+                    .px_3()
+                    .py_2()
+                    .justify_start()
+                    .rounded(cx.theme().radius_lg)
+                    .when(selected, |card| {
+                        card.border_color(primary).bg(primary.opacity(0.08))
+                    })
                     .child(
-                        Collapsible::new()
-                            .open(open)
-                            // Navigation to appearance is immediate so its focused
-                            // controls and the scroll destination share one layout.
-                            .when(section != Section::Appearance, |collapse| {
-                                collapse
-                                    .motion_id(SharedString::from(format!("{}-body", section.id())))
-                            })
-                            .content(v_flex().px_3().pb_3().pt_1().children(body)),
-                    ),
-            );
-        }
-        div().child(list)
+                        v_flex()
+                            .items_start()
+                            .gap_0p5()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .when(selected, |name| name.text_color(primary))
+                                    .child(name),
+                            )
+                            .child(div().text_xs().text_color(muted).truncate().child(hint)),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.set_format(&target, window, cx);
+                        window.focus(&this.format_focus, cx);
+                    }))
+            })
+            .collect();
+        div()
+            .id("workflow-format")
+            .test_support()
+            .role(Role::RadioGroup)
+            .aria_label(tr("settings.target_format"))
+            .aria_value(selected_value)
+            .rounded(cx.theme().radius_lg)
+            .border_1()
+            .border_color(transparent_black())
+            // The group keeps its focus while busy (an import may start while
+            // it has focus); `format_key` ignores keys until it is idle.
+            .track_focus(&self.format_focus)
+            .focus_visible(move |style| style.border_color(ring))
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                this.format_key(event, window, cx);
+            }))
+            .child(div().grid().grid_cols(2).gap_2().children(cards))
     }
 
-    /// The section's toggle: a quiet full-width button with the title, the
-    /// summary and an error marker that does not rely on color alone.
-    fn section_header(
+    /// One tab's content: the Format tab's own controls, then its sections.
+    fn render_tab(
+        &self,
+        tab: SettingsTab,
+        settings: &Settings,
+        busy: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let mut content = v_flex()
+            .id(SharedString::from(format!("{}-panel", tab.id())))
+            .test_support()
+            .role(Role::TabPanel)
+            .aria_label(tr(tab.title_key()))
+            .gap_5();
+        if tab == SettingsTab::Format {
+            content = content.child(self.render_core(settings, busy, cx));
+        }
+        for section in tab.sections() {
+            content = content.child(self.render_section(*section, settings, busy, cx));
+        }
+        content
+    }
+
+    /// A section: a small heading (marked when Start would refuse its
+    /// values) over the section's controls in a well.
+    fn render_section(
         &self,
         section: Section,
-        summary: SharedString,
-        error: bool,
-        open: bool,
+        settings: &Settings,
+        busy: bool,
         cx: &mut Context<Self>,
-    ) -> Button {
+    ) -> impl IntoElement {
+        let error = self.section_error(section, settings, cx);
         let color = if error {
             cx.theme().danger
         } else {
             cx.theme().muted_foreground
         };
-        let chevron = if open {
-            IconName::ChevronDown
-        } else {
-            IconName::ChevronRight
-        };
-        Button::new(section.id())
-            .ghost()
-            .w_full()
-            .tooltip(tr(section.title_key()))
-            .accessibility_label(tr(section.title_key()))
-            .toggled(open)
+        v_flex()
+            .gap_2()
             .child(
                 h_flex()
-                    .w_full()
+                    .id(section.id())
+                    .test_support()
+                    .role(Role::Heading)
+                    .aria_label(tr(section.title_key()))
+                    .gap_1()
                     .items_center()
-                    .justify_between()
-                    .gap_3()
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .items_center()
-                            .child(Icon::new(chevron).xsmall())
-                            .child(div().text_sm().child(tr(section.title_key()))),
-                    )
-                    .child(
-                        h_flex()
-                            .gap_1()
-                            .items_center()
-                            .min_w_0()
-                            .text_xs()
-                            .text_color(color)
-                            .when(error, |this| {
-                                this.child(Icon::new(IconName::TriangleAlert).xsmall())
-                            })
-                            .child(div().truncate().child(summary)),
-                    ),
+                    .text_xs()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(color)
+                    .when(error, |this| {
+                        this.child(Icon::new(IconName::TriangleAlert).xsmall())
+                    })
+                    .child(tr(section.title_key())),
             )
-            .on_click(cx.listener(move |this, _, _, cx| {
-                let next = if this.open_section == Some(section) {
-                    None
-                } else {
-                    Some(section)
-                };
-                this.set_open_section(next, cx);
-            }))
+            .child(
+                v_flex()
+                    .glass_well(cx)
+                    .p_3()
+                    .child(self.render_section_body(section, settings, busy, cx)),
+            )
     }
 
-    fn section_summary(
-        &self,
-        section: Section,
-        settings: &Settings,
-        cx: &App,
-    ) -> (SharedString, bool) {
+    /// Whether the section holds a value Start would refuse.
+    fn section_error(&self, section: Section, settings: &Settings, cx: &App) -> bool {
         match section {
-            Section::Output => {
-                let concurrency = if settings.concurrency > 0 {
-                    settings.concurrency.to_string()
-                } else {
-                    tr("settings.concurrency_auto").to_string()
-                };
-                let overwrite = overwrite_label(settings.overwrite);
-                let naming = if settings.output_suffix_enabled {
-                    settings.output_suffix.clone()
-                } else {
-                    settings.file_name_template.clone()
-                };
-                (
-                    format!("{concurrency} · {overwrite} · {naming}").into(),
-                    false,
-                )
-            }
-            Section::Compression => {
-                let count = self.enabled_policy_count(settings);
-                (
-                    tr_with("settings.enabled_count", &[("count", &count)]),
-                    false,
-                )
-            }
-            Section::Color => (
-                enabled_label(
-                    settings.color_management_policy == ColorManagementPolicy::ConvertToSrgb,
-                ),
-                false,
-            ),
-            Section::Cache => (enabled_label(settings.result_cache), false),
-            Section::FormatParameters => (
-                match settings.format.as_str() {
-                    "jpeg" if settings.jpeg_progressive => tr("settings.jpeg_progressive_mode"),
-                    "jpeg" => tr("settings.jpeg_baseline_mode"),
-                    "png" => format!("oxipng {}", settings.png_oxipng_level).into(),
-                    "webp" => {
-                        format!("{} {}", tr("settings.webp_method"), settings.webp_method).into()
-                    }
-                    "avif" => {
-                        format!("{} {}", tr("settings.avif_speed"), settings.avif_speed).into()
-                    }
-                    _ => SharedString::default(),
-                },
-                false,
-            ),
-            Section::Presets => (
-                workflow_presets::matching_workflow_preset_id(settings)
-                    .and_then(|id| preset_label(&id, settings))
-                    .unwrap_or_else(|| tr("workflow.custom_settings")),
-                false,
-            ),
-            Section::Pdf => {
-                let error = self.pdf_range_error_for_display(cx).is_some();
-                let summary = if settings.pdf_page_range.trim().is_empty() {
-                    tr("workflow.pdf_all_pages")
-                } else {
-                    tr("workflow.pdf_selected_pages")
-                };
-                (summary, error)
-            }
-            Section::Resize => (resize_mode_label(settings.resize_mode), false),
-            Section::TargetSize => {
-                let invalid = self.invalid_target_size(settings, cx);
-                let summary = if settings.target_size_enabled {
-                    tr_with(
-                        "workflow.target_summary",
-                        &[("kib", &settings.target_size_kib)],
-                    )
-                } else {
-                    tr("settings.disabled")
-                };
-                (summary, invalid)
-            }
-            Section::Metadata => (metadata_label(settings.metadata_policy), false),
-            Section::Appearance => {
-                let theme = theme_label(settings.theme);
-                let summary = if settings.reduce_motion {
-                    format!("{theme} · {}", tr("settings.reduce_motion_label")).into()
-                } else {
-                    theme
-                };
-                (summary, false)
-            }
+            // Only what Start refuses: a malformed range with no PDF queued is
+            // shown inside the section, not flagged on the tab.
+            Section::Pdf => self.pdf_range_error_for_batch(cx).is_some(),
+            Section::TargetSize => self.invalid_target_size(settings, cx),
+            _ => false,
         }
-    }
-
-    fn enabled_policy_count(&self, settings: &Settings) -> usize {
-        let can_lossless = self.supports_lossless(&settings.format);
-        let quality_enabled = settings.format != "png" && !(can_lossless && settings.lossless);
-        let auto_quality_supported = matches!(settings.format.as_str(), "jpeg" | "webp")
-            && quality_enabled
-            && !settings.target_size_enabled;
-        [
-            settings.lossless,
-            settings.skip_if_larger,
-            settings.multi_candidate,
-            settings.auto_quality && auto_quality_supported,
-            settings.generation_loss_protection,
-        ]
-        .into_iter()
-        .filter(|on| *on)
-        .count()
     }
 
     fn render_section_body(
@@ -1573,7 +1572,6 @@ impl SettingsForm {
             Section::Resize => self.render_resize(settings, busy, cx),
             Section::TargetSize => self.render_target_size(settings, busy, cx),
             Section::Metadata => self.render_metadata(settings, busy, cx),
-            Section::Appearance => self.render_appearance(settings, busy, cx),
         }
     }
 
@@ -2259,34 +2257,6 @@ impl SettingsForm {
                 cx,
             ))
     }
-
-    fn render_appearance(&self, settings: &Settings, busy: bool, cx: &mut Context<Self>) -> Div {
-        v_flex()
-            .gap_3()
-            .child(
-                v_flex()
-                    .gap_1()
-                    .child(Self::field_label(tr("settings.theme"), cx))
-                    .child(
-                        Select::new(self.theme.state())
-                            .id("workflow-theme")
-                            .small()
-                            .accessibility_label(tr("settings.theme"))
-                            .disabled(busy),
-                    ),
-            )
-            .child(self.switch_row(
-                "switch-reduce-motion",
-                tr("settings.reduce_motion_label"),
-                Some(tr("settings.reduce_motion_description")),
-                settings.reduce_motion,
-                busy,
-                |this, on, _, cx| {
-                    this.edit(cx, |s| s.reduce_motion = on);
-                },
-                cx,
-            ))
-    }
 }
 
 impl Render for SettingsForm {
@@ -2300,9 +2270,7 @@ impl Render for SettingsForm {
         v_flex()
             .id("settings-form")
             .test_support()
-            .gap_3()
-            .child(self.render_core(&settings, busy, cx))
-            .child(self.render_sections(&settings, busy, cx))
+            .child(self.render_tab(self.tab, &settings, busy, cx))
     }
 }
 
@@ -2322,27 +2290,15 @@ const METADATA_POLICIES: [MetadataPolicy; 3] = [
     MetadataPolicy::PreserveAll,
 ];
 
-fn format_items(
-    formats: &[String],
-    items: &[imgconvert_gpui_shared::QueueItem],
-) -> Vec<ChoiceItem> {
-    formats
-        .iter()
-        .map(|format| {
-            let label = if items
-                .iter()
-                .any(|item| item.source_format_hint() == Some(format.as_str()))
-            {
-                tr_with(
-                    "queue.source_format",
-                    &[("format", &format.to_ascii_uppercase())],
-                )
-            } else {
-                format.to_ascii_uppercase().into()
-            };
-            ChoiceItem::new(format.clone(), label)
-        })
-        .collect()
+/// One line on what a target format is good for, shown on its card.
+fn format_hint(format: &str) -> SharedString {
+    match format {
+        "jpeg" => tr("settings.format_hint_jpeg"),
+        "png" => tr("settings.format_hint_png"),
+        "webp" => tr("settings.format_hint_webp"),
+        "avif" => tr("settings.format_hint_avif"),
+        _ => SharedString::default(),
+    }
 }
 
 fn overwrite_label(mode: OverwriteMode) -> SharedString {
@@ -2405,40 +2361,11 @@ fn metadata_items() -> Vec<ChoiceItem> {
         .collect()
 }
 
-const THEME_PREFERENCES: [ThemePreference; 3] = [
-    ThemePreference::System,
-    ThemePreference::Light,
-    ThemePreference::Dark,
-];
-
-fn theme_label(theme: ThemePreference) -> SharedString {
-    tr(match theme {
-        ThemePreference::System => "settings.theme_system",
-        ThemePreference::Light => "settings.theme_light",
-        ThemePreference::Dark => "settings.theme_dark",
-    })
-}
-
-fn theme_items() -> Vec<ChoiceItem> {
-    THEME_PREFERENCES
-        .into_iter()
-        .map(|theme| ChoiceItem::new(theme.as_str(), theme_label(theme)))
-        .collect()
-}
-
 fn avif_subsample_items() -> Vec<ChoiceItem> {
     vec![
         ChoiceItem::new("yuv444", "4:4:4"),
         ChoiceItem::new("yuv420", "4:2:0"),
     ]
-}
-
-fn enabled_label(on: bool) -> SharedString {
-    if on {
-        tr("settings.enabled")
-    } else {
-        tr("settings.disabled")
-    }
 }
 
 fn active_preset_id(settings: &Settings) -> String {
@@ -2460,20 +2387,6 @@ fn preset_items(settings: &Settings) -> Vec<ChoiceItem> {
         items.push(ChoiceItem::new(preset.id.clone(), preset.name.clone()));
     }
     items
-}
-
-fn preset_label(id: &str, settings: &Settings) -> Option<SharedString> {
-    builtin_workflow_presets()
-        .into_iter()
-        .find(|preset| preset.id == id)
-        .map(|preset| tr(preset.label_key))
-        .or_else(|| {
-            settings
-                .custom_workflow_presets
-                .iter()
-                .find(|preset| preset.id == id)
-                .map(|preset| SharedString::from(preset.name.clone()))
-        })
 }
 
 fn pdf_error_text(error: &PdfPageRangeError) -> SharedString {
