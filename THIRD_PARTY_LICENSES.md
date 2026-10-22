@@ -14170,7 +14170,7 @@ still covered by `pnpm run license:npm` policy checks.
 - @jridgewell/trace-mapping@0.3.31 — MIT — https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
 - @lucide/svelte@1.22.0 — ISC — https://lucide.dev
 - @mdx-js/mdx@3.1.1 — MIT — https://mdxjs.com
-- @next/env@16.3.8 — MIT — https://github.com/vercel/next.js#readme
+- @next/env@16.4.2 — MIT — https://github.com/vercel/next.js#readme
 - @nodable/entities@3.0.0 — MIT — https://github.com/nodable/val-parsers#readme
 - @oxc-project/types@0.137.0 — MIT — https://oxc.rs
 - @oxc-project/types@0.154.0 — MIT — https://oxc.rs
@@ -14737,7 +14737,7 @@ still covered by `pnpm run license:npm` policy checks.
 - netmask@2.1.1 — MIT — https://github.com/rs/node-netmask
 - next-themes@0.4.6 — MIT — https://github.com/pacocoursey/next-themes#readme
 - next-tick@1.1.0 — ISC — https://github.com/medikoo/next-tick#readme
-- next@16.3.8 — MIT — https://nextjs.org
+- next@16.4.2 — MIT — https://nextjs.org
 - normalize-package-data@6.0.2 — BSD-2-Clause — https://github.com/npm/normalize-package-data#readme
 - normalize-package-data@7.0.1 — BSD-2-Clause — https://github.com/npm/normalize-package-data#readme
 - normalize-path@3.0.0 — MIT — https://github.com/jonschlinkert/normalize-path
@@ -19167,10 +19167,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @next/env@16.3.8
+### @next/env@16.4.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/@next+env@16.3.8/node_modules/@next/env`
+- Package path: `node_modules/.pnpm/@next+env@16.4.2/node_modules/@next/env`
 - Homepage: https://github.com/vercel/next.js#readme
 
 _No LICENSE/NOTICE file found in the installed package; see package metadata above._
@@ -34797,7 +34797,7 @@ the licensed code:
 ### fumadocs-core@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_6e54758ff39a6b98179d3a5fc1f3bc31/node_modules/fumadocs-core`
+- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_0c5383b5edf8631ddcab97bf670f38db/node_modules/fumadocs-core`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34829,7 +34829,7 @@ SOFTWARE.
 ### fumadocs-mdx@15.2.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_a32df6035d2e88a7372081b7f0ebba56/node_modules/fumadocs-mdx`
+- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_f0c91ffd1e0a3968655424c830f5c21d/node_modules/fumadocs-mdx`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34861,7 +34861,7 @@ SOFTWARE.
 ### fumadocs-ui@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_5995b6e0757e36e6244ff84d601e0763/node_modules/fumadocs-ui`
+- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_3e78a54e09936a9a0a31dff55a0179b4/node_modules/fumadocs-ui`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -43051,10 +43051,10 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### next@16.3.8
+### next@16.4.2
 
 - License: MIT
-- Package path: `node_modules/.pnpm/next@16.3.8_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
+- Package path: `node_modules/.pnpm/next@16.4.2_@playwright+test@1.61.1_react-dom@19.2.7_react@19.2.7__react@19.2.7/node_modules/next`
 - Homepage: https://nextjs.org
 
 #### license.md
