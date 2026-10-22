@@ -32,6 +32,7 @@ use imgconvert_backend::external_codecs::{
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::tasks;
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, SettingsModel};
 
 /// How a status chip reinforces its text.
@@ -779,6 +780,7 @@ pub fn open_plugin_diagnostics(window: &mut Window, cx: &mut App) -> Entity<Plug
         let refresh_entity = for_content.clone();
         let loading = for_content.read(cx).is_loading();
         dialog
+            .glass_dialog(cx)
             .title(tr("diagnostics.title"))
             .w(px(760.))
             .content(move |content, _, _| content.child(content_entity.clone()))

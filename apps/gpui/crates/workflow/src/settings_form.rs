@@ -873,10 +873,11 @@ impl SettingsForm {
         cx: &mut Context<Self>,
     ) {
         let form = cx.entity().downgrade();
-        window.open_alert_dialog(cx, move |dialog, _, _| {
+        window.open_alert_dialog(cx, move |dialog, _, cx| {
             let form = form.clone();
             let id = id.clone();
             dialog
+                .glass_dialog(cx)
                 .title(tr_with("workflow.delete_preset_title", &[("name", &name)]))
                 .description(tr("workflow.delete_preset_description"))
                 .ok_text(tr("workflow.delete"))

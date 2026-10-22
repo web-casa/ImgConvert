@@ -25,6 +25,7 @@ use imgconvert_backend::environmental_impact::{
 };
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, ItemStatus, QueueModel};
 
 /// What the dialog describes.
@@ -605,9 +606,10 @@ pub fn open_environmental_impact(
 ) -> Entity<ImpactView> {
     let view = cx.new(|cx| ImpactView::new(subject, window, cx));
     let for_content = view.clone();
-    window.open_dialog(cx, move |dialog, window, _| {
+    window.open_dialog(cx, move |dialog, window, cx| {
         let content_entity = for_content.clone();
         dialog
+            .glass_dialog(cx)
             .title(tr("impact.title"))
             // Kit dialogs take pixels; follow the rem scale by hand.
             .w(window.rem_size() * 35.)
