@@ -1305,16 +1305,6 @@ status.warnings:
   en: Warnings
   zh-CN: 有告警
 
-# Reference card layout: shortcuts navigate existing regions in the same window.
-nav.queue:
-  en: Queue
-  zh-CN: 队列
-nav.convert:
-  en: Convert
-  zh-CN: 转换
-nav.settings:
-  en: Settings
-  zh-CN: 设置
 queue.add_folders:
   en: Add folders…
   zh-CN: 添加文件夹…
@@ -1328,12 +1318,6 @@ queue.supported_formats:
   en: Input formats
   zh-CN: 支持导入的格式
 
-nav.convert_target:
-  en: Go to conversion settings
-  zh-CN: 跳到转换参数
-nav.settings_target:
-  en: Go to appearance settings
-  zh-CN: 跳到外观设置
 
 queue.compare_item:
   en: "Compare %{name}"

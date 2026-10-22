@@ -202,10 +202,13 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
     let (handle, _workspace) = open_workspace(cx);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("nav-queue").label(), Some("Queue"));
+        assert_eq!(
+            window.find("workspace-appearance").label(),
+            Some("Appearance")
+        );
         window.click("language-toggle", cx);
         window.render_frame(cx);
-        assert_eq!(window.find("nav-queue").label(), Some("队列"));
+        assert_eq!(window.find("workspace-appearance").label(), Some("外观"));
     })
     .unwrap();
     cx.update(|cx| {
@@ -219,7 +222,10 @@ fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
     cx.update(toggle_language);
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("nav-queue").label(), Some("Queue"));
+        assert_eq!(
+            window.find("workspace-appearance").label(),
+            Some("Appearance")
+        );
     })
     .unwrap();
     cx.update(|cx| {
@@ -869,6 +875,12 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
         assert_eq!(cx.theme().mode, ThemeMode::Light);
         assert_eq!(cx.theme().theme_name().as_ref(), LIGHT_THEME_NAME);
         assert_eq!(cx.glass().mode(), ThemeMode::Light);
+        // The primary button paints `button_primary`; it must carry the
+        // product gradient, not fall back to the solid color.
+        assert_ne!(
+            cx.theme().tokens.button_primary.background,
+            gpui_kit::Background::from(cx.theme().button_primary)
+        );
         assert!(!cx.reduce_motion());
     });
 
@@ -878,6 +890,12 @@ fn theme_preference_and_reduced_motion_follow_the_settings_record(cx: &mut TestA
         assert!(cx.theme().is_dark());
         assert_eq!(cx.theme().theme_name().as_ref(), DARK_THEME_NAME);
         assert_eq!(cx.glass().mode(), ThemeMode::Dark);
+        // The primary button paints `button_primary`; it must carry the
+        // product gradient, not fall back to the solid color.
+        assert_ne!(
+            cx.theme().tokens.button_primary.background,
+            gpui_kit::Background::from(cx.theme().button_primary)
+        );
     });
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
@@ -1342,6 +1360,34 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         assert!(window.find("workflow-impact").visible());
+        // At the minimum window size and an enlarged base font the capsule
+        // drops its secondary labels and keeps every command inside itself.
+        let font = gpui_kit::component::Theme::global(cx).font_size;
+        gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font * 1.15);
+        window.resize(size(px(760.), px(480.)));
+        window.bounds_changed(cx);
+        window.render_frame(cx);
+        let bar = window.find("workflow-action-bar").bounds();
+        for id in [
+            "workflow-choose-output",
+            "workflow-impact",
+            "workflow-start",
+        ] {
+            let control = window.find(id);
+            assert!(control.visible(), "{id} at the minimum size");
+            let bounds = control.bounds();
+            assert!(
+                bounds.left() >= bar.left() && bounds.right() <= bar.right(),
+                "{id} {bounds:?} must stay inside the capsule {bar:?}"
+            );
+        }
+        assert_eq!(
+            window.find("workflow-impact").label(),
+            Some("Batch scenario…"),
+            "the icon-only command keeps its name"
+        );
+        gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font);
+        window.render_frame(cx);
         window.click("workflow-impact", cx);
     })
     .unwrap();
@@ -3161,8 +3207,7 @@ fn quality_floor_keyboard_steps_cross_off_and_respect_limits_and_busy(cx: &mut T
 }
 
 #[gpui_kit::test]
-fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut TestAppContext) {
-    use gpui_kit::Focusable as _;
+fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut TestAppContext) {
     use imgconvert_backend::settings::Theme;
     use imgconvert_gpui_workflow::Section;
 
@@ -3209,21 +3254,34 @@ fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut Te
         });
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
-            let content = window.find("workspace-content").bounds();
+            let queue_panel = window.find("workspace-queue-panel").bounds();
+            let settings_panel = window.find("workspace-settings-panel").bounds();
+            let queue = window.find("queue-drop-target").bounds();
             let footer = window.find("workflow-action-bar").bounds();
             assert!(
-                content.bottom() <= footer.top(),
-                "content must end above the footer"
+                queue.bottom() <= footer.top(),
+                "the queue must end above the floating capsule: {queue:?} / {footer:?}"
             );
             assert!(
-                footer.bottom() <= px(height),
-                "footer {footer:?} at {width}x{height}"
+                footer.left() >= queue_panel.left()
+                    && footer.right() <= queue_panel.right()
+                    && footer.bottom() <= queue_panel.bottom(),
+                "the capsule floats inside the queue panel: {footer:?} in {queue_panel:?}"
+            );
+            assert!(
+                queue_panel.right() <= settings_panel.left(),
+                "the settings panel trails the queue panel"
+            );
+            assert!(
+                settings_panel.right() <= px(width) && settings_panel.bottom() <= px(height),
+                "settings panel {settings_panel:?} at {width}x{height}"
             );
             for id in [
                 "queue-add-files",
                 "queue-add-folders",
                 "queue-paste",
                 "workflow-start",
+                "workspace-appearance",
             ] {
                 let action = window.find(id);
                 assert!(action.visible(), "{id} at {width}x{height}");
@@ -3236,20 +3294,19 @@ fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut Te
                     bounds.top() >= px(0.) && bounds.bottom() <= px(height),
                     "{id}: {bounds:?}"
                 );
-                if id != "workflow-start" {
+                if id.starts_with("queue-") {
                     assert!(
-                        bounds.top() >= content.top() && bounds.bottom() <= content.bottom(),
-                        "{id} must stay inside the content, clear of the footer: {bounds:?}"
+                        bounds.top() >= queue.top() && bounds.bottom() <= queue.bottom(),
+                        "{id} must stay inside the queue, clear of the capsule: {bounds:?}"
                     );
                 }
             }
-            window.click("nav-settings", cx);
+            window.click("workspace-appearance", cx);
         })
         .unwrap();
         settle_animations(cx, handle);
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
-            assert_eq!(window.find("nav-settings").checked(), Some(true));
             assert!(window.find("workflow-theme").visible());
             assert_eq!(window.find("workflow-theme").focused(), Some(true));
             let before_scroll = window.find("workflow-theme").bounds().origin;
@@ -3268,9 +3325,8 @@ fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut Te
             assert_eq!(
                 window.find("workflow-theme").bounds().origin,
                 after_scroll,
-                "navigation must not keep pinning the settings to the bottom"
+                "the command must not keep pinning the settings to the bottom"
             );
-
             assert_eq!(
                 workspace
                     .read(cx)
@@ -3281,26 +3337,6 @@ fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut Te
                     .open_section(),
                 Some(Section::Appearance)
             );
-            window.click("nav-convert", cx);
-        })
-        .unwrap();
-        settle_animations(cx, handle);
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            assert_eq!(window.find("nav-convert").checked(), Some(true));
-            assert!(window.find("settings-quality").visible());
-            assert_eq!(window.find("workflow-format").focused(), Some(true));
-            window.click("workflow-open-settings", cx);
-        })
-        .unwrap();
-        settle_animations(cx, handle);
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            assert!(window.find("workflow-theme").visible());
-            window.click("nav-queue", cx);
-            window.render_frame(cx);
-            assert_eq!(window.find("nav-queue").checked(), Some(true));
-            assert!(workspace.read(cx).focus_handle(cx).is_focused(window));
         })
         .unwrap();
         cx.update(|cx| {
@@ -3316,7 +3352,7 @@ fn card_layout_keeps_actions_visible_and_shortcuts_preserve_settings(cx: &mut Te
 }
 
 #[gpui_kit::test]
-fn card_navigation_preserves_a_nonempty_running_batch(cx: &mut TestAppContext) {
+fn appearance_command_preserves_a_nonempty_running_batch(cx: &mut TestAppContext) {
     use imgconvert_backend::progress::BatchId;
     let _locale = locale_guard();
     let (handle, _workspace) = open_workspace(cx);
@@ -3345,33 +3381,26 @@ fn card_navigation_preserves_a_nonempty_running_batch(cx: &mut TestAppContext) {
             (settings.format.clone(), settings.quality, settings.theme),
         )
     });
-    for id in [
-        "nav-settings",
-        "nav-convert",
-        "nav-queue",
-        "workflow-open-settings",
-    ] {
-        cx.update_window(handle, |_, window, cx| {
-            window.render_frame(cx);
-            assert!(window.find("workflow-cancel").visible());
-            window.click(id, cx);
-        })
-        .unwrap();
-        settle_animations(cx, handle);
-        cx.update(|cx| {
-            let models = AppModels::global(cx);
-            assert_eq!(models.batch().read(cx), &batch_before);
-            let queue = models.queue().read(cx);
-            assert_eq!(queue.len(), 1);
-            assert_eq!(queue.item_at(0).unwrap().key.as_ref(), "card-source");
-            assert_eq!(queue.item_at(0).unwrap().status, ItemStatus::Pending);
-            let settings = models.settings().read(cx).settings();
-            assert_eq!(
-                (settings.format.clone(), settings.quality, settings.theme),
-                settings_before
-            );
-        });
-    }
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("workflow-cancel").visible());
+        window.click("workspace-appearance", cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        assert_eq!(models.batch().read(cx), &batch_before);
+        let queue = models.queue().read(cx);
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue.item_at(0).unwrap().key.as_ref(), "card-source");
+        assert_eq!(queue.item_at(0).unwrap().status, ItemStatus::Pending);
+        let settings = models.settings().read(cx).settings();
+        assert_eq!(
+            (settings.format.clone(), settings.quality, settings.theme),
+            settings_before
+        );
+    });
     cx.run_until_parked();
     assert_eq!(std::fs::read(&source).unwrap(), one_by_one_png());
     std::fs::remove_dir_all(dir).unwrap();

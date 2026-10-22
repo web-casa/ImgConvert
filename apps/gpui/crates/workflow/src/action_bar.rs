@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! The fixed bottom action bar: the window's one decision (Start / Cancel) with
-//! the output folder and the batch status beside it. The shell places it
-//! below the content; the behaviour stays in [`WorkflowPanel`], which the bar
-//! drives and observes.
+//! The floating action capsule: the window's one decision (Start / Cancel)
+//! with the output folder and the batch status beside it. The shell places it
+//! at the foot of the queue panel; the behaviour stays in [`WorkflowPanel`],
+//! which the bar drives and observes.
 
-use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
@@ -32,11 +32,12 @@ use crate::workflow_panel::WorkflowPanel;
 pub enum ActionBarEvent {
     /// Open the storage and environmental scenario for the finished batch.
     BatchImpact,
-    /// Focus the application appearance settings in the existing inspector.
-    OpenSettings,
 }
 
 impl EventEmitter<ActionBarEvent> for ActionBar {}
+
+/// Window width, in rem, below which the capsule drops its secondary labels.
+pub const COMPACT_WIDTH_REM: f32 = 66.;
 
 pub struct ActionBar {
     panel: Entity<WorkflowPanel>,
@@ -114,7 +115,11 @@ impl ActionBar {
 }
 
 impl Render for ActionBar {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The same breakpoint the shell uses to narrow the settings panel:
+        // below it the capsule keeps only icons for its secondary commands,
+        // with their names on tooltips and in the accessibility tree.
+        let compact = window.viewport_size().width < window.rem_size() * COMPACT_WIDTH_REM;
         let batch = self.batch.read(cx);
         let active = batch.is_active();
         let cancelling = matches!(batch.phase(), BatchPhase::Cancelling);
@@ -158,41 +163,67 @@ impl Render for ActionBar {
                 )
             });
         let muted = cx.theme().muted_foreground;
-        let rounded = ButtonRounded::Size(cx.theme().radius_tokens().lg);
+        let glass = cx.glass();
+        let pill = ButtonRounded::Size(cx.theme().radius_full());
 
         h_flex()
             .id("workflow-action-bar")
             .test_support()
             .glass_bar(cx)
             .w_full()
-            .p_3()
+            .py_2()
+            .pl_2()
+            .pr_2()
             .gap_3()
             .items_center()
             .child(
                 Button::new("workflow-choose-output")
                     .ghost()
-                    .rounded(rounded)
-                    .h_11()
-                    .w_64()
+                    .rounded(pill)
+                    .h_12()
+                    .max_w_64()
                     .min_w_0()
-                    .px_3()
+                    .flex_shrink(1.)
+                    .pl_1p5()
+                    .pr_4()
+                    .bg(glass.chip())
                     .tooltip(output_path.clone())
                     .accessibility_label(choose_output_name)
                     .disabled(active)
                     .child(
                         h_flex()
-                            .gap_2()
+                            .gap_2p5()
                             .items_center()
-                            .child(gpui_kit::component::Icon::new(IconName::FolderOpen).small())
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .size_9()
+                                    .flex_none()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(cx.theme().radius_full())
+                                    .bg(glass.chip_strong())
+                                    .shadow(glass.lift_shadows())
+                                    .child(
+                                        gpui_kit::component::Icon::new(IconName::FolderOpen)
+                                            .small(),
+                                    ),
+                            )
                             .child(
                                 v_flex()
                                     .items_start()
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(muted)
-                                            .child(tr("workflow.output_dir")),
-                                    )
+                                    .min_w_0()
+                                    // Narrow windows keep the folder name and
+                                    // drop only its caption.
+                                    .when(!compact, |this| {
+                                        this.child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted)
+                                                .child(tr("workflow.output_dir")),
+                                        )
+                                    })
                                     .child(
                                         div()
                                             .id("workflow-output-dir")
@@ -200,7 +231,13 @@ impl Render for ActionBar {
                                             .aria_label(output_path.clone())
                                             .text_sm()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .max_w_48()
+                                            .map(|this| {
+                                                if compact {
+                                                    this.max_w_24()
+                                                } else {
+                                                    this.max_w_48()
+                                                }
+                                            })
                                             .truncate()
                                             .child(output_path.clone()),
                                     ),
@@ -212,28 +249,10 @@ impl Render for ActionBar {
                     })),
             )
             .child(
-                Button::new("workflow-open-settings")
-                    .ghost()
-                    .rounded(rounded)
-                    .icon(IconName::Settings)
-                    .accessibility_label(tr("nav.settings"))
-                    .tooltip(tr("nav.settings"))
-                    .on_click(cx.listener(|_, _, _, cx| {
-                        cx.emit(ActionBarEvent::OpenSettings);
-                    })),
-            )
-            .child(div().w_px().h_8().bg(cx.theme().border))
-            .child(
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .gap_0p5()
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(muted)
-                            .child(tr("workflow.status")),
-                    )
+                    .gap_1p5()
                     .child(
                         div()
                             .id("workflow-status")
@@ -265,8 +284,15 @@ impl Render for ActionBar {
                     Button::new("workflow-impact")
                         .ghost()
                         .small()
-                        .rounded(rounded)
-                        .label(tr("impact.batch_open"))
+                        .rounded(pill)
+                        .map(|this| {
+                            if compact {
+                                this.icon(IconName::ChartPie)
+                                    .accessibility_label(tr("impact.batch_open"))
+                            } else {
+                                this.label(tr("impact.batch_open"))
+                            }
+                        })
                         .tooltip(tr("impact.title"))
                         .on_click(cx.listener(|_, _, _, cx| {
                             cx.emit(ActionBarEvent::BatchImpact);
@@ -274,10 +300,11 @@ impl Render for ActionBar {
                 )
             })
             .child(if active {
+                // Stopping keeps finished outputs, so it is not destructive:
+                // a default button, not a danger one.
                 Button::new("workflow-cancel")
-                    .danger()
                     .large()
-                    .rounded(rounded)
+                    .rounded(pill)
                     .px_6()
                     .label(if cancelling {
                         tr("workflow.cancelling")
@@ -290,14 +317,16 @@ impl Render for ActionBar {
                         this.panel.update(cx, WorkflowPanel::cancel);
                     }))
             } else {
+                // Only an available Start is the window's default commit; a
+                // disabled primary washes out to an unreadable tint.
                 Button::new("workflow-start")
-                    .primary()
+                    .when(can_start, ButtonVariants::primary)
                     .large()
-                    .rounded(rounded)
+                    .rounded(pill)
                     .px_6()
                     .label(start_label)
                     .disabled(!can_start)
-                    .when(can_start, |this| this.shadow(cx.glass().primary_shadows()))
+                    .when(can_start, |this| this.shadow(glass.primary_shadows()))
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.panel.update(cx, |panel, cx| panel.start(window, cx));
                     }))

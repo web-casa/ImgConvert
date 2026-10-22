@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 ImgConvert contributors
 
-//! The product theme layer ("Liquid Glass", design decision of 2026-10-18).
+//! The product theme layer ("Clear Glass 2.0", design decision of
+//! 2026-10-22: two glass panels on a soft backdrop and a floating action
+//! capsule; light "Clear" and dark "Obsidian" palettes).
 //!
 //! Three things live here and nowhere else:
 //!
@@ -9,7 +11,8 @@
 //!   and dark) that give every Kit component its colors, radius and shadow;
 //! - the application-owned [`GlassTokens`] Kit has no role for: the blurred
 //!   backdrop, the translucent panel surface with its stroke and specular
-//!   highlight, the fixed action bar and the primary button's glow;
+//!   highlight, the floating action capsule, the quiet chip and well fills
+//!   inside panels and the primary button's glow;
 //! - the bridge from the persisted `theme` / `reduceMotion` settings to Kit
 //!   ([`install`], [`apply`]).
 //!
@@ -130,23 +133,25 @@ fn resolved_mode(window: Option<&Window>, cx: &App) -> ThemeMode {
     mode_for(preference, appearance)
 }
 
-/// Per-mode edits on top of the loaded config: the dark primary surface is a
-/// vertical gradient (the token carries a `Background`, the color stays solid
-/// for text and borders).
+/// Per-mode edits on top of the loaded config: the primary surface is a
+/// leading-to-trailing gradient (the token carries a `Background`, the color
+/// stays solid for text and borders). Kit paints the brand badge from
+/// `primary` and the primary button from `button_primary`, so both carry it.
+/// Every stop keeps the primary foreground at 4.5:1 or better.
 fn apply_mode_tokens(mode: ThemeMode, cx: &mut App) {
-    if !mode.is_dark() {
-        return;
-    }
+    let (from, to) = if mode.is_dark() {
+        (0x5ac8_faff, 0x2b93_ffff)
+    } else {
+        (0x1670_f0ff, 0x0a5c_e0ff)
+    };
+    let gradient = linear_gradient(
+        90.,
+        linear_color_stop(hsla(from), 0.),
+        linear_color_stop(hsla(to), 1.),
+    );
     Theme::update(cx, |theme| {
-        let color = theme.primary;
-        theme.tokens.primary = ThemeToken::new(
-            color,
-            linear_gradient(
-                180.,
-                linear_color_stop(hsla(0x5ac8_faff), 0.),
-                linear_color_stop(hsla(0x2b93_ffff), 1.),
-            ),
-        );
+        theme.tokens.primary = ThemeToken::new(theme.primary, gradient);
+        theme.tokens.button_primary = ThemeToken::new(theme.button_primary, gradient);
     });
 }
 
@@ -192,6 +197,11 @@ pub struct GlassTokens {
     bar: Hsla,
     bar_border: Hsla,
     bar_shadows: Vec<BoxShadow>,
+    chip: Hsla,
+    chip_strong: Hsla,
+    lift_shadows: Vec<BoxShadow>,
+    well: Hsla,
+    well_border: Hsla,
     primary_shadows: Vec<BoxShadow>,
 }
 
@@ -233,6 +243,32 @@ impl GlassTokens {
         self.bar_shadows.clone()
     }
 
+    /// The quiet fill of a track or chip inside a panel (segmented control
+    /// track, count chip, the output folder button).
+    pub fn chip(&self) -> Hsla {
+        self.chip
+    }
+
+    /// The raised fill of a selected segment or a small control that sits
+    /// on a chip; pair it with [`Self::lift_shadows`].
+    pub fn chip_strong(&self) -> Hsla {
+        self.chip_strong
+    }
+
+    /// The one-pixel lift under a raised chip (none in the dark palette,
+    /// where the lighter fill already separates it).
+    pub fn lift_shadows(&self) -> Vec<BoxShadow> {
+        self.lift_shadows.clone()
+    }
+
+    pub fn well_background(&self) -> Hsla {
+        self.well
+    }
+
+    pub fn well_border(&self) -> Hsla {
+        self.well_border
+    }
+
     /// The glow under the one primary button of the window.
     pub fn primary_shadows(&self) -> Vec<BoxShadow> {
         self.primary_shadows.clone()
@@ -252,14 +288,35 @@ pub trait GlassStyled: Styled + Sized {
             .shadow(glass.panel_shadows())
     }
 
-    /// The fixed footer that carries the window's decision.
+    /// The floating capsule that carries the window's decision. It is
+    /// nearly opaque: without a backdrop blur, rows behind a lighter fill
+    /// would show through its text.
     fn glass_bar(self, cx: &App) -> Self {
         let glass = cx.glass();
         self.bg(glass.bar_background())
             .border_1()
             .border_color(glass.bar_border())
-            .rounded(cx.theme().radius_tokens().xl)
+            .rounded(cx.theme().radius_full())
             .shadow(glass.bar_shadows())
+    }
+
+    /// A pill-shaped glass strip for window-level commands.
+    fn glass_capsule(self, cx: &App) -> Self {
+        let glass = cx.glass();
+        self.bg(glass.panel_background())
+            .border_1()
+            .border_color(glass.panel_border())
+            .rounded(cx.theme().radius_full())
+            .shadow(glass.panel_shadows())
+    }
+
+    /// A grouped block inside a panel (switch lists, nested options).
+    fn glass_well(self, cx: &App) -> Self {
+        let glass = cx.glass();
+        self.bg(glass.well_background())
+            .border_1()
+            .border_color(glass.well_border())
+            .rounded(cx.theme().radius_lg)
     }
 }
 
@@ -276,6 +333,14 @@ struct GlassPalette {
     bar: Hsla,
     bar_border: Hsla,
     bar_shadow: (Pixels, Pixels, Hsla),
+    /// A hairline ring around panels and the capsule; on a light backdrop a
+    /// white stroke alone does not separate them.
+    outline: Option<Hsla>,
+    chip: Hsla,
+    chip_strong: Hsla,
+    lift: Option<Hsla>,
+    well: Hsla,
+    well_border: Hsla,
     primary_glow: (Pixels, Pixels, Hsla),
 }
 
@@ -286,38 +351,51 @@ impl GlassPalette {
                 backdrop: Backdrop {
                     base: rgba(0x0b0e_16ff),
                     blobs: vec![
-                        Blob::new(0x2a5b_ffff, (0.15, -0.05), 0.42, 0.55),
-                        Blob::new(0xff5e_8aff, (1.05, 0.45), 0.40, 0.40),
-                        Blob::new(0x19c6_b8ff, (0.60, 1.20), 0.42, 0.35),
+                        Blob::new(0x2b6c_ffff, (0.12, 0.18), 0.48, 0.42),
+                        Blob::new(0xff4f_a0ff, (0.88, 0.12), 0.42, 0.30),
+                        Blob::new(0x22d3_eeff, (0.60, 1.00), 0.50, 0.26),
                     ],
                 },
-                panel: hsla(0xffff_ff12),
-                panel_border: hsla(0xffff_ff29),
-                highlight: hsla(0xffff_ff59),
-                panel_shadow: (px(24.), px(60.), hsla(0x0000_0073)),
-                bar: hsla(0x1c20_2cf2),
-                bar_border: hsla(0xffff_ff33),
-                bar_shadow: (px(24.), px(60.), hsla(0x0000_008c)),
-                primary_glow: (px(10.), px(28.), hsla(0x2b93_ff73)),
+                panel: hsla(0xffff_ff11),
+                panel_border: hsla(0xffff_ff24),
+                highlight: hsla(0xffff_ff1a),
+                panel_shadow: (px(20.), px(50.), hsla(0x0000_0059)),
+                bar: hsla(0x161a_26f0),
+                bar_border: hsla(0xffff_ff24),
+                bar_shadow: (px(18.), px(40.), hsla(0x0000_0080)),
+                outline: None,
+                chip: hsla(0xffff_ff12),
+                chip_strong: hsla(0xffff_ff24),
+                lift: None,
+                well: hsla(0xffff_ff12),
+                well_border: hsla(0x0000_0000),
+                primary_glow: (px(6.), px(18.), hsla(0x2b93_ff73)),
             }
         } else {
             Self {
                 backdrop: Backdrop {
-                    base: rgba(0xe9ec_f1ff),
+                    base: rgba(0xe8eb_f1ff),
                     blobs: vec![
-                        Blob::new(0xffff_ffff, (-0.10, -0.20), 0.55, 0.90),
-                        Blob::new(0xcfd9_eaff, (1.10, 1.20), 0.55, 0.90),
-                        Blob::new(0xdde7_f7ff, (0.60, 1.30), 0.45, 0.80),
+                        Blob::new(0xffff_ffff, (0.08, 0.06), 0.52, 1.00),
+                        Blob::new(0xffda_e9ff, (0.92, 0.04), 0.44, 0.85),
+                        Blob::new(0xbeda_ffff, (0.72, 1.04), 0.54, 0.95),
+                        Blob::new(0xd0f2_e8ff, (0.04, 1.00), 0.36, 0.80),
                     ],
                 },
-                panel: hsla(0xffff_ff94),
-                panel_border: hsla(0xffff_fff2),
+                panel: hsla(0xffff_ff9e),
+                panel_border: hsla(0xffff_fff5),
                 highlight: hsla(0xffff_ffff),
-                panel_shadow: (px(14.), px(40.), hsla(0x1014_1814)),
+                panel_shadow: (px(18.), px(44.), hsla(0x1e2d_5017)),
                 bar: hsla(0xffff_fff5),
-                bar_border: hsla(0xffff_fff2),
-                bar_shadow: (px(18.), px(44.), hsla(0x1014_1829)),
-                primary_glow: (px(8.), px(20.), hsla(0x0071_e352)),
+                bar_border: hsla(0xffff_fff5),
+                bar_shadow: (px(16.), px(40.), hsla(0x1e2d_5029)),
+                outline: Some(hsla(0x1420_3c0b)),
+                chip: hsla(0x0f16_240b),
+                chip_strong: hsla(0xffff_ffff),
+                lift: Some(hsla(0x1420_3c14)),
+                well: hsla(0xffff_ffb3),
+                well_border: hsla(0x1420_3c0f),
+                primary_glow: (px(6.), px(16.), hsla(0x0a74_ff52)),
             }
         }
     }
@@ -327,15 +405,30 @@ impl GlassPalette {
         let drop = |(offset_y, blur, color): (Pixels, Pixels, Hsla)| {
             BoxShadow::new(px(0.), offset_y, color).blur_radius(blur)
         };
+        let outline = self
+            .outline
+            .map(|color| BoxShadow::new(px(0.), px(0.), color).spread_radius(px(1.)));
+        let with_outline = |mut shadows: Vec<BoxShadow>| {
+            shadows.extend(outline.clone());
+            shadows
+        };
         GlassTokens {
             mode,
             backdrop,
             panel: self.panel,
             panel_border: self.panel_border,
-            panel_shadows: vec![drop(self.panel_shadow), highlight.clone()],
+            panel_shadows: with_outline(vec![drop(self.panel_shadow), highlight.clone()]),
             bar: self.bar,
             bar_border: self.bar_border,
-            bar_shadows: vec![drop(self.bar_shadow), highlight],
+            bar_shadows: with_outline(vec![drop(self.bar_shadow), highlight]),
+            chip: self.chip,
+            chip_strong: self.chip_strong,
+            lift_shadows: self
+                .lift
+                .map(|color| vec![BoxShadow::new(px(0.), px(1.), color).blur_radius(px(2.))])
+                .unwrap_or_default(),
+            well: self.well,
+            well_border: self.well_border,
             primary_shadows: vec![drop(self.primary_glow)],
         }
     }
