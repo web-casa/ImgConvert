@@ -26,6 +26,7 @@ use gpui_kit::{
     Styled as _, Subscription, TestSupportExt as _, Window, div, rems,
 };
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, tasks};
 use std::sync::{
     Arc,
@@ -403,9 +404,10 @@ pub fn open_updates(window: &mut Window, cx: &mut App) -> Option<Entity<UpdatesD
         }
     });
     let content = view.clone();
-    window.open_dialog(cx, move |dialog, window, _| {
+    window.open_dialog(cx, move |dialog, window, cx| {
         let content = content.clone();
         dialog
+            .glass_dialog(cx)
             .title(tr("update.title"))
             .w(window.rem_size() * 32.)
             .content(move |body, _, _| body.child(content.clone()))
@@ -488,6 +490,8 @@ mod tests {
             gpui_kit::init(cx);
             set_locale(Locale::English);
             services::init_with_settings(cx, || SettingsModel::in_memory(Settings::default()));
+            // Dialogs paint with the product's glass tokens, as in the app.
+            imgconvert_gpui_shared::theme::install(cx);
             let model = cx.new(|_| UpdateModel::new(Some(driver.clone())));
             cx.set_global(Updates(model.clone()));
             let (handle, _) = gpui_kit::open_window(

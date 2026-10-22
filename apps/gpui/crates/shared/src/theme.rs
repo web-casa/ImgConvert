@@ -205,8 +205,16 @@ pub struct GlassTokens {
     accent_soft: Hsla,
     accent_edge: Hsla,
     illustration: [Hsla; 2],
+    dialog: Hsla,
+    dialog_border: Hsla,
     primary_shadows: Vec<BoxShadow>,
 }
+
+/// Marks drawn on top of an image (the preview's labels and divider). They
+/// sit on photo content, not on a theme surface, so both modes share them.
+const IMAGE_LABEL_BACKGROUND: u32 = 0x0000_00a6;
+const IMAGE_LABEL_FOREGROUND: u32 = 0xffff_ffff;
+const IMAGE_DIVIDER: u32 = 0xffff_ffff;
 
 impl Global for GlassTokens {}
 
@@ -287,6 +295,30 @@ impl GlassTokens {
         self.illustration
     }
 
+    /// The surface of a modal dialog: nearly opaque, because without a
+    /// backdrop blur the window would show through its text.
+    pub fn dialog_background(&self) -> Hsla {
+        self.dialog
+    }
+
+    pub fn dialog_border(&self) -> Hsla {
+        self.dialog_border
+    }
+
+    /// The fill of a label drawn over an image.
+    pub fn image_label_background(&self) -> Hsla {
+        hsla(IMAGE_LABEL_BACKGROUND)
+    }
+
+    pub fn image_label_foreground(&self) -> Hsla {
+        hsla(IMAGE_LABEL_FOREGROUND)
+    }
+
+    /// A divider line drawn over an image.
+    pub fn image_divider(&self) -> Hsla {
+        hsla(IMAGE_DIVIDER)
+    }
+
     /// The glow under the one primary button of the window.
     pub fn primary_shadows(&self) -> Vec<BoxShadow> {
         self.primary_shadows.clone()
@@ -328,6 +360,15 @@ pub trait GlassStyled: Styled + Sized {
             .shadow(glass.panel_shadows())
     }
 
+    /// A modal dialog's surface: the glass fill, its edge and the panel
+    /// radius. Kit keeps the dialog's own drop shadow and motion.
+    fn glass_dialog(self, cx: &App) -> Self {
+        let glass = cx.glass();
+        self.bg(glass.dialog_background())
+            .border_color(glass.dialog_border())
+            .rounded(cx.theme().radius_2xl())
+    }
+
     /// A grouped block inside a panel (switch lists, nested options).
     fn glass_well(self, cx: &App) -> Self {
         let glass = cx.glass();
@@ -362,6 +403,8 @@ struct GlassPalette {
     accent_soft: Hsla,
     accent_edge: Hsla,
     illustration: [Hsla; 2],
+    dialog: Hsla,
+    dialog_border: Hsla,
     primary_glow: (Pixels, Pixels, Hsla),
 }
 
@@ -393,6 +436,8 @@ impl GlassPalette {
                 accent_soft: hsla(0x3b9d_ff1f),
                 accent_edge: hsla(0x3b9d_ff47),
                 illustration: [hsla(0x3b9d_ff2e), hsla(0x5ee6_a02e)],
+                dialog: hsla(0x161a_26fa),
+                dialog_border: hsla(0xffff_ff24),
                 primary_glow: (px(6.), px(18.), hsla(0x2b93_ff73)),
             }
         } else {
@@ -422,6 +467,8 @@ impl GlassPalette {
                 accent_soft: hsla(0x0a64_f014),
                 accent_edge: hsla(0x0a64_f033),
                 illustration: [hsla(0x0a64_f024), hsla(0x1278_4a24)],
+                dialog: hsla(0xffff_fffa),
+                dialog_border: hsla(0x1420_3c14),
                 primary_glow: (px(6.), px(16.), hsla(0x0a74_ff52)),
             }
         }
@@ -459,6 +506,8 @@ impl GlassPalette {
             accent_soft: self.accent_soft,
             accent_edge: self.accent_edge,
             illustration: self.illustration,
+            dialog: self.dialog,
+            dialog_border: self.dialog_border,
             primary_shadows: vec![drop(self.primary_glow)],
         }
     }

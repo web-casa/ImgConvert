@@ -24,6 +24,7 @@ use gpui_kit::{App, SharedString, WeakEntity, Window};
 use imgconvert_backend::convert::{ConversionPlanEntry, ConvertOptions};
 use imgconvert_backend::settings::OverwriteMode;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 
 use crate::workflow_panel::WorkflowPanel;
 
@@ -259,7 +260,7 @@ pub fn advance(
     // One answer per dialog: the close handler aborts only when neither
     // button answered (close button, Escape).
     let answered = Rc::new(Cell::new(false));
-    window.open_alert_dialog(cx, move |dialog, _, _| {
+    window.open_alert_dialog(cx, move |dialog, _, cx| {
         let ok_panel = panel.clone();
         let ok_pending = Rc::clone(&pending);
         let ok_answered = Rc::clone(&answered);
@@ -272,6 +273,7 @@ pub fn advance(
         let close_pending = Rc::clone(&pending);
         let close_answered = Rc::clone(&answered);
         dialog
+            .glass_dialog(cx)
             .confirm()
             .keyboard(escape_closes)
             .title(title.clone())

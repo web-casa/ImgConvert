@@ -16,6 +16,7 @@ use gpui_kit::{
 };
 use gpui_kit::{Global, KeyBinding};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
+use imgconvert_gpui_shared::theme::GlassStyled as _;
 
 gpui_kit::actions!(imgconvert_legal, [OpenSupport]);
 
@@ -212,8 +213,9 @@ fn open(kind: DocumentKind, window: &mut Window, cx: &mut App) -> Entity<LegalDi
     install_keymap(cx);
     let view = cx.new(|cx| LegalDialog::new(kind, window, cx));
     let content = view.clone();
-    window.open_dialog(cx, move |dialog, window, _| {
+    window.open_dialog(cx, move |dialog, window, cx| {
         dialog
+            .glass_dialog(cx)
             .title(kind.title())
             .w(
                 (window.rem_size() * 40.)
@@ -266,7 +268,14 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         let (handle, view) = cx.update(|cx| {
+            imgconvert_gpui_shared::services::init_with_settings(cx, || {
+                imgconvert_gpui_shared::SettingsModel::in_memory(
+                    imgconvert_platform::settings::Settings::default(),
+                )
+            });
             gpui_kit::init(cx);
+            // Dialogs paint with the product's glass tokens, as in the app.
+            imgconvert_gpui_shared::theme::install(cx);
             let (handle, _) = gpui_kit::open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(Bounds::new(

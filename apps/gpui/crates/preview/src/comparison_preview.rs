@@ -21,7 +21,7 @@ use gpui_kit::{
     App, AppContext as _, Context, Div, Entity, FocusHandle, FontWeight, ImageSource,
     InteractiveElement as _, IntoElement, KeyDownEvent, ObjectFit, ParentElement as _, Render,
     RenderImage, SharedString, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    Subscription, TestSupportExt as _, Window, div, img, px, relative, rgb, transparent_black,
+    Subscription, TestSupportExt as _, Window, div, img, px, relative, transparent_black,
 };
 use imgconvert_backend::convert::ConvertWarning;
 use imgconvert_backend::preview::{self, PreviewOptions};
@@ -30,6 +30,7 @@ use imgconvert_gpui_shared::conversion::{options_for_item, warning_texts};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::images::{decode_png, format_bytes};
 use imgconvert_gpui_shared::tasks;
+use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, Services, SettingsModel};
 
 /// Longest edge of the preview images, as the Svelte shell requests.
@@ -368,6 +369,14 @@ impl ComparisonPreview {
     ) -> gpui_kit::AnyElement {
         let reveal = self.reveal / 100.;
         let muted = cx.theme().muted_foreground;
+        let (label_background, label_foreground, divider) = {
+            let glass = cx.glass();
+            (
+                glass.image_label_background(),
+                glass.image_label_foreground(),
+                glass.image_divider(),
+            )
+        };
         let label = |text: SharedString| {
             div()
                 .absolute()
@@ -375,10 +384,10 @@ impl ComparisonPreview {
                 .px_2()
                 .py_1()
                 .rounded_sm()
-                .bg(rgb(0x0000_0000).opacity(0.65))
+                .bg(label_background)
                 .text_xs()
                 .font_weight(FontWeight::MEDIUM)
-                .text_color(rgb(0x00ff_ffff))
+                .text_color(label_foreground)
                 .child(text)
         };
         let mut stage = div()
@@ -428,7 +437,7 @@ impl ComparisonPreview {
                         .bottom_0()
                         .left(relative(reveal))
                         .w(px(2.))
-                        .bg(rgb(0x00ff_ffff)),
+                        .bg(divider),
                 )
                 .child(label(tr("preview.after")).left_3())
                 .child(label(tr("preview.before")).right_3());
@@ -713,6 +722,7 @@ pub fn open_comparison_preview(
         let close_entity = for_close.clone();
         let loading = for_content.read(cx).is_loading();
         dialog
+            .glass_dialog(cx)
             .title(tr("preview.title"))
             .w(px(880.))
             .content(move |content, _, _| content.child(content_entity.clone()))
