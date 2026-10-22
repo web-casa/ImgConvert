@@ -931,6 +931,67 @@ mod tests {
     }
 
     #[test]
+    fn eviction_and_clear_hand_back_each_image_exactly_once() {
+        let mut model = QueueModel::with_thumbnail_budget(250);
+        model.add_files(vec![scan_file("a"), scan_file("b"), scan_file("c")]);
+        let (a, b, c) = (
+            claim(&mut model, "a"),
+            claim(&mut model, "b"),
+            claim(&mut model, "c"),
+        );
+        assert!(model.set_thumbnail(&a, image(25)).is_empty());
+        assert!(model.set_thumbnail(&b, image(25)).is_empty());
+        model.touch_thumbnails([a.key()]);
+        // The third image pushes the budget over and evicts "b".
+        let evicted = model.set_thumbnail(&c, image(25));
+        assert_eq!(evicted.len(), 1);
+        assert_eq!(
+            Arc::strong_count(&evicted[0]),
+            1,
+            "model released its handle"
+        );
+        assert!(matches!(
+            model.item(b.key()).unwrap().thumbnail,
+            ThumbnailState::NotRequested
+        ));
+
+        // Replacing a ready image releases the old handle and keeps the new one.
+        let replaced = model.set_thumbnail(&c, image(30));
+        assert_eq!(replaced.len(), 1);
+        assert_eq!(Arc::strong_count(&replaced[0]), 1);
+
+        // Clearing hands back every image still decoded, once.
+        let cleared = model.clear();
+        assert_eq!(cleared.len(), 2);
+        for image in &cleared {
+            assert_eq!(Arc::strong_count(image), 1);
+        }
+        assert_eq!(model.thumbnail_bytes(), 0);
+        assert!(model.clear().is_empty());
+    }
+
+    #[test]
+    fn stale_ticket_returns_the_image_without_touching_the_item() {
+        let mut model = QueueModel::with_thumbnail_budget(250);
+        model.add_files(vec![scan_file("a")]);
+        let stale = claim(&mut model, "a");
+        // Re-importing clears the queue and bumps the revision; the old ticket
+        // must hand the decoded image straight back.
+        model.clear();
+        model.add_files(vec![scan_file("a")]);
+        let image = image(25);
+        let returned = model.set_thumbnail(&stale, Arc::clone(&image));
+        assert_eq!(returned.len(), 1);
+        assert!(Arc::ptr_eq(&returned[0], &image));
+        assert_eq!(Arc::strong_count(&returned[0]), 2);
+        assert_eq!(model.thumbnail_bytes(), 0);
+        assert!(matches!(
+            model.item(&"a".into()).unwrap().thumbnail,
+            ThumbnailState::NotRequested
+        ));
+    }
+
+    #[test]
     fn stale_tickets_are_rejected_and_replacements_release_the_old_image() {
         let mut model = QueueModel::with_thumbnail_budget(10_000);
         model.add_files(vec![scan_file("a")]);
