@@ -3221,6 +3221,242 @@ fn precision_warnings_survive_queue_completion_and_retranslate(cx: &mut TestAppC
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+/// Dragging the quality slider with the pointer writes the setting along the
+/// track, in both directions, through Kit's own hit testing.
+#[gpui_kit::test]
+fn quality_slider_follows_a_pointer_drag(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let quality = |cx: &mut TestAppContext| {
+        cx.run_until_parked();
+        cx.update(|cx| AppModels::global(cx).settings().read(cx).settings().quality)
+    };
+    let start = quality(cx);
+    for (from, to, check) in [
+        (0.5_f32, 0.98_f32, (|q: u8| q >= 95) as fn(u8) -> bool),
+        (0.98, 0.02, |q: u8| q <= 5),
+        (0.02, 0.5, |q: u8| (40..=60).contains(&q)),
+    ] {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            let bounds = window.find("settings-quality").bounds();
+            let at = |fraction: f32| {
+                gpui_kit::point(
+                    bounds.left() + bounds.size.width * fraction,
+                    bounds.center().y,
+                )
+            };
+            window.drag(at(from), at(to), cx);
+        })
+        .unwrap();
+        let value = quality(cx);
+        assert!(check(value), "{from} -> {to}: quality {value}");
+    }
+    assert_ne!(start, 0);
+}
+
+/// A real Kit Select: Enter confirms the highlighted choice and writes the
+/// setting; Escape closes the list and keeps the value.
+#[gpui_kit::test]
+fn select_confirms_with_enter_and_escape_keeps_the_value(cx: &mut TestAppContext) {
+    use imgconvert_gpui_workflow::SettingsTab;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let overwrite = |cx: &mut TestAppContext| {
+        cx.run_until_parked();
+        cx.update(|cx| {
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .overwrite
+        })
+    };
+    let before = overwrite(cx);
+    cx.update_window(handle, |_, window, cx| {
+        let form = workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone();
+        form.update(cx, |form, cx| form.set_tab(SettingsTab::Output, cx));
+        window.render_frame(cx);
+        window.click("settings-overwrite", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.press("down", cx);
+        window.press("enter", cx);
+    })
+    .unwrap();
+    let chosen = overwrite(cx);
+    assert_ne!(chosen, before, "Enter confirms the next choice");
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("settings-overwrite", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.press("down", cx);
+        window.press("escape", cx);
+    })
+    .unwrap();
+    assert_eq!(overwrite(cx), chosen, "Escape keeps the value");
+    // Reopened, the same kind of keystrokes confirm (Up here: the choice is
+    // now the last one), so Escape is what discarded the move above.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("settings-overwrite", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, cx| {
+        window.press("up", cx);
+        window.press("enter", cx);
+    })
+    .unwrap();
+    assert_ne!(overwrite(cx), chosen, "the list confirms when not escaped");
+}
+
+/// With the theme set to follow the system, a platform appearance change
+/// switches the glass and Kit themes; an explicit choice ignores it.
+#[gpui_kit::test]
+fn system_theme_follows_the_platform_appearance(cx: &mut TestAppContext) {
+    use gpui_kit::WindowAppearance;
+    use imgconvert_backend::settings::Theme;
+    use imgconvert_gpui_shared::theme::ActiveGlass as _;
+
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let set_theme = |cx: &mut TestAppContext, theme: Theme| {
+        cx.update(|cx| {
+            AppModels::global(cx)
+                .settings()
+                .clone()
+                .update(cx, |settings, cx| {
+                    settings.update(cx, |settings| settings.theme = theme);
+                });
+        });
+        cx.run_until_parked();
+    };
+    let dark = |cx: &mut TestAppContext| {
+        cx.run_until_parked();
+        cx.update(|cx| {
+            (
+                cx.glass().mode().is_dark(),
+                gpui_kit::component::ActiveTheme::theme(cx).mode.is_dark(),
+            )
+        })
+    };
+    set_theme(cx, Theme::System);
+    assert_eq!(dark(cx), (false, false), "the test platform starts light");
+    cx.simulate_window_appearance_change(handle, WindowAppearance::Dark);
+    assert_eq!(dark(cx), (true, true), "follows the platform to dark");
+    cx.simulate_window_appearance_change(handle, WindowAppearance::Light);
+    assert_eq!(dark(cx), (false, false), "and back to light");
+    set_theme(cx, Theme::Light);
+    cx.simulate_window_appearance_change(handle, WindowAppearance::Dark);
+    assert_eq!(dark(cx), (false, false), "an explicit theme ignores it");
+    cx.simulate_window_appearance_change(handle, WindowAppearance::Light);
+}
+
+/// Cancel during a real batch: the bar switches to Cancelling, the batch
+/// ends as cancelled, nothing is written, and the files stay pending.
+#[gpui_kit::test]
+fn cancel_stops_a_running_batch_without_outputs(cx: &mut TestAppContext) {
+    use imgconvert_gpui_shared::BatchPhase;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-gpui-cancel-{}", std::process::id()));
+    let out = dir.join("out");
+    std::fs::create_dir_all(&out).unwrap();
+    let keys = ["c0", "c1", "c2"];
+    cx.update(|cx| {
+        let models = AppModels::global(cx).clone();
+        models.queue().update(cx, |queue, cx| {
+            queue.add_files(
+                keys.iter()
+                    .map(|key| {
+                        let path = dir.join(format!("{key}.png"));
+                        std::fs::write(&path, one_by_one_png()).unwrap();
+                        imgconvert_backend::import::ImportScanFile {
+                            path: path.to_string_lossy().into_owned(),
+                            key: (*key).into(),
+                            relative_dir: None,
+                            metadata: None,
+                        }
+                    })
+                    .collect(),
+            );
+            cx.notify();
+        });
+        let workflow = workspace.read(cx).workflow().clone();
+        workflow.update(cx, |workflow, cx| workflow.set_output_dir(out.clone(), cx));
+    });
+    // Holding the execution gate parks the started batch on its thread.
+    let gate = cx.update(|cx| {
+        imgconvert_gpui_shared::Services::global(cx)
+            .batch()
+            .execution_gate()
+            .handle()
+    });
+    let held_gate = gate.lock().unwrap();
+    let previous = current_batch_id(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("workflow-start", cx);
+    })
+    .unwrap();
+    wait_until(cx, "the batch runs", |cx| {
+        AppModels::global(cx).batch().read(cx).is_active()
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("workflow-cancel").visible());
+        window.click("workflow-cancel", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        assert_eq!(
+            *AppModels::global(cx).batch().read(cx).phase(),
+            BatchPhase::Cancelling
+        );
+    });
+    drop(held_gate);
+    wait_for_batch_after(cx, previous);
+    cx.update(|cx| {
+        let models = AppModels::global(cx);
+        match models.batch().read(cx).phase() {
+            BatchPhase::Finished(summary) => assert!(summary.cancelled, "{summary:?}"),
+            phase => panic!("expected a cancelled finish, got {phase:?}"),
+        }
+        let queue = models.queue().read(cx);
+        for key in keys {
+            let status = &queue.item(&key.into()).unwrap().status;
+            assert!(
+                !matches!(status, ItemStatus::Done { .. }),
+                "{key} was not converted: {status:?}"
+            );
+        }
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let status = window.find("workflow-status").value().unwrap().to_owned();
+        assert!(status.starts_with("Cancelled"), "{status}");
+        assert!(window.find("workflow-start").visible());
+    })
+    .unwrap();
+    let written = std::fs::read_dir(&out).unwrap().count();
+    assert_eq!(written, 0, "no output after cancelling before any file");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[gpui_kit::test]
 fn settings_controls_expose_native_names_roles_and_toggle_state(cx: &mut TestAppContext) {
     use imgconvert_gpui_shared::i18n::{Locale, tr};
