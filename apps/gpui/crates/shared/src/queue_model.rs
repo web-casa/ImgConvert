@@ -172,7 +172,7 @@ pub enum ClipboardIssue {
 
 impl ClipboardIssue {
     pub fn text(&self) -> SharedString {
-        use crate::i18n::{tr, tr_with};
+        use crate::i18n::{tr, tr_count, tr_with};
         match self {
             Self::InvalidPaths(count) => {
                 tr_with("queue.clipboard_invalid_paths", &[("count", count)])
@@ -183,7 +183,7 @@ impl ClipboardIssue {
             ),
             Self::Truncated => tr("queue.clipboard_truncated"),
             Self::ImageIssues(count) => {
-                tr_with("queue.clipboard_image_issues", &[("count", count)])
+                tr_count("queue.clipboard_image_issues", "count", *count, &[])
             }
             Self::Empty => tr("queue.clipboard_empty"),
             Self::Unavailable => tr("queue.clipboard_unavailable"),

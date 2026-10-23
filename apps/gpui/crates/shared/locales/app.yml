@@ -80,11 +80,20 @@ queue.importing:
 queue.item_count:
   en: "%{count} items"
   zh-CN: "%{count} 个文件"
+queue.item_count_one:
+  en: "%{count} item"
+  zh-CN: "%{count} 个文件"
 queue.import_added:
   en: "Added %{added} files"
   zh-CN: "已添加 %{added} 个文件"
+queue.import_added_one:
+  en: "Added %{added} file"
+  zh-CN: "已添加 %{added} 个文件"
 queue.import_added_skipped:
   en: "Added %{added} files, skipped %{skipped}"
+  zh-CN: "已添加 %{added} 个文件，跳过 %{skipped} 个"
+queue.import_added_skipped_one:
+  en: "Added %{added} file, skipped %{skipped}"
   zh-CN: "已添加 %{added} 个文件，跳过 %{skipped} 个"
 queue.import_nothing:
   en: No supported images found
@@ -911,6 +920,9 @@ diagnostics.messages.unknown:
 workflow.ready:
   en: "%{count} files ready"
   zh-CN: "%{count} 个文件待转换"
+workflow.ready_one:
+  en: "%{count} file ready"
+  zh-CN: "%{count} 个文件待转换"
 workflow.ready_empty:
   en: Add files to begin
   zh-CN: 先添加文件
@@ -937,6 +949,9 @@ settings.reduce_motion_description:
   zh-CN: 缩短或关闭界面动画。
 queue.page_count:
   en: "%{count} pages"
+  zh-CN: "%{count} 页"
+queue.page_count_one:
+  en: "%{count} page"
   zh-CN: "%{count} 页"
 impact.title:
   en: Storage and environmental scenario
@@ -1102,17 +1117,23 @@ update.batch_active:
 queue.import_partial:
   en: "Added %{added} files. %{detail}"
   zh-CN: "已添加 %{added} 个文件。%{detail}"
+queue.import_partial_one:
+  en: "Added %{added} file. %{detail}"
+  zh-CN: "已添加 %{added} 个文件。%{detail}"
 queue.clipboard_invalid_paths:
   en: "%{count} file paths couldn’t be represented as UTF-8. Choose files with supported names."
   zh-CN: "%{count} 个文件路径无法表示为 UTF-8。请选择名称受支持的文件。"
 queue.clipboard_path_issues:
-  en: "%{skipped} entries skipped; %{errors} paths couldn’t be read. Check that the files exist and are readable."
+  en: "Skipped: %{skipped}. Unreadable paths: %{errors}. Check that the files exist and are readable."
   zh-CN: "跳过 %{skipped} 项；%{errors} 个路径无法读取。请确认文件存在且具有读取权限。"
 queue.clipboard_truncated:
   en: The scan reached its limit. Import fewer files at a time.
   zh-CN: 扫描已达到上限。请分批导入较少的文件。
 queue.clipboard_image_issues:
   en: "%{count} images couldn’t be imported. Copy a supported image within the size limits and try again."
+  zh-CN: "%{count} 张图片无法导入。请复制未超出大小限制的受支持图片后重试。"
+queue.clipboard_image_issues_one:
+  en: "%{count} image couldn’t be imported. Copy a supported image within the size limits and try again."
   zh-CN: "%{count} 张图片无法导入。请复制未超出大小限制的受支持图片后重试。"
 queue.clipboard_unavailable:
   en: Couldn’t read the clipboard. Try again, or add files with the file picker.
@@ -1248,7 +1269,7 @@ queue.remove_item:
   en: "Remove %{name} from the queue"
   zh-CN: "从队列移除 %{name}"
 queue.scan_issues:
-  en: "%{skipped} entries skipped; %{errors} paths couldn’t be read."
+  en: "Skipped: %{skipped}. Unreadable paths: %{errors}."
   zh-CN: "跳过 %{skipped} 项；%{errors} 个路径无法读取。"
 
 errors.outputSafetyCheckFailedGeneric:
@@ -1273,6 +1294,9 @@ queue.animation_unknown:
   zh-CN: 动画状态未确认
 workflow.animation_summary:
   en: "%{count} files · %{animated} animated (unsupported) · %{unknown} unverified"
+  zh-CN: "%{count} 个文件 · %{animated} 个动画（暂不支持）· %{unknown} 个状态未确认"
+workflow.animation_summary_one:
+  en: "%{count} file · %{animated} animated (unsupported) · %{unknown} unverified"
   zh-CN: "%{count} 个文件 · %{animated} 个动画（暂不支持）· %{unknown} 个状态未确认"
 status.warnings:
   en: Warnings

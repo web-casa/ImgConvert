@@ -19,7 +19,7 @@ use gpui_kit::{
     Subscription, TestSupportExt as _, Window, div,
 };
 use imgconvert_backend::progress::BatchId;
-use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::i18n::{tr, tr_count, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{
     AppModels, BatchModel, BatchPhase, ItemStatus, QueueItem, QueueModel, SettingsModel,
@@ -108,7 +108,7 @@ impl ActionBar {
         if count == 0 {
             (tr("workflow.ready_empty"), false)
         } else {
-            (tr_with("workflow.ready", &[("count", &count)]), false)
+            (tr_count("workflow.ready", "count", count, &[]), false)
         }
     }
 

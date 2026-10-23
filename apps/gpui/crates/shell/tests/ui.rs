@@ -1669,7 +1669,7 @@ fn clipboard_bitmap_button_imports_metadata_and_clears_only_managed_files(cx: &m
     assert_eq!(std::fs::read(&path).unwrap(), one_by_one_png());
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
-        assert_eq!(window.find("queue-feedback").value(), Some("Added 1 files"));
+        assert_eq!(window.find("queue-feedback").value(), Some("Added 1 file"));
         window.click("queue-clear", cx);
     })
     .unwrap();
@@ -2662,7 +2662,9 @@ fn parity_scan_reports_failures_and_stop_preserves_existing_queue(cx: &mut TestA
         window.render_frame(cx);
         let text = window.find("queue-feedback").value().unwrap().to_owned();
         assert!(
-            text.contains("Added 1 files") && text.contains("1 paths couldn’t be read"),
+            text.contains("Added 1 file")
+                && !text.contains("1 files")
+                && text.contains("Unreadable paths: 1"),
             "{text}"
         );
         toggle_language(cx);
