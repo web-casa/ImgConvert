@@ -93,7 +93,7 @@ for (const [label, text, required] of [
     workflow,
     "actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9",
   ],
-  ["Pages workflow", workflow, "actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128"],
+  ["Pages workflow", workflow, "actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346"],
   ["Pages workflow", workflow, "github.event.repository.has_pages == true"],
   ["Pages workflow", workflow, "path: pages"],
   ["Pages workflow", workflow, "pages: write"],
