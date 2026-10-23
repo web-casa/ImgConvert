@@ -24,7 +24,8 @@ use crate::set_language;
 pub const TRIGGER_ID: &str = "language-menu";
 
 /// The language command and its popover.
-pub fn language_popover(cx: &App) -> Popover {
+/// Below the compact width the trigger shows only its globe icon.
+pub fn language_popover(compact: bool, cx: &App) -> Popover {
     let pill = ButtonRounded::Size(cx.theme().radius_full());
     let current = Locale::current();
     Popover::new("language-popover")
@@ -35,7 +36,7 @@ pub fn language_popover(cx: &App) -> Popover {
                 .small()
                 .rounded(pill)
                 .icon(IconName::Globe)
-                .label(current.native_name())
+                .when(!compact, |button| button.label(current.native_name()))
                 .accessibility_label(tr_with(
                     "app.language",
                     &[("language", &current.native_name())],
@@ -71,6 +72,11 @@ fn render_languages(window: &mut Window, cx: &mut App) -> impl IntoElement + use
         })
         .read(cx)
         .clone();
+    // The group is the panel's only Tab stop: hold focus on it while the
+    // panel is open, so the arrow keys work as soon as it appears.
+    if !group_focus.is_focused(window) {
+        window.focus(&group_focus, cx);
+    }
     let current = Locale::current();
     let glass = cx.glass();
     let pill = ButtonRounded::Size(cx.theme().radius_full());

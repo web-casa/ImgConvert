@@ -266,6 +266,18 @@ fn language_menu_and_toggle_rewrite_visible_labels(cx: &mut TestAppContext) {
     })
     .unwrap();
     assert_eq!(Locale::current(), Locale::Japanese);
+    // The keyboard works as soon as the panel is open: Down moves to the
+    // next language, Home to the first.
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("language-panel").visible());
+    })
+    .unwrap();
+    cx.simulate_keystrokes(handle, "down");
+    assert_eq!(Locale::current(), Locale::Korean);
+    cx.simulate_keystrokes(handle, "home");
+    assert_eq!(Locale::current(), Locale::English);
+    cx.update(|cx| set_language(Locale::Japanese, cx));
     // The quick switch goes to English from any other language, and from
     // English to Simplified Chinese.
     cx.update(toggle_language);
@@ -3447,11 +3459,19 @@ fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut
     for (width, height, theme, locale) in [(760., 480.), (1_000., 640.), (1_280., 800.)]
         .into_iter()
         .flat_map(|(width, height)| {
+            // Every language at the minimum size; English and Chinese at
+            // the larger ones.
+            let locales: &'static [Locale] = if width < 800. {
+                &Locale::ALL
+            } else {
+                &[Locale::English, Locale::SimplifiedChinese]
+            };
             [Theme::Light, Theme::Dark]
                 .into_iter()
                 .flat_map(move |theme| {
-                    [Locale::English, Locale::SimplifiedChinese]
-                        .map(move |locale| (width, height, theme, locale))
+                    locales
+                        .iter()
+                        .map(move |locale| (width, height, theme, *locale))
                 })
         })
     {
@@ -3512,7 +3532,7 @@ fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut
                 "workspace-appearance",
             ] {
                 let action = window.find(id);
-                assert!(action.visible(), "{id} at {width}x{height}");
+                assert!(action.visible(), "{id} at {width}x{height} in {locale:?}");
                 let bounds = action.bounds();
                 assert!(
                     bounds.left() >= px(0.) && bounds.right() <= px(width),
@@ -4564,6 +4584,8 @@ fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
         })
         .unwrap();
         cx.run_until_parked();
+        // The footer moves while the dialog animates in; click it at rest.
+        settle_dialog_motion(cx, handle);
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
             assert!(window.has_active_dialog(cx), "{trigger} opens a dialog");

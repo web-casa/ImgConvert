@@ -10,7 +10,9 @@
 //! Appearance popover.
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
@@ -161,7 +163,7 @@ impl Workspace {
         &self.action_bar
     }
 
-    fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_header(&self, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let pill = ButtonRounded::Size(cx.theme().radius_full());
         h_flex()
             .id("workspace-header")
@@ -194,48 +196,56 @@ impl Workspace {
                     .items_center()
                     .glass_capsule(cx)
                     .child(
-                        Button::new("plugin-diagnostics")
-                            .ghost()
-                            .small()
-                            .rounded(pill)
-                            .label(tr("diagnostics.open"))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.open_plugin_diagnostics(window, cx);
-                            })),
+                        header_command(
+                            "plugin-diagnostics",
+                            IconName::Inspector,
+                            "diagnostics.open",
+                            compact,
+                            pill,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.open_plugin_diagnostics(window, cx);
+                        })),
                     )
                     .when(imgconvert_gpui_app_settings::is_visible(), |bar| {
                         bar.child(
-                            Button::new("updates-open")
-                                .ghost()
-                                .small()
-                                .rounded(pill)
-                                .label(tr("update.open"))
-                                .on_click(|_, window, cx| {
-                                    imgconvert_gpui_app_settings::open_updates(window, cx);
-                                }),
+                            header_command(
+                                "updates-open",
+                                IconName::RefreshCw,
+                                "update.open",
+                                compact,
+                                pill,
+                            )
+                            .on_click(|_, window, cx| {
+                                imgconvert_gpui_app_settings::open_updates(window, cx);
+                            }),
                         )
                     })
                     .child(
-                        Button::new("privacy-open")
-                            .ghost()
-                            .small()
-                            .rounded(pill)
-                            .label(tr("legal.privacy_open"))
-                            .on_click(|_, window, cx| {
-                                imgconvert_gpui_app_settings::legal::open_privacy(window, cx);
-                            }),
+                        header_command(
+                            "privacy-open",
+                            IconName::EyeOff,
+                            "legal.privacy_open",
+                            compact,
+                            pill,
+                        )
+                        .on_click(|_, window, cx| {
+                            imgconvert_gpui_app_settings::legal::open_privacy(window, cx);
+                        }),
                     )
                     .child(
-                        Button::new("licenses-open")
-                            .ghost()
-                            .small()
-                            .rounded(pill)
-                            .label(tr("legal.licenses_open"))
-                            .on_click(|_, window, cx| {
-                                imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
-                            }),
+                        header_command(
+                            "licenses-open",
+                            IconName::Info,
+                            "legal.licenses_open",
+                            compact,
+                            pill,
+                        )
+                        .on_click(|_, window, cx| {
+                            imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
+                        }),
                     )
-                    .child(crate::language::language_popover(cx))
+                    .child(crate::language::language_popover(compact, cx))
                     .child(crate::appearance::appearance_popover(cx)),
             )
     }
@@ -283,7 +293,7 @@ impl Render for Workspace {
                 v_flex()
                     .size_full()
                     .relative()
-                    .child(self.render_header(cx))
+                    .child(self.render_header(compact, cx))
                     .child(
                         h_flex()
                             .id("workspace-content")
@@ -353,4 +363,25 @@ fn brand_mark() -> Arc<Image> {
         ))
     })
     .clone()
+}
+
+/// A header command: its name as the label, or below the compact width only
+/// its icon, with the name on the tooltip and in the accessibility tree.
+fn header_command(
+    id: &'static str,
+    icon: IconName,
+    key: &str,
+    compact: bool,
+    pill: ButtonRounded,
+) -> Button {
+    let name = tr(key);
+    let button = Button::new(id).ghost().small().rounded(pill);
+    if compact {
+        button
+            .icon(icon)
+            .accessibility_label(name.clone())
+            .tooltip(name)
+    } else {
+        button.label(name)
+    }
 }
