@@ -257,7 +257,6 @@ fn persisted_format_and_folder_drive_the_panel_and_follow_its_edits(cx: &mut Tes
             window.find("workflow-output-dir").label(),
             Some("/persisted/out")
         );
-        // Start reads "Start", not "Start…": no folder prompt will open.
         assert_eq!(window.find("workflow-start").label(), Some("Start"));
 
         workflow.update(cx, |workflow, cx| {
@@ -1469,7 +1468,7 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
         }
         assert_eq!(
             window.find("workflow-impact").label(),
-            Some("Batch scenario…"),
+            Some("Batch scenario"),
             "the icon-only command keeps its name"
         );
         gpui_kit::component::Theme::update(cx, |theme| theme.font_size = font);

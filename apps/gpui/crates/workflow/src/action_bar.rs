@@ -316,12 +316,6 @@ impl Render for ActionBar {
             && !planning
             && !progress_bridge::is_busy(cx);
         let output_dir = self.panel.read(cx).output_dir(cx);
-        // Starting without a chosen folder opens the picker first.
-        let start_label = if output_dir.is_some() {
-            tr("workflow.start")
-        } else {
-            tr("workflow.start_choose")
-        };
         let output_path: SharedString = output_dir.as_ref().map_or_else(
             || tr("workflow.output_not_chosen"),
             |dir| SharedString::from(dir.to_string_lossy().into_owned()),
@@ -537,7 +531,7 @@ impl Render for ActionBar {
                     .large()
                     .rounded(pill)
                     .px_6()
-                    .label(start_label)
+                    .label(tr("workflow.start"))
                     .disabled_for_all(!can_start)
                     .when(can_start, |this| this.shadow(glass.primary_shadows()))
                     .on_click(cx.listener(|this, _, window, cx| {

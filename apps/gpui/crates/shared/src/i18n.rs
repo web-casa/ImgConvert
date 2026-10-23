@@ -143,9 +143,9 @@ mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         set_locale(Locale::English);
-        assert_eq!(tr("queue.add_files").as_ref(), "Add files…");
+        assert_eq!(tr("queue.add_files").as_ref(), "Add files");
         set_locale(Locale::SimplifiedChinese);
-        assert_eq!(tr("queue.add_files").as_ref(), "添加文件…");
+        assert_eq!(tr("queue.add_files").as_ref(), "添加文件");
         set_locale(Locale::English);
     }
 

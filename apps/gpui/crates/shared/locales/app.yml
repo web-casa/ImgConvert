@@ -36,8 +36,8 @@ queue.title:
   en: Queue
   zh-CN: 队列
 queue.add_files:
-  en: Add files…
-  zh-CN: 添加文件…
+  en: Add files
+  zh-CN: 添加文件
 queue.paste:
   en: Paste
   zh-CN: 粘贴
@@ -135,17 +135,14 @@ workflow.output_dir:
   en: Output folder
   zh-CN: 输出文件夹
 workflow.choose_output:
-  en: Choose folder…
-  zh-CN: 选择文件夹…
+  en: Choose folder
+  zh-CN: 选择文件夹
 workflow.output_not_chosen:
   en: Chosen when you start
   zh-CN: 开始时选择
 workflow.start:
   en: Start
   zh-CN: 开始转换
-workflow.start_choose:
-  en: Start…
-  zh-CN: 开始转换…
 workflow.cancel:
   en: Cancel
   zh-CN: 取消
@@ -771,8 +768,8 @@ diagnostics.manual_helper_title:
   en: Manual helper
   zh-CN: 手动指定的辅助程序
 diagnostics.choose:
-  en: Choose…
-  zh-CN: 选择…
+  en: Choose
+  zh-CN: 选择
 diagnostics.clear:
   en: Clear
   zh-CN: 清除
@@ -960,8 +957,8 @@ impact.open:
   en: Scenario
   zh-CN: 存储情景
 impact.batch_open:
-  en: Batch scenario…
-  zh-CN: 批量情景…
+  en: Batch scenario
+  zh-CN: 批量情景
 impact.smaller:
   en: "Output smaller by %{bytes}"
   zh-CN: "输出减少 %{bytes}"
@@ -1039,8 +1036,8 @@ impact.close:
   zh-CN: 关闭
 
 update.open:
-  en: "Updates…"
-  zh-CN: "更新…"
+  en: Updates
+  zh-CN: 更新
 
 update.title:
   en: "Updates"
@@ -1306,8 +1303,8 @@ status.warnings:
   zh-CN: 有告警
 
 queue.add_folders:
-  en: Add folders…
-  zh-CN: 添加文件夹…
+  en: Add folders
+  zh-CN: 添加文件夹
 queue.supported_formats:
   en: Input formats
   zh-CN: 支持导入的格式
@@ -1328,7 +1325,7 @@ settings.tab_output:
   en: Output
   zh-CN: 输出
 settings.tab_processing:
-  en: Processing
+  en: Adjust
   zh-CN: 处理
 settings.tab_privacy:
   en: Privacy
@@ -1340,7 +1337,7 @@ settings.format_hint_jpeg:
   en: Opens everywhere
   zh-CN: 兼容所有设备
 settings.format_hint_png:
-  en: Lossless, keeps transparency
+  en: Lossless, keeps alpha
   zh-CN: 无损，保留透明
 settings.format_hint_webp:
   en: Made for the web
