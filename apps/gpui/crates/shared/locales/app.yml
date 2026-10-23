@@ -1123,6 +1123,9 @@ queue.import_partial_one:
 queue.clipboard_invalid_paths:
   en: "%{count} file paths couldn’t be represented as UTF-8. Choose files with supported names."
   zh-CN: "%{count} 个文件路径无法表示为 UTF-8。请选择名称受支持的文件。"
+queue.clipboard_invalid_paths_one:
+  en: "%{count} file path couldn’t be represented as UTF-8. Choose files with supported names."
+  zh-CN: "%{count} 个文件路径无法表示为 UTF-8。请选择名称受支持的文件。"
 queue.clipboard_path_issues:
   en: "Skipped: %{skipped}. Unreadable paths: %{errors}. Check that the files exist and are readable."
   zh-CN: "跳过 %{skipped} 项；%{errors} 个路径无法读取。请确认文件存在且具有读取权限。"
