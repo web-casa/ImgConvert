@@ -8,6 +8,26 @@ import { zhCN } from "./messages/zh-CN";
 
 export type AppLocale = "zh-CN" | "en-US";
 
+// Locales the settings file may hold. The newer desktop shell writes all of
+// them; this shell shows Chinese for the Chinese ones and English otherwise,
+// and keeps the stored value so switching shells does not lose the choice.
+export const PERSISTED_LOCALES = [
+  "zh-CN",
+  "en-US",
+  "zh-TW",
+  "ja",
+  "ko",
+  "fr",
+  "es",
+  "pt-BR",
+  "de",
+] as const;
+export type PersistedLocale = (typeof PERSISTED_LOCALES)[number];
+
+export function isPersistedLocale(value: unknown): value is PersistedLocale {
+  return typeof value === "string" && (PERSISTED_LOCALES as readonly string[]).includes(value);
+}
+
 export const locale = localeStore;
 
 // Both dictionaries are bundled statically. Register them before init so the

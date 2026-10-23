@@ -5,6 +5,9 @@ app.title:
 app.language:
   en: "Language: %{language}"
   zh-CN: "语言：%{language}"
+app.language_title:
+  en: Language
+  zh-CN: 语言
 app.quit:
   en: Quit ImgConvert
   zh-CN: 退出 ImgConvert

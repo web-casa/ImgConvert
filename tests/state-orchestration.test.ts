@@ -37,6 +37,7 @@ vi.mock("@tauri-apps/plugin-store", () => ({
   })),
 }));
 
+import { get } from "svelte/store";
 import {
   addPaths,
   appUpdate,
@@ -64,7 +65,7 @@ import {
   setItemTargetFormat,
   ui,
 } from "../src/lib/state.svelte";
-import { setAppLocale } from "../src/lib/i18n";
+import { locale, setAppLocale } from "../src/lib/i18n";
 
 const runtimeAccess = {
   useHostLinuxPicker: false,
@@ -780,6 +781,22 @@ describe("desktop state orchestration", () => {
     expect(capabilities.writable).toEqual(["png"]);
     expect(engine.ok).toBe(true);
     expect(mocks.storeSet).toHaveBeenCalled();
+  });
+
+  it("keeps a locale written by the newer shell and shows its display language", async () => {
+    for (const [stored, shown] of [
+      ["ja", "en-US"],
+      ["zh-TW", "zh-CN"],
+      ["de", "en-US"],
+    ] as const) {
+      mocks.storeGet.mockResolvedValueOnce({ locale: stored });
+      await initPersistence();
+      expect(settings.locale).toBe(stored);
+      expect(get(locale)).toBe(shown);
+    }
+    mocks.storeGet.mockResolvedValueOnce({ locale: "xx" });
+    await initPersistence();
+    expect(settings.locale).toBe("en-US");
   });
 
   it("handles settings persistence failures and clears the warning after retry", async () => {

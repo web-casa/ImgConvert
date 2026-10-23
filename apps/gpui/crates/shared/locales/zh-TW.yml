@@ -3,6 +3,8 @@ app.title:
   zh-TW: ImgConvert
 app.language:
   zh-TW: "語言：%{language}"
+app.language_title:
+  zh-TW: 語言
 app.quit:
   zh-TW: 結束 ImgConvert
 app.open_files:

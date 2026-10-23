@@ -3,6 +3,7 @@
   import { onDestroy, onMount } from "svelte";
   import { CloseIcon, ShieldCheckIcon, SquareTopDownIcon } from "@solar-icons/svelte/bold-duotone";
   import { t } from "svelte-i18n";
+  import { normalizeLocale } from "$lib/i18n";
   import { Button } from "$lib/components/ui/button";
   import { EXTERNAL_LINKS, openExternalUrl } from "$lib/external-links";
   import { trapTabWithin } from "$lib/focus-trap";
@@ -16,7 +17,9 @@
   let dialog = $state<HTMLDivElement | null>(null);
   let closeButton = $state<HTMLButtonElement | null>(null);
   let previousFocus: HTMLElement | null = null;
-  const policyText = $derived(settings.locale === "zh-CN" ? privacyChinese : privacyEnglish);
+  const policyText = $derived(
+    normalizeLocale(settings.locale) === "zh-CN" ? privacyChinese : privacyEnglish,
+  );
 
   onMount(() => {
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
