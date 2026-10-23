@@ -1,0 +1,885 @@
+_version: 2
+app.title:
+  de: ImgConvert
+app.language:
+  de: "Sprache: %{language}"
+app.quit:
+  de: ImgConvert beenden
+app.open_files:
+  de: Öffnen …
+app.instance_blocked_title:
+  de: ImgConvert wird bereits ausgeführt
+app.instance_blocked:
+  de: "Eine andere ImgConvert-Instanz (Version %{version}, Prozess %{pid}) ist geöffnet. Beide Versionen teilen sich eine Einstellungsdatei, daher kann nur eine gleichzeitig laufen. Beende das andere ImgConvert und öffne dieses dann erneut."
+app.instance_blocked_unknown:
+  de: Eine andere ImgConvert-Instanz ist geöffnet. Beide Versionen teilen sich eine Einstellungsdatei, daher kann nur eine gleichzeitig laufen. Beende das andere ImgConvert und öffne dieses dann erneut.
+menu.edit:
+  de: Bearbeiten
+menu.file:
+  de: Ablage
+settings.save_failed:
+  de: "Einstellungen konnten nicht gesichert werden: %{detail}"
+queue.title:
+  de: Warteliste
+queue.add_files:
+  de: Dateien hinzufügen
+queue.paste:
+  de: Einsetzen
+queue.clipboard_empty:
+  de: Kopiere ein Bild oder absolute Dateipfade und füge sie erneut ein.
+queue.item_format_label:
+  de: "Zielformat für %{name}: %{format}"
+queue.target_format:
+  de: Zielformat für diese Datei
+queue.global_format:
+  de: "Global · %{format}"
+queue.follow_global:
+  de: Globalem Format folgen
+queue.reset_formats:
+  de: Formate zurücksetzen
+queue.clear:
+  de: Leeren
+queue.cancel_import:
+  de: Stoppen
+queue.empty_title:
+  de: Noch keine Bilder
+queue.empty_description:
+  de: Bilder oder Ordner hierher ziehen, Dateien hinzufügen oder ein kopiertes Bild bzw. Dateipfade einsetzen.
+queue.drop_hint:
+  de: Loslassen zum Hinzufügen
+queue.importing:
+  de: Importieren …
+queue.item_count:
+  de: "%{count} Objekte"
+queue.item_count_one:
+  de: "%{count} Objekt"
+queue.import_added:
+  de: "%{added} Dateien hinzugefügt"
+queue.import_added_one:
+  de: "%{added} Datei hinzugefügt"
+queue.import_added_skipped:
+  de: "%{added} Dateien hinzugefügt, %{skipped} übersprungen"
+queue.import_added_skipped_one:
+  de: "%{added} Datei hinzugefügt, %{skipped} übersprungen"
+queue.import_nothing:
+  de: Keine unterstützten Bilder gefunden
+queue.import_failed:
+  de: "Import fehlgeschlagen: %{detail}"
+queue.import_cancelled:
+  de: Import abgebrochen
+queue.thumbnail_unavailable:
+  de: Keine Vorschau
+status.pending:
+  de: Ausstehend
+status.running:
+  de: Konvertieren …
+status.done:
+  de: Fertig
+status.skipped:
+  de: Übersprungen
+status.error:
+  de: Fehlgeschlagen
+status.saved:
+  de: "%{before} → %{after}"
+workflow.title:
+  de: Konvertieren
+workflow.format:
+  de: Ausgabeformat
+workflow.output_dir:
+  de: Zielordner
+workflow.choose_output:
+  de: Ordner wählen
+workflow.output_not_chosen:
+  de: Wird beim Start gewählt
+workflow.start:
+  de: Starten
+workflow.cancel:
+  de: Abbrechen
+workflow.cancelling:
+  de: Abbrechen …
+workflow.announce_started:
+  de: "Stapel mit %{count} Dateien wird konvertiert"
+workflow.progress:
+  de: "%{done} von %{total} fertig"
+workflow.batch_progress:
+  de: Fortschritt der Stapelkonvertierung
+workflow.summary_cancelled:
+  de: "Abgebrochen nach %{done} von %{total}"
+workflow.failed:
+  de: "Stapel fehlgeschlagen: %{detail}"
+workflow.already_running:
+  de: Ein Stapel läuft bereits
+workflow.nothing_to_convert:
+  de: Füge zuerst Bilder zur Warteliste hinzu
+settings.title:
+  de: Konvertierungseinstellungen
+settings.core_section:
+  de: Format und Qualität
+settings.target_format:
+  de: Zielformat
+settings.quality:
+  de: Qualität
+settings.quality_upper_bound:
+  de: Qualitätsobergrenze
+settings.quality_effective:
+  de: "%{requested} → %{effective}"
+settings.output_section:
+  de: Ausgabeverhalten
+settings.concurrency:
+  de: Parallelität
+settings.concurrency_auto:
+  de: Automatisch
+settings.existing_files:
+  de: Vorhandene Dateien
+settings.overwrite_ask:
+  de: Fragen
+settings.overwrite_skip:
+  de: Überspringen
+settings.overwrite_overwrite:
+  de: Überschreiben
+settings.output_suffix:
+  de: Dateinamensuffix
+settings.add_output_suffix:
+  de: Suffix anhängen
+settings.output_suffix_hint:
+  de: Wird vor der Dateiendung eingefügt. Unicode wird unterstützt; maximal 48 Zeichen und 128 Byte.
+settings.output_suffix_adjusted:
+  de: Nicht unterstützte Pfadzeichen wurden ersetzt und die sichere Längenbegrenzung angewendet.
+settings.output_suffix_required:
+  de: Gib mindestens ein Zeichen ein oder deaktiviere diesen Schalter, um kein Suffix zu verwenden.
+settings.suffix_disabled_collision_hint:
+  de: Ohne Suffix und mit gleichem Zielformat kann eine Ausgabe ihrer Quelle entsprechen. Für vorhandene Dateien gilt die Auswahl unter „Vorhandene Dateien“.
+settings.file_name_template:
+  de: Dateinamensvorlage
+settings.file_name_template_hint:
+  de: Wird verwendet, wenn „Suffix anhängen“ aus ist. Unterstützt %name%, %extension% und %date%.
+settings.compression_section:
+  de: Komprimierungsregeln
+settings.lossless_label:
+  de: Verlustfrei
+settings.lossless_description:
+  de: Verlustfreie Pixel bevorzugen, wenn das Zielformat dies unterstützt; die Ausgabe ist dann evtl. nicht minimal.
+settings.skip_larger_label:
+  de: Nur kleinere Ausgaben behalten
+settings.skip_larger_description:
+  de: Standardmäßig aus. Wenn aktiviert, wird ein Bitmap-Ergebnis nur geschrieben, wenn es kleiner als die Quelle ist. Lass es aus, wenn das Format wichtiger als die Größe ist. Die SVG-Rasterung ist nicht betroffen.
+settings.multi_candidate_label:
+  de: Kleinsten Kandidaten suchen
+settings.multi_candidate_description:
+  de: Gleichwertige Kodierungsvarianten testen und das kleinste Ergebnis behalten; die Konvertierung kann etwas länger dauern.
+settings.auto_quality_label:
+  de: Automatische Qualität
+settings.auto_quality_description:
+  de: JPEG/WebP suchen die niedrigste Qualität, die den Zielwert erreicht, um die Größe zu minimieren.
+settings.generation_protection_label:
+  de: Nur lohnende verlustbehaftete Neukodierung
+settings.generation_protection_description:
+  de: Standardmäßig aus. Wenn aktiviert, wird ein verlustbehaftetes Bild nur dann in ein anderes verlustbehaftetes Format geschrieben, wenn genug Platz gespart wird. Lass es aus, wenn das gewählte Format erforderlich ist.
+settings.color_section:
+  de: Farbmanagement
+settings.convert_to_srgb_label:
+  de: In sRGB konvertieren
+settings.convert_to_srgb_description:
+  de: Pixel mit dem eingebetteten ICC-Profil in sRGB umrechnen und das alte Profil für eine einheitliche Darstellung entfernen.
+settings.result_cache_label:
+  de: Ergebnis-Cache
+settings.result_cache_description:
+  de: Vorhandene Ausgaben wiederverwenden, wenn Quelle und Einstellungen unverändert sind; nützlich für wiederholte Stapel.
+settings.clear_result_cache:
+  de: Ergebnis-Cache leeren
+settings.clearing_result_cache:
+  de: Cache wird geleert …
+settings.result_cache_cleared:
+  de: "%{count} Einträge im Ergebnis-Cache gelöscht."
+settings.clear_result_cache_failed:
+  de: "Ergebnis-Cache konnte nicht geleert werden: %{detail}"
+settings.format_parameters:
+  de: Formatparameter
+settings.progressive_jpeg:
+  de: Progressives JPEG
+settings.trellis_scans:
+  de: Trellis-Scans
+settings.png_optimization_level:
+  de: PNG-Optimierungsstufe
+settings.experimental_quantize:
+  de: Experimentelle Quantisierung
+settings.color_count:
+  de: Farbanzahl
+settings.webp_method:
+  de: Methode
+settings.near_lossless:
+  de: Nahezu verlustfrei
+settings.near_lossless_off:
+  de: "Aus"
+settings.sharp_yuv:
+  de: Sharp YUV
+settings.avif_speed:
+  de: Geschwindigkeit
+settings.avif_chroma_subsampling:
+  de: Chroma-Subsampling
+settings.target_score:
+  de: Zielwert
+settings.minimum_quality:
+  de: Mindestqualität
+settings.quality_floor_off:
+  de: "Aus"
+workflow.preset:
+  de: Szenario-Preset
+workflow.custom_settings:
+  de: Eigene Einstellungen
+workflow.save_preset:
+  de: Aktuelle Einstellungen sichern
+workflow.preset_name:
+  de: Preset-Name
+workflow.delete_preset:
+  de: Preset löschen
+workflow.delete_preset_named:
+  de: "Preset „%{name}“ löschen"
+workflow.delete_preset_title:
+  de: "„%{name}“ löschen?"
+workflow.delete_preset_description:
+  de: Dies kann nicht widerrufen werden.
+workflow.delete:
+  de: Löschen
+workflow.preset_limit:
+  de: "Bis zu %{count} eigene Presets möglich."
+workflow.presets.web_sharing:
+  de: Teilen im Web
+workflow.presets.web_sharing_description:
+  de: WebP, längste Kante 2048 px, nur mit Farbmetadaten.
+workflow.presets.email:
+  de: E-Mail-Anhang
+workflow.presets.email_description:
+  de: JPEG, längste Kante 1600 px, Ziel 1 MiB.
+workflow.presets.high_quality:
+  de: Hochwertiges Archiv
+workflow.presets.high_quality_description:
+  de: Hochwertiges AVIF mit allen unterstützten Metadaten.
+workflow.presets.private_sharing:
+  de: Privat teilen
+workflow.presets.private_sharing_description:
+  de: JPEG, längste Kante 2048 px, alle Metadaten entfernt.
+workflow.pdf_section:
+  de: PDF zu Bildern
+workflow.pdf_pages:
+  de: Seitenbereich (leer für alle)
+workflow.pdf_pages_placeholder:
+  de: "Beispiel: 1-3, 5, 8-10"
+workflow.pdf_pages_hint:
+  de: Seiten beginnen bei 1. Seiten und Bereiche kombinierbar; bis zu 500 Seiten pro Auftrag.
+workflow.pdf_dpi:
+  de: Renderauflösung (DPI)
+workflow.pdf_dpi_hint:
+  de: "Gilt nur für PDF-Eingaben. Bereich: 72–600 DPI; Standard: 150."
+workflow.pdf_dpi_hint_active:
+  de: PDF-Seiten werden zuerst mit dieser DPI gerendert; eine aktive Stapel-Größenregel wird danach angewendet.
+workflow.pdf_range_invalid:
+  de: Ungültiger Seitenbereich. Verwende ein Muster wie 1-3, 5, 8-10.
+workflow.pdf_range_out_of_bounds:
+  de: "Der Seitenbereich überschreitet die %{count} Seiten dieses Dokuments."
+workflow.pdf_range_required:
+  de: "Dieses Dokument ist groß. Wähle die Seiten explizit aus; bis zu %{count} auf einmal."
+workflow.pdf_range_too_long:
+  de: Der Seitenbereich ist zu lang.
+workflow.pdf_too_many_pages:
+  de: "Pro Auftrag können bis zu %{count} PDF-Seiten konvertiert werden."
+workflow.resize_section:
+  de: Stapel-Größenregel
+workflow.resize_mode:
+  de: Größenmodus
+workflow.resize_modes.none:
+  de: Originalgröße beibehalten
+workflow.resize_modes.fit:
+  de: In Breite und Höhe einpassen
+workflow.resize_modes.width:
+  de: Breite festlegen
+workflow.resize_modes.height:
+  de: Höhe festlegen
+workflow.resize_modes.longest_edge:
+  de: Längste Kante festlegen
+workflow.resize_modes.percentage:
+  de: Prozentual skalieren
+workflow.width:
+  de: Breite (px)
+workflow.height:
+  de: Höhe (px)
+workflow.size:
+  de: Größe (px)
+workflow.percentage:
+  de: Skalierung (%)
+workflow.allow_upscale:
+  de: Kleinere Bilder vergrößern erlauben
+workflow.compression_policy_disabled:
+  de: „Nur kleinere Ausgaben behalten“ und „Nur lohnende verlustbehaftete Neukodierung“ gelten nicht beim Skalieren.
+workflow.target_section:
+  de: Zieldateigröße
+workflow.target_enable:
+  de: Unter einer Zielgröße bleiben
+workflow.target_kib:
+  de: Zielgröße (KiB)
+workflow.target_hint:
+  de: Verfügbar für verlustbehaftetes JPEG/WebP. Die aktuelle Qualität ist die Obergrenze, die Mindestqualität wird eingehalten.
+workflow.target_unsupported:
+  de: Wähle verlustbehaftetes JPEG oder WebP, bevor du die Zielgröße aktivierst.
+workflow.metadata_section:
+  de: Datenschutz-Metadaten
+workflow.metadata_policy:
+  de: Aufbewahrungsregel
+workflow.metadata.strip_all:
+  de: Alle Metadaten entfernen
+workflow.metadata.strip_all_description:
+  de: Pixel mit Profil in sRGB umrechnen, dann ICC, EXIF, XMP und IPTC zum öffentlichen Teilen entfernen.
+workflow.metadata.color_only:
+  de: Nur Farbprofil behalten
+workflow.metadata.color_only_description:
+  de: Vollständiges ICC-Profil für die Farbdarstellung behalten; Profil- oder Gerätekennungen können erhalten bleiben.
+workflow.metadata.preserve_all:
+  de: Alle unterstützten Metadaten behalten
+workflow.metadata.preserve_all_description:
+  de: ICC, EXIF, XMP und IPTC beibehalten, sofern unterstützt.
+workflow.invalid_configuration:
+  de: Korrigiere vor dem Start die markierten Einstellungen
+preview.open:
+  de: Vergleichen
+preview.title:
+  de: Vorher-Nachher-Vorschau
+preview.pdf_page:
+  de: "PDF-Seite %{page}"
+preview.before:
+  de: Original
+preview.after:
+  de: Konvertiert
+preview.loading:
+  de: Exakte Vorschau wird erstellt …
+preview.refresh:
+  de: Vorschau aktualisieren
+preview.stale:
+  de: Die Konvertierungseinstellungen wurden geändert. Aktualisiere die konvertierte Vorschau.
+preview.close:
+  de: Schließen
+preview.reveal:
+  de: Ziehen, um vorher und nachher zu vergleichen
+preview.dimensions:
+  de: "%{width} × %{height}"
+preview.output_size:
+  de: "Geschätzte Ausgabe: %{size}"
+preview.quality:
+  de: "Gewählte Qualität: %{quality}"
+preview.target_met:
+  de: Zielgröße erreicht
+preview.target_not_met:
+  de: Das Ziel ist innerhalb der Mindestqualität nicht erreichbar
+preview.error:
+  de: "Vergleichsvorschau konnte nicht erstellt werden: %{detail}"
+preview.cancelled:
+  de: Vorschau abgebrochen
+warning.output_backup_retained:
+  de: "Konvertiert, aber die Sicherung der vorherigen Ausgabe ist noch vorhanden: %{path}"
+warning.modified_time_not_preserved:
+  de: "Konvertiert, aber das Änderungsdatum konnte nicht beibehalten werden: %{path}"
+warning.temporary_file_retained:
+  de: "Konvertiert, aber die temporäre Datei konnte nicht entfernt werden: %{path}"
+warning.color_profile_converted_for_resize:
+  de: Pixel wurden vor dem Skalieren in sRGB umgerechnet und das nun ungültige ICC-Quellprofil entfernt.
+warning.invalid_color_profile_discarded:
+  de: Das eingebettete ICC-Profil war ungültig und wurde durch die Datenschutzregel entfernt. Die Pixel verwenden ihre dekodierten Werte, daher können Farben von der Quellanwendung abweichen.
+warning.invalid_color_profile_ignored_for_preview:
+  de: Das eingebettete ICC-Profil ist ungültig. Es bleibt wie gewünscht in der konvertierten Datei, aber diese Vorschau verwendet die dekodierten Pixelwerte ohne das Profil.
+warning.target_size_not_met:
+  de: "Ziel %{target}; der kleinste brauchbare Kandidat hatte %{actual} und konnte das Ziel innerhalb der Mindestqualität nicht erreichen."
+warning.pdf_pages_skipped_existing:
+  de: "%{count} vorhandene Seitenausgabe(n) beibehalten."
+warning.pdf_render_warnings:
+  de: "PDF-Seite %{page} erzeugte %{count} Kompatibilitätswarnung(en); einige Inhalte fehlen möglicherweise."
+safety.queued_input_conflict_title:
+  de: Überschreiben einer Quelle verhindert
+safety.queued_input_conflict_message:
+  de: "%{count} Ausgabepfad(e) entsprechen einer anderen Eingabe in der Warteliste. Zum Schutz der Quellen werden diese Objekte nicht geschrieben; die übrigen können fortgesetzt werden."
+safety.continue_remaining:
+  de: Übrige fortsetzen
+safety.continue_conversion:
+  de: Konvertierung fortsetzen
+safety.source_overwrite_title:
+  de: Quelldatei könnte ersetzt werden
+safety.source_overwrite:
+  de: Quelldatei ersetzen
+safety.source_overwrite_message:
+  de: "%{count} Ausgabedatei(en) sind identisch mit ihrer Quelle. Beim Fortfahren wird das Original ersetzt; dies kann nicht widerrufen werden."
+safety.source_overwrite_single_message:
+  de: "Diese Ausgabe ist identisch mit ihrer Quelle: %{path}. Beim Bestätigen wird das Original ersetzt; dies kann nicht widerrufen werden."
+safety.source_overwrite_will_skip_message:
+  de: "%{count} Ausgabedatei(en) entsprechen ihrer Quelle. Da „Überspringen“ gewählt ist, bleiben diese Originale unverändert."
+safety.confirm_overwrite_title:
+  de: Überschreiben bestätigen
+safety.output_exists:
+  de: "Ausgabedatei existiert bereits: %{path}"
+safety.pdf_outputs_exist:
+  de: "Für dieses PDF gibt es bereits %{count} Seitenausgaben. Diese Dateien überschreiben?"
+safety.overwrite:
+  de: Überschreiben
+safety.skip:
+  de: Überspringen
+safety.planning:
+  de: Ausgabepfade werden geprüft …
+safety.plan_failed:
+  de: "Ausgabepfade konnten nicht geprüft werden: %{detail}"
+safety.restart_needed:
+  de: Warteliste oder Einstellungen wurden geändert. Starte erneut.
+diagnostics.title:
+  de: Plug-in-Diagnose
+diagnostics.open:
+  de: Plug-in-Diagnose
+diagnostics.description:
+  de: Optionale HEIC-Importanbieter, Manifest-Suchpfade und Helfererkennung. macOS nutzt das System-ImageIO, Windows bevorzugt WIC, Linux kann heif-convert verwenden.
+diagnostics.refresh:
+  de: Aktualisieren
+diagnostics.close:
+  de: Schließen
+diagnostics.loading:
+  de: Plug-in-Diagnose wird gelesen …
+diagnostics.load_error:
+  de: "Plug-in-Diagnose konnte nicht geladen werden: %{detail}"
+diagnostics.choose_heic_helper:
+  de: HEIC-Helfer wählen
+diagnostics.manual_helper_enabled:
+  de: Manueller Helfer aktiv
+diagnostics.manual_helper_unavailable:
+  de: Manueller Helfer nicht verfügbar
+diagnostics.set_helper_failed:
+  de: "Manueller Helfer konnte nicht festgelegt werden: %{detail}"
+diagnostics.helper_cleared:
+  de: Manueller Helfer entfernt
+diagnostics.clear_helper_failed:
+  de: "Manueller Helfer konnte nicht entfernt werden: %{detail}"
+diagnostics.heic_enabled:
+  de: Optionaler HEIC-Import ist aktiviert
+diagnostics.heic_disabled:
+  de: Optionaler HEIC-Import ist deaktiviert
+diagnostics.extensions:
+  de: "Dateiendungen: %{extensions}"
+diagnostics.type:
+  de: Typ
+diagnostics.license:
+  de: Lizenz
+diagnostics.system_imageio:
+  de: System-ImageIO
+diagnostics.windows_wic:
+  de: Windows WIC
+diagnostics.system_helper:
+  de: Systemhelfer
+diagnostics.executable:
+  de: Programm
+diagnostics.argv:
+  de: argv
+diagnostics.no_external_args:
+  de: Keine Argumente für externe Prozesse
+diagnostics.no_provider:
+  de: Kein nutzbarer Manifest-Anbieter oder Systemhelfer gefunden.
+diagnostics.summary_title:
+  de: Erkennungsübersicht
+diagnostics.external_codecs:
+  de: Externe Codecs
+diagnostics.manual_helper:
+  de: Manueller Helfer
+diagnostics.enabled:
+  de: Aktiviert
+diagnostics.disabled:
+  de: Deaktiviert
+diagnostics.available:
+  de: Verfügbar
+diagnostics.unavailable:
+  de: Nicht verfügbar
+diagnostics.not_configured:
+  de: Nicht konfiguriert
+diagnostics.accepted_manifests:
+  de: Akzeptierte Manifeste
+diagnostics.rejected_manifests:
+  de: Abgelehnte Manifeste
+diagnostics.system_codecs:
+  de: System-Codecs
+diagnostics.system_helpers:
+  de: Systemhelfer
+diagnostics.license_boundary_title:
+  de: Lizenz- und Vertriebsgrenzen
+diagnostics.license_boundary_body:
+  de: Die Haupt-App enthält keine HEIC-Codecs, linkt nicht gegen libheif und vertreibt kein x265. Der HEIC-Import erfolgt über optionale, nur dekodierende Helfer/Anbieter in der Umgebung des Benutzers; Plug-in-Lizenz, Quellcode/NOTICE und Patentrisiken liegen in der Verantwortung des Plug-in-Anbieters. Store- oder Flatpak-Builds können die Erkennung externer Codecs deaktivieren, um das Hauptpaket sauber abzugrenzen. Windows prüft zuerst die System-WIC-Erweiterungen für HEIF/HEVC; fehlen sie, folge dem Diagnosehinweis, um Systemerweiterungen zu installieren oder einen separaten Helfer zu verwenden, ohne HEIC-Codecs zu bündeln.
+diagnostics.system_codecs_title:
+  de: System-Codecs
+diagnostics.no_system_codecs:
+  de: Auf dieser Plattform gibt es keine Einträge zur System-Codec-Prüfung.
+diagnostics.manual_helper_title:
+  de: Manueller Helfer
+diagnostics.choose:
+  de: Wählen
+diagnostics.clear:
+  de: Entfernen
+diagnostics.selected:
+  de: Ausgewählt
+diagnostics.not_configured_helper:
+  de: Kein manueller Helfer konfiguriert.
+diagnostics.system_helpers_title:
+  de: Systemhelfer
+diagnostics.no_system_helpers:
+  de: Auf dieser Plattform wird kein Systemhelfer geprüft.
+diagnostics.manifest_search_title:
+  de: Manifest-Suche
+diagnostics.no_manifest_dirs:
+  de: Auf dieser Plattform wird kein Manifest-Ordner durchsucht.
+diagnostics.no_license:
+  de: Kein Lizenzhinweis
+diagnostics.status_accepted:
+  de: Verfügbar
+diagnostics.status_ready:
+  de: Bereit
+diagnostics.status_rejected:
+  de: Abgelehnt
+diagnostics.status_missing:
+  de: Fehlt
+diagnostics.status_empty:
+  de: Leer
+diagnostics.status_untrusted:
+  de: Nicht vertrauenswürdig
+diagnostics.status_unreadable:
+  de: Nicht lesbar
+diagnostics.status_not_directory:
+  de: Kein Ordner
+diagnostics.status_unsupported:
+  de: Nicht aktiviert
+diagnostics.status_disabled:
+  de: Deaktiviert
+diagnostics.found:
+  de: Gefunden
+diagnostics.missing:
+  de: Fehlt
+diagnostics.active:
+  de: Aktiv
+diagnostics.inactive:
+  de: Inaktiv
+diagnostics.provider_manifest:
+  de: Manifest-Plug-in
+diagnostics.source_explicit:
+  de: Eigener Pfad
+diagnostics.source_platform:
+  de: Aktuelle Plattform
+diagnostics.source_flatpak_extension:
+  de: Flatpak-Erweiterung
+diagnostics.messages.details_hidden:
+  de: Details sind nur in Entwicklungs-Builds verfügbar.
+diagnostics.messages.external_codecs_build_disabled:
+  de: Die Erkennung externer Codecs/Helfer ist in diesem Build deaktiviert.
+diagnostics.messages.external_codecs_build_disabled_flatpak_enabled:
+  de: Die Erkennung externer Codecs/Helfer ist in diesem Build deaktiviert; die Flatpak-Codec-Erweiterung bleibt aktiviert.
+diagnostics.messages.external_codecs_environment_disabled:
+  de: "%{detail} deaktiviert die Erkennung externer Codecs/Helfer."
+diagnostics.messages.external_codecs_environment_disabled_flatpak_enabled:
+  de: "%{detail} deaktiviert die Erkennung externer Codecs/Helfer; die Flatpak-Codec-Erweiterung bleibt aktiviert."
+diagnostics.messages.external_codec_trust_unsupported:
+  de: Das Vertrauensmodell für externe HEIC-Helfer ist auf dieser Plattform nicht aktiviert.
+diagnostics.messages.selected_helper_not_configured:
+  de: Es ist kein manueller Helfer konfiguriert.
+diagnostics.messages.selected_helper_unavailable:
+  de: "Der gewählte Helfer ist nicht verfügbar: %{detail}"
+diagnostics.messages.directory_missing:
+  de: Ordner nicht gefunden.
+diagnostics.messages.path_not_directory:
+  de: Der Pfad ist kein Ordner.
+diagnostics.messages.directory_untrusted:
+  de: Der Ordner oder einer seiner übergeordneten Ordner ist für andere Benutzer beschreibbar.
+diagnostics.messages.manifest_not_found:
+  de: Kein Manifest imgconvert-codec-*.json gefunden.
+diagnostics.messages.directory_unreadable:
+  de: "Ordner konnte nicht gelesen werden: %{detail}"
+diagnostics.messages.manifest_rejected:
+  de: "Manifest abgelehnt: %{detail}"
+diagnostics.messages.path_environment_missing:
+  de: PATH ist nicht gesetzt.
+diagnostics.messages.helper_not_found_in_trusted_path:
+  de: In keinem vertrauenswürdigen PATH-Ordner wurde ein Programm gefunden.
+diagnostics.messages.wic_unsupported_platform:
+  de: Die HEIC-Dekodierung über Windows WIC ist nur unter Windows verfügbar.
+diagnostics.messages.wic_available:
+  de: "Windows-WIC-HEIC-Decoder erkannt: %{detail}"
+diagnostics.messages.wic_missing:
+  de: Kein Windows-WIC-HEIC-Decoder erkannt.
+diagnostics.messages.wic_probe_failed:
+  de: "Erkennung von Windows WIC HEIC fehlgeschlagen: %{detail}"
+diagnostics.messages.windows_heif_install_hint:
+  de: Installiere die Microsoft-Erweiterungen „HEIF-Bilderweiterungen“ und „HEVC-Videoerweiterungen“ und versuche es erneut. Verwaltete Geräte können sie über Microsoft Store, winget oder ein Offline-App-Paket erhalten.
+diagnostics.messages.unknown:
+  de: "Diagnose %{code}: %{detail}"
+workflow.ready:
+  de: "%{count} Dateien bereit"
+workflow.ready_one:
+  de: "%{count} Datei bereit"
+workflow.ready_empty:
+  de: Füge Dateien hinzu, um zu beginnen
+settings.appearance_section:
+  de: Erscheinungsbild
+settings.theme:
+  de: Design
+settings.theme_system:
+  de: System
+settings.theme_light:
+  de: Hell
+settings.theme_dark:
+  de: Dunkel
+settings.reduce_motion_label:
+  de: Bewegung reduzieren
+settings.reduce_motion_description:
+  de: Verkürzt oder entfernt Animationen der Oberfläche.
+queue.page_count:
+  de: "%{count} Seiten"
+queue.page_count_one:
+  de: "%{count} Seite"
+impact.title:
+  de: Speicher- und Umweltszenario
+impact.open:
+  de: Szenario
+impact.batch_open:
+  de: Stapelszenario
+impact.smaller:
+  de: "Ausgabe %{bytes} kleiner"
+impact.larger:
+  de: "Ausgabe %{bytes} größer"
+impact.same:
+  de: Ausgabegröße unverändert
+impact.boundary:
+  de: Eine kleinere Datei belegt weder freigegebenen Speicherplatz noch eingesparten Strom oder vermiedene Emissionen.
+impact.excluded:
+  de: Ein vergleichbares einzelnes statisches Rasterergebnis ist nicht bestätigt. Dokumente, Animationen, mehrere Ausgaben, AVIF/HEIC mit unbekanntem Sequenzstatus und ältere Ergebnisse sind ausgeschlossen.
+impact.batch:
+  de: "Stapel: %{count} geeignete Ergebnisse; %{excluded} weitere abgeschlossene Ergebnisse ausgeschlossen. Dieses gemeinsame Szenario ist unabhängig von den einzelnen Bereichen."
+impact.storage:
+  de: Speicherszenario
+impact.local:
+  de: "Lokal oder unbekannt: nur Bytes"
+impact.cloud:
+  de: Annahmen für Cloud-Speicher erkunden
+impact.originals:
+  de: Originaldateien
+impact.hypothetical:
+  de: "Annahme: Ausgaben ersetzen Originale"
+impact.confirmed:
+  de: Ich habe Originale ersetzt (Selbstangabe)
+impact.retained:
+  de: Originale werden behalten
+impact.days:
+  de: Aufbewahrung in Tagen (0–3650)
+impact.copies:
+  de: Kopien
+impact.copies_default:
+  de: 1–3
+impact.invalid:
+  de: Gib eine ganze Zahl von 0 bis 3650 Tagen ein.
+impact.estimate:
+  de: Schätzung für Cloud-Speicher-Szenario
+impact.no_reduction:
+  de: Keine Nettoverkleinerung der Ausgabe; keine positive Umweltschätzung.
+impact.retained_notice:
+  de: Werden Originale behalten, ist keine positive Schätzung der Speicherreduktion möglich.
+impact.limits:
+  de: Durchschnittliche Kapazitätszuordnung; ein Annahmebereich, keine erzielten oder Nettoreduktionen und kein Konfidenzintervall. Ein selbst angegebener Ersatz bleibt eine Schätzung.
+impact.method:
+  de: Methode und Quellen (offline verfügbar)
+impact.formula:
+  de: "Modell v1.0.0: Kapazität (TB) × Aufbewahrungsstunden × 0,65–1,2 Wh/TB·h × PUE 1,1–1,185 × Kopien = Energie (Wh). Energie ÷ 1000 × 473 g CO₂/kWh = Gramm CO₂. Die Netzintensität ist der globale Durchschnitt 2024; historische Faktoren beschreiben keinen aktuellen Anbieter und kein lokales Gerät."
+impact.privacy:
+  de: Ohne Konvertierungsenergie, Netzwerke, Hardwareherstellung, Entsorgung und Rebound-Effekte. Parameter bleiben im Speicher des Bereichs, werden beim Schließen zurückgesetzt und weder gesichert noch hochgeladen. Dateigrößen verwenden binäre KB/MB; das Modell verwendet dezimale TB.
+impact.close:
+  de: Schließen
+update.open:
+  de: Updates
+update.title:
+  de: Updates
+update.manual:
+  de: Updates für diese Vorschauversion werden manuell bereitgestellt.
+update.idle:
+  de: Nach einer neueren Version suchen.
+update.checking:
+  de: Suche nach Updates
+update.current:
+  de: Du bist auf dem neuesten Stand
+update.available:
+  de: Ein Update ist verfügbar
+update.downloading:
+  de: Update wird geladen und überprüft
+update.ready:
+  de: Update überprüft. Installiere es, wenn dein Stapel fertig ist.
+update.installing:
+  de: Update wird installiert
+update.installed:
+  de: Update installiert. Beende ImgConvert und öffne es erneut, um es zu verwenden.
+update.current_version:
+  de: "Aktuelle Version: %{version}"
+update.new_version:
+  de: "Neue Version: %{version}"
+update.bytes:
+  de: "%{bytes} Byte geladen"
+update.check:
+  de: Nach Updates suchen
+update.download:
+  de: Update laden
+update.install:
+  de: Update installieren
+update.close:
+  de: Schließen
+update.batch_active:
+  de: Warte, bis der aktuelle Stapel fertig ist, bevor du installierst.
+queue.import_partial:
+  de: "%{added} Dateien hinzugefügt. %{detail}"
+queue.import_partial_one:
+  de: "%{added} Datei hinzugefügt. %{detail}"
+queue.clipboard_invalid_paths:
+  de: "%{count} Dateipfade konnten nicht als UTF-8 dargestellt werden. Wähle Dateien mit unterstützten Namen."
+queue.clipboard_invalid_paths_one:
+  de: "%{count} Dateipfad konnte nicht als UTF-8 dargestellt werden. Wähle Dateien mit unterstützten Namen."
+queue.clipboard_path_issues:
+  de: "Übersprungen: %{skipped}. Nicht lesbare Pfade: %{errors}. Prüfe, ob die Dateien existieren und lesbar sind."
+queue.clipboard_truncated:
+  de: Das Suchlimit wurde erreicht. Importiere weniger Dateien auf einmal.
+queue.clipboard_image_issues:
+  de: "%{count} Bilder konnten nicht importiert werden. Kopiere ein unterstütztes Bild innerhalb der Größengrenzen und versuche es erneut."
+queue.clipboard_image_issues_one:
+  de: "%{count} Bild konnte nicht importiert werden. Kopiere ein unterstütztes Bild innerhalb der Größengrenzen und versuche es erneut."
+queue.clipboard_unavailable:
+  de: Die Zwischenablage konnte nicht gelesen werden. Versuche es erneut oder füge Dateien über die Dateiauswahl hinzu.
+queue.clipboard_image_failed:
+  de: Das Bild konnte nicht gelesen werden. Kopiere ein unterstütztes Bild innerhalb der Größengrenzen und versuche es erneut.
+legal.privacy_open:
+  de: Datenschutz
+legal.licenses_open:
+  de: Info
+legal.privacy_title:
+  de: Datenschutz und Support
+legal.licenses_title:
+  de: Info und Lizenzen
+legal.offline_policy:
+  de: Lies die in dieser App enthaltene Datenschutzerklärung. Der Support-Link öffnet deinen Browser.
+legal.version:
+  de: "ImgConvert %{version} · Apache-2.0 · Lizenztexte des Projekts und von Drittanbietern"
+legal.support:
+  de: Support auf GitHub
+legal.close:
+  de: Schließen
+errors.fileNotFound:
+  de: "Datei nicht gefunden: %{path}"
+errors.permissionDenied:
+  de: "Zugriff verweigert: %{path}"
+errors.outputPermissionDenied:
+  de: "In den Zielordner kann nicht geschrieben werden: %{path}. Wähle einen Zielordner und versuche es erneut."
+errors.unsupportedFormat:
+  de: "Nicht unterstütztes Format: %{format}"
+errors.outputExists:
+  de: "Ausgabedatei existiert bereits: %{path}"
+errors.invalidOutputSuffix:
+  de: Das Dateinamensuffix enthält nicht unterstützte Zeichen oder ist zu lang.
+errors.sourceOverwriteConfirmationRequired:
+  de: "Vor dem Ersetzen einer Quelldatei ist eine ausdrückliche Bestätigung erforderlich: %{path}"
+errors.outputConflictsWithInput:
+  de: "Zum Schutz einer Quelle in der Warteliste wurde diese Ausgabe nicht geschrieben, da sie einer anderen Eingabe entspricht: %{path}"
+errors.outputSafetyCheckFailed:
+  de: "Es konnte nicht bestätigt werden, dass dieser Stapel die Quelldateien sicher erhält. Prüfe den Zugriff auf die betroffene Datei und versuche es erneut: %{path}"
+errors.outputNotSmaller:
+  de: "Übersprungen, da die Ausgabe nicht kleiner als die Quelle ist: %{path}"
+errors.pdfPasswordProtected:
+  de: "Dieses PDF ist verschlüsselt oder passwortgeschützt und kann nicht konvertiert werden: %{path}"
+errors.pdfSettingsInvalid:
+  de: "Seitenbereich oder DPI-Einstellung des PDF ist ungültig: %{path}"
+errors.pdfResourceLimit:
+  de: "PDF-Datei oder -Seite überschreitet das sichere Ressourcenlimit. Wähle weniger Seiten oder eine niedrigere DPI: %{path}"
+errors.pdfInvalid:
+  de: "Das PDF ist ungültig, beschädigt oder enthält nicht unterstützte Inhalte: %{path}"
+errors.conversionFailed:
+  de: "Bild konnte nicht konvertiert werden: %{path}"
+errors.batchFailed:
+  de: Die Stapelkonvertierung konnte nicht abgeschlossen werden.
+errors.importFailed:
+  de: Die ausgewählte Datei bzw. der Ordner konnte nicht importiert werden.
+errors.clipboardImportFailed:
+  de: Das Bild aus der Zwischenablage konnte nicht importiert werden.
+errors.nativeDialogFailed:
+  de: Die Dateiauswahl des Systems konnte nicht geöffnet werden.
+errors.thumbnailFailed:
+  de: "Bildvorschau konnte nicht erstellt werden: %{path}"
+errors.previewFailed:
+  de: "Vergleichsvorschau konnte nicht erstellt werden: %{path}"
+errors.codecConfigurationFailed:
+  de: Der HEIC-Helfer konnte nicht konfiguriert werden.
+errors.taskFailed:
+  de: Der Vorgang konnte nicht abgeschlossen werden. Bitte versuche es erneut.
+queue.source_format:
+  de: "%{format} · Quelle"
+queue.remove:
+  de: Entfernen
+queue.remove_item:
+  de: "%{name} aus der Warteliste entfernen"
+queue.scan_issues:
+  de: "Übersprungen: %{skipped}. Nicht lesbare Pfade: %{errors}."
+errors.outputSafetyCheckFailedGeneric:
+  de: Es konnte nicht bestätigt werden, dass dieser Stapel die Quelldateien sicher erhält. Prüfe den Dateizugriff und versuche es erneut.
+settings.clear_result_cache_failed_generic:
+  de: Der Ergebnis-Cache konnte nicht geleert werden. Prüfe den Dateizugriff und versuche es erneut.
+warning.bit_depth_reduced:
+  de: "Genauigkeit von %{from} Bit auf %{to} Bit reduziert."
+warning.alpha_flattened:
+  de: Transparenz wurde auf einen deckenden Hintergrund reduziert.
+queue.animated:
+  de: Animiert · nicht unterstützt
+queue.animation_unknown:
+  de: Animation ungeprüft
+workflow.animation_summary:
+  de: "%{count} Dateien · %{animated} animiert (nicht unterstützt) · %{unknown} ungeprüft"
+workflow.animation_summary_one:
+  de: "%{count} Datei · %{animated} animiert (nicht unterstützt) · %{unknown} ungeprüft"
+status.warnings:
+  de: Warnungen
+queue.add_folders:
+  de: Ordner hinzufügen
+queue.supported_formats:
+  de: Eingabeformate
+queue.compare_item:
+  de: "%{name} vergleichen"
+queue.impact_item:
+  de: "Speicherszenario für %{name}"
+queue.progress_item:
+  de: "Konvertierungsfortschritt für %{name}"
+settings.tab_format:
+  de: Format
+settings.tab_output:
+  de: Ausgabe
+settings.tab_processing:
+  de: Anpassen
+settings.tab_privacy:
+  de: Datenschutz
+settings.tab_has_issue:
+  de: "%{tab}, erfordert Aufmerksamkeit"
+settings.format_hint_jpeg:
+  de: Öffnet sich überall
+settings.format_hint_png:
+  de: Verlustfrei, mit Alpha
+settings.format_hint_webp:
+  de: Fürs Web gemacht
+settings.format_hint_avif:
+  de: Kleinste Dateien
+workflow.preset_manage:
+  de: Presets sichern und verwalten
+settings.cache_section:
+  de: Cache
+status.smaller_percent:
+  de: "−%{percent} %"
+status.larger_percent:
+  de: "+%{percent} %"
+workflow.summary_saved:
+  de: "%{summary} · %{saved} gespart"
+workflow.summary_done:
+  de: "%{count} fertig"
+workflow.summary_skipped:
+  de: "%{count} übersprungen"
+workflow.summary_failed:
+  de: "%{count} fehlgeschlagen"
+status.same_size:
+  de: Gleiche Größe
+status.smaller_under_one:
+  de: −<1 %
+status.larger_under_one:
+  de: "+<1 %"

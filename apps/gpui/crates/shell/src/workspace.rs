@@ -10,6 +10,7 @@
 //! Appearance popover.
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{
     ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
 };
@@ -25,12 +26,12 @@ use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
 use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
-use imgconvert_gpui_shared::i18n::tr;
+use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, COMPACT_WIDTH_REM, WorkflowPanel};
 use std::sync::{Arc, OnceLock};
 
-use crate::toggle_language;
+use crate::set_language;
 
 pub struct Workspace {
     queue_view: Entity<QueueView>,
@@ -239,17 +240,7 @@ impl Workspace {
                                 imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
                             }),
                     )
-                    .child(
-                        Button::new("language-toggle")
-                            .ghost()
-                            .small()
-                            .rounded(pill)
-                            .icon(IconName::Globe)
-                            .label(tr("app.language_toggle"))
-                            .tooltip(tr("app.language_toggle_tooltip"))
-                            // Same command as the `ToggleLanguage` action and menu item.
-                            .on_click(|_, _, cx| toggle_language(cx)),
-                    )
+                    .child(language_menu(pill))
                     .child(crate::appearance::appearance_popover(cx)),
             )
     }
@@ -367,4 +358,30 @@ fn brand_mark() -> Arc<Image> {
         ))
     })
     .clone()
+}
+
+/// The language button: the current language by its own name, opening the
+/// list of shipped languages, each by its own name.
+fn language_menu(pill: ButtonRounded) -> impl IntoElement {
+    let current = Locale::current();
+    Button::new("language-menu")
+        .ghost()
+        .small()
+        .rounded(pill)
+        .icon(IconName::Globe)
+        .label(current.native_name())
+        .accessibility_label(tr_with(
+            "app.language",
+            &[("language", &current.native_name())],
+        ))
+        .dropdown_menu(move |mut menu, _, _| {
+            for locale in Locale::ALL {
+                menu = menu.item(
+                    PopupMenuItem::new(locale.native_name())
+                        .checked(locale == current)
+                        .on_click(move |_, _, cx| set_language(locale, cx)),
+                );
+            }
+            menu
+        })
 }

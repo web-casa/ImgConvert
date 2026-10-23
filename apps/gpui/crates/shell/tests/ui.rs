@@ -10,7 +10,7 @@ use gpui_kit::{
     WindowOptions, point, px, size,
 };
 use imgconvert_backend::settings::{AppLocale, Settings};
-use imgconvert_gpui::{Workspace, init_app, toggle_language};
+use imgconvert_gpui::{Workspace, init_app, set_language, toggle_language};
 use imgconvert_gpui_shared::i18n::{Locale, set_locale};
 use imgconvert_gpui_shared::{AppModels, ItemStatus, SettingsModel, progress_bridge, services};
 
@@ -197,41 +197,53 @@ fn external_file_drag_exit_does_not_import(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn language_toggle_rewrites_visible_labels(cx: &mut TestAppContext) {
+fn language_menu_and_toggle_rewrite_visible_labels(cx: &mut TestAppContext) {
     let _locale = locale_guard();
     let (handle, _workspace) = open_workspace(cx);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        assert_eq!(
-            window.find("workspace-appearance").label(),
-            Some("Appearance")
-        );
-        window.click("language-toggle", cx);
-        window.render_frame(cx);
-        assert_eq!(window.find("workspace-appearance").label(), Some("外观"));
-    })
-    .unwrap();
-    cx.update(|cx| {
-        let settings = AppModels::global(cx).settings().read(cx);
-        assert_eq!(
-            settings.settings().locale,
-            AppLocale::ZhCn,
-            "toggle persists"
-        );
-    });
+    let appearance = |cx: &mut TestAppContext| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            (
+                window
+                    .find("workspace-appearance")
+                    .label()
+                    .map(str::to_owned),
+                window.find("language-menu").label().map(str::to_owned),
+            )
+        })
+        .unwrap()
+    };
+    assert_eq!(
+        appearance(cx),
+        (
+            Some("Appearance".to_owned()),
+            Some("Language: English".to_owned())
+        )
+    );
+    for locale in Locale::ALL {
+        cx.update(|cx| set_language(locale, cx));
+        let expected = imgconvert_gpui_shared::i18n::tr("settings.appearance_section").to_string();
+        // The button reads the language by its own name inside the
+        // localized "Language: …" accessible name.
+        let menu = imgconvert_gpui_shared::i18n::tr_with(
+            "app.language",
+            &[("language", &locale.native_name())],
+        )
+        .to_string();
+        assert!(menu.contains(locale.native_name()), "{menu}");
+        assert_eq!(appearance(cx), (Some(expected), Some(menu)), "{locale:?}");
+        cx.update(|cx| {
+            let settings = AppModels::global(cx).settings().read(cx);
+            assert_eq!(settings.settings().locale, locale.app_locale(), "persisted");
+        });
+    }
+    // The quick switch goes to English from any other language, and from
+    // English to Simplified Chinese.
     cx.update(toggle_language);
-    cx.update_window(handle, |_, window, cx| {
-        window.render_frame(cx);
-        assert_eq!(
-            window.find("workspace-appearance").label(),
-            Some("Appearance")
-        );
-    })
-    .unwrap();
-    cx.update(|cx| {
-        let settings = AppModels::global(cx).settings().read(cx);
-        assert_eq!(settings.settings().locale, AppLocale::EnUs);
-    });
+    assert_eq!(appearance(cx).1.as_deref(), Some("Language: English"));
+    cx.update(toggle_language);
+    assert_eq!(appearance(cx).0.as_deref(), Some("外观"));
+    cx.update(|cx| set_language(Locale::English, cx));
 }
 
 #[gpui_kit::test]
@@ -3421,10 +3433,7 @@ fn glass_layout_keeps_actions_visible_and_appearance_preserves_settings(cx: &mut
                 .update(cx, |settings, cx| {
                     settings.update(cx, |settings| {
                         settings.theme = theme;
-                        settings.locale = match locale {
-                            Locale::English => AppLocale::EnUs,
-                            Locale::SimplifiedChinese => AppLocale::ZhCn,
-                        };
+                        settings.locale = locale.app_locale();
                         settings.format = if theme == Theme::Dark { "png" } else { "avif" }.into();
                     });
                 });

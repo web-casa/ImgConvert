@@ -72,7 +72,7 @@ macro_rules! string_enum {
 
 string_enum!(OverwriteMode { Ask = "ask", Skip = "skip", Overwrite = "overwrite" }, default = Skip);
 string_enum!(Theme { Light = "light", Dark = "dark", System = "system" }, default = System);
-string_enum!(AppLocale { ZhCn = "zh-CN", EnUs = "en-US" }, default = ZhCn);
+string_enum!(AppLocale { ZhCn = "zh-CN", EnUs = "en-US", ZhTw = "zh-TW", Ja = "ja", Ko = "ko", Fr = "fr", Es = "es", PtBr = "pt-BR", De = "de" }, default = ZhCn);
 string_enum!(MetadataPolicy { StripAll = "stripAll", ColorOnly = "colorOnly", PreserveAll = "preserveAll" }, default = StripAll);
 string_enum!(ResizeMode { None = "none", Fit = "fit", Width = "width", Height = "height", LongestEdge = "longestEdge", Percentage = "percentage" }, default = None);
 string_enum!(ColorManagementPolicy { Preserve = "preserve", ConvertToSrgb = "convertToSrgb" }, default = Preserve);

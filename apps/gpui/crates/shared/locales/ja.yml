@@ -1,0 +1,885 @@
+_version: 2
+app.title:
+  ja: ImgConvert
+app.language:
+  ja: "言語：%{language}"
+app.quit:
+  ja: ImgConvert を終了
+app.open_files:
+  ja: 開く…
+app.instance_blocked_title:
+  ja: ImgConvert はすでに起動しています
+app.instance_blocked:
+  ja: "別の ImgConvert（バージョン %{version}、プロセス %{pid}）が開いています。2 つのバージョンは同じ設定ファイルを共有するため、同時に 1 つしか実行できません。もう一方の ImgConvert を終了してから、もう一度開いてください。"
+app.instance_blocked_unknown:
+  ja: 別の ImgConvert が開いています。2 つのバージョンは同じ設定ファイルを共有するため、同時に 1 つしか実行できません。もう一方の ImgConvert を終了してから、もう一度開いてください。
+menu.edit:
+  ja: 編集
+menu.file:
+  ja: ファイル
+settings.save_failed:
+  ja: "設定を保存できませんでした: %{detail}"
+queue.title:
+  ja: キュー
+queue.add_files:
+  ja: ファイルを追加
+queue.paste:
+  ja: ペースト
+queue.clipboard_empty:
+  ja: 画像またはファイルの絶対パスをコピーしてから、もう一度ペーストしてください。
+queue.item_format_label:
+  ja: "%{name} の出力形式: %{format}"
+queue.target_format:
+  ja: このファイルの出力形式
+queue.global_format:
+  ja: "共通 · %{format}"
+queue.follow_global:
+  ja: 共通の形式に従う
+queue.reset_formats:
+  ja: 形式をリセット
+queue.clear:
+  ja: クリア
+queue.cancel_import:
+  ja: 停止
+queue.empty_title:
+  ja: 画像がありません
+queue.empty_description:
+  ja: 画像やフォルダをここにドロップするか、ファイルを追加するか、コピーした画像やファイルパスをペーストしてください。
+queue.drop_hint:
+  ja: ドロップしてキューに追加
+queue.importing:
+  ja: 読み込み中…
+queue.item_count:
+  ja: "%{count} 項目"
+queue.item_count_one:
+  ja: "%{count} 項目"
+queue.import_added:
+  ja: "%{added} 個のファイルを追加しました"
+queue.import_added_one:
+  ja: "%{added} 個のファイルを追加しました"
+queue.import_added_skipped:
+  ja: "%{added} 個のファイルを追加、%{skipped} 個をスキップしました"
+queue.import_added_skipped_one:
+  ja: "%{added} 個のファイルを追加、%{skipped} 個をスキップしました"
+queue.import_nothing:
+  ja: 対応する画像が見つかりません
+queue.import_failed:
+  ja: "読み込めませんでした: %{detail}"
+queue.import_cancelled:
+  ja: 読み込みをキャンセルしました
+queue.thumbnail_unavailable:
+  ja: プレビューなし
+status.pending:
+  ja: 待機中
+status.running:
+  ja: 変換中…
+status.done:
+  ja: 完了
+status.skipped:
+  ja: スキップ
+status.error:
+  ja: 失敗
+status.saved:
+  ja: "%{before} → %{after}"
+workflow.title:
+  ja: 変換
+workflow.format:
+  ja: 出力形式
+workflow.output_dir:
+  ja: 出力フォルダ
+workflow.choose_output:
+  ja: フォルダを選択
+workflow.output_not_chosen:
+  ja: 開始時に選択
+workflow.start:
+  ja: 開始
+workflow.cancel:
+  ja: キャンセル
+workflow.cancelling:
+  ja: キャンセル中…
+workflow.announce_started:
+  ja: "%{count} 件の一括変換を開始しました"
+workflow.progress:
+  ja: "%{total} 件中 %{done} 件完了"
+workflow.batch_progress:
+  ja: 一括変換の進行状況
+workflow.summary_cancelled:
+  ja: "%{total} 件中 %{done} 件でキャンセルしました"
+workflow.failed:
+  ja: "一括変換に失敗しました: %{detail}"
+workflow.already_running:
+  ja: 一括変換はすでに実行中です
+workflow.nothing_to_convert:
+  ja: 先に画像をキューに追加してください
+settings.title:
+  ja: 変換設定
+settings.core_section:
+  ja: 形式と画質
+settings.target_format:
+  ja: 出力形式
+settings.quality:
+  ja: 画質
+settings.quality_upper_bound:
+  ja: 画質の上限
+settings.quality_effective:
+  ja: "%{requested} → %{effective}"
+settings.output_section:
+  ja: 出力の動作
+settings.concurrency:
+  ja: 同時処理数
+settings.concurrency_auto:
+  ja: 自動
+settings.existing_files:
+  ja: 既存のファイル
+settings.overwrite_ask:
+  ja: 確認する
+settings.overwrite_skip:
+  ja: スキップ
+settings.overwrite_overwrite:
+  ja: 上書き
+settings.output_suffix:
+  ja: ファイル名の接尾辞
+settings.add_output_suffix:
+  ja: 接尾辞を追加
+settings.output_suffix_hint:
+  ja: 拡張子の前に追加されます。Unicode 文字を使用できます。最大 48 文字・128 バイトです。
+settings.output_suffix_adjusted:
+  ja: パスに使用できない文字を置き換え、安全な長さに制限しました。
+settings.output_suffix_required:
+  ja: "1 文字以上入力するか、このスイッチをオフにして接尾辞を省略してください。"
+settings.suffix_disabled_collision_hint:
+  ja: 接尾辞なしで出力形式が同じ場合、出力が元ファイルと同じになることがあります。既存のファイルは「既存のファイル」の設定に従います。
+settings.file_name_template:
+  ja: ファイル名テンプレート
+settings.file_name_template_hint:
+  ja: 「接尾辞を追加」がオフのときに使用されます。%name%、%extension%、%date% に対応しています。
+settings.compression_section:
+  ja: 圧縮ポリシー
+settings.lossless_label:
+  ja: ロスレス
+settings.lossless_description:
+  ja: 出力形式が対応している場合はロスレスを優先します。出力サイズが最小にならないことがあります。
+settings.skip_larger_label:
+  ja: 小さくなった出力のみ保存
+settings.skip_larger_description:
+  ja: デフォルトはオフです。オンにすると、ビットマップの結果は元ファイルより小さい場合のみ書き出されます。サイズより指定形式が重要な場合はオフのままにしてください。SVG のラスタライズには影響しません。
+settings.multi_candidate_label:
+  ja: 最小の候補を試す
+settings.multi_candidate_description:
+  ja: 同等のエンコード候補を試して最小の結果を保持します。変換に少し時間がかかる場合があります。
+settings.auto_quality_label:
+  ja: 自動画質
+settings.auto_quality_description:
+  ja: JPEG/WebP で目標スコアに達する最低画質を探し、サイズを最小化します。
+settings.generation_protection_label:
+  ja: 効果のある非可逆再エンコードのみ保存
+settings.generation_protection_description:
+  ja: デフォルトはオフです。オンにすると、非可逆画像を別の非可逆形式に変換するのは十分に容量を節約できる場合のみになります。指定形式が必須の場合はオフのままにしてください。
+settings.color_section:
+  ja: カラーマネジメント
+settings.convert_to_srgb_label:
+  ja: sRGB に変換
+settings.convert_to_srgb_description:
+  ja: 埋め込み ICC プロファイルを使ってピクセルを sRGB に変換し、元のプロファイルを削除して表示を統一します。
+settings.result_cache_label:
+  ja: 結果キャッシュ
+settings.result_cache_description:
+  ja: 元ファイルと設定が変わっていない場合は既存の出力を再利用します。繰り返しの一括処理に便利です。
+settings.clear_result_cache:
+  ja: 結果キャッシュを消去
+settings.clearing_result_cache:
+  ja: キャッシュを消去中…
+settings.result_cache_cleared:
+  ja: "%{count} 件の結果キャッシュ記録を消去しました。"
+settings.clear_result_cache_failed:
+  ja: "結果キャッシュを消去できませんでした: %{detail}"
+settings.format_parameters:
+  ja: 形式パラメータ
+settings.progressive_jpeg:
+  ja: プログレッシブ JPEG
+settings.trellis_scans:
+  ja: トレリススキャン
+settings.png_optimization_level:
+  ja: PNG 最適化レベル
+settings.experimental_quantize:
+  ja: 試験的な量子化
+settings.color_count:
+  ja: 色数
+settings.webp_method:
+  ja: メソッド
+settings.near_lossless:
+  ja: ニアロスレス
+settings.near_lossless_off:
+  ja: オフ
+settings.sharp_yuv:
+  ja: Sharp YUV
+settings.avif_speed:
+  ja: 速度
+settings.avif_chroma_subsampling:
+  ja: クロマサブサンプリング
+settings.target_score:
+  ja: 目標スコア
+settings.minimum_quality:
+  ja: 最低画質
+settings.quality_floor_off:
+  ja: オフ
+workflow.preset:
+  ja: シナリオプリセット
+workflow.custom_settings:
+  ja: カスタム設定
+workflow.save_preset:
+  ja: 現在の設定を保存
+workflow.preset_name:
+  ja: プリセット名
+workflow.delete_preset:
+  ja: プリセットを削除
+workflow.delete_preset_named:
+  ja: "プリセット「%{name}」を削除"
+workflow.delete_preset_title:
+  ja: "「%{name}」を削除しますか？"
+workflow.delete_preset_description:
+  ja: この操作は取り消せません。
+workflow.delete:
+  ja: 削除
+workflow.preset_limit:
+  ja: "カスタムプリセットは最大 %{count} 個まで保存できます。"
+workflow.presets.web_sharing:
+  ja: Web 共有
+workflow.presets.web_sharing_description:
+  ja: WebP、長辺 2048 px、カラーメタデータのみ保持。
+workflow.presets.email:
+  ja: メール添付
+workflow.presets.email_description:
+  ja: JPEG、長辺 1600 px、目標 1 MiB。
+workflow.presets.high_quality:
+  ja: 高画質アーカイブ
+workflow.presets.high_quality_description:
+  ja: 高画質 AVIF、対応するすべてのメタデータを保持。
+workflow.presets.private_sharing:
+  ja: プライベート共有
+workflow.presets.private_sharing_description:
+  ja: JPEG、長辺 2048 px、すべてのメタデータを削除。
+workflow.pdf_section:
+  ja: PDF から画像へ
+workflow.pdf_pages:
+  ja: ページ範囲（空欄ですべて）
+workflow.pdf_pages_placeholder:
+  ja: "例: 1-3, 5, 8-10"
+workflow.pdf_pages_hint:
+  ja: ページは 1 から始まります。ページと範囲を組み合わせられます。1 ジョブあたり最大 500 ページです。
+workflow.pdf_dpi:
+  ja: レンダリング解像度（DPI）
+workflow.pdf_dpi_hint:
+  ja: "PDF 入力にのみ適用されます。範囲: 72–600 DPI、デフォルト: 150。"
+workflow.pdf_dpi_hint_active:
+  ja: PDF ページはまずこの DPI でレンダリングされ、その後に有効な一括リサイズルールが適用されます。
+workflow.pdf_range_invalid:
+  ja: ページ範囲が無効です。1-3, 5, 8-10 のような形式で入力してください。
+workflow.pdf_range_out_of_bounds:
+  ja: "ページ範囲がこのドキュメントの %{count} ページを超えています。"
+workflow.pdf_range_required:
+  ja: "このドキュメントは大きいため、ページを明示的に選択してください。一度に最大 %{count} ページです。"
+workflow.pdf_range_too_long:
+  ja: ページ範囲が長すぎます。
+workflow.pdf_too_many_pages:
+  ja: "1 ジョブで変換できる PDF ページは最大 %{count} ページです。"
+workflow.resize_section:
+  ja: 一括リサイズルール
+workflow.resize_mode:
+  ja: リサイズモード
+workflow.resize_modes.none:
+  ja: 元のサイズを維持
+workflow.resize_modes.fit:
+  ja: 幅と高さに収める
+workflow.resize_modes.width:
+  ja: 幅を指定
+workflow.resize_modes.height:
+  ja: 高さを指定
+workflow.resize_modes.longest_edge:
+  ja: 長辺を指定
+workflow.resize_modes.percentage:
+  ja: パーセントで拡大縮小
+workflow.width:
+  ja: 幅（px）
+workflow.height:
+  ja: 高さ（px）
+workflow.size:
+  ja: サイズ（px）
+workflow.percentage:
+  ja: 倍率（%）
+workflow.allow_upscale:
+  ja: 小さい画像の拡大を許可
+workflow.compression_policy_disabled:
+  ja: リサイズ時は「小さくなった出力のみ保存」と「効果のある非可逆再エンコードのみ保存」は適用されません。
+workflow.target_section:
+  ja: 目標ファイルサイズ
+workflow.target_enable:
+  ja: 目標サイズ以下を目指す
+workflow.target_kib:
+  ja: 目標サイズ（KiB）
+workflow.target_hint:
+  ja: 非可逆の JPEG/WebP で使用できます。現在の画質が上限となり、最低画質が守られます。
+workflow.target_unsupported:
+  ja: 目標サイズを有効にする前に、非可逆の JPEG または WebP を選択してください。
+workflow.metadata_section:
+  ja: プライバシーメタデータ
+workflow.metadata_policy:
+  ja: 保持ポリシー
+workflow.metadata.strip_all:
+  ja: すべてのメタデータを削除
+workflow.metadata.strip_all_description:
+  ja: プロファイル付きのピクセルを sRGB に変換してから、ICC、EXIF、XMP、IPTC を削除します。公開共有向けです。
+workflow.metadata.color_only:
+  ja: カラープロファイルのみ保持
+workflow.metadata.color_only_description:
+  ja: 色の再現のため ICC プロファイル全体を保持します。プロファイルやデバイスの識別情報が残る場合があります。
+workflow.metadata.preserve_all:
+  ja: 対応するすべてのメタデータを保持
+workflow.metadata.preserve_all_description:
+  ja: 対応している場合は ICC、EXIF、XMP、IPTC を保持します。
+workflow.invalid_configuration:
+  ja: 開始する前に、強調表示された設定を修正してください
+preview.open:
+  ja: 比較
+preview.title:
+  ja: 変換前後のプレビュー
+preview.pdf_page:
+  ja: "PDF %{page} ページ"
+preview.before:
+  ja: 元画像
+preview.after:
+  ja: 変換後
+preview.loading:
+  ja: 正確なプレビューを生成中…
+preview.refresh:
+  ja: プレビューを更新
+preview.stale:
+  ja: 変換設定が変更されました。更新すると変換後のプレビューに反映されます。
+preview.close:
+  ja: 閉じる
+preview.reveal:
+  ja: ドラッグして変換前後を比較
+preview.dimensions:
+  ja: "%{width} × %{height}"
+preview.output_size:
+  ja: "推定出力サイズ %{size}"
+preview.quality:
+  ja: "選択された画質 %{quality}"
+preview.target_met:
+  ja: 目標サイズに達しました
+preview.target_not_met:
+  ja: 最低画質の範囲内では目標に達しません
+preview.error:
+  ja: "比較プレビューを生成できませんでした: %{detail}"
+preview.cancelled:
+  ja: プレビューをキャンセルしました
+warning.output_backup_retained:
+  ja: "変換しましたが、以前の出力のバックアップが残っています: %{path}"
+warning.modified_time_not_preserved:
+  ja: "変換しましたが、変更日時を保持できませんでした: %{path}"
+warning.temporary_file_retained:
+  ja: "変換しましたが、一時ファイルを削除できませんでした: %{path}"
+warning.color_profile_converted_for_resize:
+  ja: リサイズ前にピクセルを sRGB に変換し、無効になった元の ICC プロファイルを削除しました。
+warning.invalid_color_profile_discarded:
+  ja: 埋め込み ICC プロファイルが無効だったため、プライバシーポリシーにより削除しました。ピクセルはデコードされた値を使用するため、元のアプリケーションと色が異なる場合があります。
+warning.invalid_color_profile_ignored_for_preview:
+  ja: 埋め込み ICC プロファイルが無効です。指定どおり変換後のファイルには残りますが、このプレビューではプロファイルを使わずにデコードされたピクセル値で表示しています。
+warning.target_size_not_met:
+  ja: "目標 %{target}。使用可能な最小の候補は %{actual} で、最低画質の範囲内では目標に達しませんでした。"
+warning.pdf_pages_skipped_existing:
+  ja: "既存のページ出力 %{count} 件を保持しました。"
+warning.pdf_render_warnings:
+  ja: "PDF %{page} ページで互換性に関する警告が %{count} 件発生しました。一部の内容が欠けている可能性があります。"
+safety.queued_input_conflict_title:
+  ja: キュー内の元ファイルの上書きを防止しました
+safety.queued_input_conflict_message:
+  ja: "%{count} 件の出力パスがキュー内の別の入力と一致しています。元ファイルを保護するため、これらの項目は書き出されません。残りの項目は続行できます。"
+safety.continue_remaining:
+  ja: 残りの項目を続行
+safety.continue_conversion:
+  ja: 変換を続行
+safety.source_overwrite_title:
+  ja: 元ファイルが置き換えられる可能性があります
+safety.source_overwrite:
+  ja: 元ファイルを置き換え
+safety.source_overwrite_message:
+  ja: "%{count} 件の出力ファイルが元ファイルと同じファイルです。続行すると元ファイルが置き換えられ、元に戻せません。"
+safety.source_overwrite_single_message:
+  ja: "この出力は元ファイルと同じファイルです: %{path}。確定すると元ファイルが置き換えられ、元に戻せません。"
+safety.source_overwrite_will_skip_message:
+  ja: "%{count} 件の出力ファイルが元ファイルと一致しています。「スキップ」が選択されているため、元ファイルは変更されません。"
+safety.confirm_overwrite_title:
+  ja: 上書きの確認
+safety.output_exists:
+  ja: "出力ファイルはすでに存在します: %{path}"
+safety.pdf_outputs_exist:
+  ja: "この PDF には既存のページ出力が %{count} 件あります。これらのファイルを上書きしますか？"
+safety.overwrite:
+  ja: 上書き
+safety.skip:
+  ja: スキップ
+safety.planning:
+  ja: 出力パスを確認中…
+safety.plan_failed:
+  ja: "出力パスを確認できませんでした: %{detail}"
+safety.restart_needed:
+  ja: キューまたは設定が変更されました。もう一度開始してください。
+diagnostics.title:
+  ja: プラグイン診断
+diagnostics.open:
+  ja: プラグイン診断
+diagnostics.description:
+  ja: HEIC のオプション読み込みプロバイダ、マニフェストの検索パス、ヘルパーの検出状況です。macOS はシステムの ImageIO、Windows は WIC を優先し、Linux は heif-convert を使用できます。
+diagnostics.refresh:
+  ja: 更新
+diagnostics.close:
+  ja: 閉じる
+diagnostics.loading:
+  ja: プラグイン診断を読み込み中…
+diagnostics.load_error:
+  ja: "プラグイン診断を読み込めません: %{detail}"
+diagnostics.choose_heic_helper:
+  ja: HEIC ヘルパーを選択
+diagnostics.manual_helper_enabled:
+  ja: 手動ヘルパーが有効です
+diagnostics.manual_helper_unavailable:
+  ja: 手動ヘルパーは使用できません
+diagnostics.set_helper_failed:
+  ja: "手動ヘルパーを設定できませんでした: %{detail}"
+diagnostics.helper_cleared:
+  ja: 手動ヘルパーを解除しました
+diagnostics.clear_helper_failed:
+  ja: "手動ヘルパーを解除できませんでした: %{detail}"
+diagnostics.heic_enabled:
+  ja: HEIC のオプション読み込みは有効です
+diagnostics.heic_disabled:
+  ja: HEIC のオプション読み込みは無効です
+diagnostics.extensions:
+  ja: "拡張子: %{extensions}"
+diagnostics.type:
+  ja: 種類
+diagnostics.license:
+  ja: ライセンス
+diagnostics.system_imageio:
+  ja: システム ImageIO
+diagnostics.windows_wic:
+  ja: Windows WIC
+diagnostics.system_helper:
+  ja: システムヘルパー
+diagnostics.executable:
+  ja: 実行ファイル
+diagnostics.argv:
+  ja: argv
+diagnostics.no_external_args:
+  ja: 外部プロセスの引数なし
+diagnostics.no_provider:
+  ja: 使用可能なマニフェストプロバイダまたはシステムヘルパーが見つかりませんでした。
+diagnostics.summary_title:
+  ja: 検出の概要
+diagnostics.external_codecs:
+  ja: 外部コーデック
+diagnostics.manual_helper:
+  ja: 手動ヘルパー
+diagnostics.enabled:
+  ja: 有効
+diagnostics.disabled:
+  ja: 無効
+diagnostics.available:
+  ja: 使用可能
+diagnostics.unavailable:
+  ja: 使用不可
+diagnostics.not_configured:
+  ja: 未設定
+diagnostics.accepted_manifests:
+  ja: 承認されたマニフェスト
+diagnostics.rejected_manifests:
+  ja: 拒否されたマニフェスト
+diagnostics.system_codecs:
+  ja: システムコーデック
+diagnostics.system_helpers:
+  ja: システムヘルパー
+diagnostics.license_boundary_title:
+  ja: ライセンスと配布チャネルの境界
+diagnostics.license_boundary_body:
+  ja: 本体アプリは HEIC コーデックを同梱せず、libheif をリンクせず、x265 を配布しません。HEIC の読み込みは、ユーザー環境にあるデコード専用のオプションのヘルパー/プロバイダを介して行われます。プラグインのライセンス、ソース/NOTICE、特許のリスクはプラグイン配布者の責任となります。ストア版や Flatpak 版では、本体パッケージの境界を保つため外部コーデックの検出を無効にできます。Windows ではまずシステムの WIC HEIF/HEVC 拡張機能を確認します。見つからない場合は、診断のヒントに従ってシステム拡張機能をインストールするか、HEIC コーデックを同梱しない別のヘルパーを使用してください。
+diagnostics.system_codecs_title:
+  ja: システムコーデック
+diagnostics.no_system_codecs:
+  ja: このプラットフォームにはシステムコーデックの確認項目がありません。
+diagnostics.manual_helper_title:
+  ja: 手動ヘルパー
+diagnostics.choose:
+  ja: 選択
+diagnostics.clear:
+  ja: 解除
+diagnostics.selected:
+  ja: 選択済み
+diagnostics.not_configured_helper:
+  ja: 手動ヘルパーは設定されていません。
+diagnostics.system_helpers_title:
+  ja: システムヘルパー
+diagnostics.no_system_helpers:
+  ja: このプラットフォームではシステムヘルパーを確認しません。
+diagnostics.manifest_search_title:
+  ja: マニフェストの検索
+diagnostics.no_manifest_dirs:
+  ja: このプラットフォームではマニフェストのディレクトリを検索しません。
+diagnostics.no_license:
+  ja: ライセンス表記なし
+diagnostics.status_accepted:
+  ja: 使用可能
+diagnostics.status_ready:
+  ja: 準備完了
+diagnostics.status_rejected:
+  ja: 拒否
+diagnostics.status_missing:
+  ja: なし
+diagnostics.status_empty:
+  ja: 空
+diagnostics.status_untrusted:
+  ja: 信頼されていません
+diagnostics.status_unreadable:
+  ja: 読み取り不可
+diagnostics.status_not_directory:
+  ja: ディレクトリではありません
+diagnostics.status_unsupported:
+  ja: 無効
+diagnostics.status_disabled:
+  ja: 無効
+diagnostics.found:
+  ja: 検出
+diagnostics.missing:
+  ja: なし
+diagnostics.active:
+  ja: 使用中
+diagnostics.inactive:
+  ja: 未使用
+diagnostics.provider_manifest:
+  ja: マニフェストプラグイン
+diagnostics.source_explicit:
+  ja: カスタムパス
+diagnostics.source_platform:
+  ja: 現在のプラットフォーム
+diagnostics.source_flatpak_extension:
+  ja: Flatpak 拡張機能
+diagnostics.messages.details_hidden:
+  ja: 詳細は開発ビルドでのみ表示されます。
+diagnostics.messages.external_codecs_build_disabled:
+  ja: このビルドでは外部コーデック/ヘルパーの検出が無効になっています。
+diagnostics.messages.external_codecs_build_disabled_flatpak_enabled:
+  ja: このビルドでは外部コーデック/ヘルパーの検出が無効になっています。Flatpak コーデック拡張機能は引き続き有効です。
+diagnostics.messages.external_codecs_environment_disabled:
+  ja: "%{detail} により外部コーデック/ヘルパーの検出が無効になっています。"
+diagnostics.messages.external_codecs_environment_disabled_flatpak_enabled:
+  ja: "%{detail} により外部コーデック/ヘルパーの検出が無効になっています。Flatpak コーデック拡張機能は引き続き有効です。"
+diagnostics.messages.external_codec_trust_unsupported:
+  ja: このプラットフォームでは外部 HEIC ヘルパーの信頼モデルが有効になっていません。
+diagnostics.messages.selected_helper_not_configured:
+  ja: 手動ヘルパーは設定されていません。
+diagnostics.messages.selected_helper_unavailable:
+  ja: "選択したヘルパーは使用できません: %{detail}"
+diagnostics.messages.directory_missing:
+  ja: ディレクトリが見つかりません。
+diagnostics.messages.path_not_directory:
+  ja: このパスはディレクトリではありません。
+diagnostics.messages.directory_untrusted:
+  ja: このディレクトリまたはその親ディレクトリに、ほかのユーザーが書き込めます。
+diagnostics.messages.manifest_not_found:
+  ja: imgconvert-codec-*.json マニフェストが見つかりませんでした。
+diagnostics.messages.directory_unreadable:
+  ja: "ディレクトリを読み取れません: %{detail}"
+diagnostics.messages.manifest_rejected:
+  ja: "マニフェストが拒否されました: %{detail}"
+diagnostics.messages.path_environment_missing:
+  ja: PATH が設定されていません。
+diagnostics.messages.helper_not_found_in_trusted_path:
+  ja: 信頼された PATH ディレクトリに実行ファイルが見つかりませんでした。
+diagnostics.messages.wic_unsupported_platform:
+  ja: Windows WIC による HEIC デコードは Windows でのみ使用できます。
+diagnostics.messages.wic_available:
+  ja: "Windows WIC HEIC デコーダを検出しました: %{detail}"
+diagnostics.messages.wic_missing:
+  ja: Windows WIC HEIC デコーダは検出されませんでした。
+diagnostics.messages.wic_probe_failed:
+  ja: "Windows WIC HEIC の検出に失敗しました: %{detail}"
+diagnostics.messages.windows_heif_install_hint:
+  ja: Microsoft HEIF 画像拡張機能と HEVC ビデオ拡張機能をインストールしてから、もう一度お試しください。管理対象デバイスでは Microsoft Store、winget、またはオフラインのアプリパッケージで展開できます。
+diagnostics.messages.unknown:
+  ja: "診断 %{code}: %{detail}"
+workflow.ready:
+  ja: "%{count} 個のファイルの準備完了"
+workflow.ready_one:
+  ja: "%{count} 個のファイルの準備完了"
+workflow.ready_empty:
+  ja: ファイルを追加して開始
+settings.appearance_section:
+  ja: 外観
+settings.theme:
+  ja: テーマ
+settings.theme_system:
+  ja: システム
+settings.theme_light:
+  ja: ライト
+settings.theme_dark:
+  ja: ダーク
+settings.reduce_motion_label:
+  ja: 視差効果を減らす
+settings.reduce_motion_description:
+  ja: インターフェイスのアニメーションを短縮または省略します。
+queue.page_count:
+  ja: "%{count} ページ"
+queue.page_count_one:
+  ja: "%{count} ページ"
+impact.title:
+  ja: ストレージと環境のシナリオ
+impact.open:
+  ja: シナリオ
+impact.batch_open:
+  ja: 一括シナリオ
+impact.smaller:
+  ja: "出力が %{bytes} 小さくなりました"
+impact.larger:
+  ja: "出力が %{bytes} 大きくなりました"
+impact.same:
+  ja: 出力サイズは変わりません
+impact.boundary:
+  ja: ファイルが小さくなっても、ディスク容量の解放、電力の節約、排出の回避が確定するわけではありません。
+impact.excluded:
+  ja: 比較可能な単一の静止ラスター結果が確認されていません。ドキュメント、アニメーション、複数の出力、シーケンスの有無が不明な AVIF/HEIC、および旧形式の結果は除外されます。
+impact.batch:
+  ja: "一括: 対象となる結果 %{count} 件。その他の完了結果 %{excluded} 件は除外されています。この共通シナリオは個別のパネルとは独立しています。"
+impact.storage:
+  ja: ストレージのシナリオ
+impact.local:
+  ja: "ローカルまたは不明: バイト数のみ"
+impact.cloud:
+  ja: クラウドストレージの前提を検討
+impact.originals:
+  ja: 元ファイル
+impact.hypothetical:
+  ja: 出力が元ファイルを置き換えると仮定
+impact.confirmed:
+  ja: 元ファイルを置き換えた（自己申告）
+impact.retained:
+  ja: 元ファイルを保持
+impact.days:
+  ja: 保持日数（0–3650）
+impact.copies:
+  ja: コピー数
+impact.copies_default:
+  ja: "1–3"
+impact.invalid:
+  ja: "0 から 3650 までの整数の日数を入力してください。"
+impact.estimate:
+  ja: クラウドストレージのシナリオ推定
+impact.no_reduction:
+  ja: 出力の正味の削減がないため、環境面での効果は推定されません。
+impact.retained_notice:
+  ja: 元ファイルを保持する場合、ストレージ削減の推定は成り立ちません。
+impact.limits:
+  ja: 平均的な容量配分に基づく前提範囲であり、実際の削減量や正味の削減量、信頼区間ではありません。自己申告による置き換えも推定値のままです。
+impact.method:
+  ja: 方法と出典（オフラインで参照可能）
+impact.formula:
+  ja: "モデル v1.0.0: 容量（TB）× 保持時間（時間）× 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × コピー数 = エネルギー（Wh）。エネルギー ÷ 1000 × 473 g CO₂/kWh = CO₂ グラム数。電力の排出係数は 2024 年の世界平均です。過去の係数は現在のプロバイダやローカルデバイスを表すものではありません。"
+impact.privacy:
+  ja: 変換時のエネルギー、ネットワーク、ハードウェアの製造・廃棄、リバウンド効果は含みません。パラメータはパネルのメモリ内にのみ保持され、閉じるとリセットされ、保存もアップロードもされません。ファイルサイズは 2 進の KB/MB、モデルは 10 進の TB を使用します。
+impact.close:
+  ja: 閉じる
+update.open:
+  ja: アップデート
+update.title:
+  ja: アップデート
+update.manual:
+  ja: このプレビュー版のアップデートは手動で提供されます。
+update.idle:
+  ja: 新しいバージョンを確認します。
+update.checking:
+  ja: アップデートを確認中
+update.current:
+  ja: 最新の状態です
+update.available:
+  ja: アップデートがあります
+update.downloading:
+  ja: アップデートをダウンロードして検証中
+update.ready:
+  ja: アップデートを検証しました。一括処理が終わったらインストールしてください。
+update.installing:
+  ja: アップデートをインストール中
+update.installed:
+  ja: アップデートをインストールしました。ImgConvert を終了して再度開くと適用されます。
+update.current_version:
+  ja: "現在のバージョン: %{version}"
+update.new_version:
+  ja: "新しいバージョン: %{version}"
+update.bytes:
+  ja: "%{bytes} バイトをダウンロード済み"
+update.check:
+  ja: アップデートを確認
+update.download:
+  ja: アップデートをダウンロード
+update.install:
+  ja: アップデートをインストール
+update.close:
+  ja: 閉じる
+update.batch_active:
+  ja: インストールする前に、現在の一括処理が終わるまでお待ちください。
+queue.import_partial:
+  ja: "%{added} 個のファイルを追加しました。%{detail}"
+queue.import_partial_one:
+  ja: "%{added} 個のファイルを追加しました。%{detail}"
+queue.clipboard_invalid_paths:
+  ja: "%{count} 個のファイルパスを UTF-8 で表現できませんでした。対応する名前のファイルを選択してください。"
+queue.clipboard_invalid_paths_one:
+  ja: "%{count} 個のファイルパスを UTF-8 で表現できませんでした。対応する名前のファイルを選択してください。"
+queue.clipboard_path_issues:
+  ja: "スキップ: %{skipped}。読み取れないパス: %{errors}。ファイルが存在し、読み取り可能か確認してください。"
+queue.clipboard_truncated:
+  ja: スキャンが上限に達しました。一度に読み込むファイルを減らしてください。
+queue.clipboard_image_issues:
+  ja: "%{count} 枚の画像を読み込めませんでした。サイズ制限内の対応画像をコピーして、もう一度お試しください。"
+queue.clipboard_image_issues_one:
+  ja: "%{count} 枚の画像を読み込めませんでした。サイズ制限内の対応画像をコピーして、もう一度お試しください。"
+queue.clipboard_unavailable:
+  ja: クリップボードを読み取れませんでした。もう一度試すか、ファイル選択でファイルを追加してください。
+queue.clipboard_image_failed:
+  ja: 画像を読み取れませんでした。サイズ制限内の対応画像をコピーして、もう一度お試しください。
+legal.privacy_open:
+  ja: プライバシー
+legal.licenses_open:
+  ja: 情報
+legal.privacy_title:
+  ja: プライバシーとサポート
+legal.licenses_title:
+  ja: 情報とライセンス
+legal.offline_policy:
+  ja: このアプリに同梱されたプライバシーポリシーをお読みください。サポートリンクはブラウザで開きます。
+legal.version:
+  ja: "ImgConvert %{version} · Apache-2.0 · プロジェクトおよびサードパーティのライセンス文"
+legal.support:
+  ja: GitHub でサポート
+legal.close:
+  ja: 閉じる
+errors.fileNotFound:
+  ja: "ファイルが見つかりません: %{path}"
+errors.permissionDenied:
+  ja: "アクセスが拒否されました: %{path}"
+errors.outputPermissionDenied:
+  ja: "出力ディレクトリに書き込めません: %{path}。出力ディレクトリを選択して、もう一度お試しください。"
+errors.unsupportedFormat:
+  ja: "対応していない形式です: %{format}"
+errors.outputExists:
+  ja: "出力ファイルはすでに存在します: %{path}"
+errors.invalidOutputSuffix:
+  ja: ファイル名の接尾辞に使用できない文字が含まれているか、長すぎます。
+errors.sourceOverwriteConfirmationRequired:
+  ja: "元ファイルを置き換えるには明示的な確認が必要です: %{path}"
+errors.outputConflictsWithInput:
+  ja: "キュー内の元ファイルを保護するため、別の入力と一致するこの出力は書き出されませんでした: %{path}"
+errors.outputSafetyCheckFailed:
+  ja: "この一括処理で元ファイルを安全に保持できるか確認できませんでした。該当ファイルへのアクセスを確認して、もう一度お試しください: %{path}"
+errors.outputNotSmaller:
+  ja: "出力が元ファイルより小さくないためスキップしました: %{path}"
+errors.pdfPasswordProtected:
+  ja: "この PDF は暗号化またはパスワードで保護されているため変換できません: %{path}"
+errors.pdfSettingsInvalid:
+  ja: "PDF のページ範囲または DPI の設定が無効です: %{path}"
+errors.pdfResourceLimit:
+  ja: "PDF ファイルまたはページが安全なリソース上限を超えています。ページ数を減らすか DPI を下げてください: %{path}"
+errors.pdfInvalid:
+  ja: "PDF が無効か、破損しているか、対応していない内容を含んでいます: %{path}"
+errors.conversionFailed:
+  ja: "画像を変換できませんでした: %{path}"
+errors.batchFailed:
+  ja: 一括変換を完了できませんでした。
+errors.importFailed:
+  ja: 選択したファイルまたはフォルダを読み込めませんでした。
+errors.clipboardImportFailed:
+  ja: クリップボードの画像を読み込めませんでした。
+errors.nativeDialogFailed:
+  ja: システムのファイル選択を開けませんでした。
+errors.thumbnailFailed:
+  ja: "画像のプレビューを生成できませんでした: %{path}"
+errors.previewFailed:
+  ja: "比較プレビューを生成できませんでした: %{path}"
+errors.codecConfigurationFailed:
+  ja: HEIC ヘルパーを設定できませんでした。
+errors.taskFailed:
+  ja: 要求された操作を完了できませんでした。もう一度お試しください。
+queue.source_format:
+  ja: "%{format} · 元"
+queue.remove:
+  ja: 削除
+queue.remove_item:
+  ja: "%{name} をキューから削除"
+queue.scan_issues:
+  ja: "スキップ: %{skipped}。読み取れないパス: %{errors}。"
+errors.outputSafetyCheckFailedGeneric:
+  ja: この一括処理で元ファイルを安全に保持できるか確認できませんでした。ファイルへのアクセスを確認して、もう一度お試しください。
+settings.clear_result_cache_failed_generic:
+  ja: 結果キャッシュを消去できませんでした。ファイルへのアクセスを確認して、もう一度お試しください。
+warning.bit_depth_reduced:
+  ja: "精度を %{from} ビットから %{to} ビットに下げました。"
+warning.alpha_flattened:
+  ja: 透明部分を不透明な背景に合成しました。
+queue.animated:
+  ja: アニメーション · 非対応
+queue.animation_unknown:
+  ja: アニメーション未確認
+workflow.animation_summary:
+  ja: "%{count} 個のファイル · アニメーション %{animated} 個（非対応） · 未確認 %{unknown} 個"
+workflow.animation_summary_one:
+  ja: "%{count} 個のファイル · アニメーション %{animated} 個（非対応） · 未確認 %{unknown} 個"
+status.warnings:
+  ja: 警告
+queue.add_folders:
+  ja: フォルダを追加
+queue.supported_formats:
+  ja: 入力形式
+queue.compare_item:
+  ja: "%{name} を比較"
+queue.impact_item:
+  ja: "%{name} のストレージシナリオ"
+queue.progress_item:
+  ja: "%{name} の変換の進行状況"
+settings.tab_format:
+  ja: 形式
+settings.tab_output:
+  ja: 出力
+settings.tab_processing:
+  ja: 調整
+settings.tab_privacy:
+  ja: プライバシー
+settings.tab_has_issue:
+  ja: "%{tab}、要確認"
+settings.format_hint_jpeg:
+  ja: どこでも開ける
+settings.format_hint_png:
+  ja: ロスレス、透過を保持
+settings.format_hint_webp:
+  ja: Web 向け
+settings.format_hint_avif:
+  ja: 最小のファイル
+workflow.preset_manage:
+  ja: プリセットの保存と管理
+settings.cache_section:
+  ja: キャッシュ
+status.smaller_percent:
+  ja: "−%{percent}%"
+status.larger_percent:
+  ja: "+%{percent}%"
+workflow.summary_saved:
+  ja: "%{summary} · %{saved} 削減"
+workflow.summary_done:
+  ja: "%{count} 件完了"
+workflow.summary_skipped:
+  ja: "%{count} 件スキップ"
+workflow.summary_failed:
+  ja: "%{count} 件失敗"
+status.same_size:
+  ja: 同じサイズ
+status.smaller_under_one:
+  ja: "−<1%"
+status.larger_under_one:
+  ja: "+<1%"

@@ -2,7 +2,8 @@
 // Copyright (C) 2026 ImgConvert contributors
 
 //! Interface strings. Keys describe intent (`queue.add_files`), never a
-//! source-language sentence; both locales are written in `locales/app.yml`.
+//! source-language sentence. `locales/app.yml` holds English and Simplified
+//! Chinese; every other locale has its own file in the same directory.
 //!
 //! The locale is one global shared with GPUI Kit's own strings because this
 //! crate and `gpui-component` link the same `rust-i18n` major version.
@@ -10,30 +11,72 @@
 use gpui_kit::SharedString;
 use imgconvert_backend::settings::AppLocale;
 
-/// Locales the shell ships. Order is the toggle order.
+/// Locales the shell ships, in the order the language menu lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Locale {
     English,
     SimplifiedChinese,
+    TraditionalChinese,
+    Japanese,
+    Korean,
+    French,
+    Spanish,
+    Portuguese,
+    German,
 }
 
 impl Locale {
+    pub const ALL: [Self; 9] = [
+        Self::English,
+        Self::SimplifiedChinese,
+        Self::TraditionalChinese,
+        Self::Japanese,
+        Self::Korean,
+        Self::French,
+        Self::Spanish,
+        Self::Portuguese,
+        Self::German,
+    ];
+
     pub const fn tag(self) -> &'static str {
         match self {
             Self::English => "en",
             Self::SimplifiedChinese => "zh-CN",
+            Self::TraditionalChinese => "zh-TW",
+            Self::Japanese => "ja",
+            Self::Korean => "ko",
+            Self::French => "fr",
+            Self::Spanish => "es",
+            Self::Portuguese => "pt-BR",
+            Self::German => "de",
         }
     }
 
-    pub const fn next(self) -> Self {
+    /// The language's name in that language, as the language menu shows it.
+    pub const fn native_name(self) -> &'static str {
+        match self {
+            Self::English => "English",
+            Self::SimplifiedChinese => "简体中文",
+            Self::TraditionalChinese => "繁體中文",
+            Self::Japanese => "日本語",
+            Self::Korean => "한국어",
+            Self::French => "Français",
+            Self::Spanish => "Español",
+            Self::Portuguese => "Português (Brasil)",
+            Self::German => "Deutsch",
+        }
+    }
+
+    /// The other side of the quick switch: English from any other locale,
+    /// Simplified Chinese from English.
+    pub const fn toggled(self) -> Self {
         match self {
             Self::English => Self::SimplifiedChinese,
-            Self::SimplifiedChinese => Self::English,
+            _ => Self::English,
         }
     }
 
-    /// Picks the start-up locale from the POSIX locale variables; Chinese
-    /// variants map to Simplified Chinese, everything else to English.
+    /// Picks the start-up locale from the POSIX locale variables.
     pub fn from_environment() -> Self {
         ["LC_ALL", "LC_MESSAGES", "LANG"]
             .iter()
@@ -42,12 +85,32 @@ impl Locale {
             .map_or(Self::English, |value| Self::from_tag(&value))
     }
 
+    /// Maps a BCP 47 or POSIX tag to a shipped locale: Chinese written in
+    /// Traditional script (Hant, TW, HK, MO) to Traditional Chinese, other
+    /// Chinese to Simplified, the other shipped languages by their primary
+    /// subtag, and everything else to English.
     pub fn from_tag(tag: &str) -> Self {
-        let lowered = tag.to_ascii_lowercase();
-        if lowered.starts_with("zh") {
-            Self::SimplifiedChinese
-        } else {
-            Self::English
+        let lowered = tag.to_ascii_lowercase().replace('_', "-");
+        let primary = lowered.split(['-', '.', '@']).next().unwrap_or("");
+        match primary {
+            "zh" => {
+                let traditional = lowered
+                    .split(['-', '.', '@'])
+                    .skip(1)
+                    .any(|part| matches!(part, "hant" | "tw" | "hk" | "mo"));
+                if traditional {
+                    Self::TraditionalChinese
+                } else {
+                    Self::SimplifiedChinese
+                }
+            }
+            "ja" => Self::Japanese,
+            "ko" => Self::Korean,
+            "fr" => Self::French,
+            "es" => Self::Spanish,
+            "pt" => Self::Portuguese,
+            "de" => Self::German,
+            _ => Self::English,
         }
     }
 
@@ -60,6 +123,13 @@ impl Locale {
         match self {
             Self::English => AppLocale::EnUs,
             Self::SimplifiedChinese => AppLocale::ZhCn,
+            Self::TraditionalChinese => AppLocale::ZhTw,
+            Self::Japanese => AppLocale::Ja,
+            Self::Korean => AppLocale::Ko,
+            Self::French => AppLocale::Fr,
+            Self::Spanish => AppLocale::Es,
+            Self::Portuguese => AppLocale::PtBr,
+            Self::German => AppLocale::De,
         }
     }
 
@@ -67,6 +137,13 @@ impl Locale {
         match locale {
             AppLocale::EnUs => Self::English,
             AppLocale::ZhCn => Self::SimplifiedChinese,
+            AppLocale::ZhTw => Self::TraditionalChinese,
+            AppLocale::Ja => Self::Japanese,
+            AppLocale::Ko => Self::Korean,
+            AppLocale::Fr => Self::French,
+            AppLocale::Es => Self::Spanish,
+            AppLocale::PtBr => Self::Portuguese,
+            AppLocale::De => Self::German,
         }
     }
 }
@@ -149,44 +226,66 @@ mod tests {
         set_locale(Locale::English);
     }
 
+    /// Every locale file, keyed by the locale it holds; `app.yml` holds the
+    /// English source and Simplified Chinese.
+    const LOCALE_FILES: [(&str, &str); 8] = [
+        ("zh-CN", include_str!("../locales/app.yml")),
+        ("zh-TW", include_str!("../locales/zh-TW.yml")),
+        ("ja", include_str!("../locales/ja.yml")),
+        ("ko", include_str!("../locales/ko.yml")),
+        ("fr", include_str!("../locales/fr.yml")),
+        ("es", include_str!("../locales/es.yml")),
+        ("pt-BR", include_str!("../locales/pt-BR.yml")),
+        ("de", include_str!("../locales/de.yml")),
+    ];
+
+    fn placeholders(text: &str) -> std::collections::BTreeSet<String> {
+        text.split("%{")
+            .skip(1)
+            .filter_map(|part| part.split_once('}').map(|(name, _)| name.to_owned()))
+            .collect()
+    }
+
     #[test]
-    fn every_app_key_has_both_locales_and_matching_placeholders() {
+    fn every_app_key_has_every_locale_and_matching_placeholders() {
         let _guard = LOCALE_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let source = include_str!("../locales/app.yml");
-        for line in source
+        let keys: Vec<&str> = source
             .lines()
             .filter(|line| !line.starts_with([' ', '#', '_']) && line.ends_with(':'))
-        {
-            let key = line.trim_end_matches(':');
-            let english = rust_i18n::t!(key, locale = "en");
-            let chinese = rust_i18n::t!(key, locale = "zh-CN");
-            assert_ne!(english, key, "missing English: {key}");
-            assert_ne!(chinese, key, "missing Chinese: {key}");
-            let tokens = |text: &str| -> std::collections::BTreeSet<String> {
-                text.split("%{")
-                    .skip(1)
-                    .filter_map(|part| part.split_once('}').map(|(name, _)| name.to_owned()))
-                    .collect()
-            };
-            assert_eq!(tokens(&english), tokens(&chinese), "{key}");
-            // Check explicit locale entries, too: English fallback must not
-            // conceal a missing Chinese translation.
-            let block = source
-                .split_once(&format!("{key}:\n"))
-                .unwrap()
-                .1
-                .split("\n\n")
-                .next()
-                .unwrap();
-            assert!(
-                block
-                    .lines()
-                    .take_while(|line| line.starts_with("  "))
-                    .any(|line| line.starts_with("  zh-CN:")),
-                "{key}"
-            );
+            .map(|line| line.trim_end_matches(':'))
+            .collect();
+        for key in &keys {
+            let english = rust_i18n::t!(*key, locale = "en");
+            assert_ne!(english, *key, "missing English: {key}");
+            for (tag, file) in LOCALE_FILES {
+                // An explicit entry, so English fallback cannot conceal a
+                // missing translation.
+                let block = file
+                    .split_once(&format!("\n{key}:\n"))
+                    .unwrap_or_else(|| panic!("{tag} lacks {key}"))
+                    .1;
+                assert!(
+                    block
+                        .lines()
+                        .take_while(|line| line.starts_with("  "))
+                        .any(|line| line.starts_with(&format!("  {tag}:"))),
+                    "{tag} lacks {key}"
+                );
+                let text = rust_i18n::t!(*key, locale = tag);
+                assert_eq!(placeholders(&english), placeholders(&text), "{tag} {key}");
+            }
+        }
+        // The extra files hold only keys the source defines.
+        for (tag, file) in &LOCALE_FILES[1..] {
+            let extra = file
+                .lines()
+                .filter(|line| !line.starts_with([' ', '#', '_']) && line.ends_with(':'))
+                .filter(|line| !keys.contains(&line.trim_end_matches(':')))
+                .count();
+            assert_eq!(extra, 0, "{tag} has keys the source lacks");
         }
         set_locale(Locale::SimplifiedChinese);
         assert_eq!(&*gpui_kit::component::locale(), "zh-CN");
@@ -300,16 +399,35 @@ mod tests {
     }
 
     #[test]
-    fn locale_tags_map_chinese_variants_to_simplified() {
-        assert_eq!(Locale::from_tag("zh_CN.UTF-8"), Locale::SimplifiedChinese);
-        assert_eq!(Locale::from_tag("zh-Hant-TW"), Locale::SimplifiedChinese);
-        assert_eq!(Locale::from_tag("en_US.UTF-8"), Locale::English);
-        assert_eq!(Locale::English.next().next(), Locale::English);
+    fn locale_tags_map_to_shipped_locales() {
+        for (tag, locale) in [
+            ("zh_CN.UTF-8", Locale::SimplifiedChinese),
+            ("zh-Hans", Locale::SimplifiedChinese),
+            ("zh-Hant-TW", Locale::TraditionalChinese),
+            ("zh_TW.UTF-8", Locale::TraditionalChinese),
+            ("zh-HK", Locale::TraditionalChinese),
+            ("ja_JP.UTF-8", Locale::Japanese),
+            ("ko-KR", Locale::Korean),
+            ("fr_CA.UTF-8", Locale::French),
+            ("es-419", Locale::Spanish),
+            ("pt_PT.UTF-8", Locale::Portuguese),
+            ("de_DE@euro", Locale::German),
+            ("en_US.UTF-8", Locale::English),
+            ("it_IT.UTF-8", Locale::English),
+            ("", Locale::English),
+        ] {
+            assert_eq!(Locale::from_tag(tag), locale, "{tag}");
+        }
+        for locale in Locale::ALL {
+            assert_eq!(Locale::from_tag(locale.tag()), locale);
+        }
+        assert_eq!(Locale::English.toggled().toggled(), Locale::English);
+        assert_eq!(Locale::German.toggled(), Locale::English);
     }
 
     #[test]
     fn interface_locales_round_trip_through_the_settings_value() {
-        for locale in [Locale::English, Locale::SimplifiedChinese] {
+        for locale in Locale::ALL {
             assert_eq!(Locale::from_app_locale(locale.app_locale()), locale);
         }
         assert_eq!(Locale::English.app_locale().as_str(), "en-US");
