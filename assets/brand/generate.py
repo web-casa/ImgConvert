@@ -73,7 +73,10 @@ def tile(x, y, size, prefix):
 
 
 def svg(body, defs, size=1024):
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {size} {size}">
+    """`size` is the intrinsic size; the drawing is always on a 1024 grid.
+    GPUI rasterises an embedded SVG at its intrinsic size, so a mark meant
+    for a 28 px slot declares a small one."""
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 1024 1024">
 <title>ImgConvert</title>
 <defs>
 {defs}
@@ -109,5 +112,5 @@ shadow = """<filter id="m-shadow" x="-20%" y="-20%" width="140%" height="140%">
 (OUT / "logo-mark.svg").write_text(svg(disc(512, 512, 470, 8, "k", 36), gradients("k")))
 
 # The mark at title-bar size (about 28 px): fewer pixels and a wider gap.
-(OUT / "logo-mark-small.svg").write_text(svg(disc(512, 512, 480, 5, "q", 80), gradients("q")))
+(OUT / "logo-mark-small.svg").write_text(svg(disc(512, 512, 480, 5, "q", 80), gradients("q"), size=64))
 print("\n".join(sorted(p.name for p in OUT.glob("*.svg"))))
