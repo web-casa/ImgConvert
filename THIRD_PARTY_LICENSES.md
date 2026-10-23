@@ -15013,7 +15013,7 @@ still covered by `pnpm run license:npm` policy checks.
 - zbsearch@4.0.0 — Apache-2.0 — https://github.com/micheleriva/zbsearch#readme
 - zimmerframe@1.1.4 — MIT — https://github.com/sveltejs/zimmerframe#readme
 - zip-stream@6.0.1 — MIT — https://github.com/archiverjs/node-zip-stream
-- zod@4.4.3 — MIT — https://zod.dev
+- zod@4.6.7 — MIT — https://zod.dev
 - zwitch@2.0.4 — MIT — https://github.com/wooorm/zwitch#readme
 
 ## npm License Texts
@@ -34797,7 +34797,7 @@ the licensed code:
 ### fumadocs-core@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_0c5383b5edf8631ddcab97bf670f38db/node_modules/fumadocs-core`
+- Package path: `node_modules/.pnpm/fumadocs-core@16.14.4_@mdx-js+mdx@3.1.1_@types+estree-jsx@1.0.5_@types+hast@3.0.5_@type_eb7650e0ec4d02be3703a26830d013f4/node_modules/fumadocs-core`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34829,7 +34829,7 @@ SOFTWARE.
 ### fumadocs-mdx@15.2.3
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_f0c91ffd1e0a3968655424c830f5c21d/node_modules/fumadocs-mdx`
+- Package path: `node_modules/.pnpm/fumadocs-mdx@15.2.3_@types+mdast@4.0.4_@types+mdx@2.0.14_@types+react@19.2.17_fumadocs-_84171b8c0c9c12b1e9d7f7ae4f6118a3/node_modules/fumadocs-mdx`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -34861,7 +34861,7 @@ SOFTWARE.
 ### fumadocs-ui@16.14.4
 
 - License: MIT
-- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_3e78a54e09936a9a0a31dff55a0179b4/node_modules/fumadocs-ui`
+- Package path: `node_modules/.pnpm/fumadocs-ui@16.14.4_@types+mdx@2.0.14_@types+react-dom@19.2.3_@types+react@19.2.17__@ty_19d97d3d15ff0acc6ca1db821491988e/node_modules/fumadocs-ui`
 - Homepage: https://fumadocs.dev
 
 #### LICENSE
@@ -56191,10 +56191,10 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### zod@4.4.3
+### zod@4.6.7
 
 - License: MIT
-- Package path: `node_modules/.pnpm/zod@4.4.3/node_modules/zod`
+- Package path: `node_modules/.pnpm/zod@4.6.7/node_modules/zod`
 - Homepage: https://zod.dev
 
 #### LICENSE
