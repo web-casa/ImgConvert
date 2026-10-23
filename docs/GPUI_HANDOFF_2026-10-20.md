@@ -1,6 +1,6 @@
 # GPUI 迁移开发交接（2026-10-20）
 
-> **已过时（2026-10-24）**：本文是当时的快照。G2 已于 2026-10-24 收口，D1a/C1 不再受 G2 限制；最新状态见 `GPUI_G2_ACCEPTANCE.md` 末节与 `DEVELOPMENT_PLAN_2026-10.md` §4.2。
+> **已过时（2026-10-24）**：本文是当时的快照。G2 的三项原生冒烟已于 2026-10-24 完成，G2 本身仍待裸机性能基线；最新状态见 `GPUI_G2_ACCEPTANCE.md` 末节与 `DEVELOPMENT_PLAN_2026-10.md` §4.2。
 
 本文是当前 GPUI 迁移开发状态快照。长期门槛和逐项验收标准以[迁移方案](GPUI_MIGRATION_PLAN.md)、[开发方案](DEVELOPMENT_PLAN_2026-10.md)及[G2 验收记录](GPUI_G2_ACCEPTANCE.md)为准；这份快照不取代它们。
 

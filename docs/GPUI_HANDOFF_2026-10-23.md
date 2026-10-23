@@ -1,6 +1,6 @@
 # GPUI 界面重设计交接（2026-10-23）
 
-> **已过时（2026-10-24）**：本文是当时的快照。G2 已于 2026-10-24 收口，D1a/C1 不再受 G2 限制；最新状态见 `GPUI_G2_ACCEPTANCE.md` 末节与 `DEVELOPMENT_PLAN_2026-10.md` §4.2。
+> **已过时（2026-10-24）**：本文是当时的快照。G2 的三项原生冒烟已于 2026-10-24 完成，G2 本身仍待裸机性能基线；最新状态见 `GPUI_G2_ACCEPTANCE.md` 末节与 `DEVELOPMENT_PLAN_2026-10.md` §4.2。
 
 本文是“清透玻璃 2.0”界面重设计的开发状态快照，接续 [2026-10-20 交接](GPUI_HANDOFF_2026-10-20.md)。长期门槛与验收标准仍以 [迁移方案](GPUI_MIGRATION_PLAN.md)、[开发方案](DEVELOPMENT_PLAN_2026-10.md) 和 [G2 验收记录](GPUI_G2_ACCEPTANCE.md) 为准；设计本身的权威记录是 [GPUI_GLASS_LAYOUT.md](GPUI_GLASS_LAYOUT.md)。
 
