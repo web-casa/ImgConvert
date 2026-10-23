@@ -12,7 +12,7 @@
 
 验证使用独立 Kit 工程承载显式 macOS 控件与调度回归；工程以产品锁为种子，解析后逐个核对包名/版本/来源，并检查 assets/macros 同样锁在 0.7.1。框架只在既有 test-support context 增加不触发绘制的 frame-wake / handler-exists 观察接口，不暴露底层测试窗口，不编译发布 crate 中缺少外部字体夹具/存在宏错误的无关 unit suite。产品源码和锁不必为无头回归临时变更。原生系统候选必须另验。早期 discard-only 版本的 13 项 macOS 无头回归通过，但真实 AXPress 激活隐私对话框仍有旧系统候选，不能宣称完成修复；加入上下文重置后的版本必须另记原生结果。首轮 owner 误记/消失遗漏、后续候选选择顺序/补帧阶段、首次无旧 handler 的恢复与 Unicode 配置问题都纳入 review 处置。各版实验结论不互相替代，最终结果见 G2 清单和 PR。
 
-接入验证：`verify.py` 核对全部源码清单、修改过的源码文件（现为十个）、实际 Cargo 来源、固定版本和 workspace 成员；重建 registry 锁条目必须得到接入前完整锁 hash，保证只换来源。独立归档审计逐字节复现全部保留文件，架构护栏与 GPUI CI 运行核验。`check.py --active` 的 13 项回归必须选中正式来源目录，原生验证使用不带额外 config 的正常 `--locked` 构建；结果记在 G2 清单。上游版本包含同等修复后，删除候选并在无补丁版本重跑相同回归与原生场景。当前 G2 未关闭。
+接入验证：`verify.py` 核对全部源码清单、修改过的源码文件（现为十一个）、实际 Cargo 来源、固定版本和 workspace 成员；重建 registry 锁条目必须得到接入前完整锁 hash，保证只换来源。独立归档审计逐字节复现全部保留文件，架构护栏与 GPUI CI 运行核验。`check.py --active` 的 13 项回归必须选中正式来源目录，原生验证使用不带额外 config 的正常 `--locked` 构建；结果记在 G2 清单。上游版本包含同等修复后，删除候选并在无补丁版本重跑相同回归与原生场景。当前 G2 未关闭。
 
 共享焦点排序修复针对 `TabStopMap::insert`：同一 `FocusId` 再次注册时，`by_id` 已指向最后一次注册，但 `order` 仍保留旧节点，反向遍历可能反复回到同一 handle。修复在更新 `by_id` 前删除同 ID 的旧排序项，保持最后一处注册为唯一停靠点。最小复现已获用户明确授权，于 2026-10-20 提交 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)，代码与步骤见 [GPUI_TAB_STOP_REPRO.md](GPUI_TAB_STOP_REPRO.md)。产品侧新增 `tests/tab_stop.rs` 三项无头回归（原始共享 handle、缓存重放、Tab stop 状态切换）；前两项在未修源码上失败、在正式接入源码上通过，状态切换项作为不变量在两边均通过；法律弹窗的四控件反向循环 UI 测试在未修源码上失败、接入后通过。这项修复只证明焦点排序，不替代原生键盘/VoiceOver 验收。
 
@@ -41,6 +41,23 @@
 - 产品侧同时修了一处：标题行“外观”按钮原本没有点击监听（它的弹出层由外层的 mouse-down 打开），所以节点不声明“按下”，VoiceOver/AXPress 完全按不动它。给它加了空的点击监听后可以打开；UI 测试 `a11y_press_opens_the_appearance_popover` 覆盖。
 - 上游：尚未提交 issue。对外提交需要用户授权，复现文档已按可直接发布的形式写好。
 - 退出条件：上游锁定版本包含等效修复后，删除这部分改动，在无补丁版本上重跑上述回归和原生按下场景。
+
+## 已接入：live region（`aria_live`）
+
+- 问题：批次开始和完成时，VoiceOver 不会主动播报，状态只能在用户把光标移到状态文字时读出，不满足 WCAG 4.1.3（状态消息）。AccessKit 的 macOS 适配层已经支持 live region：节点设了 `live` 后，值变化或 `live` 从关变开时会发出 `AnnouncementRequested`。缺的只是 GPUI 无法设置这个属性。
+- 修改：在同一 `gpui-pre` 源码里，`elements/div.rs` 新增 `aria_live(Live)`，`gpui.rs` 再导出 `accesskit::Live`。test-support 新增 `a11y_node_for_test`，可以读取最后一帧的节点属性。
+- 产品侧：操作栏里有一个不占尺寸的“播报”节点（`workflow-announcement`，Status 角色），只在进入这些里程碑时出现一帧：批次开始（“开始转换，共 N 个文件”）、取消、完成（与状态行相同的摘要）、失败，以及设置写入失败。
+  - 节点在加入辅助功能树时被播报，下一帧就移除，所以每个事件只播报一次，同样的文字下次也会重新播报。
+  - 失败和设置写入失败用 `Assertive`，其余用 `Polite`。
+  - 状态行本身不是 live region，它的无障碍值始终等于可见文字（包括运行中的进度）。
+  - 进度变化、就绪文字、提示，以及完成后编辑队列引起的摘要变化，都不播报。
+  - 设置错误和批次里程碑分开跟踪，已有的设置错误不会挡住之后的批次播报。设置错误按文字跟踪，换成另一个错误也会播报，错误消失不播报。
+  - 一批在两次渲染之间就开始并结束时，先说“开始转换”，再说结果，开始不会丢。
+  - 播报节点同时设置名称和值：macOS 读值，Windows 和 Linux 的适配层按名称播报 live region。
+- 验证：UI 测试覆盖以下行为。原生结果记录在 G2 清单。
+  - `batch_milestones_are_announced_once`：每个里程碑只播报一次，运行中重绘与完成后编辑队列不再播报，两次渲染之间开始又结束的一批同时说开始和结果，取消与取消后的结果各播报一次，状态行读可见文字，播报节点的名称等于值；
+  - `settings_and_batch_failures_are_both_announced`：在设置文件位置放一个目录，让写入在任何平台、任何用户下都确定失败。失败立即以 Assertive 播报；错误仍在时批次失败照样播报；写入恢复后错误消失，不播报。
+- 退出条件：上游 GPUI 提供等效接口后，删除这部分改动。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
 

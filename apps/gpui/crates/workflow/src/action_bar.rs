@@ -14,10 +14,11 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Context, Entity, EventEmitter, FontWeight, InteractiveElement as _, IntoElement,
+    App, Context, Entity, EventEmitter, FontWeight, InteractiveElement as _, IntoElement, Live,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, TestSupportExt as _, Window, div,
 };
+use imgconvert_backend::progress::BatchId;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{
@@ -45,6 +46,10 @@ pub struct ActionBar {
     queue: Entity<QueueModel>,
     batch: Entity<BatchModel>,
     settings: Entity<SettingsModel>,
+    /// The milestone already announced, and an announcement waiting to be
+    /// put in the accessibility tree for one frame.
+    announced: Announced,
+    announcement: Option<(SharedString, Live)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -57,11 +62,23 @@ impl ActionBar {
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
             cx.observe(models.settings(), |_, _, cx| cx.notify()),
         ];
+        // What is already the case when the bar appears is not news.
+        let batch = models.batch().read(cx);
+        let announced = Announced {
+            milestone: (batch.id(), Milestone::of(batch.phase())),
+            settings_error: models
+                .settings()
+                .read(cx)
+                .last_error()
+                .map(SharedString::from),
+        };
         Self {
             panel,
             queue: models.queue().clone(),
             batch: models.batch().clone(),
             settings: models.settings().clone(),
+            announced,
+            announcement: None,
             _subscriptions: subscriptions,
         }
     }
@@ -80,19 +97,26 @@ impl ActionBar {
                 true,
             );
         }
+        if let Some(text) = self.batch_text(cx) {
+            let failed = matches!(self.batch.read(cx).phase(), BatchPhase::Failed(_));
+            return (text, failed);
+        }
+        if let Some(notice) = self.panel.read(cx).notice_text() {
+            return (notice, false);
+        }
+        let count = self.queue.read(cx).len();
+        if count == 0 {
+            (tr("workflow.ready_empty"), false)
+        } else {
+            (tr_with("workflow.ready", &[("count", &count)]), false)
+        }
+    }
+
+    /// The batch's part of the status line; `None` while no batch has run.
+    fn batch_text(&self, cx: &App) -> Option<SharedString> {
         let batch = self.batch.read(cx);
-        let text = match batch.phase() {
-            BatchPhase::Idle => {
-                if let Some(notice) = self.panel.read(cx).notice_text() {
-                    return (notice, false);
-                }
-                let count = self.queue.read(cx).len();
-                return if count == 0 {
-                    (tr("workflow.ready_empty"), false)
-                } else {
-                    (tr_with("workflow.ready", &[("count", &count)]), false)
-                };
-            }
+        Some(match batch.phase() {
+            BatchPhase::Idle => return None,
             BatchPhase::Running | BatchPhase::Cancelling => tr_with(
                 "workflow.progress",
                 &[("done", &batch.finished_count()), ("total", &batch.total())],
@@ -141,9 +165,97 @@ impl ActionBar {
                 }
             }
             BatchPhase::Failed(_detail) => tr("errors.batchFailed"),
-        };
-        (text, matches!(batch.phase(), BatchPhase::Failed(_)))
+        })
     }
+
+    /// Records the milestone the batch and settings are at, and when one
+    /// was entered since the last render, queues its announcement. Only the
+    /// moments that matter are announced, once each: a batch starting,
+    /// being cancelled, finishing or failing, and a settings write failing.
+    /// Progress, readiness and notices are not: a screen reader user reads
+    /// them on the status line, whose accessible value is its visible text.
+    fn track_announcement(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let batch = self.batch.read(cx);
+        let milestone = (batch.id(), Milestone::of(batch.phase()));
+        let total = batch.total();
+        let error = self.settings.read(cx).last_error().map(SharedString::from);
+        let mut parts = Vec::new();
+        let mut live = Live::Polite;
+        // A new or different settings error is news; one clearing is not.
+        if error != self.announced.settings_error {
+            self.announced.settings_error.clone_from(&error);
+            if let Some(detail) = &error {
+                parts.push(tr_with("settings.save_failed", &[("detail", detail)]));
+                live = Live::Assertive;
+            }
+        }
+        if milestone != self.announced.milestone {
+            // A batch that began and ended between two renders was still
+            // started: say so before its outcome.
+            let new_batch = milestone.0.is_some() && milestone.0 != self.announced.milestone.0;
+            if new_batch && !matches!(milestone.1, Milestone::Idle | Milestone::Running) {
+                parts.push(tr_with("workflow.announce_started", &[("count", &total)]));
+            }
+            self.announced.milestone = milestone;
+            let text = match milestone.1 {
+                Milestone::Idle => None,
+                Milestone::Running => {
+                    Some(tr_with("workflow.announce_started", &[("count", &total)]))
+                }
+                Milestone::Cancelling => Some(tr("workflow.cancelling")),
+                Milestone::Finished | Milestone::Failed => self.batch_text(cx),
+            };
+            if milestone.1 == Milestone::Failed {
+                live = Live::Assertive;
+            }
+            parts.extend(text);
+        }
+        if parts.is_empty() {
+            return;
+        }
+        let text: SharedString = parts
+            .iter()
+            .map(SharedString::as_ref)
+            .collect::<Vec<_>>()
+            .join(" ")
+            .into();
+        self.announcement = Some((text, live));
+        // The node is announced when it enters the accessibility tree; it
+        // leaves on the next frame, so the same words are announced again
+        // the next time they are due rather than read as unchanged.
+        cx.on_next_frame(window, |this, _, cx| {
+            this.announcement = None;
+            cx.notify();
+        });
+    }
+}
+
+/// Where a batch is, as far as announcements are concerned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Milestone {
+    Idle,
+    Running,
+    Cancelling,
+    Finished,
+    Failed,
+}
+
+impl Milestone {
+    fn of(phase: &BatchPhase) -> Self {
+        match phase {
+            BatchPhase::Idle => Self::Idle,
+            BatchPhase::Running => Self::Running,
+            BatchPhase::Cancelling => Self::Cancelling,
+            BatchPhase::Finished(_) => Self::Finished,
+            BatchPhase::Failed(_) => Self::Failed,
+        }
+    }
+}
+
+/// What the last announcement covered.
+struct Announced {
+    milestone: (Option<BatchId>, Milestone),
+    settings_error: Option<SharedString>,
 }
 
 /// The net bytes this batch saved: finished rows of its own jobs whose
@@ -170,6 +282,7 @@ pub fn net_saving(items: &[QueueItem], jobs: &[SharedString]) -> Option<u64> {
 
 impl Render for ActionBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.track_announcement(window, cx);
         // The same breakpoint the shell uses to narrow the settings panel:
         // below it the capsule keeps only icons for its secondary commands,
         // with their names on tooltips and in the accessibility tree.
@@ -236,10 +349,28 @@ impl Render for ActionBar {
         let glass = cx.glass();
         let pill = ButtonRounded::Size(cx.theme().radius_full());
 
+        let announcement = self.announcement.clone();
         h_flex()
             .id("workflow-action-bar")
             .test_support()
+            .relative()
             .glass_bar(cx)
+            // A live region with no size: it is only ever heard. It exists for
+            // the one frame an announcement needs (see `track_announcement`).
+            .children(announcement.map(|(text, live)| {
+                div()
+                    .id("workflow-announcement")
+                    .test_support()
+                    .role(gpui_kit::Role::Status)
+                    // macOS announces the value; Windows and Linux adapters
+                    // announce a live region by its name.
+                    .aria_label(text.clone())
+                    .aria_value(text)
+                    .aria_live(live)
+                    .absolute()
+                    .size_0()
+                    .overflow_hidden()
+            }))
             .w_full()
             .py_2()
             .pl_2()

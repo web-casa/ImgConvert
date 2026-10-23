@@ -265,7 +265,7 @@
              }
              accesskit::Action::Focus => {
                  if let Some(focus_id) = self.a11y.focus_ids.get(&request.target_node).copied()
-@@ -6955,6 +7025,174 @@
+@@ -6955,6 +7025,187 @@
          }
      }
  
@@ -437,6 +437,19 @@
 +        true
 +    }
 +
++    /// The accessibility node the last frame built for the element whose id
++    /// path ends with `id`, as a platform adapter receives it. Panics when
++    /// several nodes' ids end with `id`.
++    #[cfg(any(test, feature = "test-support"))]
++    pub fn a11y_node_for_test(&self, id: impl Into<ElementId>) -> Option<accesskit::Node> {
++        let id = id.into();
++        match self.a11y.test_node_ids.get(&id).copied() {
++            Some(Some(node)) => self.a11y.test_node_actions.get(&node).cloned(),
++            Some(None) => panic!("several accessibility nodes have element id {id:?}"),
++            None => None,
++        }
++    }
++
      /// Toggles the inspector mode on this window.
      #[cfg(any(feature = "inspector", debug_assertions))]
      pub fn toggle_inspector(&mut self, cx: &mut App) {
@@ -517,7 +530,31 @@
                              if pushed_a11y_node {
 --- a/src/elements/div.rs
 +++ b/src/elements/div.rs
-@@ -2392,10 +2392,44 @@
+@@ -1435,6 +1435,15 @@
+         self
+     }
+ 
++    /// Mark this element as a live region: assistive technology announces
++    /// its value when the value changes, or when the region turns live,
++    /// without moving focus to it. `Live::Polite` waits for the current
++    /// speech to finish; `Live::Assertive` interrupts it.
++    fn aria_live(mut self, live: accesskit::Live) -> Self {
++        self.interactivity().aria.live = Some(live);
++        self
++    }
++
+     /// Set the minimum numeric value for this element.
+     fn aria_min_numeric_value(mut self, value: f64) -> Self {
+         self.interactivity().aria.min_numeric_value = Some(value);
+@@ -2117,6 +2126,7 @@
+     pub(crate) numeric_value_step: Option<f64>,
+     pub(crate) value: Option<SharedString>,
+     pub(crate) placeholder: Option<SharedString>,
++    pub(crate) live: Option<accesskit::Live>,
+     pub(crate) orientation: Option<accesskit::Orientation>,
+     pub(crate) level: Option<usize>,
+     pub(crate) position_in_set: Option<usize>,
+@@ -2392,10 +2402,44 @@
                              } else {
                                  None
                              };
@@ -563,7 +600,7 @@
                              (result, element_state)
                          },
                      )
-@@ -2431,13 +2465,15 @@
+@@ -2431,13 +2475,15 @@
              || window.is_inspector_picking(cx)
      }
  
@@ -580,7 +617,7 @@
          fn round_to_two_decimals(pixels: Pixels) -> Pixels {
              const ROUNDING_FACTOR: f32 = 100.0;
              (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
-@@ -2490,9 +2526,9 @@
+@@ -2490,9 +2536,9 @@
                  scroll_handle_state.bounds = bounds;
              }
  
@@ -592,6 +629,16 @@
          }
      }
  
+@@ -3567,6 +3613,9 @@
+         if let Some(placeholder) = &self.aria.placeholder {
+             node.set_placeholder(placeholder.to_string());
+         }
++        if let Some(live) = self.aria.live {
++            node.set_live(live);
++        }
+         if let Some(orientation) = self.aria.orientation {
+             node.set_orientation(orientation);
+         }
 --- a/src/window/a11y.rs
 +++ b/src/window/a11y.rs
 @@ -96,6 +96,14 @@
@@ -755,3 +802,14 @@
                  {
                      let prepaint_start = window.prepaint_index();
                      window.reuse_prepaint(element_state.prepaint_range.clone());
+--- a/src/gpui.rs
++++ b/src/gpui.rs
+@@ -96,7 +96,7 @@
+ 
+ pub use accesskit;
+ pub use accesskit::Action as AccessibleAction;
+-pub use accesskit::{Orientation, Role, Toggled};
++pub use accesskit::{Live, Orientation, Role, Toggled};
+ pub use action::*;
+ pub use anyhow::Result;
+ pub use app::*;

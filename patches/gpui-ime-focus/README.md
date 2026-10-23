@@ -14,7 +14,7 @@ python3 patches/gpui-ime-focus/verify.py --archives \
   "$HOME/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f"
 ```
 
-`verify.py` checks every retained byte against `vendor-files.json`, validates the ten modified source files against the reviewed diffs, rejects extra/missing/modified files and links, and verifies the resolved packages come from the actual product paths. Reconstructing the original registry entries must reproduce the pre-activation lock hash: only the two source entries changed, with no version changes. Archive audit uses the existing safe extractor and compares every retained byte with the pinned archives plus patches; only removal of example/test targets and `publish = false` changes manifests. It creates temporary data only below the owned `apps/gpui/target/tmp` root. The architecture guard runs source checks; GPUI CI also verifies actual metadata after its normal builds/tests. Source files and the product lock use LF on all checkouts.
+`verify.py` checks every retained byte against `vendor-files.json`, validates the eleven modified source files against the reviewed diffs, rejects extra/missing/modified files and links, and verifies the resolved packages come from the actual product paths. Reconstructing the original registry entries must reproduce the pre-activation lock hash: only the two source entries changed, with no version changes. Archive audit uses the existing safe extractor and compares every retained byte with the pinned archives plus patches; only removal of example/test targets and `publish = false` changes manifests. It creates temporary data only below the owned `apps/gpui/target/tmp` root. The architecture guard runs source checks; GPUI CI also verifies actual metadata after its normal builds/tests. Source files and the product lock use LF on all checkouts.
 
 ## Shared tab-stop registration
 
@@ -23,6 +23,10 @@ The same source tree also carries the `TabStopMap::insert` fix for [longbridge/g
 ## Accessibility press and scroll-into-view
 
 The same `gpui-pre` source also changes `element.rs`, `elements/div.rs`, `window.rs`, `window/a11y.rs` and `view.rs` so an accessibility `Click` on a node without its own listener no longer synthesizes a mouse click at a stale, unclipped or covered position. Prepaint records each node's clip, its own hitbox and its enclosing scroll containers (with their scrolling axes), plus every hitbox that acts on a pointer press; a press is delivered only at a point (centre first, then a three-by-three grid) where hit testing reaches that hitbox with no other such hitbox above it, otherwise the node is scrolled into view and pressed two frames later, or not at all. Nodes inside scroll containers declare and handle `ScrollIntoView`, which only moves the axes a container scrolls. Cached views do not reuse their prepaint while accessibility is active, so their nodes stay in the tree. Test support gains `Window::simulate_a11y_activation` and `Window::simulate_a11y_action`. The analysis and reproduction are in [`docs/GPUI_A11Y_CLICK_REPRO.md`](../../docs/GPUI_A11Y_CLICK_REPRO.md); product regressions are `apps/gpui/crates/shell/tests/a11y_actions.rs` and the UI test `a11y_press_on_a_setting_scrolled_under_the_tabs_reaches_the_setting`. No upstream issue has been filed yet.
+
+## Live regions
+
+`elements/div.rs` also gains `aria_live(Live)`, which sets AccessKit's `live` property so platform adapters announce the element's value when it changes, and `gpui.rs` re-exports `accesskit::Live`. Test support gains `Window::a11y_node_for_test` to read the last frame's node. ImgConvert's action bar uses it for a size-less status node that exists for one frame when a batch starts, is cancelled, finishes or fails, or a settings write fails, so each milestone is announced once (`batch_milestones_are_announced_once`, `settings_and_batch_failures_are_both_announced`).
 
 ## Ownership and behavior
 

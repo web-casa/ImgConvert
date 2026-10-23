@@ -143,6 +143,9 @@ workflow.cancel:
 workflow.cancelling:
   en: Cancelling…
   zh-CN: 正在取消…
+workflow.announce_started:
+  en: "Converting a batch of %{count}"
+  zh-CN: "开始转换，共 %{count} 个文件"
 workflow.progress:
   en: "%{done} of %{total} done"
   zh-CN: "已完成 %{done} / %{total}"
