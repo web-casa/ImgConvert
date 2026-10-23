@@ -76,6 +76,8 @@ osascript scripts/record-gpui-macos-voiceover.applescript "$CANDIDATE_PID" 20 fi
 | 提交 / 候选 SHA256 | Mac / OS / 架构 | 语言 / 输入法 / 缩放 | 场景 | 实际结果 | 录屏 / 日志 / 签名证据 | 操作者 / 时间 |
 | --- | --- | --- | --- | --- | --- | --- |
 
+收口所用的最终记录填在文末“2026-10-24：最终候选集中复验与 G2 收口”一节的证据表中，本模板表不再单独填写。
+
 当前记录（2026-10-19）：目标为 `ivmmdexuniji.local` 的 macOS 13.6 / arm64，用户确认 `ivmm` 为专用测试账号并授予辅助功能；此前的 `-25211` 已解除。所有候选、截图助手和日志位于独立 worktree 的 `target/tmp/g2-scope`，不改原有脏检出。钥匙串仍无正式签名身份；本地 ad-hoc 签名仅用于开发沙盒行为检查，不代表 MAS 信任、profile、公证或 TestFlight 验收（参见 [Apple 官方示例的 Debug 与 Distribution 区别](https://github.com/Apple-Actions/Example-macOS)）。
 
 已取得的原生补充证据：
@@ -515,7 +517,7 @@ G2 继续开放。
 
 | 项目 | 记录 |
 | --- | --- |
-| 源码 | main `f88e50f4f2264c17f2f77115e737733b045eaeae`（即 #63 的合并提交），测试机独立检出 `~/tools/imgconvert-glass-20261023`，`git status` 干净 |
+| 源码 | main `f88e50f4f2264c17f2f77115e737733b045eaeae`（#63 rebase 合并后的结果），测试机独立检出 `~/tools/imgconvert-glass-20261023`，`git status` 干净 |
 | 依赖 | gpui-kit `=0.7.1`；gpui-pre 0.3.8 以 vendor 方式锁定（`apps/gpui/vendor/gpui-pre`，补丁登记见 `patches/gpui-ime-focus/`） |
 | 机器 | `ivmmdexuniji.local`，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用测试账号 `ivmm` |
 | direct 候选 | `cargo build --release --locked -p imgconvert-gpui`，构建输出 SHA256 `83b057c40b7718dcfb1b53c8f7453f940458bc83eb0828ec96bf4da87afe31c8`（构建日志 `g2-final2-build/direct.log`，`7363a350…`）；ad-hoc 装包为 `~/imgc-glass/ImgConvertGlass.app`，主程序 `1634aa6ba2593479c525e1d46331f58229ec7fe098fa4c132d2b2825f554e89d` |
@@ -527,7 +529,7 @@ G2 继续开放。
 
 ### 录屏
 
-全屏连续录制，开着 VoiceOver 字幕面板。原始视频只保存在测试机运行目录 `g2-vo-glass-zh-20261023-0236/recordings/`（目录名沿用 10-23 建立的运行目录，内容为 10-24 录制）。
+全屏连续录制；VoiceOver 录屏开着字幕面板，IME 录屏时 VoiceOver 关闭。原始视频只保存在测试机运行目录 `g2-vo-glass-zh-20261023-0236/recordings/`（目录名沿用 10-23 建立的运行目录，内容为 10-24 录制）。
 
 | 文件 | 时长 | SHA256 | 内容 |
 | --- | --- | --- | --- |
@@ -555,7 +557,7 @@ G2 继续开放。
 
 ### IME（中文界面、浅色，简体拼音 `com.apple.inputmethod.SCIM.ITABC`）
 
-用真实鼠标点击聚焦“预设名称”，Ctrl+Space 切换输入法，逐键输入。截图用已授权的截图助手（窗口所在区域，含系统候选窗），保存在运行目录 `final2-ime/`；全程连续录屏 `g2-final2-ime.mov`。下表的坐标与哈希来自带录屏的第二次运行（04:01–04:09），与第一次运行（03:27–03:30）结果一致。
+用真实鼠标点击聚焦“预设名称”，Ctrl+Space 切换输入法，逐键输入。截图用已授权的截图助手（窗口所在区域，含系统候选窗），保存在运行目录 `final2-ime/`；全程连续录屏 `g2-final2-ime.mov`。下表的坐标与哈希来自带录屏的第二次运行（04:01–04:09），B1–B4 与第一次运行（03:27–03:30）结果一致，B5 只在第二次运行中执行。
 
 | 步骤 | 实际结果 |
 | --- | --- |
@@ -564,7 +566,7 @@ G2 继续开放。
 | B1 退格与继续 | 退格后“ni ha”，补 o 回到“ni hao”；Space 确认为“你好”，继续输入 ma 并确认得到“你好吗” |
 | B2 移动窗口后 | 窗口 (216,85)→(150,70)；重新组合“shi”，字段 (876,540)，候选 (869,568)，随窗口移动；截图 `ime-after-move.png`（`9b08b0ca…`）；窗口随后移回 (216,85) |
 | B3 滚动设置后 | 设置区滚动后字段到 (942,435)，候选 (935,463)，随滚动移动 |
-| B5 Escape 取消组合 | 组合“zhong”（候选紧贴字段），按 Escape 后字段为空、候选关闭；截图 `ime-b5-composing.png`（`733af51f…`）、`ime-b5-cancelled.png`（`59e5a5f2…`） |
+| B5 Escape 取消组合 | 组合“zhong”（候选紧贴字段），按 Escape 后字段为空、候选关闭。“预设名称”是未保存的草稿字段，没有可被覆盖的已保存值；“未确认组合不覆盖已保存设置”沿用 10-19 在后缀字段上的记录，此后 IME 路径未改动；截图 `ime-b5-composing.png`（`733af51f…`）、`ime-b5-cancelled.png`（`59e5a5f2…`） |
 | B4 组合中打开对话框 | 组合“ni”时打开“关于”：候选关闭，字段被对话框遮住；一次 Escape 关闭对话框，字段保留已提交的“ni”，没有候选残留，也没有写进别的字段 |
 
 每步结束后切回 ABC，测试账号最终输入源为 ABC。
@@ -576,7 +578,7 @@ G2 继续开放。
 | C1 取消输入选择器 | 选择器关闭，队列为空，状态 “Add files to begin” |
 | C2a 取消首次输出授权 | 导入后按 Start，出现原生选择器；Escape 后只剩主窗口，行仍为 Pending，`sbx-out` 内 0 个文件。界面上显示的 `sbx-out` 是上次会话保存的路径，没有被当作授权 |
 | C2 选输出目录并转换 | 再按 Start，在选择器中选 `sbx-out`：写出 `a-precision16_done.avif`（580 B，SHA256 `2712ac93…`），摘要 “1 done · saved 58 B”，源 hash 不变 |
-| C3 已选输出后取消再次选择 | 再次打开目录选择器后取消：仍显示 `sbx-out`；之后 Start 不再弹选择器，直接写出，说明本会话授权保留 |
+| C3 已选输出后取消再次选择 | 再次打开目录选择器后取消：仍显示 `sbx-out`；之后 Start 不再弹选择器，直接写出 `sbx-out/a-precision16_done.avif`（本行未单独记录 hash），说明本会话授权保留 |
 | C4 不可写位置并重选恢复 | `chmod 500 sbx-out` 后转换：行显示 “Failed · Cannot write to the output directory: …/sbx-out. Choose an output directory and try again.”，目录内 0 个文件；重选 `sbx-out2` 后转换成功（`2712ac93…`），源 hash 不变。之后把 `sbx-out` 恢复为 755 并记录 |
 | C5 重启 | 退出并重新启动：保存的 `sbx-out2` 仍显示，但 Start 打开原生选择器；选择 `sbx-out`（已恢复 755）后转换成功（`2712ac93…`），源 hash 不变 |
 | C6 来源与输出重合 | 沿用 `0d39630` 的记录（确认框 Cancel 后源 hash 不变）。`0d39630..f88e50f` 之间的 GPUI 改动只有对话框关闭按钮、英文单复数、禁用状态、品牌图标和批次摘要（另有 tokio 与许可清单更新），不涉及输出规划与来源保护。本候选上的尝试没有构成重合（格式没切到 PNG、后缀仍在），产生的测试输出已删除，未计入 |
@@ -585,17 +587,28 @@ G2 继续开放。
 
 | 提交 / 候选 SHA256 | Mac / OS / 架构 | 语言 / 输入法 / 缩放 | 场景 | 结果 | 证据 | 时间 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `f88e50f` / direct `1634aa6b…` | Parallels VM / 13.6 / arm64 | 中文、浅色 / VO 中文 / Retina | V1–V10 | 通过 | `g2-final2-vo-zh-CN-light.mov`、`g2-final2-vo-zh-CN-light-v8.mov`，`final2-vo-zh-CN-light/*.txt` | 02:18–02:41 |
-| 同上 | 同上 | 英文、深色 / VO 中文 / Retina | V1–V10 | 通过 | `g2-final2-vo-en-US-dark.mov`、`g2-final2-vo-en-US-dark-v8.mov`，`final2-vo-en-US-dark/*.txt` | 03:09–03:26 |
+| `f88e50f` / direct `1634aa6b…` | Parallels VM / 13.6 / arm64 | 中文、浅色 / VO 中文 / Retina | V1–V10 | 通过（遗留见下） | `g2-final2-vo-zh-CN-light.mov`、`g2-final2-vo-zh-CN-light-v8.mov`，`final2-vo-zh-CN-light/*.txt` | 02:18–02:41 |
+| 同上 | 同上 | 英文、深色 / VO 中文 / Retina | V1–V10 | 通过（遗留见下） | `g2-final2-vo-en-US-dark.mov`、`g2-final2-vo-en-US-dark-v8.mov`，`final2-vo-en-US-dark/*.txt` | 03:09–03:26 |
 | 同上 | 同上 | 中文、浅色 / 简体拼音 / Retina | B1–B5 | 通过 | `g2-final2-ime.mov`，`final2-ime/*.png` | 04:01–04:09 |
 | `f88e50f` / Store 签名后 `e52b6cc9…` | 同上 | 英文 / ABC / Retina | C1、C2a、C2–C5 | 通过 | 脚本输出，`sbx-out*` 输出 hash `2712ac93…` | 03:30–03:36 |
 
 ### 其他三项门槛的口径
 
 G2 原文另外三项沿用阶段 2 的 PoC 证据，不是本候选上的测量：
-- 性能：2026-10-17 PoC，同等功能与数据集下，已测的导入（97 ms 对 96 ms，在 `GPUI_BASELINE.md` 规定的 ±5% 内）与空闲内存（−69%/−81%）不劣于基线；取消路径没有性能指标，列为遗留。门槛原文允许以 PoC 结论判断，完整功能的性能结论由 G3/G4 给出。
+- 性能：2026-10-17 PoC，同等功能与数据集下，已测的导入（97 ms 对 96 ms，在 `GPUI_BASELINE.md` 规定的 ±5% 内）与空闲内存（−69%/−81%）不劣于基线。取消路径在基线协议里没有指标（`batch_cancelled` 使该次运行无效），本次补测，见下一小节。门槛原文允许以 PoC 结论判断，完整功能的性能结论由 G3/G4 给出。
 - 六平台探针：run 39008501338，证明启动、就绪与出帧；阶段 2 计划中更宽的探针步骤（打开选择器、输入中文、正常退出、安装身份）没有全部做。
 - macOS 私有 API 扫描：为 0（阶段 2 记录）。
+
+### 取消路径性能补测
+
+同一虚拟机、同一语料（200 个 `harbor-blue.png` 副本，1800×1200，转 AVIF），各跑 5 次，每次新进程。批次开始 3 s 后用 CGEvent 在“取消”按钮上真实点击，记录点击脚本开始与结束的时间，计算到探针 `batch_cancelled` 标记的间隔（脚本 `cancel-gpui.sh` / `cancel-tauri.sh`，日志在测试机 `~/imgc-glass/cancel-bench/`）。
+
+| 应用 | 二进制 | 自点击开始（中位数，ms） | 自点击结束（中位数，ms） | 各次（开始..结束） |
+| --- | --- | --- | --- | --- |
+| GPUI direct（`f88e50f`） | `83b057c4…` | 826 | 417 | 871..464、826..393、884..379、820..417、286..−117 |
+| Tauri 基线（`5f81987` 检出中 10-12 的 release 构建，复制后运行） | `e0754068…` | 1989 | 817 | 1305..182、2037..1401、2145..817、1936..1258、1989..427 |
+
+点击脚本本身有 0.4–1.3 s 的开销（三个 CGEvent 之间各等 0.1 s，再加 osascript 启动），所以真实延迟落在两列之间。两种口径下 GPUI 都不慢于基线。GPUI 第 5 次的负值表示取消在脚本返回前已完成。
 
 ### 遗留（不阻塞收口）
 
@@ -605,9 +618,8 @@ G2 原文另外三项沿用阶段 2 的 PoC 证据，不是本候选上的测量
 - 禁用状态：原生只观察了空队列时的“开始转换”和设置区的“保存当前设置”。批次运行中导入、粘贴、语言、格式、输出目录等控件的禁用状态由 #61 的 UI 测试 `disabled_commands_are_disabled_for_assistive_technology` 覆盖，没有原生 VO 记录。Linux AT-SPI 适配层不读取按钮禁用状态，Kit 的 Switch/Select/Slider/Input 不能从外部设置禁用（上游 longbridge/gpui-kit#3660 已补充说明）。
 - IME：组合中缩放窗口时候选停在原位，直到下一次按键；同机 Cocoa `NSTextField` 表现相同，按平台行为记录（缩放场景在 v24 候选上验证，本候选未重做）。不同缩放的多显示器（虚拟机只有一个显示器）和数字输入框没有原生验证。
 - 沙盒：来源与输出重合沿用 `0d39630` 的记录（理由见上表）。
-- 性能：取消路径没有测量。
 - 正式 MAS 签名、profile、TestFlight 与 Microsoft Store 实跑属于 G3 及之后；本节不涉及任何公开发布或商店提交。
 
 ### 判断
 
-VoiceOver、IME、沙盒授权三项冒烟在同一最终候选 `f88e50f` 上有原生证据；沿用旧候选或未在本候选上记录的项目都列在“遗留”中（窗口缩放中的 IME、C6、对话框标题朗读、键盘焦点可见性、阶段 2 的性能/探针/私有 API）。性能项中取消路径从未有基线指标（基线协议把 `batch_cancelled` 视为无效运行），按阶段 2 已作出的 PoC 判断沿用，并交用户确认；其余遗留不影响基本可用性。**G2 收口**。按开发方案，第 11 项完成，D1a/C1（第 12a/12b 项）与阶段 4/5 不再受 G2 限制；它们仍按开发方案 §4 的次序推进，G1/G3 的验收各自独立。
+VoiceOver、IME、沙盒授权三项冒烟在同一最终候选 `f88e50f` 上有原生证据；沿用旧候选或未在本候选上记录的项目都列在“遗留”中（窗口缩放中的 IME、C6、对话框标题朗读、键盘焦点可见性、阶段 2 的导入/内存/探针/私有 API）。取消路径的性能已补测，不劣于基线；其余遗留不影响基本可用性。**G2 收口**。按开发方案，第 11 项完成，D1a/C1（第 12a/12b 项）与阶段 4/5 不再受 G2 限制；它们仍按开发方案 §4 的次序推进，G1/G3 的验收各自独立。
