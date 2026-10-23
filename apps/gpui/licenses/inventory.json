@@ -1195,7 +1195,7 @@
     },
     {
       "name": "clipboard-win",
-      "version": "5.4.1",
+      "version": "5.4.3",
       "license": "BSL-1.0",
       "authors": [
         "Douman <douman@gmx.se>"
@@ -11750,5 +11750,5 @@
       "sha256": "efa1224931b98468f5005f77285457f8d2eab0a77a15941aa10abbab1ae9a74e"
     }
   ],
-  "documentSha256": "fbd1d9d10013d5e2ff8d0df123c151397acc0288a2b6071c1c6598d9016586ee"
+  "documentSha256": "c9883df481552d6d70b5a0a4a7a51dde85ec62623fe43c87f15b55cd320e0c4e"
 }
