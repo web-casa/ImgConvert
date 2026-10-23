@@ -455,12 +455,40 @@
      pub fn toggle_inspector(&mut self, cx: &mut App) {
 --- a/src/app/test_context.rs
 +++ b/src/app/test_context.rs
-@@ -614,6 +614,30 @@
-             window.dispatch_keystroke(keystroke, cx)
-         })
-         .unwrap();
+@@ -5,8 +5,9 @@
+     Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+     Pixels, Platform, PlatformTextSystem, Point, Render, Result, SharedString, Size,
+     SystemNotification, SystemNotificationResponse, Task, TestDispatcher, TestPlatform,
+-    TestScreenCaptureSource, TestWindow, TextSystem, VisualContext, Window, WindowBounds,
+-    WindowHandle, WindowOptions, WindowVisibility, app::GpuiMode, window::ElementArenaScope,
++    TestScreenCaptureSource, TestWindow, TextSystem, VisualContext, Window, WindowAppearance,
++    WindowBounds, WindowHandle, WindowOptions, WindowVisibility, app::GpuiMode,
++    window::ElementArenaScope,
+ };
+ use anyhow::{anyhow, bail};
+ use futures::{Stream, StreamExt, channel::oneshot};
+@@ -462,6 +463,17 @@
+         self.test_window(window_handle).simulate_resize(size);
+     }
+ 
++    /// Simulates the platform switching the window between light and dark
++    /// appearance, running the window's appearance observers.
++    pub fn simulate_window_appearance_change(
++        &self,
++        window_handle: AnyWindowHandle,
++        appearance: WindowAppearance,
++    ) {
++        self.test_window(window_handle)
++            .simulate_appearance_change(appearance);
 +    }
 +
+     /// Simulates a change in whether the platform is presenting the window.
+     pub fn simulate_window_visibility_change(
+         &self,
+@@ -616,6 +628,30 @@
+         .unwrap();
+     }
+ 
 +    /// Captures a counter that can be read during a window update without
 +    /// borrowing App again or forcing a draw. The observer owns the test handle.
 +    pub fn frame_wake_observer(&self, window: AnyWindowHandle) -> impl Fn() -> usize + use<> {
@@ -483,10 +511,11 @@
 +            crate::PlatformWindow::set_input_handler(&mut platform, handler);
 +            true
 +        }
-     }
- 
++    }
++
      /// Returns the `TestWindow` backing the given handle.
-
+     pub(crate) fn test_window(&self, window: AnyWindowHandle) -> TestWindow {
+         self.app
 --- a/src/tab_stop.rs
 +++ b/src/tab_stop.rs
 @@ -85,6 +85,10 @@

@@ -5,8 +5,9 @@ use crate::{
     Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
     Pixels, Platform, PlatformTextSystem, Point, Render, Result, SharedString, Size,
     SystemNotification, SystemNotificationResponse, Task, TestDispatcher, TestPlatform,
-    TestScreenCaptureSource, TestWindow, TextSystem, VisualContext, Window, WindowBounds,
-    WindowHandle, WindowOptions, WindowVisibility, app::GpuiMode, window::ElementArenaScope,
+    TestScreenCaptureSource, TestWindow, TextSystem, VisualContext, Window, WindowAppearance,
+    WindowBounds, WindowHandle, WindowOptions, WindowVisibility, app::GpuiMode,
+    window::ElementArenaScope,
 };
 use anyhow::{anyhow, bail};
 use futures::{Stream, StreamExt, channel::oneshot};
@@ -460,6 +461,17 @@ impl TestAppContext {
     /// Simulates the user resizing the window to the new size.
     pub fn simulate_window_resize(&self, window_handle: AnyWindowHandle, size: Size<Pixels>) {
         self.test_window(window_handle).simulate_resize(size);
+    }
+
+    /// Simulates the platform switching the window between light and dark
+    /// appearance, running the window's appearance observers.
+    pub fn simulate_window_appearance_change(
+        &self,
+        window_handle: AnyWindowHandle,
+        appearance: WindowAppearance,
+    ) {
+        self.test_window(window_handle)
+            .simulate_appearance_change(appearance);
     }
 
     /// Simulates a change in whether the platform is presenting the window.

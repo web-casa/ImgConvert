@@ -32,7 +32,7 @@
   "gpui-pre/src/app/entity_map.rs": "47e536ebd98ec97bc1193c176295b4b69dfb2a37c30cb8ab7879e32b1a4ea180",
   "gpui-pre/src/app/headless_app_context.rs": "b8f42a8e9e99f74611984fcf301f5f998377e7ea2eacd20a3a9c45873143a248",
   "gpui-pre/src/app/test_app.rs": "ea41a502634c8eb8011a0f499b8a3900939228e6f6260bf8857766c799633316",
-  "gpui-pre/src/app/test_context.rs": "576871bbb7c6c0a844dbed9a4f03c7df9082051bf77c17d66fafc073e7891785",
+  "gpui-pre/src/app/test_context.rs": "d7a2a41a93fe276ab0959085ea2468fbce66ac051035292032835e9ff064c4b1",
   "gpui-pre/src/app/visual_test_context.rs": "b6e0399349417b70cf067a90cf46a385a0b2efc999e30fd4a037d0ecdd87ff1c",
   "gpui-pre/src/arena.rs": "262e6403f8fa505592dddb674028f43c0e41beb1f51aa97e37c917215052580b",
   "gpui-pre/src/asset_cache.rs": "cc1eb306523094d2d9a0e15538ce9a4fe29408288bd73e27781ea9a92c1b059e",
