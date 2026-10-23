@@ -1222,6 +1222,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 
 [[package]]
+name = "fd-lock"
+version = "4.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce92ff622d6dadf7349484f42c93271a0d49b7cc4d466a936405bacbe10aa78"
+dependencies = [
+ "cfg-if",
+ "rustix",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "fdeflate"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2187,10 +2198,9 @@ checksum = "65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a"
 name = "imgconvert"
 version = "0.3.1"
 dependencies = [
- "blake3",
- "hayro",
+ "imgconvert-backend",
  "imgconvert-core",
- "libc",
+ "imgconvert-platform",
  "serde",
  "serde_json",
  "tauri",
@@ -2202,9 +2212,24 @@ dependencies = [
  "tauri-plugin-persisted-scope",
  "tauri-plugin-process",
  "tauri-plugin-store",
+]
+
+[[package]]
+name = "imgconvert-backend"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hayro",
+ "imgconvert-core",
+ "imgconvert-platform",
+ "serde",
+ "serde_json",
  "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
  "tokio-util",
  "unicode-normalization",
+ "url",
  "windows",
 ]
 
@@ -2224,6 +2249,21 @@ dependencies = [
  "resvg",
  "ssimulacra2",
  "webp",
+]
+
+[[package]]
+name = "imgconvert-platform"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "fd-lock",
+ "imgconvert-core",
+ "libc",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "unicode-normalization",
+ "windows",
 ]
 
 [[package]]
@@ -5084,9 +5124,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.53.1"
+version = "1.53.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
 dependencies = [
  "bytes",
  "libc",
