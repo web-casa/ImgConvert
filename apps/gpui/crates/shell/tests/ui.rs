@@ -3374,6 +3374,7 @@ fn cancel_stops_a_running_batch_without_outputs(cx: &mut TestAppContext) {
     let (handle, workspace) = open_workspace(cx);
     let dir = std::env::temp_dir().join(format!("imgconvert-gpui-cancel-{}", std::process::id()));
     let out = dir.join("out");
+    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&out).unwrap();
     let keys = ["c0", "c1", "c2"];
     cx.update(|cx| {
@@ -3439,10 +3440,7 @@ fn cancel_stops_a_running_batch_without_outputs(cx: &mut TestAppContext) {
         let queue = models.queue().read(cx);
         for key in keys {
             let status = &queue.item(&key.into()).unwrap().status;
-            assert!(
-                !matches!(status, ItemStatus::Done { .. }),
-                "{key} was not converted: {status:?}"
-            );
+            assert_eq!(*status, ItemStatus::Pending, "{key} stays pending");
         }
     });
     cx.update_window(handle, |_, window, cx| {
