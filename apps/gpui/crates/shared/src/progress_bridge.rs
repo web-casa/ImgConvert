@@ -236,8 +236,12 @@ fn settle(
                 cx.notify();
             });
             batch.update(cx, |batch, cx| {
-                batch.fail(crate::command_error::format_command_error(&error));
-                cx.notify();
+                // Like the Ok path: only a batch still running may fail; a
+                // model already settled or forgotten stays as it is.
+                if batch.is_active() {
+                    batch.fail(crate::command_error::format_command_error(&error));
+                    cx.notify();
+                }
             });
         }
     });
