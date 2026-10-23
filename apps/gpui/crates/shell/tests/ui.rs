@@ -521,6 +521,9 @@ fn comparison_preview_generates_marks_stale_and_releases(cx: &mut TestAppContext
         window.render_frame(cx);
         assert!(window.has_active_dialog(cx));
         assert!(window.find("comparison-preview").visible());
+        // While the preview loads, its own close button is the way out.
+        assert!(window.find("preview-close").visible());
+        assert!(window.try_find("close").is_none(), "no corner close button");
     })
     .unwrap();
     let preview = cx.update(|cx| {
@@ -1394,6 +1397,7 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
         assert_ne!(view.read(cx).outcome(cx), Some(ScenarioOutcome::Invalid));
         window.render_frame(cx);
         assert!(window.find("impact-result").visible());
+        assert!(window.try_find("close").is_none(), "no corner close button");
         window.click("impact-close", cx);
     })
     .unwrap();
@@ -1484,6 +1488,7 @@ fn finished_items_open_the_storage_scenario_dialog(cx: &mut TestAppContext) {
         assert_eq!(batch_view.read(cx).subject(), &ImpactSubject::Batch);
         assert_eq!(batch_view.read(cx).batch_counts(cx), Some((1, 0)));
         assert!(window.find("impact-measurement").visible());
+        assert!(window.try_find("close").is_none(), "no corner close button");
         window.click("impact-close", cx);
     })
     .unwrap();
@@ -2479,6 +2484,7 @@ fn legal_dialogs_focus_the_reading_control_on_open_and_restore_the_trigger(
             .unwrap();
         let mut visited = vec![first.clone()];
         let mut completed_cycle = false;
+        let mut reached_close = false;
         for _ in 0..8 {
             cx.update_window(handle, |_, window, cx| window.press("shift-tab", cx))
                 .unwrap();
@@ -2486,6 +2492,7 @@ fn legal_dialogs_focus_the_reading_control_on_open_and_restore_the_trigger(
                 .update_window(handle, |_, window, cx| {
                     window.render_frame(cx);
                     assert!(gpui_kit::base::active_focus_trap(window, cx).is_some());
+                    reached_close |= window.find("legal-close").focused() == Some(true);
                     window.focused(cx).unwrap()
                 })
                 .unwrap();
@@ -2501,7 +2508,10 @@ fn legal_dialogs_focus_the_reading_control_on_open_and_restore_the_trigger(
             visited.push(focused);
         }
         assert!(completed_cycle, "reverse Tab must complete a modal cycle");
-        assert_eq!(visited.len(), 4, "both close buttons, document and support");
+        // Document, support link and the localized close button: Kit's
+        // corner close button is not shown.
+        assert_eq!(visited.len(), 3, "document, support and close");
+        assert!(reached_close, "the localized close button is in the cycle");
         cx.update_window(handle, |_, window, cx| {
             window.press("escape", cx);
             window.render_frame(cx);
@@ -4371,6 +4381,21 @@ fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
             window.click(close, cx);
             window.render_frame(cx);
             assert!(!window.has_active_dialog(cx), "{close} closes it");
+        })
+        .unwrap();
+        // Escape still closes it too.
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(trigger, cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx));
+            window.press("escape", cx);
+            window.render_frame(cx);
+            assert!(!window.has_active_dialog(cx), "Escape closes {trigger}");
         })
         .unwrap();
     }

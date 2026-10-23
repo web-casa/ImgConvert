@@ -548,6 +548,8 @@ mod tests {
             open_updates(window, cx);
             window.render_frame(cx);
             assert!(window.find("update-install").visible());
+            assert!(window.find("update-close").visible());
+            assert!(window.try_find("close").is_none(), "no corner close button");
             window.click("update-install", cx);
         })
         .unwrap();
