@@ -1,6 +1,6 @@
 # GPUI G2 / R11 原生验收
 
-G2 当前保持未关闭。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
+**G2 已于 2026-10-24 收口**，判断、依据与遗留见文末“最终候选集中复验与 G2 收口”一节；之前各节保留历次记录。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
 
 ## 候选和隔离环境
 
@@ -506,3 +506,88 @@ G2 继续开放。
 - 在 Page Down 滚动正文时，VO 没有给出新的朗读（只有“你当前在窗口中”的提示）。按 Tab 时，VO 的 text under cursor 仍是整篇正文，因此看不出焦点有没有移到关闭按钮。键盘焦点循环此前已在 #42 的原生复验中通过，当时有 4 个停靠点；移除角落按钮后是 3 个，无头测试已覆盖，原生没有重做。
 
 连续录屏：`屏幕录制2026-10-23 18.08.36.mov`，保存在测试机运行目录。
+
+## 2026-10-23/24：最终候选集中复验与 G2 收口
+
+此前的记录分散在多个候选上（`db5a98f` 加工作区补丁、`0d39630`，以及 #59 之后没有构建 hash 的许可对话框记录）。只读评审据此否决了第一次收口草稿。本节在**同一个**最终候选上重做全部三项。
+
+### 候选
+
+| 项目 | 记录 |
+| --- | --- |
+| 源码 | main `3d14b71`（#62 之后），测试机独立检出，`git status` 干净 |
+| 依赖 | gpui-kit `=0.7.1`；gpui-pre 0.3.8 以 vendor 方式锁定（`apps/gpui/vendor/gpui-pre`，补丁登记见 `patches/gpui-ime-focus/`） |
+| 机器 | `ivmmdexuniji.local`，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用账号 `ivmm` |
+| direct 候选 | `cargo build --release --locked`，构建输出 SHA256 `af6c6f402a78473ed5235a5c940b053b457e58322d58dbea19ef8bf134ee46e2`（日志 `direct.log`，`f700df72…`）；ad-hoc 装包为 `~/imgc-glass/ImgConvertGlass.app`，主程序 `1920c88862d1564b4709bac3c81cfe4a0e92f4bb7ef0ec476360f36bcd2fee40` |
+| Store 功能候选 | `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 cargo build --release --locked --no-default-features -p imgconvert-gpui`，构建输出 `bbcb4bb764392a73f80ce3226665ed9d440f4706e6ee428bd6a98d7e1dbf591d`（日志 `store.log`，`14bfcbeb…`）；装包为 `~/imgc-glass/sandbox/ImgConvertGlassSandbox.app`，只有 `app-sandbox` 与 `files.user-selected.read-write` 两项 entitlement，ad-hoc runtime 签名后 `codesign --verify --deep --strict` 通过，签名后主程序 `57c8061368c55bb33bce50ba71b8a3396a0c58ec19eaa313c7bf113becbb91b2` |
+| 夹具 | `g2-final-input/`：`a-precision16.png`、`harbor-blue.png`、`motion.gif`、`motion.png`（APNG）、`unverified.png`（填充后动画状态无法在预算内确认）；沙盒用 `sbx-in/a-precision16.png`（`8ec201a3…`） |
+
+录屏均为全屏连续录制，开着 VoiceOver 字幕面板，原始视频只保存在测试机运行目录 `g2-vo-glass-zh-20261023-0236/recordings/`：
+
+| 文件 | 时长 | SHA256 | 内容 |
+| --- | --- | --- | --- |
+| `g2-final-vo-zh.mov` | 483 s | `d236503ef9534b24895a541ce9da9abe6634691af7f8929714d7b32711aecedc` | 中文/浅色 A1–A6 |
+| `g2-final-vo-zh-dialog.mov` | 600 s | `55a2f45a02846d54466c264db2142b99c0e4aeda452f93ceddede7f0b90b7d0e` | A8；A7 的第一次尝试（VO 停在别的窗口，未计入） |
+| `g2-final-vo-zh-a7.mov` | 305 s | `e0d06a8aff307b320cbc502270039f95e4762926aac2f87dc9f432cdc75371a4` | A7 重做 |
+| `g2-final-vo-en-dark.mov` | 1025 s | `cb0491c510d7eae34babb746ff6f101c6d4344a798b3582bbe7dea727b851a95` | 英文/深色 E1–E6 |
+| `g2-final-vo-en-dark-attempt1.mov` | 988 s | `1b6801f1aa25723edd2a1fd7fbaf190aab930a975a4d978a0bce316748135075` | 第一次尝试：脚本把主窗口提到选择器之上，导入为 0，未计入 |
+
+### VoiceOver（清单第 1–5 步）
+
+“经 VO”指用 VoiceOver 的 `perform action`（与 VO+Space 相同）激活；“AXPress”指 System Events 直接按下，只作补充。
+
+| 步骤 | 中文/浅色 | 英文/深色 |
+| --- | --- | --- |
+| 2 空队列（窗口级逐项右移） | 24 项：标题 → 插件诊断/更新…/隐私/关于/English/外观 → 还没有图片 → 说明 → 添加文件…/添加文件夹…/粘贴 → 9 个格式胶囊 → 选择文件夹…: …/vo-out → 先添加文件 → “开始转换 无可用操作 button”（`AXEnabled=false`） | 同样 24 项，英文名称；“Start 无可用操作 button” |
+| 2 导入后的标记 | 经 VO 激活“添加文件夹…”，选择夹具目录：已添加 5 个文件；`motion.gif`、`motion.png` 行读作“动画 · 暂不支持 · …”，`unverified.png` 读作“动画状态未确认 · …”；行内依次为状态、事实、目标格式、对比、移除 | 同样经 VO 导入；“Animated · unsupported · GIF · 64 × 64 · g2-final-input”、“Animation unverified · PNG · …”、“Target format for motion.gif: Global · AVIF”、“Remove motion.gif from the queue” |
+| 3 运行与完成 | 开始转换用 AXPress 触发，经输出目录选择器；字幕 234 s “开始转换，共 5 个文件”，235 s “完成 2 · 失败 3 · 节省 8.6 MB”（两个动画文件和动画状态未确认的文件按设计失败） | 经 VO 激活 Start，经选择器；字幕约 558 s “2 done · 3 failed · saved 8.6 MB”。开始播报没有出现：选择器关闭时 VO 读出焦点“ImgConvert, Heading”，盖过了它（见遗留） |
+| 3 设置标签 | A8：经 VO 进入“转换设置”标签组，激活第 2 个标签，VO 读“输出 tab，第2项（共4项）”，再激活回到“格式” | 设置组的逐项朗读沿用 `0d39630` 的英文记录（见上一节）；本轮没有重做 |
+| 4 对话框 | A7：经 VO 激活“关于”，对话框打开；VO 右移到唯一的“关闭 button”并激活，对话框关闭，“关于”`AXFocused=true`。再次打开后按 Escape，同样关闭并回到“关于” | E5/E6：经 VO 打开 About，VO 先落在许可正文“# GPUI Third-Party Licenses”；右移到“Close button”激活后关闭，About `AXFocused=true`；Escape 同样 |
+| 4 语言跟随 | A2：经 VO 激活“English”，说明文字变为英文；再经 VO 激活“中文”，变回中文 | 界面从 E1 起就是英文 |
+
+### IME（中文界面、浅色，简体拼音 `com.apple.inputmethod.SCIM.ITABC`）
+
+用真实鼠标点击聚焦“预设名称”，Ctrl+Space 切换输入法，逐键输入。截图用已授权的截图助手（窗口所在区域，含候选窗），保存在运行目录 `final-ime/`。
+
+| 步骤 | 实际结果 |
+| --- | --- |
+| B1 组合 | 标记文字“ni hao”，字段 (942,462) 196×24，候选 (935,490)，紧贴字段下方 |
+| B1 翻页 | `=` 展开候选面板（6 列多行），`-` 收回到单行；截图 `ime-b1-page1.png`（`af6dd682…`）、`ime-b1-page2.png`（`d7357799…`）、`ime-b1-page1-again.png`（`aa1dd7ad…`） |
+| B1 退格与继续 | 退格后为“ni ha”，补 o 后回到“ni hao”；Space 确认为“你好”，继续输入 ma 并确认得到“你好吗” |
+| B2 移动窗口后 | 窗口 (216,85)→(150,70)；重新组合“shi”，字段 (876,447)，候选 (869,475)，跟随移动；截图 `ime-after-move.png`（`2ffc743f…`） |
+| B3 滚动设置后 | 设置区滚动 120 px，字段 (942,342)，候选 (935,370)，跟随滚动 |
+| B4 组合中打开对话框 | 组合“ni”时打开“关于”：候选关闭，字段被对话框遮住；一次 Escape 关闭对话框，字段保留已提交的“ni”，没有候选残留，也没有写进别的字段 |
+
+每步结束后切回 ABC，测试账号最终输入源为 ABC。
+
+### 沙盒（Store 功能候选，英文界面）
+
+| 场景（清单行） | 实际结果 |
+| --- | --- |
+| 取消输入选择器（C1） | 选择器关闭，队列为空，状态“Add files to begin” |
+| 选输入并选输出目录（C2） | 首次 Start 打开原生选择器，选 `sbx-out` 后写出 `a-precision16_done.avif`（580 B），摘要“1 done · saved 58 B”，源 hash 不变 |
+| 已选输出后取消再次选择（C3） | 再次打开选择器后取消：仍显示 `sbx-out`；之后 Start 不再弹选择器，直接写出，说明本会话授权保留 |
+| 不可写位置并重选恢复（C4） | `chmod 500 sbx-out` 后转换：行显示 “Failed · Cannot write to the output directory: …/sbx-out. Choose an output directory and try again.”，目录内 0 个文件；重选 `sbx-out2` 后转换成功 |
+| 重启后（C5） | 退出并重新启动：保存的 `sbx-out2` 仍显示，但 Start 打开原生选择器；重新选择 `sbx-out` 后转换成功，源 hash 不变 |
+| 来源与输出重合 | 本候选未重做。`0d39630` 上已验证（确认框 Cancel 后源 hash 不变）；其后 #59–#62 只改对话框关闭按钮、英文复数、禁用状态和品牌图标，不涉及来源保护路径 |
+
+### 其他三项门槛的口径
+
+G2 原文另外三项沿用阶段 2 的 PoC 证据，不是本候选上的测量：
+- 性能：2026-10-17 PoC，同等功能与数据集下导入 97 ms 对 96 ms（在 `GPUI_BASELINE.md` 规定的 ±5% 内），空闲内存 −69%/−81%；没有记录取消路径的性能指标。门槛原文允许以 PoC 结论判断，完整功能的性能结论由 G3/G4 给出。
+- 六平台探针：run 39008501338，证明启动、就绪与出帧；阶段 2 计划中更宽的探针步骤（打开选择器、输入中文、正常退出、安装身份）没有全部做。
+- macOS 私有 API 扫描：为 0（阶段 2 记录）。
+
+### 遗留（不阻塞收口）
+
+- VoiceOver：首次开始时如果先经过输出目录选择器，选择器关闭后 VO 朗读焦点，可能盖过开始播报（英文轮次复现，中文轮次没有）；完成播报两轮都有。
+- VoiceOver：对话框关闭后，键盘焦点回到触发按钮，但 VO 光标停在窗口标题，没有跟到“关于”。
+- 禁用状态：原生只观察了空队列时的“开始转换”。批次运行中导入、粘贴、语言、格式、输出目录等控件的禁用状态由 #61 的 UI 测试 `disabled_commands_are_disabled_for_assistive_technology` 覆盖，没有原生 VO 记录。Linux AT-SPI 适配层不读取按钮禁用状态，Kit 的 Switch/Select/Slider/Input 不能从外部设置禁用（上游 longbridge/gpui-kit#3660 已补充说明）。
+- 设置区的逐项 VO 朗读与告警朗读来自 `0d39630`，本候选上只做了标签切换和行内容朗读。
+- IME：组合中缩放窗口时候选停在原位，直到下一次按键；同机 Cocoa `NSTextField` 表现相同，按平台行为记录（缩放场景在 v24 候选上验证）。不同缩放的多显示器（虚拟机只有一个显示器）和数字输入框没有原生验证。
+- 截图拍摄时发现：一批完成后清空队列，操作栏仍显示上一批的“完成 5”和进度条。这与 G2 三项无关，已在 #63 修复并有回归测试。
+- 正式 MAS 签名、profile、TestFlight 与 Microsoft Store 实跑属于 G3 及之后；本节不涉及任何公开发布或商店提交。
+
+### 判断
+
+VoiceOver、IME、沙盒授权三项冒烟在同一最终候选上有原生证据，遗留项都有记录且不影响基本可用性；连同上述按 PoC 口径满足的性能、探针与私有 API 扫描，**G2 收口**。按开发方案，第 11 项完成，D1a/C1（第 12a/12b 项）与阶段 4/5 不再受 G2 限制；它们仍按开发方案 §4 的次序推进，G1/G3 的验收各自独立。
