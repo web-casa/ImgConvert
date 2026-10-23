@@ -1670,6 +1670,9 @@ fn clipboard_bitmap_button_imports_metadata_and_clears_only_managed_files(cx: &m
     cx.update_window(handle, |_, window, cx| {
         window.render_frame(cx);
         assert_eq!(window.find("queue-feedback").value(), Some("Added 1 file"));
+        // Counts of one read in the singular where they are shown.
+        assert_eq!(window.find("queue-count").value(), Some("1 item"));
+        assert_eq!(window.find("workflow-status").value(), Some("1 file ready"));
         window.click("queue-clear", cx);
     })
     .unwrap();

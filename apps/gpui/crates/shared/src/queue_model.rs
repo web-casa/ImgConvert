@@ -175,7 +175,7 @@ impl ClipboardIssue {
         use crate::i18n::{tr, tr_count, tr_with};
         match self {
             Self::InvalidPaths(count) => {
-                tr_with("queue.clipboard_invalid_paths", &[("count", count)])
+                tr_count("queue.clipboard_invalid_paths", "count", *count, &[])
             }
             Self::PathIssues { skipped, errors } => tr_with(
                 "queue.clipboard_path_issues",

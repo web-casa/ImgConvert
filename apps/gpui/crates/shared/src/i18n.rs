@@ -218,7 +218,14 @@ mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         set_locale(Locale::English);
-        let cases: [CountCase<'_>; 8] = [
+        let cases: [CountCase<'_>; 9] = [
+            (
+                "queue.clipboard_invalid_paths",
+                "count",
+                &[],
+                "1 file path couldn’t be represented as UTF-8. Choose files with supported names.",
+                "2 file paths couldn’t be represented as UTF-8. Choose files with supported names.",
+            ),
             ("queue.item_count", "count", &[], "1 item", "2 items"),
             (
                 "workflow.ready",
