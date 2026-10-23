@@ -9,9 +9,7 @@
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, IconName, Sizable as _, h_flex, v_flex,
-};
+use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, Context, Entity, EventEmitter, FontWeight, InteractiveElement as _, IntoElement, Live,
@@ -19,6 +17,7 @@ use gpui_kit::{
     Subscription, TestSupportExt as _, Window, div,
 };
 use imgconvert_backend::progress::BatchId;
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::i18n::{tr, tr_count, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_shared::{
@@ -390,7 +389,7 @@ impl Render for ActionBar {
                     .bg(glass.chip())
                     .tooltip(output_path.clone())
                     .accessibility_label(choose_output_name)
-                    .disabled(active)
+                    .disabled_for_all(active)
                     .child(
                         h_flex()
                             .gap_2p5()
@@ -512,7 +511,7 @@ impl Render for ActionBar {
                     } else {
                         tr("workflow.cancel")
                     })
-                    .disabled(cancelling)
+                    .disabled_for_all(cancelling)
                     .loading(cancelling)
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.panel.update(cx, WorkflowPanel::cancel);
@@ -526,7 +525,7 @@ impl Render for ActionBar {
                     .rounded(pill)
                     .px_6()
                     .label(start_label)
-                    .disabled(!can_start)
+                    .disabled_for_all(!can_start)
                     .when(can_start, |this| this.shadow(glass.primary_shadows()))
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.panel.update(cx, |panel, cx| panel.start(window, cx));

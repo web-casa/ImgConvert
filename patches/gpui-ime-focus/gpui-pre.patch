@@ -530,7 +530,23 @@
                              if pushed_a11y_node {
 --- a/src/elements/div.rs
 +++ b/src/elements/div.rs
-@@ -1435,6 +1435,15 @@
+@@ -791,6 +791,15 @@
+         self
+     }
+ 
++    /// Report this element to assistive technology as disabled (or not).
++    /// Unlike the other `aria_*` setters this one is available to every
++    /// interactive element, so components that wrap one (such as buttons
++    /// built on an inner element) can be marked from outside.
++    fn aria_disabled(mut self, disabled: bool) -> Self {
++        self.interactivity().aria.disabled = disabled;
++        self
++    }
++
+     /// Set whether this element is a tab stop.
+     ///
+     /// When false, the element remains in tab-index order but cannot be reached via keyboard navigation.
+@@ -1435,6 +1444,15 @@
          self
      }
  
@@ -546,15 +562,16 @@
      /// Set the minimum numeric value for this element.
      fn aria_min_numeric_value(mut self, value: f64) -> Self {
          self.interactivity().aria.min_numeric_value = Some(value);
-@@ -2117,6 +2126,7 @@
+@@ -2117,6 +2135,8 @@
      pub(crate) numeric_value_step: Option<f64>,
      pub(crate) value: Option<SharedString>,
      pub(crate) placeholder: Option<SharedString>,
 +    pub(crate) live: Option<accesskit::Live>,
++    pub(crate) disabled: bool,
      pub(crate) orientation: Option<accesskit::Orientation>,
      pub(crate) level: Option<usize>,
      pub(crate) position_in_set: Option<usize>,
-@@ -2392,10 +2402,44 @@
+@@ -2392,10 +2412,44 @@
                              } else {
                                  None
                              };
@@ -600,7 +617,7 @@
                              (result, element_state)
                          },
                      )
-@@ -2431,13 +2475,15 @@
+@@ -2431,13 +2485,15 @@
              || window.is_inspector_picking(cx)
      }
  
@@ -617,7 +634,7 @@
          fn round_to_two_decimals(pixels: Pixels) -> Pixels {
              const ROUNDING_FACTOR: f32 = 100.0;
              (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
-@@ -2490,9 +2536,9 @@
+@@ -2490,9 +2546,9 @@
                  scroll_handle_state.bounds = bounds;
              }
  
@@ -629,12 +646,15 @@
          }
      }
  
-@@ -3567,6 +3613,9 @@
+@@ -3567,6 +3623,12 @@
          if let Some(placeholder) = &self.aria.placeholder {
              node.set_placeholder(placeholder.to_string());
          }
 +        if let Some(live) = self.aria.live {
 +            node.set_live(live);
++        }
++        if self.aria.disabled {
++            node.set_disabled();
 +        }
          if let Some(orientation) = self.aria.orientation {
              node.set_orientation(orientation);

@@ -16,9 +16,7 @@ use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, IconName, Sizable as _, h_flex, v_flex,
-};
+use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, AsyncApp, ClickEvent, Context, Entity, EventEmitter, ExternalPaths,
@@ -27,6 +25,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
     TestSupportExt as _, Window, div, img, px, size,
 };
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::command_error::format_command_error;
 use imgconvert_gpui_shared::i18n::{tr, tr_count, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
@@ -326,7 +325,7 @@ impl QueueView {
                     .small()
                     .rounded(pill)
                     .label(tr("queue.reset_formats"))
-                    .disabled(count == 0 || batch_busy || importing)
+                    .disabled_for_all(count == 0 || batch_busy || importing)
                     .on_click(|_, _, cx| {
                         if format_edit_busy(cx) {
                             return;
@@ -347,7 +346,7 @@ impl QueueView {
                     .small()
                     .rounded(pill)
                     .label(tr("queue.clear"))
-                    .disabled(count == 0 || batch_busy || importing)
+                    .disabled_for_all(count == 0 || batch_busy || importing)
                     .on_click(cx.listener(|this, _, window, cx| this.clear_queue(window, cx))),
             )
             .child(
@@ -356,7 +355,7 @@ impl QueueView {
                     .rounded(pill)
                     .icon(IconName::Plus)
                     .label(tr("queue.add_files"))
-                    .disabled(importing)
+                    .disabled_for_all(importing)
                     .on_click(|_, _, cx| import::pick_and_import(cx)),
             )
             .child(
@@ -365,7 +364,7 @@ impl QueueView {
                     .rounded(pill)
                     .icon(IconName::FolderOpen)
                     .label(tr("queue.add_folders"))
-                    .disabled(importing)
+                    .disabled_for_all(importing)
                     .on_click(|_, _, cx| import::pick_folders_and_import(cx)),
             )
             .child(
@@ -374,7 +373,7 @@ impl QueueView {
                     .rounded(pill)
                     .icon(IconName::Copy)
                     .label(tr("queue.paste"))
-                    .disabled(importing)
+                    .disabled_for_all(importing)
                     .on_click(|_, _, cx| crate::clipboard::paste(cx)),
             )
     }
@@ -604,7 +603,7 @@ impl QueueView {
                                         .rounded(ButtonRounded::Size(cx.theme().radius_full()))
                                         .icon(IconName::Plus)
                                         .label(tr("queue.add_files"))
-                                        .disabled(importing)
+                                        .disabled_for_all(importing)
                                         .on_click(|_, _, cx| import::pick_and_import(cx)),
                                 ),
                             )
@@ -613,7 +612,7 @@ impl QueueView {
                                     .rounded(ButtonRounded::Size(cx.theme().radius_full()))
                                     .icon(IconName::FolderOpen)
                                     .label(tr("queue.add_folders"))
-                                    .disabled(importing)
+                                    .disabled_for_all(importing)
                                     .on_click(|_, _, cx| import::pick_folders_and_import(cx)),
                             )
                             .child(
@@ -621,7 +620,7 @@ impl QueueView {
                                     .rounded(ButtonRounded::Size(cx.theme().radius_full()))
                                     .icon(IconName::Copy)
                                     .label(tr("queue.paste"))
-                                    .disabled(importing)
+                                    .disabled_for_all(importing)
                                     .on_click(|_, _, cx| crate::clipboard::paste(cx)),
                             ),
                     )
@@ -780,7 +779,7 @@ impl RenderOnce for QueueRow {
             .icon(IconName::Eye)
             .accessibility_label(tr_with("queue.compare_item", &[("name", &item.name)]))
             .tooltip(tr("preview.title"))
-            .disabled(self.busy)
+            .disabled_for_all(self.busy)
             .on_click(move |event, window, cx| on_compare(event, window, cx));
         // A finished item has a measured size change to put in context.
         let impact = matches!(item.status, ItemStatus::Done { .. }).then(|| {
@@ -799,7 +798,7 @@ impl RenderOnce for QueueRow {
             .icon(IconName::CircleX)
             .accessibility_label(tr_with("queue.remove_item", &[("name", &item.name)]))
             .tooltip(tr("queue.remove"))
-            .disabled(self.busy)
+            .disabled_for_all(self.busy)
             .on_click(move |_, window, cx| {
                 if format_edit_busy(cx) {
                     return;
@@ -943,7 +942,7 @@ fn format_control(item: &QueueItem, busy: bool, cx: &App) -> impl IntoElement {
         .label(label)
         .icon(IconName::ChevronDown)
         .tooltip(tr("queue.target_format"))
-        .disabled(busy)
+        .disabled_for_all(busy)
         .dropdown_menu(move |menu, _, _| {
             let default_key = key.clone();
             let mut menu = menu

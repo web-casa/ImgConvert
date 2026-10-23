@@ -39,7 +39,7 @@
   - 使用修复后的源码，全部通过。
   - 原生复验结果记录在 G2 清单。
 - 产品侧同时修了一处：标题行“外观”按钮原本没有点击监听（它的弹出层由外层的 mouse-down 打开），所以节点不声明“按下”，VoiceOver/AXPress 完全按不动它。给它加了空的点击监听后可以打开；UI 测试 `a11y_press_opens_the_appearance_popover` 覆盖。
-- 上游：尚未提交 issue。对外提交需要用户授权，复现文档已按可直接发布的形式写好。
+- 上游：经用户授权，于 2026-10-23 提交 [longbridge/gpui-kit#3658](https://github.com/longbridge/gpui-kit/issues/3658)，内容即复现文档，不含账号路径或原始媒体。
 - 退出条件：上游锁定版本包含等效修复后，删除这部分改动，在无补丁版本上重跑上述回归和原生按下场景。
 
 ## 已接入：live region（`aria_live`）
@@ -57,7 +57,17 @@
 - 验证：UI 测试覆盖以下行为。原生结果记录在 G2 清单。
   - `batch_milestones_are_announced_once`：每个里程碑只播报一次，运行中重绘与完成后编辑队列不再播报，两次渲染之间开始又结束的一批同时说开始和结果，取消与取消后的结果各播报一次，状态行读可见文字，播报节点的名称等于值；
   - `settings_and_batch_failures_are_both_announced`：在设置文件位置放一个目录，让写入在任何平台、任何用户下都确定失败。失败立即以 Assertive 播报；错误仍在时批次失败照样播报；写入恢复后错误消失，不播报。
+- 上游：经用户授权，于 2026-10-23 提交 [longbridge/gpui-kit#3659](https://github.com/longbridge/gpui-kit/issues/3659)。
 - 退出条件：上游 GPUI 提供等效接口后，删除这部分改动。
+
+## 已接入：禁用状态告知辅助技术（`aria_disabled`）
+
+- 问题：G2 最终复验时，空队列下“开始转换”画成禁用，但辅助功能报告 `enabled=true`，VoiceOver 读“开始转换 button”，没有“变暗”。Kit 的 `disabled` 只是不挂点击处理，GPUI 也没有设置 AccessKit `disabled` 的接口。gpui-base `button.rs` 的测试注释承认了这个上游缺口。
+- 修改：同一 `gpui-pre` 的 `elements/div.rs` 在 `InteractiveElement` 上新增 `aria_disabled(bool)`，写入 AccessKit 的 `disabled`。放在 `InteractiveElement` 而不是只放在 stateful 元素上，是因为 Kit 的 `Button` 只实现前者，它的 `interactivity()` 指向同一个带角色的元素。
+- 产品侧：shared 新增 `a11y::DisabledForAll::disabled_for_all(bool)`，同时调用 `disabled` 与 `aria_disabled`。23 处 Kit `Button` 改用它，覆盖开始转换、导入、粘贴、清空、重置格式、行命令、预设、诊断、更新、对比等。
+- 遗留：Kit 的 `Switch`、`Select`、`Slider`、`Input` 不实现 `InteractiveElement`，无法从外部设置，它们禁用时仍会被报告为可用（共 9 处）。需要 Kit 上游提供接口。另外，Linux 上 AccessKit 的 AT-SPI 适配层对 `Button` / `Link` 角色不读取 `disabled`，仍报告为可用（单选角色则报告为只读），所以本修复目前只在 macOS 与 Windows 生效；这需要改 AccessKit，记为遗留。两点均已写入经用户授权提交的 [longbridge/gpui-kit#3660](https://github.com/longbridge/gpui-kit/issues/3660)。Kit 的 `DropdownButton`、`ButtonGroup` 也不传递该状态，本应用目前没有用到。
+- 验证：UI 测试 `disabled_commands_are_disabled_for_assistive_technology`：空队列时开始节点是 disabled，不声明“按下”和“聚焦”；加入待转换文件后不再 disabled；批次运行时格式卡片（单选角色）是 disabled 且不可聚焦。去掉 `set_disabled` 时该测试失败。
+- 退出条件：上游 GPUI/Kit 提供等效接口后删除。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
 
