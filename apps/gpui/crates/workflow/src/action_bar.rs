@@ -57,7 +57,20 @@ impl ActionBar {
         let models = AppModels::global(cx).clone();
         let subscriptions = vec![
             cx.observe(&panel, |_, _, cx| cx.notify()),
-            cx.observe(models.queue(), |_, _, cx| cx.notify()),
+            cx.observe(models.queue(), |this, queue, cx| {
+                // An ended batch describes files that are no longer listed
+                // once the queue is empty (cleared, or its last file
+                // removed): drop it so the capsule shows readiness instead.
+                if queue.read(cx).is_empty() {
+                    this.batch.update(cx, |batch, cx| {
+                        if !batch.is_active() && *batch.phase() != BatchPhase::Idle {
+                            batch.forget();
+                            cx.notify();
+                        }
+                    });
+                }
+                cx.notify();
+            }),
             cx.observe(models.batch(), |_, _, cx| cx.notify()),
             cx.observe(models.settings(), |_, _, cx| cx.notify()),
         ];

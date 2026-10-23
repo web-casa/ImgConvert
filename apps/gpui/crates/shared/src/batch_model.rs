@@ -129,6 +129,14 @@ impl BatchModel {
         true
     }
 
+    /// Drops an ended batch, as when the queue it described has emptied;
+    /// a running batch is kept.
+    pub fn forget(&mut self) {
+        if !self.is_active() {
+            *self = Self::default();
+        }
+    }
+
     pub fn fail(&mut self, detail: SharedString) {
         self.phase = BatchPhase::Failed(detail);
     }
@@ -147,6 +155,28 @@ impl BatchModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forget_drops_only_an_ended_batch() {
+        let mut model = BatchModel::default();
+        model.begin(BatchId::new(5), vec!["a".into()]);
+        model.forget();
+        assert_eq!(
+            model.phase(),
+            &BatchPhase::Running,
+            "a running batch is kept"
+        );
+        model.request_cancel();
+        model.forget();
+        assert_eq!(
+            model.phase(),
+            &BatchPhase::Cancelling,
+            "so is a cancelling one"
+        );
+        model.finish_without_summary(None);
+        model.forget();
+        assert_eq!(model, BatchModel::default());
+    }
 
     #[test]
     fn counts_follow_events_of_the_current_batch_only() {

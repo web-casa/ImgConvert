@@ -3927,6 +3927,139 @@ fn finished_batch_summary_names_the_net_saving(cx: &mut TestAppContext) {
     }
 }
 
+/// A finished batch stops describing the queue once the queue is empty:
+/// removing its last file or clearing the queue returns the capsule to
+/// readiness, without the old summary, progress bar or scenario command.
+#[gpui_kit::test]
+fn ended_batch_leaves_the_capsule_once_its_files_leave_the_queue(cx: &mut TestAppContext) {
+    use gpui_kit::SharedString;
+    use imgconvert_backend::convert::{BatchProgressEvent, BatchSummary, ConvertResult};
+    use imgconvert_backend::import::{ImportImageMetadata, ImportScanFile};
+    use imgconvert_backend::progress::BatchId;
+    use imgconvert_gpui_shared::BatchPhase;
+
+    let _locale = locale_guard();
+    let (handle, _) = open_workspace(cx);
+    let scan = |key: &str| ImportScanFile {
+        key: key.to_string(),
+        path: format!("/no-real-data/{key}.png"),
+        relative_dir: None,
+        metadata: Some(ImportImageMetadata {
+            animation: imgconvert_backend::import::ImportAnimation::Static,
+            format: "png".into(),
+            width: 2,
+            height: 2,
+            dpi_x: None,
+            dpi_y: None,
+            page_count: None,
+        }),
+    };
+    let jobs: Vec<SharedString> = vec!["ran-0".into(), "ran-1".into()];
+    let run = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let models = AppModels::global(cx).clone();
+            models.queue().update(cx, |queue, cx| {
+                queue.clear();
+                queue.add_files(jobs.iter().map(|key| scan(key)).collect());
+                for index in 0..jobs.len() {
+                    queue.apply_batch_event(
+                        &BatchProgressEvent::FileFinished {
+                            index,
+                            result: ConvertResult {
+                                input: "fixture".into(),
+                                output: "fixture-output".into(),
+                                in_size: 2048,
+                                out_size: 1024,
+                                environment_comparable: true,
+                                warning: None,
+                                warnings: vec![],
+                                output_count: 1,
+                                skipped_output_count: 0,
+                            },
+                        },
+                        &jobs,
+                    );
+                }
+                cx.notify();
+            });
+            models.batch().update(cx, |batch, cx| {
+                batch.begin(BatchId::new(78), jobs.clone());
+                batch.finish_without_summary(Some(BatchSummary {
+                    total: jobs.len(),
+                    completed: jobs.len(),
+                    skipped: 0,
+                    failed: 0,
+                    cancelled: false,
+                }));
+                cx.notify();
+            });
+        });
+    };
+    let capsule = |cx: &mut TestAppContext| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            (
+                window.find("workflow-status").value().unwrap().to_owned(),
+                window.a11y_node_for_test("workflow-progress").is_some(),
+                window.try_find("workflow-impact").is_some(),
+            )
+        })
+        .unwrap()
+    };
+
+    cx.update_window(handle, |_, window, _| window.simulate_a11y_activation())
+        .unwrap();
+    run(cx);
+    let (status, progress, impact) = capsule(cx);
+    assert!(status.starts_with("2 done"), "{status}");
+    assert!(progress, "the finished batch shows its progress");
+    assert!(impact, "the finished batch offers its scenario");
+
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().clone();
+        queue.update(cx, |queue, cx| {
+            queue.remove(&jobs[0]);
+            cx.notify();
+        });
+    });
+    let (status, ..) = capsule(cx);
+    assert!(
+        status.starts_with("2 done"),
+        "one of its files remains: {status}"
+    );
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().clone();
+        queue.update(cx, |queue, cx| {
+            queue.remove(&jobs[1]);
+            cx.notify();
+        });
+    });
+    assert_eq!(
+        capsule(cx),
+        ("Add files to begin".to_owned(), false, false),
+        "the last file of the run was removed"
+    );
+
+    run(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("queue-clear", cx);
+    })
+    .unwrap();
+    assert_eq!(
+        capsule(cx),
+        ("Add files to begin".to_owned(), false, false),
+        "clearing the queue clears the run's summary"
+    );
+    cx.update(|cx| {
+        assert_eq!(
+            *AppModels::global(cx).batch().read(cx).phase(),
+            BatchPhase::Idle,
+            "clearing forgets the ended batch"
+        );
+    });
+}
+
 /// A long failure reason truncates inside the row's result lane at the
 /// minimum window size and an enlarged base font; it never runs into the
 /// command lane.
@@ -4139,6 +4272,20 @@ fn batch_milestones_are_announced_once(cx: &mut TestAppContext) {
     .unwrap();
 
     cx.update(|cx| {
+        // The batch's files are listed, as they are when a run starts.
+        queue.update(cx, |queue, cx| {
+            queue.add_files(
+                jobs.iter()
+                    .map(|key| imgconvert_backend::import::ImportScanFile {
+                        key: key.to_string(),
+                        path: format!("/no-real-data/{key}.png"),
+                        relative_dir: None,
+                        metadata: None,
+                    })
+                    .collect(),
+            );
+            cx.notify();
+        });
         batch.update(cx, |batch, cx| {
             batch.begin(BatchId::new(41), jobs.clone());
             cx.notify();
@@ -4188,7 +4335,12 @@ fn batch_milestones_are_announced_once(cx: &mut TestAppContext) {
     // Editing the queue afterwards can change the summary; it is not news.
     cx.update(|cx| queue.update(cx, |_, cx| cx.notify()));
     cx.update_window(handle, |_, window, cx| {
-        assert_eq!(announcements(window, cx).0, None);
+        let (announcement, status, _) = announcements(window, cx);
+        assert_eq!(announcement, None);
+        assert!(
+            status.as_deref().is_some_and(|s| s.starts_with("2 done")),
+            "the listed batch keeps its summary: {status:?}"
+        );
     })
     .unwrap();
 
