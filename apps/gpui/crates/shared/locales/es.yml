@@ -874,11 +874,11 @@ status.larger_percent:
 workflow.summary_saved:
   es: "%{summary} · ahorro de %{saved}"
 workflow.summary_done:
-  es: "%{count} completados"
+  es: "Completados: %{count}"
 workflow.summary_skipped:
-  es: "%{count} omitidos"
+  es: "Omitidos: %{count}"
 workflow.summary_failed:
-  es: "%{count} con error"
+  es: "Con error: %{count}"
 status.same_size:
   es: Mismo tamaño
 status.smaller_under_one:

@@ -164,7 +164,9 @@
       onclick={toggleLocale}
     >
       <TranslationIcon size={20} />
-      <span class="text-[10px] font-semibold">{settings.locale === "zh-CN" ? "EN" : "ZH"}</span>
+      <span class="text-[10px] font-semibold"
+        >{normalizeLocale(settings.locale) === "zh-CN" ? "EN" : "ZH"}</span
+      >
     </Button>
     <Button
       variant="ghost"
