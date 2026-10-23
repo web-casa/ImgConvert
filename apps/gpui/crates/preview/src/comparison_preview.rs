@@ -10,7 +10,6 @@
 
 use std::sync::Arc;
 
-use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
@@ -26,6 +25,7 @@ use gpui_kit::{
 use imgconvert_backend::convert::ConvertWarning;
 use imgconvert_backend::preview::{self, PreviewOptions};
 use imgconvert_backend::settings::Settings;
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::conversion::{options_for_item, warning_texts};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::images::{decode_png, format_bytes};
@@ -737,7 +737,7 @@ pub fn open_comparison_preview(
                         Button::new("preview-refresh")
                             .outline()
                             .label(tr("preview.refresh"))
-                            .disabled(loading)
+                            .disabled_for_all(loading)
                             .on_click(move |_, _, cx| {
                                 refresh_entity.update(cx, ComparisonPreview::refresh);
                             }),

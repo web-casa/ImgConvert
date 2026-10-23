@@ -4405,3 +4405,70 @@ fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
         .unwrap();
     }
 }
+
+/// A disabled command is announced as disabled, not only drawn that way:
+/// Kit's `disabled` alone cannot tell AccessKit.
+#[gpui_kit::test]
+fn disabled_commands_are_disabled_for_assistive_technology(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.simulate_a11y_activation();
+        window.render_frame(cx);
+        let start = window
+            .a11y_node_for_test("workflow-start")
+            .expect("Start is in the accessibility tree");
+        assert!(start.is_disabled(), "nothing to convert yet");
+        assert!(
+            !start.supports_action(gpui_kit::AccessibleAction::Click),
+            "and it cannot be pressed"
+        );
+        assert!(
+            !start.supports_action(gpui_kit::AccessibleAction::Focus),
+            "or focused"
+        );
+        let add = window.a11y_node_for_test("queue-add-files").unwrap();
+        assert!(!add.is_disabled(), "adding files is available");
+    })
+    .unwrap();
+    cx.update(|cx| {
+        let queue = AppModels::global(cx).queue().clone();
+        queue.update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: "/no-real-data/one.png".into(),
+                key: "one".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let start = window.a11y_node_for_test("workflow-start").unwrap();
+        assert!(!start.is_disabled(), "a pending file can be converted");
+        let card = window.a11y_node_for_test("format-card:png").unwrap();
+        assert_eq!(card.role(), gpui_kit::Role::RadioButton);
+        assert!(!card.is_disabled(), "formats can be chosen while idle");
+    })
+    .unwrap();
+    // While a batch runs the format cards (radio buttons) are disabled too.
+    cx.update(|cx| {
+        let batch = AppModels::global(cx).batch().clone();
+        batch.update(cx, |batch, cx| {
+            batch.begin(
+                imgconvert_backend::progress::BatchId::new(51),
+                vec!["one".into()],
+            );
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        let card = window.a11y_node_for_test("format-card:png").unwrap();
+        assert_eq!(card.role(), gpui_kit::Role::RadioButton);
+        assert!(card.is_disabled(), "no format change during a batch");
+        assert!(!card.supports_action(gpui_kit::AccessibleAction::Focus));
+    })
+    .unwrap();
+}

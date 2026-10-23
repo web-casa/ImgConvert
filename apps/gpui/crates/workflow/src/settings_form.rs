@@ -50,6 +50,7 @@ use imgconvert_backend::settings::{
 use imgconvert_backend::workflow_presets::{
     self, CUSTOM_PRESET_ID_PREFIX, builtin_workflow_presets,
 };
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
@@ -1435,7 +1436,7 @@ impl SettingsForm {
                     .role(Role::RadioButton)
                     .tab_stop(false)
                     .toggled(selected)
-                    .disabled(busy)
+                    .disabled_for_all(busy)
                     .accessibility_label(name.clone())
                     .tooltip(hint.clone())
                     .w_full()
@@ -1832,7 +1833,7 @@ impl SettingsForm {
                         } else {
                             tr("settings.clear_result_cache")
                         })
-                        .disabled(busy || clearing)
+                        .disabled_for_all(busy || clearing)
                         .loading(clearing)
                         .on_click(cx.listener(|this, _, _, cx| this.clear_result_cache(cx))),
                 ),
@@ -2032,7 +2033,7 @@ impl SettingsForm {
                                     .outline()
                                     .small()
                                     .label(tr("workflow.save_preset"))
-                                    .disabled(busy || !can_save || !name_valid)
+                                    .disabled_for_all(busy || !can_save || !name_valid)
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         let name = this.preset_name.read(cx).value().to_string();
                                         if this.save_preset(&name, cx).is_some() {
@@ -2087,7 +2088,7 @@ impl SettingsForm {
                                     .small()
                                     .label(tr("workflow.delete"))
                                     .tooltip(delete_label)
-                                    .disabled(busy)
+                                    .disabled_for_all(busy)
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         this.confirm_delete_preset(
                                             id.clone(),

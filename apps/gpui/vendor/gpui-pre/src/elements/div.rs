@@ -791,6 +791,15 @@ pub trait InteractiveElement: Sized {
         self
     }
 
+    /// Report this element to assistive technology as disabled (or not).
+    /// Unlike the other `aria_*` setters this one is available to every
+    /// interactive element, so components that wrap one (such as buttons
+    /// built on an inner element) can be marked from outside.
+    fn aria_disabled(mut self, disabled: bool) -> Self {
+        self.interactivity().aria.disabled = disabled;
+        self
+    }
+
     /// Set whether this element is a tab stop.
     ///
     /// When false, the element remains in tab-index order but cannot be reached via keyboard navigation.
@@ -2127,6 +2136,7 @@ pub(crate) struct AriaProperties {
     pub(crate) value: Option<SharedString>,
     pub(crate) placeholder: Option<SharedString>,
     pub(crate) live: Option<accesskit::Live>,
+    pub(crate) disabled: bool,
     pub(crate) orientation: Option<accesskit::Orientation>,
     pub(crate) level: Option<usize>,
     pub(crate) position_in_set: Option<usize>,
@@ -3615,6 +3625,9 @@ impl Interactivity {
         }
         if let Some(live) = self.aria.live {
             node.set_live(live);
+        }
+        if self.aria.disabled {
+            node.set_disabled();
         }
         if let Some(orientation) = self.aria.orientation {
             node.set_orientation(orientation);

@@ -19,12 +19,13 @@ use futures::{
 use gpui_kit::component::button::Button;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Entity, Global, IntoElement, ParentElement as _, Render,
     Styled as _, Subscription, TestSupportExt as _, Window, div, rems,
 };
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, tasks};
@@ -362,7 +363,7 @@ impl Render for UpdatesDialog {
                         Button::new("update-check")
                             .outline()
                             .label(tr("update.check"))
-                            .disabled(
+                            .disabled_for_all(
                                 busy || matches!(
                                     phase,
                                     UpdatePhase::Manual | UpdatePhase::Installed

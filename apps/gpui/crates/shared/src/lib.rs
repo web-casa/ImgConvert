@@ -11,6 +11,7 @@
 
 rust_i18n::i18n!("locales", fallback = "en");
 
+pub mod a11y;
 pub mod batch_model;
 pub mod choice;
 pub mod command_error;

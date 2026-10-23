@@ -4,7 +4,7 @@
 
 - gpui-kit / gpui-base / gpui-component 0.7.1; gpui-pre 0.3.8; accesskit 0.24 / accesskit_macos 0.26.
 - Observed natively on macOS 13.6 (arm64, Parallels VM) with VoiceOver on and with System Events `AXPress`, in the ImgConvert GPUI candidate built from `db5a98f`. The headless regression below needs two test-support hooks from the candidate patch, because the test platform has no accessibility adapter.
-- Upstream report: **not filed**. Filing an issue is an outward-facing action and waits for the maintainer's authorization; this file is written so it can be posted as is.
+- Upstream report: [longbridge/gpui-kit#3658](https://github.com/longbridge/gpui-kit/issues/3658), filed with the maintainer's authorization on 2026-10-23.
 
 ## Cause
 

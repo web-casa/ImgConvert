@@ -4,7 +4,7 @@
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "5be22bb4197ef2dd7eca552c24cf8a8c6f9b4a1304e8c2a6bc8799945b48ddff",
+      "patch_sha256": "4e0c2e4da9f950909a9e3bd225df3fbad6c9f9ec65826392d57d993481ada9f2",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
         "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
@@ -12,7 +12,7 @@
         "src/app/test_context.rs": "576871bbb7c6c0a844dbed9a4f03c7df9082051bf77c17d66fafc073e7891785",
         "src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1",
         "src/element.rs": "498036b2f1bb5f65f7cd7a3ed353a393a70c3f7b7885ee2e5f330ad5cf37cda4",
-        "src/elements/div.rs": "f47106a94b9042ca24445b9827fd5157321bc53c0ccf538d7e590e9f043db999",
+        "src/elements/div.rs": "d63603c0173d6418359f95118cc8f0e571f829e07055e1ae2744620d1527d233",
         "src/window/a11y.rs": "94cd7f61a27c4d657fc025948974e1f81123990b839340911adf580d7695fb29",
         "src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
         "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823"

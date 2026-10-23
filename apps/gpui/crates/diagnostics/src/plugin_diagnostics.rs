@@ -16,8 +16,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, IconName, Sizable as _, WindowExt as _, h_flex,
-    v_flex,
+    ActiveTheme as _, Icon, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -29,6 +28,7 @@ use imgconvert_backend::external_codecs::{
     ManifestDiagnostic, ManifestSearchDirDiagnostic, SelectedHelperDiagnostic,
     SystemCodecDiagnostic, SystemHelperDiagnostic,
 };
+use imgconvert_gpui_shared::a11y::DisabledForAll as _;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::tasks;
@@ -520,7 +520,7 @@ impl PluginDiagnostics {
                             .outline()
                             .small()
                             .label(tr("diagnostics.choose"))
-                            .disabled(self.helper_busy || !heic.external_codecs_enabled)
+                            .disabled_for_all(self.helper_busy || !heic.external_codecs_enabled)
                             .loading(self.helper_busy)
                             .on_click(
                                 cx.listener(|this, _, window, cx| this.choose_helper(window, cx)),
@@ -531,7 +531,7 @@ impl PluginDiagnostics {
                             .ghost()
                             .small()
                             .label(tr("diagnostics.clear"))
-                            .disabled(self.helper_busy || !selected.configured)
+                            .disabled_for_all(self.helper_busy || !selected.configured)
                             .on_click(cx.listener(|this, _, _, cx| this.set_helper_path(None, cx))),
                     ),
             )
@@ -795,7 +795,7 @@ pub fn open_plugin_diagnostics(window: &mut Window, cx: &mut App) -> Entity<Plug
                         Button::new("diagnostics-refresh")
                             .outline()
                             .label(tr("diagnostics.refresh"))
-                            .disabled(loading)
+                            .disabled_for_all(loading)
                             .on_click(move |_, _, cx| {
                                 refresh_entity.update(cx, PluginDiagnostics::refresh);
                             }),
