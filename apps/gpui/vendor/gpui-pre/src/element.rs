@@ -378,7 +378,24 @@ impl<E: Element> Drawable<E> {
                                 y1: ((bounds.origin.y.0 + bounds.size.height.0) * scale) as f64,
                             });
                             self.element.write_a11y_info(&mut node);
+                            if let Some(containers) = window.a11y.scroll_chain() {
+                                node.add_action(accesskit::Action::ScrollIntoView);
+                                window.a11y.node_scroll_containers.insert(node_id, containers);
+                            }
+                            let clip = window.content_mask().bounds;
+                            window.a11y.node_clips.insert(node_id, clip);
                             window.a11y.node_bounds.insert(node_id, bounds);
+                            #[cfg(any(test, feature = "test-support"))]
+                            if let Some(element_id) = global_id.0.last() {
+                                window
+                                    .a11y
+                                    .test_node_ids
+                                    .entry(element_id.clone())
+                                    .and_modify(|node| *node = None)
+                                    .or_insert(Some(node_id));
+                            }
+                            #[cfg(any(test, feature = "test-support"))]
+                            window.a11y.test_node_actions.insert(node_id, node.clone());
                             pushed_a11y_node = window.a11y.nodes.push(node_id, node);
                             #[cfg(debug_assertions)]
                             if pushed_a11y_node {

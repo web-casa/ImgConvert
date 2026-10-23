@@ -3965,3 +3965,92 @@ fn long_failure_reasons_stay_clear_of_the_row_commands(cx: &mut TestAppContext) 
     })
     .unwrap();
 }
+
+/// A screen reader's press on a setting scrolled under the tab bar must
+/// reach that setting, not the "Privacy" tab drawn where it used to be
+/// (seen with VoiceOver on macOS before the framework fix).
+#[gpui_kit::test]
+fn a11y_press_on_a_setting_scrolled_under_the_tabs_reaches_the_setting(cx: &mut TestAppContext) {
+    use imgconvert_gpui_workflow::SettingsTab;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.simulate_a11y_activation();
+        window.render_frame(cx);
+        let tabs = window.find("settings-tabs").bounds();
+        let switch = window.find("switch-lossless").bounds();
+        // Scroll the settings so the switch's middle sits on the tab bar.
+        let lift = switch.center().y - tabs.center().y;
+        window.scroll(
+            "workflow-scroll",
+            gpui_kit::ScrollDelta::Pixels(point(px(0.), -lift)),
+            cx,
+        );
+        window.render_frame(cx);
+        assert!(
+            tabs.contains(&window.find("switch-lossless").bounds().center()),
+            "precondition: the switch is under the tab bar"
+        );
+        assert!(window.simulate_a11y_action(
+            "switch-lossless",
+            gpui_kit::AccessibleAction::Click,
+            cx
+        ));
+        assert_eq!(form.read(cx).active_tab(), SettingsTab::Format);
+        // One frame applies the scroll, the next clicks the switch.
+        for _ in 0..2 {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+        }
+        assert_eq!(form.read(cx).active_tab(), SettingsTab::Format);
+        let scroll = window.find("workflow-scroll").bounds();
+        let switch = window.find("switch-lossless").bounds();
+        assert!(
+            switch.top() >= scroll.top() && switch.bottom() <= scroll.bottom(),
+            "the switch {switch:?} is scrolled into {scroll:?}"
+        );
+    })
+    .unwrap();
+    cx.update(|cx| {
+        assert!(
+            AppModels::global(cx)
+                .settings()
+                .read(cx)
+                .settings()
+                .lossless,
+            "the press toggled the setting"
+        );
+    });
+}
+
+/// A screen reader's press on the header's Appearance command opens its
+/// popover, as a pointer click does.
+#[gpui_kit::test]
+fn a11y_press_opens_the_appearance_popover(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.simulate_a11y_activation();
+        window.render_frame(cx);
+        assert!(window.simulate_a11y_action(
+            imgconvert_gpui::appearance::TRIGGER_ID,
+            gpui_kit::AccessibleAction::Click,
+            cx
+        ));
+        window.render_frame(cx);
+        assert!(
+            window.try_find("appearance-panel").is_some(),
+            "the press opened the popover"
+        );
+    })
+    .unwrap();
+}

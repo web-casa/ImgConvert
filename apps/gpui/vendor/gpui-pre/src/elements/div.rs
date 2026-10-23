@@ -2392,10 +2392,44 @@ impl Interactivity {
                             } else {
                                 None
                             };
+                            let a11y_active = window.a11y.is_active();
+                            if a11y_active && let Some(hitbox) = &hitbox {
+                                if let Some(global_id) = global_id {
+                                    window
+                                        .a11y
+                                        .set_node_hitbox(global_id.accesskit_node_id(), hitbox.id);
+                                }
+                                if !self.click_listeners.is_empty()
+                                    || !self.mouse_down_listeners.is_empty()
+                                    || !self.mouse_up_listeners.is_empty()
+                                {
+                                    window.a11y.pointer_hitboxes.insert(hitbox.id);
+                                }
+                            }
 
-                            let scroll_offset =
+                            let (scroll_offset, max_offset) =
                                 self.clamp_scroll_position(bounds, &style, window, cx);
+                            // Children prepainted inside `f` record this
+                            // container so assistive technology can scroll
+                            // them into view.
+                            let scroll_container = self
+                                .scroll_offset
+                                .clone()
+                                .filter(|_| a11y_active)
+                                .map(|offset| crate::window::a11y::A11yScrollContainer {
+                                    offset,
+                                    viewport: window.content_mask().bounds,
+                                    max_offset,
+                                    scrolls: style.overflow.map(|overflow| overflow == Overflow::Scroll),
+                                });
+                            let pushed_container = scroll_container.is_some();
+                            if let Some(container) = scroll_container {
+                                window.a11y.push_scroll_container(container);
+                            }
                             let result = f(&style, scroll_offset, hitbox, window, cx);
+                            if pushed_container {
+                                window.a11y.pop_scroll_container();
+                            }
                             (result, element_state)
                         },
                     )
@@ -2431,13 +2465,15 @@ impl Interactivity {
             || window.is_inspector_picking(cx)
     }
 
+    /// Clamps the scroll offset to the content; returns the offset and the
+    /// maximum scroll distance on each axis.
     fn clamp_scroll_position(
         &self,
         bounds: Bounds<Pixels>,
         style: &Style,
         window: &mut Window,
         _cx: &mut App,
-    ) -> Point<Pixels> {
+    ) -> (Point<Pixels>, Point<Pixels>) {
         fn round_to_two_decimals(pixels: Pixels) -> Pixels {
             const ROUNDING_FACTOR: f32 = 100.0;
             (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
@@ -2490,9 +2526,9 @@ impl Interactivity {
                 scroll_handle_state.bounds = bounds;
             }
 
-            *scroll_offset
+            (*scroll_offset, scroll_max)
         } else {
-            Point::default()
+            (Point::default(), Point::default())
         }
     }
 

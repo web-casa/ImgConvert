@@ -7001,25 +7001,9 @@ impl Window {
 
         // Fall back to built-in action handling.
         match request.action {
-            accesskit::Action::Click => {
-                if let Some(bounds) = self.a11y.node_bounds.get(&request.target_node).copied() {
-                    let center = bounds.center();
-                    let mouse_down = PlatformInput::MouseDown(crate::MouseDownEvent {
-                        button: MouseButton::Left,
-                        position: center,
-                        modifiers: Modifiers::default(),
-                        click_count: 1,
-                        first_mouse: false,
-                    });
-                    let mouse_up = PlatformInput::MouseUp(MouseUpEvent {
-                        button: MouseButton::Left,
-                        position: center,
-                        modifiers: Modifiers::default(),
-                        click_count: 1,
-                    });
-                    self.dispatch_event(mouse_down, cx);
-                    self.dispatch_event(mouse_up, cx);
-                }
+            accesskit::Action::Click => self.a11y_click(request.target_node, true, cx),
+            accesskit::Action::ScrollIntoView => {
+                self.a11y_scroll_into_view(request.target_node);
             }
             accesskit::Action::Focus => {
                 if let Some(focus_id) = self.a11y.focus_ids.get(&request.target_node).copied()
@@ -7039,6 +7023,174 @@ impl Window {
                 );
             }
         }
+    }
+
+    /// Clicks a node as a pointer would, at a point of its visible part where
+    /// the node's own hitbox receives the click and no other element above
+    /// it acts on a pointer press: the middle first, then the rest of a
+    /// three-by-three grid. A node scrolled out of its container's viewport is scrolled
+    /// into view and, when `retry` is set, clicked two frames later: the
+    /// first frame applies the scroll, the second hit-tests the new layout.
+    /// Otherwise nothing is clicked, because a click at the node's stale or
+    /// covered position would activate whatever is drawn there.
+    fn a11y_click(&mut self, node: accesskit::NodeId, retry: bool, cx: &mut App) {
+        let Some(bounds) = self.a11y.node_bounds.get(&node).copied() else {
+            return;
+        };
+        let visible = match self.a11y.node_clips.get(&node) {
+            Some(clip) => bounds.intersect(clip),
+            None => bounds,
+        };
+        let reaches = |position: Point<Pixels>| match self.a11y.node_hitboxes.get(&node) {
+            Some(hitbox) => {
+                let hit_test = self.rendered_frame.hit_test(position);
+                let hovered = &hit_test.ids[..hit_test.hover_hitbox_count];
+                hovered.iter().position(|id| id == hitbox).is_some_and(|index| {
+                    !hovered[..index]
+                        .iter()
+                        .any(|id| self.a11y.pointer_hitboxes.contains(id))
+                })
+            }
+            None => true,
+        };
+        let position = (!visible.is_empty())
+            .then(|| {
+                [
+                    (0.5, 0.5),
+                    (0.25, 0.5),
+                    (0.75, 0.5),
+                    (0.5, 0.25),
+                    (0.5, 0.75),
+                    (0.25, 0.25),
+                    (0.75, 0.25),
+                    (0.25, 0.75),
+                    (0.75, 0.75),
+                ]
+                .map(
+                    |(x, y)| {
+                        visible.origin
+                            + point(visible.size.width * x, visible.size.height * y)
+                    },
+                )
+            })
+            .and_then(|points| points.into_iter().find(|position| reaches(*position)));
+        if let Some(position) = position {
+            let mouse_down = PlatformInput::MouseDown(crate::MouseDownEvent {
+                button: MouseButton::Left,
+                position,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+                first_mouse: false,
+            });
+            let mouse_up = PlatformInput::MouseUp(MouseUpEvent {
+                button: MouseButton::Left,
+                position,
+                modifiers: Modifiers::default(),
+                click_count: 1,
+            });
+            self.dispatch_event(mouse_down, cx);
+            self.dispatch_event(mouse_up, cx);
+        } else if retry && self.a11y_scroll_into_view(node) {
+            self.on_next_frame(move |window, _| {
+                window.on_next_frame(move |window, cx| window.a11y_click(node, false, cx));
+            });
+        } else {
+            log::debug!("a11y: not clicking {node:?}; no pointer could reach it");
+        }
+    }
+
+    /// Scrolls the containers enclosing `node`, innermost first, until the
+    /// node lies inside each viewport (its start edge, when it is larger than
+    /// the viewport). Returns whether any container moved.
+    fn a11y_scroll_into_view(&mut self, node: accesskit::NodeId) -> bool {
+        fn delta(start: Pixels, end: Pixels, view_start: Pixels, view_end: Pixels) -> Pixels {
+            if start < view_start || end - start > view_end - view_start {
+                view_start - start
+            } else if end > view_end {
+                view_end - end
+            } else {
+                px(0.)
+            }
+        }
+
+        let (Some(mut target), Some(containers)) = (
+            self.a11y.node_bounds.get(&node).copied(),
+            self.a11y.node_scroll_containers.get(&node).cloned(),
+        ) else {
+            return false;
+        };
+        let mut moved = false;
+        for container in containers.iter().rev() {
+            let view = container.viewport;
+            let mut offset = container.offset.borrow_mut();
+            let previous = *offset;
+            if container.scrolls.x {
+                offset.x = (offset.x
+                    + delta(target.left(), target.right(), view.left(), view.right()))
+                .clamp(-container.max_offset.x, px(0.));
+            }
+            if container.scrolls.y {
+                offset.y = (offset.y
+                    + delta(target.top(), target.bottom(), view.top(), view.bottom()))
+                .clamp(-container.max_offset.y, px(0.));
+            }
+            let applied = *offset - previous;
+            if applied != Point::default() {
+                moved = true;
+                target = target + applied;
+            }
+        }
+        if moved {
+            self.refresh();
+        }
+        moved
+    }
+
+    /// Activates accessibility as assistive technology would; the next frame
+    /// builds the tree. The test platform has no accessibility adapter.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn simulate_a11y_activation(&mut self) {
+        self.a11y.simulate_activation();
+        self.refresh();
+    }
+
+    /// Requests `action` on the accessibility node of the element whose id
+    /// path ends with `id`, as assistive technology would. Returns whether
+    /// the request was dispatched, not whether it had an effect: `false`
+    /// when the last frame had no such node or the node does not declare
+    /// the action (a platform adapter would not offer it). Panics when
+    /// several nodes' ids end with `id`, rather than picking one.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn simulate_a11y_action(
+        &mut self,
+        id: impl Into<ElementId>,
+        action: accesskit::Action,
+        cx: &mut App,
+    ) -> bool {
+        let id = id.into();
+        let node = match self.a11y.test_node_ids.get(&id).copied() {
+            Some(Some(node)) => node,
+            Some(None) => panic!("several accessibility nodes have element id {id:?}"),
+            None => return false,
+        };
+        let declared = self
+            .a11y
+            .test_node_actions
+            .get(&node)
+            .is_some_and(|declared| declared.supports_action(action));
+        if !declared {
+            return false;
+        }
+        self.handle_a11y_action(
+            accesskit::ActionRequest {
+                action,
+                target_tree: accesskit::TreeId::ROOT,
+                target_node: node,
+                data: None,
+            },
+            cx,
+        );
+        true
     }
 
     /// Toggles the inspector mode on this window.

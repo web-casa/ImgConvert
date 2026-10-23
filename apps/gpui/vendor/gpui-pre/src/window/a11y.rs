@@ -96,6 +96,14 @@
 //!
 //! These are cleared at the start of a frame, and re-populated during painting.
 //!
+//! Nodes without a listener for the requested action fall back to built-in
+//! handling. `Click` synthesizes a mouse click, so it first checks that the
+//! node's own hitbox would receive one at the chosen point: a node scrolled
+//! out of its container's viewport, or covered by another element, is
+//! scrolled into view and clicked on a later frame instead of clicking
+//! whatever happens to be drawn at its old position. `ScrollIntoView` moves
+//! the enclosing scroll containers recorded in [`A11y::node_scroll_containers`].
+//!
 //! [`NodeId`]: accesskit::NodeId
 
 use crate::*;
@@ -106,7 +114,9 @@ use crate::{App, Bounds, FocusId, Pixels, SharedString, Window};
 use accesskit::{Action, NodeId, TreeUpdate};
 use collections::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -114,6 +124,18 @@ use std::sync::{
 
 /// The fixed AccessKit node ID used for the root of every window's a11y tree.
 pub(crate) const ROOT_NODE_ID: NodeId = NodeId(0);
+
+/// A scroll container that encloses accessibility nodes: the part of the
+/// window it shows, its live scroll offset and range, and the axes it
+/// scrolls on (an `overflow_y_scroll` container never moves sideways, even
+/// when its content is wider).
+#[derive(Clone)]
+pub(crate) struct A11yScrollContainer {
+    pub(crate) offset: Rc<RefCell<Point<Pixels>>>,
+    pub(crate) viewport: Bounds<Pixels>,
+    pub(crate) max_offset: Point<Pixels>,
+    pub(crate) scrolls: Point<bool>,
+}
 
 /// A listener for an accessibility action on a specific node.
 pub(crate) type A11yActionListener =
@@ -148,6 +170,30 @@ pub(crate) struct A11y {
     pub(crate) nodes: A11yNodeBuilder,
     pub(crate) focus_ids: FxHashMap<NodeId, FocusId>,
     pub(crate) node_bounds: FxHashMap<NodeId, Bounds<Pixels>>,
+    /// The content mask in effect where each node was prepainted: the part
+    /// of the window its ancestors let it draw into.
+    pub(crate) node_clips: FxHashMap<NodeId, Bounds<Pixels>>,
+    /// The hitbox each node's own element inserted, if any.
+    pub(crate) node_hitboxes: FxHashMap<NodeId, HitboxId>,
+    /// Hitboxes of elements that act on a pointer press (click, mouse-down
+    /// or mouse-up listeners), accessible or not; a press is not delivered
+    /// where one of them covers the target, since it could take the press.
+    pub(crate) pointer_hitboxes: FxHashSet<HitboxId>,
+    /// The scroll containers enclosing each node, outermost first. Nodes in
+    /// the same containers share one chain.
+    pub(crate) node_scroll_containers: FxHashMap<NodeId, Rc<[A11yScrollContainer]>>,
+    /// The scroll containers enclosing the element being prepainted, and a
+    /// shared snapshot of them for the nodes pushed there.
+    scroll_stack: Vec<A11yScrollContainer>,
+    scroll_chain: Option<Rc<[A11yScrollContainer]>>,
+    /// Each node by the last segment of its element id, so tests can request
+    /// actions the way assistive technology does; `None` marks an id that
+    /// more than one node ended with.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) test_node_ids: FxHashMap<ElementId, Option<NodeId>>,
+    /// The actions each node declared, as a platform adapter sees them.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) test_node_actions: FxHashMap<NodeId, accesskit::Node>,
     pub(crate) action_listeners: FxHashMap<NodeId, Vec<(Action, A11yActionListener)>>,
     /// The window's title, used to label the root node so assistive
     /// technology can tell windows apart.
@@ -176,6 +222,16 @@ impl A11y {
             nodes: A11yNodeBuilder::new(),
             focus_ids: FxHashMap::default(),
             node_bounds: FxHashMap::default(),
+            node_clips: FxHashMap::default(),
+            node_hitboxes: FxHashMap::default(),
+            pointer_hitboxes: FxHashSet::default(),
+            node_scroll_containers: FxHashMap::default(),
+            scroll_stack: Vec::new(),
+            scroll_chain: None,
+            #[cfg(any(test, feature = "test-support"))]
+            test_node_ids: FxHashMap::default(),
+            #[cfg(any(test, feature = "test-support"))]
+            test_node_actions: FxHashMap::default(),
             action_listeners: FxHashMap::default(),
             window_title,
             last_focus_without_node: None,
@@ -219,6 +275,38 @@ impl A11y {
 
     pub(crate) fn is_active(&self) -> bool {
         self.active_this_frame
+    }
+
+    /// Activates accessibility as if assistive technology had requested it.
+    /// The test platform has no adapter to do so.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn simulate_activation(&mut self) {
+        self.active_flag.store(true, Ordering::SeqCst);
+    }
+
+    /// Enters a scroll container for the elements prepainted inside it.
+    pub(crate) fn push_scroll_container(&mut self, container: A11yScrollContainer) {
+        self.scroll_stack.push(container);
+        self.scroll_chain = Some(self.scroll_stack.as_slice().into());
+    }
+
+    /// Leaves the innermost scroll container.
+    pub(crate) fn pop_scroll_container(&mut self) {
+        self.scroll_stack.pop();
+        self.scroll_chain =
+            (!self.scroll_stack.is_empty()).then(|| self.scroll_stack.as_slice().into());
+    }
+
+    /// The scroll containers enclosing the element being prepainted.
+    pub(crate) fn scroll_chain(&self) -> Option<Rc<[A11yScrollContainer]>> {
+        self.scroll_chain.clone()
+    }
+
+    /// Records the hitbox that a node's own element inserted.
+    pub(crate) fn set_node_hitbox(&mut self, node_id: NodeId, hitbox: HitboxId) {
+        if self.nodes.has_node(node_id) {
+            self.node_hitboxes.insert(node_id, hitbox);
+        }
     }
 
     pub(crate) fn set_focusable(&mut self, node_id: NodeId, focus_id: FocusId) {
@@ -275,6 +363,16 @@ impl A11y {
     pub(crate) fn begin_frame(&mut self) {
         self.focus_ids.clear();
         self.node_bounds.clear();
+        self.node_clips.clear();
+        self.node_hitboxes.clear();
+        self.pointer_hitboxes.clear();
+        self.node_scroll_containers.clear();
+        self.scroll_stack.clear();
+        self.scroll_chain = None;
+        #[cfg(any(test, feature = "test-support"))]
+        self.test_node_ids.clear();
+        #[cfg(any(test, feature = "test-support"))]
+        self.test_node_actions.clear();
         self.action_listeners.clear();
         self.nodes.begin_frame(self.window_title.as_ref());
     }
