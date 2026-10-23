@@ -723,6 +723,9 @@ pub fn open_comparison_preview(
         let loading = for_content.read(cx).is_loading();
         dialog
             .glass_dialog(cx)
+            // The footer's own close button is the one way out besides
+            // Escape: Kit's corner button is named "Close" in every language.
+            .close_button(false)
             .title(tr("preview.title"))
             .w(px(880.))
             .content(move |content, _, _| content.child(content_entity.clone()))

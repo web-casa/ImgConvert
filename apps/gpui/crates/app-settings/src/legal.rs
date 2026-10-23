@@ -216,6 +216,9 @@ fn open(kind: DocumentKind, window: &mut Window, cx: &mut App) -> Entity<LegalDi
     window.open_dialog(cx, move |dialog, window, cx| {
         dialog
             .glass_dialog(cx)
+            // The footer's own close button is the one way out besides
+            // Escape: Kit's corner button is named "Close" in every language.
+            .close_button(false)
             .title(kind.title())
             .w(
                 (window.rem_size() * 40.)
