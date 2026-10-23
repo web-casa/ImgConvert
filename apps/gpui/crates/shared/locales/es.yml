@@ -858,7 +858,7 @@ settings.tab_has_issue:
 settings.format_hint_jpeg:
   es: Se abre en todas partes
 settings.format_hint_png:
-  es: Sin pérdida, con transparencia
+  es: Sin pérdida, con alfa
 settings.format_hint_webp:
   es: Pensado para la web
 settings.format_hint_avif:
