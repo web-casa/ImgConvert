@@ -408,6 +408,9 @@ pub fn open_updates(window: &mut Window, cx: &mut App) -> Option<Entity<UpdatesD
         let content = content.clone();
         dialog
             .glass_dialog(cx)
+            // The footer's own close button is the one way out besides
+            // Escape: Kit's corner button is named "Close" in every language.
+            .close_button(false)
             .title(tr("update.title"))
             .w(window.rem_size() * 32.)
             .content(move |body, _, _| body.child(content.clone()))

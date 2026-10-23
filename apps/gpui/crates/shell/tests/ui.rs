@@ -4339,3 +4339,39 @@ fn settings_and_batch_failures_are_both_announced(cx: &mut TestAppContext) {
     .unwrap();
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Each dialog has one way out besides Escape: its own footer button, named
+/// in the interface language. Kit's corner button is not shown; its
+/// accessible name is "Close" in every language.
+#[gpui_kit::test]
+fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
+    use gpui_kit::component::WindowExt as _;
+
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    for (trigger, close) in [
+        ("privacy-open", "legal-close"),
+        ("licenses-open", "legal-close"),
+        ("plugin-diagnostics", "diagnostics-close"),
+    ] {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(trigger, cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx), "{trigger} opens a dialog");
+            assert!(window.find(close).visible(), "{trigger}: {close} is shown");
+            assert!(
+                window.try_find("close").is_none(),
+                "{trigger}: no corner close button"
+            );
+            window.click(close, cx);
+            window.render_frame(cx);
+            assert!(!window.has_active_dialog(cx), "{close} closes it");
+        })
+        .unwrap();
+    }
+}

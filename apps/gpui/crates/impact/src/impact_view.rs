@@ -610,6 +610,9 @@ pub fn open_environmental_impact(
         let content_entity = for_content.clone();
         dialog
             .glass_dialog(cx)
+            // The footer's own close button is the one way out besides
+            // Escape: Kit's corner button is named "Close" in every language.
+            .close_button(false)
             .title(tr("impact.title"))
             // Kit dialogs take pixels; follow the rem scale by hand.
             .w(window.rem_size() * 35.)

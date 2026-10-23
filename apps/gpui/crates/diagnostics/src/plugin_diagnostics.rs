@@ -781,6 +781,9 @@ pub fn open_plugin_diagnostics(window: &mut Window, cx: &mut App) -> Entity<Plug
         let loading = for_content.read(cx).is_loading();
         dialog
             .glass_dialog(cx)
+            // The footer's own close button is the one way out besides
+            // Escape: Kit's corner button is named "Close" in every language.
+            .close_button(false)
             .title(tr("diagnostics.title"))
             .w(px(760.))
             .content(move |content, _, _| content.child(content_entity.clone()))

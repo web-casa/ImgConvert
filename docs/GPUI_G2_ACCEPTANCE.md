@@ -445,3 +445,64 @@ G2 继续开放。
 第一版状态行方案（构建 `00a5a3e0…`）的连续录屏 `g2-vo-live-01.mov`（53.35 s，SHA256 `9c2adc445eefa5b0c6fad227d02c4de043d184b35e306690618e51bc24718b3c`）可以作为平台机制的佐证：经过选择器的 4 文件批次中，字幕面板显示“完成 4 · 节省 8.7 MB”在光标不动时出现。同一版本还观察到，光标停在进度指示器上时只听到其使用提示；最终版里没有复测这个位置，未定性。
 
 结论：批次开始（不经过选择器时）和完成都会主动播报，满足 WCAG 4.1.3 的基本要求。经过首次目录选择器的那一批，只能听到完成。G2 继续开放（英文、深色、IME 与沙盒仍待重做）。
+
+### 2026-10-23：新界面的英文/深色 VoiceOver、IME 与沙盒冒烟
+
+前两节的修复（#57、#58）合并后，在 main `0d39630` 上重做，环境同上（macOS 13.6 arm64 专用账号，Retina 3024×1900）。
+
+**direct 候选**：普通 `cargo build --release --locked`，构建输出 SHA256 `88f0465c2bd689c649d6a1103b551dd27da855abf58ee021632581343b43c819`，ad-hoc 装包后 `4d6e08f1f68e6130997bd4a63462e7380653229a4293d21cea52833031555130`。
+
+#### VoiceOver（英文界面、深色，系统 VO 语言为中文，所以角色词是中文）
+
+| 场景 | 实际结果 |
+| --- | --- |
+| 窗口级顺序（辅助脚本逐项右移） | ImgConvert 标题 → Plugin diagnostics / Updates… / Privacy / About / 中文 / Appearance → Queue → 4 items → Reset formats / Clear / Add files… / Add folders… / Paste → Added 4 files → 4 个行组 → Choose folder…: …/vo-out → 4 files ready → Start → Conversion settings 标签组 → Format 组 |
+| 设置组（采集脚本 continue 20 步） | Target format、80 Quality、Save and manage presets、Preset name、Save current settings、Compression policies、五个开关、Format parameters、Speed、Chroma subsampling、Minimum quality；视口外的项目被逐个滚入，矩形都在窗口内 |
+| AXPress 矩阵 | Output/Format 标签、PNG · Source/AVIF 卡片、Lossless 开关来回、Appearance 弹出层（Theme 值 Dark、Reduce motion）、Scenario preset 列表（可见 Web sharing）、Compare harbor-blue.png 对话框（Close）、语言 中文/English 来回、窗口底边以下的 Try smallest candidate（true→false→true，标签不变）全部正确 |
+| 经选择器的 4 文件批次，光标在标题 | 自动朗读 “Converting a batch of 4” → “4 done · saved 8.7 MB” |
+| 不经选择器的 9 MB 单文件，光标在标题 | 自动朗读 “Converting a batch of 1” → “1 done · saved 8.6 MB” |
+
+连续录屏 `g2-vo-en-dark-01.mov`：416.68 s，SHA256 `681c363662663d26ff7f84a5bc4b074cc139378849e669e2e5863419058fac78`，原始视频只保存在测试机运行目录。
+
+#### IME（英文界面、深色，简体拼音）
+
+在字段上用真实鼠标点击聚焦，Ctrl+Space 切到拼音（`com.apple.inputmethod.SCIM.ITABC`），逐键输入。
+
+| 字段 | 组合中 | 系统候选窗 | Space 确认后 |
+| --- | --- | --- | --- |
+| Preset name，(942,539) 144×24 | 标记文字 “ni hao” | (935,567)，紧贴字段下方 | “你好” |
+| File name template，(942,497) 308×24 | “shi” | (935,525)，紧贴字段下方 | “适” |
+
+- 每次结束都切回 ABC。
+- 再次组合 “ni hao” 时用已授权的截图助手取证：截图 SHA256 `59f07d6fca9f2d42a34e830882ab84f5c53dd74b886948d47972c5fde3c93dc2`。截图中字段显示标记文字，候选条（“1 你好 2 👋 3 你好吗…”）紧贴输入框下方，VO 字幕在朗读候选。
+- Escape 取消组合后，字段为空，候选关闭。
+- 文件名模板已恢复为 `%name%`，并确认写回设置文件。
+
+#### 签名沙盒候选
+
+构建与签名：
+- 构建命令：`IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 cargo build --release --locked --no-default-features -p imgconvert-gpui`，构建输出 SHA256 `fc15589c34a281c0858628fd0ca038451a8e322fe5a97f1ec39ea331a54bb140`。
+- 装包为 `ImgConvertGlassSandbox.app`（bundle id `com.ivmm.imgconvert.glass-sandbox`），只有 `com.apple.security.app-sandbox` 与 `com.apple.security.files.user-selected.read-write` 两项 entitlement。
+- ad-hoc runtime 签名后，`codesign --verify --deep --strict` 通过；签名后主程序 SHA256 `d2d0d6dccf39286d3ec996f91cbd38050b30afee1cb2093bc68b1f4b5cc05641`。
+- 系统为它创建了专属容器。Store 构建不显示 “Updates…”。
+- 夹具是 `a-precision16.png`，SHA256 `8ec201a3a90d37cca5c5c47e4fad89b25f53c7e28d673444c91506abd2a43d32`。
+
+| 场景 | 实际结果 |
+| --- | --- |
+| 通过选择器导入 | 行为 “Pending” |
+| 首次 Start 打开输出选择器后取消 | 选择器关闭，没有输出，行仍为 Pending |
+| 选输出目录并转换 | 写出 `a-precision16_done.avif`（580 B），摘要 “1 done · saved 58 B”，源 hash 不变 |
+| 退出并重新启动 | 保存的目录仍显示，但 Start 再次打开原生选择器；取消后没有输出 |
+| 选择不可写的目录（`chmod 500`） | 行显示 “Failed · Cannot write to the output directory: …/sbx-out. Choose an output directory and try again.”，目录内没有半成品；恢复权限后再按 Start，直接成功写出 |
+| 输出覆盖来源（PNG、关闭后缀、输出目录选为源目录） | 弹出 “Cancel / Continue conversion” 确认；Cancel 后确认框关闭，行回到 Pending，源 hash 不变，没有输出 |
+
+观察：一次自动化操作中，输出目录被设成了 PNG 文件本身的路径。推测是 “前往文件夹”（⌘⇧G）把输入的文件夹路径自动补全成了之前输入过的文件路径。随后的转换被来源保护检查拦下，源文件不变。有意复现时（在选择器里输入文件路径），AppKit 返回的是它的父目录，没有复现出返回文件的情况，因此不记为产品缺陷。
+
+#### 中文许可对话框
+
+- VO 激活“关于”后，对话框打开，VO 光标落在许可正文上；正文全文（标题与全部条款）都可由 VoiceOver 读取。
+- 逐项右移依次为：正文 → “GitHub 项目支持” 链接 → “关闭 button” → “Close button”。
+- 最后这个是 Kit 的角落关闭按钮。它的无障碍名称在 gpui-base 中写死为英文 “Close”，中文界面下也读英文。本次在所有产品对话框（对比、存储情景、隐私/开源许可、更新、插件诊断）中隐藏了这个角落按钮。每个对话框保留自己已本地化的底部关闭按钮，Escape 仍可关闭；UI 测试 `dialogs_close_only_through_their_localized_button` 覆盖。
+- 在 Page Down 滚动正文时，VO 没有给出新的朗读（只有“你当前在窗口中”的提示）。按 Tab 时，VO 的 text under cursor 仍是整篇正文，因此看不出焦点有没有移到关闭按钮。键盘焦点循环此前已在 #42 的原生复验中通过（见上文），本次没有重做。
+
+连续录屏：`屏幕录制2026-10-23 18.08.36.mov`，保存在测试机运行目录。
