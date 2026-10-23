@@ -513,7 +513,9 @@ impl WorkflowPanel {
                     .role(Role::Tab)
                     .tab_stop(false)
                     .rounded(pill)
-                    .flex_1()
+                    // Each tab takes its label's width and shares what is
+                    // left, so longer translations do not truncate first.
+                    .flex_auto()
                     .min_w_0()
                     .toggled(selected)
                     .label(title.clone())

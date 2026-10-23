@@ -2018,9 +2018,10 @@ impl SettingsForm {
                 v_flex()
                     .gap_1()
                     .child(
-                        h_flex()
+                        // Name above, Save below at the end: the field keeps
+                        // the full width however long the button's label is.
+                        v_flex()
                             .gap_2()
-                            .items_end()
                             .child(self.text_field(
                                 "workflow-preset-name",
                                 tr("workflow.preset_name"),
@@ -2032,6 +2033,7 @@ impl SettingsForm {
                                 Button::new("workflow-save-preset")
                                     .outline()
                                     .small()
+                                    .self_end()
                                     .label(tr("workflow.save_preset"))
                                     .disabled_for_all(busy || !can_save || !name_valid)
                                     .on_click(cx.listener(|this, _, window, cx| {
