@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<title>ImgConvert</title>
+<defs>
+<linearGradient id="q-tile" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fbfcfe"/><stop offset="1" stop-color="#dfe6f1"/></linearGradient>
+<linearGradient id="q-drop" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#7fd6ff"/><stop offset="1" stop-color="#1670f0"/></linearGradient>
+</defs>
+<path d="M512 32 A480 480 0 0 1 512 992 Z" fill="url(#q-drop)"/>
+<path d="M617.6 118.4 A412.8 412.8 0 0 1 915.2 425.6" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="33.6" stroke-linecap="round"/>
+<rect x="320.0" y="32.0" width="192.6" height="192.6" fill="#7fd6ff"/>
+<rect x="128.0" y="32.0" width="192.6" height="192.6" fill="#93ddff"/>
+<rect x="320.0" y="224.0" width="192.6" height="192.6" fill="#76c0fb"/>
+<rect x="128.0" y="224.0" width="192.6" height="192.6" fill="#5cb4fa"/>
+<rect x="320.0" y="416.0" width="192.6" height="192.6" fill="#3992f5"/>
+<rect x="128.0" y="416.0" width="192.6" height="192.6" fill="#59a3f7"/>
+<rect x="320.0" y="608.0" width="192.6" height="192.6" fill="#59a3f7"/>
+<rect x="128.0" y="608.0" width="192.6" height="192.6" fill="#3992f5"/>
+<rect x="320.0" y="800.0" width="192.6" height="192.6" fill="#1670f0"/>
+<rect x="128.0" y="800.0" width="192.6" height="192.6" fill="#3b87f2"/>
+<rect x="472.0" y="32.0" width="80.0" height="960.0" fill="#ffffff"/>
+</svg>
