@@ -3,6 +3,8 @@ app.title:
   de: ImgConvert
 app.language:
   de: "Sprache: %{language}"
+app.language_title:
+  de: Sprache
 app.quit:
   de: ImgConvert beenden
 app.open_files:
@@ -24,7 +26,7 @@ queue.title:
 queue.add_files:
   de: Dateien hinzufügen
 queue.paste:
-  de: Einsetzen
+  de: "Einfügen"
 queue.clipboard_empty:
   de: Kopiere ein Bild oder absolute Dateipfade und füge sie erneut ein.
 queue.item_format_label:
@@ -644,7 +646,7 @@ impact.larger:
 impact.same:
   de: Ausgabegröße unverändert
 impact.boundary:
-  de: Eine kleinere Datei belegt weder freigegebenen Speicherplatz noch eingesparten Strom oder vermiedene Emissionen.
+  de: "Eine kleinere Datei ist kein Beleg für freigegebenen Speicherplatz, eingesparten Strom oder vermiedene Emissionen."
 impact.excluded:
   de: Ein vergleichbares einzelnes statisches Rasterergebnis ist nicht bestätigt. Dokumente, Animationen, mehrere Ausgaben, AVIF/HEIC mit unbekanntem Sequenzstatus und ältere Ergebnisse sind ausgeschlossen.
 impact.batch:

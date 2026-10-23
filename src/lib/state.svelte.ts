@@ -19,6 +19,9 @@ import {
   systemLocale,
   translate,
   type AppLocale,
+  isPersistedLocale,
+  normalizeLocale,
+  type PersistedLocale,
 } from "$lib/i18n";
 import {
   commandErrorMessage,
@@ -397,7 +400,7 @@ export interface Settings {
   concurrency: number;
   theme: Theme;
   reduceMotion: boolean;
-  locale: AppLocale;
+  locale: PersistedLocale;
 }
 
 // ---- 常量 ----
@@ -2702,7 +2705,7 @@ export async function initPersistence() {
     } else {
       settings.locale = detectedLocale;
     }
-    await setAppLocale(settings.locale);
+    await setAppLocale(normalizeLocale(settings.locale));
   } catch (e) {
     console.warn("Failed to load settings, using defaults:", e);
     persistenceStatus.error = String(e);
@@ -2780,7 +2783,7 @@ function normalizeSettings(fallbackLocale: AppLocale, persisted?: Partial<Settin
   if (!["light", "dark", "system"].includes(settings.theme)) {
     settings.theme = "system";
   }
-  if (settings.locale !== "zh-CN" && settings.locale !== "en-US") {
+  if (!isPersistedLocale(settings.locale)) {
     settings.locale = fallbackLocale;
   }
   if (typeof settings.format !== "string" || !settings.format.trim()) {

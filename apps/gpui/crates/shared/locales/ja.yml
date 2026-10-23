@@ -3,6 +3,8 @@ app.title:
   ja: ImgConvert
 app.language:
   ja: "言語：%{language}"
+app.language_title:
+  ja: 言語
 app.quit:
   ja: ImgConvert を終了
 app.open_files:

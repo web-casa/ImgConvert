@@ -7,6 +7,12 @@
 //!
 //! The locale is one global shared with GPUI Kit's own strings because this
 //! crate and `gpui-component` link the same `rust-i18n` major version.
+//!
+//! Known limits of the non-English, non-Chinese locales: Kit 0.7.1 ships its
+//! own few strings (input context menu, select placeholder) only in en,
+//! zh-CN, zh-HK, zh-TW and it, so they read English there; file sizes and
+//! percentages use English number formatting in every locale; and the
+//! privacy policy exists in English and Chinese (Simplified script).
 
 use gpui_kit::SharedString;
 use imgconvert_backend::settings::AppLocale;
@@ -85,19 +91,22 @@ impl Locale {
             .map_or(Self::English, |value| Self::from_tag(&value))
     }
 
-    /// Maps a BCP 47 or POSIX tag to a shipped locale: Chinese written in
-    /// Traditional script (Hant, TW, HK, MO) to Traditional Chinese, other
-    /// Chinese to Simplified, the other shipped languages by their primary
-    /// subtag, and everything else to English.
+    /// Maps a BCP 47 or POSIX tag to a shipped locale. Chinese follows an
+    /// explicit script (Hans, Hant) first, then the region (TW, HK and MO
+    /// read Traditional), then Simplified; the other shipped languages
+    /// match by their primary subtag, and everything else is English.
     pub fn from_tag(tag: &str) -> Self {
         let lowered = tag.to_ascii_lowercase().replace('_', "-");
         let primary = lowered.split(['-', '.', '@']).next().unwrap_or("");
         match primary {
             "zh" => {
-                let traditional = lowered
-                    .split(['-', '.', '@'])
-                    .skip(1)
-                    .any(|part| matches!(part, "hant" | "tw" | "hk" | "mo"));
+                let parts: Vec<&str> = lowered.split(['-', '.', '@']).skip(1).collect();
+                let traditional = if parts.contains(&"hans") {
+                    false
+                } else {
+                    parts.contains(&"hant")
+                        || parts.iter().any(|part| matches!(*part, "tw" | "hk" | "mo"))
+                };
                 if traditional {
                     Self::TraditionalChinese
                 } else {
@@ -166,16 +175,22 @@ pub fn tr_with(key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> SharedStri
 }
 
 /// [`tr_with`] for a message about `count` things, passed as the `name`
-/// placeholder: when `count` is one, the `<key>_one` variant is used, so
-/// English reads "1 file" rather than "1 files". Every such variant exists
-/// in both locales (Chinese has no plural, so its text is the same).
+/// placeholder: when the current language puts `count` in its singular
+/// category, the `<key>_one` variant is used, so English reads "1 file"
+/// rather than "1 files". French and Portuguese also treat 0 as singular
+/// (CLDR "one" is i = 0, 1). Every variant exists in every locale; Chinese,
+/// Japanese and Korean have no plural, so their two texts are the same.
 pub fn tr_count(
     key: &str,
     name: &str,
     count: usize,
     args: &[(&str, &dyn std::fmt::Display)],
 ) -> SharedString {
-    let key = if count == 1 {
+    let singular = match Locale::current() {
+        Locale::French | Locale::Portuguese => count <= 1,
+        _ => count == 1,
+    };
+    let key = if singular {
         format!("{key}_one")
     } else {
         key.to_owned()
@@ -374,6 +389,25 @@ mod tests {
             assert_eq!(tr_count(key, name, 1, args).as_ref(), one, "{key}");
             assert_eq!(tr_count(key, name, 2, args).as_ref(), two, "{key}");
         }
+        // French and Portuguese put 0 in the singular too.
+        for locale in [Locale::French, Locale::Portuguese] {
+            set_locale(locale);
+            assert_eq!(
+                tr_count("queue.item_count", "count", 0, &[]),
+                tr_with("queue.item_count_one", &[("count", &0)]),
+                "{locale:?}"
+            );
+            assert_ne!(
+                tr_count("queue.item_count", "count", 2, &[]),
+                tr_with("queue.item_count_one", &[("count", &2)]),
+                "{locale:?}"
+            );
+        }
+        set_locale(Locale::English);
+        assert_eq!(
+            tr_count("queue.item_count", "count", 0, &[]).as_ref(),
+            "0 items"
+        );
         // Chinese has one form, and never falls back to English.
         set_locale(Locale::SimplifiedChinese);
         assert_eq!(
@@ -406,6 +440,9 @@ mod tests {
             ("zh-Hant-TW", Locale::TraditionalChinese),
             ("zh_TW.UTF-8", Locale::TraditionalChinese),
             ("zh-HK", Locale::TraditionalChinese),
+            ("zh-Hans-TW", Locale::SimplifiedChinese),
+            ("zh-Hans-HK", Locale::SimplifiedChinese),
+            ("zh-Hant-CN", Locale::TraditionalChinese),
             ("ja_JP.UTF-8", Locale::Japanese),
             ("ko-KR", Locale::Korean),
             ("fr_CA.UTF-8", Locale::French),

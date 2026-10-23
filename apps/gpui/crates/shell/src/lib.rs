@@ -7,6 +7,7 @@
 
 pub mod appearance;
 pub mod blocked;
+pub mod language;
 pub mod probe_driver;
 pub mod workspace;
 
@@ -19,7 +20,7 @@ use imgconvert_gpui_shared::{AppModels, Services, services, settings_model, them
 pub use blocked::open_blocked_window;
 pub use workspace::{Workspace, open_main_window};
 
-actions!(imgconvert, [Quit, OpenFiles, ToggleLanguage]);
+actions!(imgconvert, [Quit, OpenFiles]);
 
 /// How long quitting waits for in-flight atomic writes.
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
@@ -42,7 +43,6 @@ pub fn init_app(cx: &mut App) {
         cx.quit();
     });
     cx.on_action(|_: &OpenFiles, cx| imgconvert_gpui_queue::import::pick_and_import(cx));
-    cx.on_action(|_: &ToggleLanguage, cx| toggle_language(cx));
 
     // Bind before building the menus so shortcuts show next to their items.
     cx.bind_keys([
@@ -58,7 +58,7 @@ pub fn init_app(cx: &mut App) {
 }
 
 /// Switches between English and Simplified Chinese (from any other locale,
-/// to English); the quick switch behind the `ToggleLanguage` action.
+/// to English).
 pub fn toggle_language(cx: &mut App) {
     set_language(Locale::current().toggled(), cx);
 }

@@ -17,7 +17,7 @@
   import { Button } from "$lib/components/ui/button";
   import appIconUrl from "$lib/assets/app-icon.png";
   import { EXTERNAL_LINKS, openExternalUrl } from "$lib/external-links";
-  import { setAppLocale } from "$lib/i18n";
+  import { normalizeLocale, setAppLocale } from "$lib/i18n";
   import { settings, engine, applyTheme, persistSettings, updaterEnabled } from "$lib/state.svelte";
 
   let {
@@ -55,7 +55,7 @@
     persistSettings();
   }
   function toggleLocale() {
-    settings.locale = settings.locale === "zh-CN" ? "en-US" : "zh-CN";
+    settings.locale = normalizeLocale(settings.locale) === "zh-CN" ? "en-US" : "zh-CN";
     void setAppLocale(settings.locale);
     void persistSettings();
   }
@@ -160,7 +160,7 @@
       class="size-11 sm:size-10"
       title={$t("topbar.language")}
       aria-label={$t("topbar.language")}
-      aria-pressed={settings.locale !== "zh-CN"}
+      aria-pressed={normalizeLocale(settings.locale) !== "zh-CN"}
       onclick={toggleLocale}
     >
       <TranslationIcon size={20} />

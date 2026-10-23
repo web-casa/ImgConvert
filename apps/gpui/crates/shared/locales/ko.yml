@@ -3,6 +3,8 @@ app.title:
   ko: ImgConvert
 app.language:
   ko: "언어: %{language}"
+app.language_title:
+  ko: 언어
 app.quit:
   ko: ImgConvert 종료
 app.open_files:

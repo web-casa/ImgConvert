@@ -237,6 +237,35 @@ fn language_menu_and_toggle_rewrite_visible_labels(cx: &mut TestAppContext) {
             assert_eq!(settings.settings().locale, locale.app_locale(), "persisted");
         });
     }
+    // The popover lists every language as a radio button; only the current
+    // one is checked, and choosing another switches to it.
+    cx.update(|cx| set_language(Locale::English, cx));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("language-menu", cx);
+    })
+    .unwrap();
+    settle_animations(cx, handle);
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("language-panel").visible());
+        for locale in Locale::ALL {
+            let button = window.find(gpui_kit::SharedString::from(format!(
+                "language-{}",
+                locale.tag()
+            )));
+            assert_eq!(button.label(), Some(locale.native_name()));
+            assert_eq!(
+                button.checked(),
+                Some(locale == Locale::English),
+                "{locale:?}"
+            );
+        }
+        window.click("language-ja", cx);
+        window.render_frame(cx);
+    })
+    .unwrap();
+    assert_eq!(Locale::current(), Locale::Japanese);
     // The quick switch goes to English from any other language, and from
     // English to Simplified Chinese.
     cx.update(toggle_language);

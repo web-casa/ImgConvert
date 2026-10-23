@@ -3,6 +3,8 @@ app.title:
   fr: ImgConvert
 app.language:
   fr: "Langue : %{language}"
+app.language_title:
+  fr: Langue
 app.quit:
   fr: Quitter ImgConvert
 app.open_files:
@@ -58,9 +60,9 @@ queue.import_added:
 queue.import_added_one:
   fr: "%{added} fichier ajouté"
 queue.import_added_skipped:
-  fr: "%{added} fichiers ajoutés, %{skipped} ignorés"
+  fr: "%{added} fichiers ajoutés · ignorés : %{skipped}"
 queue.import_added_skipped_one:
-  fr: "%{added} fichier ajouté, %{skipped} ignorés"
+  fr: "%{added} fichier ajouté · ignorés : %{skipped}"
 queue.import_nothing:
   fr: Aucune image prise en charge trouvée
 queue.import_failed:
@@ -100,7 +102,7 @@ workflow.cancelling:
 workflow.announce_started:
   fr: "Conversion d’un lot de %{count}"
 workflow.progress:
-  fr: "%{done} sur %{total} terminés"
+  fr: "Terminés : %{done} sur %{total}"
 workflow.batch_progress:
   fr: Progression de la conversion par lot
 workflow.summary_cancelled:
@@ -828,9 +830,9 @@ queue.animated:
 queue.animation_unknown:
   fr: Animation non vérifiée
 workflow.animation_summary:
-  fr: "%{count} fichiers · %{animated} animés (non pris en charge) · %{unknown} non vérifiés"
+  fr: "%{count} fichiers · animés (non pris en charge) : %{animated} · non vérifiés : %{unknown}"
 workflow.animation_summary_one:
-  fr: "%{count} fichier · %{animated} animés (non pris en charge) · %{unknown} non vérifiés"
+  fr: "%{count} fichier · animés (non pris en charge) : %{animated} · non vérifiés : %{unknown}"
 status.warnings:
   fr: Avertissements
 queue.add_folders:
@@ -848,9 +850,9 @@ settings.tab_format:
 settings.tab_output:
   fr: Sortie
 settings.tab_processing:
-  fr: Réglages
+  fr: "Ajuster"
 settings.tab_privacy:
-  fr: Confidentialité
+  fr: "Vie privée"
 settings.tab_has_issue:
   fr: "%{tab}, à vérifier"
 settings.format_hint_jpeg:

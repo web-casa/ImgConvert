@@ -3,6 +3,8 @@ app.title:
   es: ImgConvert
 app.language:
   es: "Idioma: %{language}"
+app.language_title:
+  es: Idioma
 app.quit:
   es: Salir de ImgConvert
 app.open_files:
@@ -58,9 +60,9 @@ queue.import_added:
 queue.import_added_one:
   es: "Se añadió %{added} archivo"
 queue.import_added_skipped:
-  es: "Se añadieron %{added} archivos, %{skipped} omitidos"
+  es: "Se añadieron %{added} archivos · omitidos: %{skipped}"
 queue.import_added_skipped_one:
-  es: "Se añadió %{added} archivo, %{skipped} omitidos"
+  es: "Se añadió %{added} archivo · omitidos: %{skipped}"
 queue.import_nothing:
   es: No se encontraron imágenes compatibles
 queue.import_failed:
@@ -100,7 +102,7 @@ workflow.cancelling:
 workflow.announce_started:
   es: "Convirtiendo un lote de %{count}"
 workflow.progress:
-  es: "%{done} de %{total} completados"
+  es: "Completados: %{done} de %{total}"
 workflow.batch_progress:
   es: Progreso de la conversión por lotes
 workflow.summary_cancelled:
@@ -828,9 +830,9 @@ queue.animated:
 queue.animation_unknown:
   es: Animación sin verificar
 workflow.animation_summary:
-  es: "%{count} archivos · %{animated} animados (no compatibles) · %{unknown} sin verificar"
+  es: "%{count} archivos · animados (no compatibles): %{animated} · sin verificar: %{unknown}"
 workflow.animation_summary_one:
-  es: "%{count} archivo · %{animated} animados (no compatibles) · %{unknown} sin verificar"
+  es: "%{count} archivo · animados (no compatibles): %{animated} · sin verificar: %{unknown}"
 status.warnings:
   es: Advertencias
 queue.add_folders:
