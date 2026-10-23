@@ -1,6 +1,6 @@
 # GPUI G2 / R11 原生验收
 
-**G2 已于 2026-10-24 收口**，判断、依据与遗留见文末“最终候选集中复验与 G2 收口”一节；之前各节保留历次记录。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
+**G2 已于 2026-10-24 收口**，判断、依据与遗留见文末“2026-10-24：最终候选集中复验与 G2 收口”一节；之前各节保留历次记录。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
 
 ## 候选和隔离环境
 
@@ -507,55 +507,62 @@ G2 继续开放。
 
 连续录屏：`屏幕录制2026-10-23 18.08.36.mov`，保存在测试机运行目录。
 
-## 2026-10-23/24：最终候选集中复验与 G2 收口
+## 2026-10-24：最终候选集中复验与 G2 收口
 
-此前的记录分散在多个候选上（`db5a98f` 加工作区补丁、`0d39630`，以及 #59 之后没有构建 hash 的许可对话框记录）。只读评审据此否决了第一次收口草稿。本节在**同一个**最终候选上重做全部三项。
+此前的记录分散在多个候选上，只读评审因此否决了第一次收口草稿。随后在 `3d14b71` 上做了一轮集中复验，拍网站截图时又发现“一批完成后清空队列，操作栏仍显示上一批结果”，由 #63 修复。为了让所有证据落在同一个候选上，本节在包含 #63 的 main `f88e50f` 上把三项全部重做；`3d14b71` 那一轮只作为过程记录，不作为收口证据。
 
 ### 候选
 
 | 项目 | 记录 |
 | --- | --- |
-| 源码 | main `3d14b71`（#62 之后），测试机独立检出，`git status` 干净 |
+| 源码 | main `f88e50f4f2264c17f2f77115e737733b045eaeae`（#63 之后），测试机独立检出 `~/tools/imgconvert-glass-20261023`，`git status` 干净 |
 | 依赖 | gpui-kit `=0.7.1`；gpui-pre 0.3.8 以 vendor 方式锁定（`apps/gpui/vendor/gpui-pre`，补丁登记见 `patches/gpui-ime-focus/`） |
-| 机器 | `ivmmdexuniji.local`，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用账号 `ivmm` |
-| direct 候选 | `cargo build --release --locked`，构建输出 SHA256 `af6c6f402a78473ed5235a5c940b053b457e58322d58dbea19ef8bf134ee46e2`（日志 `direct.log`，`f700df72…`）；ad-hoc 装包为 `~/imgc-glass/ImgConvertGlass.app`，主程序 `1920c88862d1564b4709bac3c81cfe4a0e92f4bb7ef0ec476360f36bcd2fee40` |
-| Store 功能候选 | `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 cargo build --release --locked --no-default-features -p imgconvert-gpui`，构建输出 `bbcb4bb764392a73f80ce3226665ed9d440f4706e6ee428bd6a98d7e1dbf591d`（日志 `store.log`，`14bfcbeb…`）；装包为 `~/imgc-glass/sandbox/ImgConvertGlassSandbox.app`，只有 `app-sandbox` 与 `files.user-selected.read-write` 两项 entitlement，ad-hoc runtime 签名后 `codesign --verify --deep --strict` 通过，签名后主程序 `57c8061368c55bb33bce50ba71b8a3396a0c58ec19eaa313c7bf113becbb91b2` |
-| 夹具 | `g2-final-input/`：`a-precision16.png`、`harbor-blue.png`、`motion.gif`、`motion.png`（APNG）、`unverified.png`（填充后动画状态无法在预算内确认）；沙盒用 `sbx-in/a-precision16.png`（`8ec201a3…`） |
+| 机器 | `ivmmdexuniji.local`，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用测试账号 `ivmm` |
+| direct 候选 | `cargo build --release --locked -p imgconvert-gpui`，构建输出 SHA256 `83b057c40b7718dcfb1b53c8f7453f940458bc83eb0828ec96bf4da87afe31c8`（构建日志 `g2-final2-build/direct.log`，`7363a350…`）；ad-hoc 装包为 `~/imgc-glass/ImgConvertGlass.app`，主程序 `1634aa6ba2593479c525e1d46331f58229ec7fe098fa4c132d2b2825f554e89d` |
+| Store 功能候选 | `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 cargo build --release --locked --no-default-features -p imgconvert-gpui`，构建输出 `89d1d27d017df030bc340f22f9197b2e248a84ac9b33801e5ff98f80cfd49325`（日志 `store.log`，`a63141af…`）；装包为 `~/imgc-glass/sandbox/ImgConvertGlassSandbox.app`，只有 `com.apple.security.app-sandbox` 与 `com.apple.security.files.user-selected.read-write` 两项 entitlement；ad-hoc runtime 签名后 `codesign --verify --deep --strict` 通过，签名后主程序 `e52b6cc9ae2e3a48b229e00da1193113119a81d36310bf0fa2667236113ea5b0` |
+| 夹具 | `g2-final-input/`：`a-precision16.png`（16 位 PNG，转换后有精度告警）、`harbor-blue.png`、`motion.gif`、`motion.png`（APNG）、`unverified.png`（填充后动画状态无法在预算内确认）；沙盒用 `sbx-in/a-precision16.png`，SHA256 `8ec201a3a90d37cca5c5c47e4fad89b25f53c7e28d673444c91506abd2a43d32` |
+| 操作 | 自动化脚本（VoiceOver 经 AppleScript 控制，键盘与鼠标经 System Events / CGEvent），在用户授权的专用账号上运行；时间为 2026-10-24 02:18–03:38（UTC+8） |
 
-录屏均为全屏连续录制，开着 VoiceOver 字幕面板，原始视频只保存在测试机运行目录 `g2-vo-glass-zh-20261023-0236/recordings/`：
+场景编号：V1–V10 为 VoiceOver，B1–B4 为 IME，C1–C5 为沙盒。“经 VO”指用 VoiceOver 的 `perform action`（等同 VO+Space）激活；“AXPress”指 System Events 直接按下，只作补充。
+
+### 录屏
+
+全屏连续录制，开着 VoiceOver 字幕面板。原始视频只保存在测试机运行目录 `g2-vo-glass-zh-20261023-0236/recordings/`。
 
 | 文件 | 时长 | SHA256 | 内容 |
 | --- | --- | --- | --- |
-| `g2-final-vo-zh.mov` | 483 s | `d236503ef9534b24895a541ce9da9abe6634691af7f8929714d7b32711aecedc` | 中文/浅色 A1–A6 |
-| `g2-final-vo-zh-dialog.mov` | 600 s | `55a2f45a02846d54466c264db2142b99c0e4aeda452f93ceddede7f0b90b7d0e` | A8；A7 的第一次尝试（VO 停在别的窗口，未计入） |
-| `g2-final-vo-zh-a7.mov` | 305 s | `e0d06a8aff307b320cbc502270039f95e4762926aac2f87dc9f432cdc75371a4` | A7 重做 |
-| `g2-final-vo-en-dark.mov` | 1025 s | `cb0491c510d7eae34babb746ff6f101c6d4344a798b3582bbe7dea727b851a95` | 英文/深色 E1–E6 |
-| `g2-final-vo-en-dark-attempt1.mov` | 988 s | `1b6801f1aa25723edd2a1fd7fbaf190aab930a975a4d978a0bce316748135075` | 第一次尝试：脚本把主窗口提到选择器之上，导入为 0，未计入 |
+| `g2-final2-vo-zh-CN-light.mov` | 641 s | `7c5ecac4d681694ceab79224d3c1506de55d348b3bc1189e1a45737bd6d9a4ec` | 中文/浅色 V1–V10（其中 V8 导航有误，见下一行） |
+| `g2-final2-vo-zh-CN-light-v8.mov` | 125 s | `6e3631ed85b80a364ac71f7c0f98018c0abcef5fe696acf498c583175ce6a316` | 中文/浅色 V8 重做 |
+| `g2-final2-vo-en-US-dark.mov` | 799 s | `b95cce8814355c6a7c148a136834382b27ff63886d5050448867947b3144e7fc` | 英文/深色 V1–V10（V8 同样用下一行） |
+| `g2-final2-vo-en-US-dark-v8.mov` | 123 s | `bef0321b9b11f3c21f31fe5084ab8f2841c82966be2d41f3695481663afd24e5` | 英文/深色 V8 |
+| `g2-final2-vo-en-US-dark-attempt1.mov` | 1644 s | `ec9af362f43d40cf3aba6b83ffbf80cfd0509fd24740a29efe3ac84b7f75be83` | 英文第一次：脚本的选择器步骤没等到窗口，导入为 0，V4–V7、V9 无效，未计入 |
 
-### VoiceOver（清单第 1–5 步）
-
-“经 VO”指用 VoiceOver 的 `perform action`（与 VO+Space 相同）激活；“AXPress”指 System Events 直接按下，只作补充。
+### VoiceOver
 
 | 步骤 | 中文/浅色 | 英文/深色 |
 | --- | --- | --- |
-| 2 空队列（窗口级逐项右移） | 24 项：标题 → 插件诊断/更新…/隐私/关于/English/外观 → 还没有图片 → 说明 → 添加文件…/添加文件夹…/粘贴 → 9 个格式胶囊 → 选择文件夹…: …/vo-out → 先添加文件 → “开始转换 无可用操作 button”（`AXEnabled=false`） | 同样 24 项，英文名称；“Start 无可用操作 button” |
-| 2 导入后的标记 | 经 VO 激活“添加文件夹…”，选择夹具目录：已添加 5 个文件；`motion.gif`、`motion.png` 行读作“动画 · 暂不支持 · …”，`unverified.png` 读作“动画状态未确认 · …”；行内依次为状态、事实、目标格式、对比、移除 | 同样经 VO 导入；“Animated · unsupported · GIF · 64 × 64 · g2-final-input”、“Animation unverified · PNG · …”、“Target format for motion.gif: Global · AVIF”、“Remove motion.gif from the queue” |
-| 3 运行与完成 | 开始转换用 AXPress 触发，经输出目录选择器；字幕 234 s “开始转换，共 5 个文件”，235 s “完成 2 · 失败 3 · 节省 8.6 MB”（两个动画文件和动画状态未确认的文件按设计失败） | 经 VO 激活 Start，经选择器；字幕约 558 s “2 done · 3 failed · saved 8.6 MB”。开始播报没有出现：选择器关闭时 VO 读出焦点“ImgConvert, Heading”，盖过了它（见遗留） |
-| 3 设置标签 | A8：经 VO 进入“转换设置”标签组，激活第 2 个标签，VO 读“输出 tab，第2项（共4项）”，再激活回到“格式” | 设置组的逐项朗读沿用 `0d39630` 的英文记录（见上一节）；本轮没有重做 |
-| 4 对话框 | A7：经 VO 激活“关于”，对话框打开；VO 右移到唯一的“关闭 button”并激活，对话框关闭，“关于”`AXFocused=true`。再次打开后按 Escape，同样关闭并回到“关于” | E5/E6：经 VO 打开 About，VO 先落在许可正文“# GPUI Third-Party Licenses”；右移到“Close button”激活后关闭，About `AXFocused=true`；Escape 同样 |
-| 4 语言跟随 | A2：经 VO 激活“English”，说明文字变为英文；再经 VO 激活“中文”，变回中文 | 界面从 E1 起就是英文 |
+| V1 空队列（清单第 2 步），窗口级逐项右移 | 24 项：标题 → 插件诊断/更新…/隐私/关于/English/外观 → 还没有图片 → 说明 → 添加文件…/添加文件夹…/粘贴 → 9 个格式胶囊 → “选择文件夹…: …/vo-out” → 先添加文件 → “开始转换 无可用操作 button”（`AXEnabled=false`） | 同样 24 项，英文名称；“Start 无可用操作 button” |
+| V2 语言跟随（第 4 步） | 经 VO 激活“English”，按钮变为“中文”；再经 VO 激活，变回“English” | 方向相反，同样通过 |
+| V3 取消输入选择器 | 经 VO 激活“添加文件夹…”，出现 Open；Escape 后只剩主窗口，队列 0 行 | 同样 |
+| V4 导入与标记（第 2 步） | 经 VO 激活“添加文件夹…”并选夹具目录：“已添加 5 个文件”，`motion.gif`/`motion.png` 为“动画 · 暂不支持 · …”，`unverified.png` 为“动画状态未确认 · …”，“5 个文件待转换” | “Added 5 files”、“Animated · unsupported · …”、“Animation unverified · …”、“5 files ready” |
+| V5 动画行朗读 | 进入行：等待中 → 事实 → “motion.gif 的目标格式：全局 · AVIF” → “对比 motion.gif” → “从队列移除 motion.gif”；`unverified.png` 同样 | “Pending” → … → “Target format for motion.gif: Global · AVIF” → “Compare motion.gif” → “Remove motion.gif from the queue” |
+| V6 运行与完成（第 3 步） | 经 VO 激活“开始转换”，经输出目录选择器；字幕约 263 s “开始转换，共 5 个文件”，约 265 s “完成 2 · 失败 3 · 节省 8.6 MB”（两个动画文件和动画状态未确认的文件按设计失败） | 经 VO 激活 Start；字幕约 367 s “Converting a batch of 5”，约 371 s “2 done · 3 failed · saved 8.6 MB” |
+| V7 告警行（第 3 步） | 进入 `a-precision16.png` 行：“完成 · 638 B → 580 B · 精度已从 16 位降至 8 位。” → 事实 → 目标格式 → “a-precision16.png 的存储情景” → 对比 → 移除 | “Done · 638 B → 580 B · Precision reduced from 16-bit to 8-bit.” → … → “Storage scenario for a-precision16.png” → … |
+| V8 设置区（第 3 步） | “转换设置 tab group” → 进入后“格式 已选择 tab，第1项（共4项）”；右移并激活“输出 tab，第2项”，`AXTabButton 输出=true`；左移激活回“格式”。随后进入“格式 group”，逐项：场景预设 → 目标格式 radio group → 80 质量 slider → 保存与管理预设 → 预设名称 text field → “保存当前设置 变暗 button” → 压缩策略 → 无损压缩/仅保留更小的输出/多候选取最小/自动质量/仅保留有损重编码收益 开关 → 格式参数 → 8 速度 → 4:4:4 色度抽样 → 30 最低质量；视口外的项目随 VO 移动被滚入 | 同样：“Conversion settings tab group”、“Output tab”切换与回切、Target format … “Save current settings 变暗 button” … “Chroma subsampling” |
+| V9 对话框（第 4 步） | 经 VO 激活“关于”，对话框打开，VO 落在许可正文；右移到唯一的“关闭 button”并经 VO 激活，对话框关闭，“关于”`AXFocused=true`。再次打开后按 Escape，同样关闭并回到“关于” | 同样，“Close button”；关闭与 Escape 后 About `AXFocused=true` |
+| V10 运行后清空（第 2 步，#63） | 经 VO 激活“清空”，窗口级逐项与 V1 完全相同：“先添加文件”、“开始转换 无可用操作”，没有进度条节点 | 同样：“Add files to begin”、“Start 无可用操作”，进度条节点 0 |
 
 ### IME（中文界面、浅色，简体拼音 `com.apple.inputmethod.SCIM.ITABC`）
 
-用真实鼠标点击聚焦“预设名称”，Ctrl+Space 切换输入法，逐键输入。截图用已授权的截图助手（窗口所在区域，含候选窗），保存在运行目录 `final-ime/`。
+用真实鼠标点击聚焦“预设名称”，Ctrl+Space 切换输入法，逐键输入。截图用已授权的截图助手（窗口所在区域，含系统候选窗），保存在运行目录 `final2-ime/`。
 
 | 步骤 | 实际结果 |
 | --- | --- |
-| B1 组合 | 标记文字“ni hao”，字段 (942,462) 196×24，候选 (935,490)，紧贴字段下方 |
-| B1 翻页 | `=` 展开候选面板（6 列多行），`-` 收回到单行；截图 `ime-b1-page1.png`（`af6dd682…`）、`ime-b1-page2.png`（`d7357799…`）、`ime-b1-page1-again.png`（`aa1dd7ad…`） |
-| B1 退格与继续 | 退格后为“ni ha”，补 o 后回到“ni hao”；Space 确认为“你好”，继续输入 ma 并确认得到“你好吗” |
-| B2 移动窗口后 | 窗口 (216,85)→(150,70)；重新组合“shi”，字段 (876,447)，候选 (869,475)，跟随移动；截图 `ime-after-move.png`（`2ffc743f…`） |
-| B3 滚动设置后 | 设置区滚动 120 px，字段 (942,342)，候选 (935,370)，跟随滚动 |
+| B1 组合 | 标记文字“ni hao”，字段 (942,555) 196×24，候选 (935,583)，紧贴字段下方 |
+| B1 翻页 | `=` 展开候选面板，`-` 收回；截图 `ime-b1-page1.png` 与 `ime-b1-page1-again.png` 相同（`95cea4fe…`），`ime-b1-page2.png` 为 `bdfa00c8…` |
+| B1 退格与继续 | 退格后“ni ha”，补 o 回到“ni hao”；Space 确认为“你好”，继续输入 ma 并确认得到“你好吗” |
+| B2 移动窗口后 | 窗口 (216,85)→(150,70)；重新组合“shi”，字段 (876,540)，候选 (869,568)，随窗口移动；截图 `ime-after-move.png`（`9b08b0ca…`）；窗口随后移回 (216,85) |
+| B3 滚动设置后 | 设置区滚动后字段到 (942,435)，候选 (935,463)，随滚动移动 |
 | B4 组合中打开对话框 | 组合“ni”时打开“关于”：候选关闭，字段被对话框遮住；一次 Escape 关闭对话框，字段保留已提交的“ni”，没有候选残留，也没有写进别的字段 |
 
 每步结束后切回 ABC，测试账号最终输入源为 ABC。
@@ -564,30 +571,40 @@ G2 继续开放。
 
 | 场景（清单行） | 实际结果 |
 | --- | --- |
-| 取消输入选择器（C1） | 选择器关闭，队列为空，状态“Add files to begin” |
-| 选输入并选输出目录（C2） | 首次 Start 打开原生选择器，选 `sbx-out` 后写出 `a-precision16_done.avif`（580 B），摘要“1 done · saved 58 B”，源 hash 不变 |
-| 已选输出后取消再次选择（C3） | 再次打开选择器后取消：仍显示 `sbx-out`；之后 Start 不再弹选择器，直接写出，说明本会话授权保留 |
-| 不可写位置并重选恢复（C4） | `chmod 500 sbx-out` 后转换：行显示 “Failed · Cannot write to the output directory: …/sbx-out. Choose an output directory and try again.”，目录内 0 个文件；重选 `sbx-out2` 后转换成功 |
-| 重启后（C5） | 退出并重新启动：保存的 `sbx-out2` 仍显示，但 Start 打开原生选择器；重新选择 `sbx-out` 后转换成功，源 hash 不变 |
-| 来源与输出重合 | 本候选未重做。`0d39630` 上已验证（确认框 Cancel 后源 hash 不变）；其后 #59–#62 只改对话框关闭按钮、英文复数、禁用状态和品牌图标，不涉及来源保护路径 |
+| C1 取消输入选择器 | 选择器关闭，队列为空，状态 “Add files to begin” |
+| C2a 取消首次输出授权 | 导入后按 Start，出现原生选择器；Escape 后只剩主窗口，行仍为 Pending，`sbx-out` 内 0 个文件。界面上显示的 `sbx-out` 是上次会话保存的路径，没有被当作授权 |
+| C2 选输出目录并转换 | 再按 Start，在选择器中选 `sbx-out`：写出 `a-precision16_done.avif`（580 B，SHA256 `2712ac93…`），摘要 “1 done · saved 58 B”，源 hash 不变 |
+| C3 已选输出后取消再次选择 | 再次打开目录选择器后取消：仍显示 `sbx-out`；之后 Start 不再弹选择器，直接写出，说明本会话授权保留 |
+| C4 不可写位置并重选恢复 | `chmod 500 sbx-out` 后转换：行显示 “Failed · Cannot write to the output directory: …/sbx-out. Choose an output directory and try again.”，目录内 0 个文件；重选 `sbx-out2` 后转换成功（`2712ac93…`），源 hash 不变。之后把 `sbx-out` 恢复为 755 并记录 |
+| C5 重启 | 退出并重新启动：保存的 `sbx-out2` 仍显示，但 Start 打开原生选择器；选择 `sbx-out`（已恢复 755）后转换成功（`2712ac93…`），源 hash 不变 |
+| 来源与输出重合 | 沿用 `0d39630` 的记录（确认框 Cancel 后源 hash 不变）。`0d39630..f88e50f` 之间改动的只有对话框关闭按钮、英文单复数、禁用状态、品牌图标和批次摘要，不涉及输出规划与来源保护。本候选上的尝试没有构成重合（格式没切到 PNG、后缀仍在），产生的测试输出已删除，未计入 |
+
+### 证据表
+
+| 提交 / 候选 SHA256 | Mac / OS / 架构 | 语言 / 输入法 / 缩放 | 场景 | 结果 | 证据 | 时间 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `f88e50f` / direct `1634aa6b…` | Parallels VM / 13.6 / arm64 | 中文、浅色 / VO 中文 / Retina | V1–V10 | 通过 | `g2-final2-vo-zh-CN-light*.mov`，`final2-vo-zh-CN-light/*.txt` | 02:18–02:41 |
+| 同上 | 同上 | 英文、深色 / VO 中文 / Retina | V1–V10 | 通过 | `g2-final2-vo-en-US-dark*.mov`，`final2-vo-en-US-dark/*.txt` | 03:09–03:26 |
+| 同上 | 同上 | 中文、浅色 / 简体拼音 / Retina | B1–B4 | 通过 | `final2-ime/*.png` | 03:27–03:30 |
+| `f88e50f` / Store 签名后 `e52b6cc9…` | 同上 | 英文 / ABC / Retina | C1–C5 | 通过 | 脚本输出，`sbx-out*` 输出 hash | 03:30–03:36 |
 
 ### 其他三项门槛的口径
 
 G2 原文另外三项沿用阶段 2 的 PoC 证据，不是本候选上的测量：
-- 性能：2026-10-17 PoC，同等功能与数据集下导入 97 ms 对 96 ms（在 `GPUI_BASELINE.md` 规定的 ±5% 内），空闲内存 −69%/−81%；没有记录取消路径的性能指标。门槛原文允许以 PoC 结论判断，完整功能的性能结论由 G3/G4 给出。
+- 性能：2026-10-17 PoC，同等功能与数据集下，已测的导入（97 ms 对 96 ms，在 `GPUI_BASELINE.md` 规定的 ±5% 内）与空闲内存（−69%/−81%）不劣于基线；取消路径没有性能指标，列为遗留。门槛原文允许以 PoC 结论判断，完整功能的性能结论由 G3/G4 给出。
 - 六平台探针：run 39008501338，证明启动、就绪与出帧；阶段 2 计划中更宽的探针步骤（打开选择器、输入中文、正常退出、安装身份）没有全部做。
 - macOS 私有 API 扫描：为 0（阶段 2 记录）。
 
 ### 遗留（不阻塞收口）
 
-- VoiceOver：首次开始时如果先经过输出目录选择器，选择器关闭后 VO 朗读焦点，可能盖过开始播报（英文轮次复现，中文轮次没有）；完成播报两轮都有。
 - VoiceOver：对话框关闭后，键盘焦点回到触发按钮，但 VO 光标停在窗口标题，没有跟到“关于”。
-- 禁用状态：原生只观察了空队列时的“开始转换”。批次运行中导入、粘贴、语言、格式、输出目录等控件的禁用状态由 #61 的 UI 测试 `disabled_commands_are_disabled_for_assistive_technology` 覆盖，没有原生 VO 记录。Linux AT-SPI 适配层不读取按钮禁用状态，Kit 的 Switch/Select/Slider/Input 不能从外部设置禁用（上游 longbridge/gpui-kit#3660 已补充说明）。
-- 设置区的逐项 VO 朗读与告警朗读来自 `0d39630`，本候选上只做了标签切换和行内容朗读。
-- IME：组合中缩放窗口时候选停在原位，直到下一次按键；同机 Cocoa `NSTextField` 表现相同，按平台行为记录（缩放场景在 v24 候选上验证）。不同缩放的多显示器（虚拟机只有一个显示器）和数字输入框没有原生验证。
-- 截图拍摄时发现：一批完成后清空队列，操作栏仍显示上一批的“完成 5”和进度条。这与 G2 三项无关，已在 #63 修复并有回归测试。
+- VoiceOver：`3d14b71` 那一轮的英文运行中，选择器关闭时 VO 朗读焦点盖过了开始播报；本候选上中英两轮都听到了开始与完成播报，没有复现。
+- 禁用状态：原生只观察了空队列时的“开始转换”和设置区的“保存当前设置”。批次运行中导入、粘贴、语言、格式、输出目录等控件的禁用状态由 #61 的 UI 测试 `disabled_commands_are_disabled_for_assistive_technology` 覆盖，没有原生 VO 记录。Linux AT-SPI 适配层不读取按钮禁用状态，Kit 的 Switch/Select/Slider/Input 不能从外部设置禁用（上游 longbridge/gpui-kit#3660 已补充说明）。
+- IME：组合中缩放窗口时候选停在原位，直到下一次按键；同机 Cocoa `NSTextField` 表现相同，按平台行为记录（缩放场景在 v24 候选上验证，本候选未重做）。不同缩放的多显示器（虚拟机只有一个显示器）和数字输入框没有原生验证。
+- 沙盒：来源与输出重合沿用 `0d39630` 的记录（理由见上表）。
+- 性能：取消路径没有测量。
 - 正式 MAS 签名、profile、TestFlight 与 Microsoft Store 实跑属于 G3 及之后；本节不涉及任何公开发布或商店提交。
 
 ### 判断
 
-VoiceOver、IME、沙盒授权三项冒烟在同一最终候选上有原生证据，遗留项都有记录且不影响基本可用性；连同上述按 PoC 口径满足的性能、探针与私有 API 扫描，**G2 收口**。按开发方案，第 11 项完成，D1a/C1（第 12a/12b 项）与阶段 4/5 不再受 G2 限制；它们仍按开发方案 §4 的次序推进，G1/G3 的验收各自独立。
+VoiceOver、IME、沙盒授权三项冒烟在同一最终候选 `f88e50f` 上有原生证据；沿用旧候选的只有上面列明的三行（窗口缩放中的 IME、来源与输出重合、阶段 2 的性能/探针/私有 API），遗留都有记录且不影响基本可用性。**G2 收口**。按开发方案，第 11 项完成，D1a/C1（第 12a/12b 项）与阶段 4/5 不再受 G2 限制；它们仍按开发方案 §4 的次序推进，G1/G3 的验收各自独立。
