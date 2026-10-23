@@ -50,9 +50,11 @@ enum DocumentKind {
 impl DocumentKind {
     fn text(self, locale: Locale) -> &'static str {
         match self {
+            // The policy is written in English and Chinese; Chinese readers
+            // of either script get the Chinese text, everyone else English.
             Self::Privacy => match locale {
-                Locale::English => PRIVACY_ENGLISH,
-                Locale::SimplifiedChinese => PRIVACY_CHINESE,
+                Locale::SimplifiedChinese | Locale::TraditionalChinese => PRIVACY_CHINESE,
+                _ => PRIVACY_ENGLISH,
             },
             Self::Licenses => LICENSES,
         }

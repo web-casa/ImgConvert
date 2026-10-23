@@ -57,10 +57,15 @@ pub fn init_app(cx: &mut App) {
     install_menus(cx);
 }
 
-/// Switches between English and Simplified Chinese, persists the choice and
-/// rebuilds every window and the native menus, which cache their labels.
+/// Switches between English and Simplified Chinese (from any other locale,
+/// to English); the quick switch behind the `ToggleLanguage` action.
 pub fn toggle_language(cx: &mut App) {
-    let next = Locale::current().next();
+    set_language(Locale::current().toggled(), cx);
+}
+
+/// Sets the interface language, persists the choice and rebuilds every
+/// window and the native menus, which cache their labels.
+pub fn set_language(next: Locale, cx: &mut App) {
     i18n::set_locale(next);
     let settings = AppModels::global(cx).settings().clone();
     settings.update(cx, |settings, cx| {

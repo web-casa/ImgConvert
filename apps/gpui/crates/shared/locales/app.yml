@@ -2,12 +2,9 @@ _version: 2
 app.title:
   en: ImgConvert
   zh-CN: ImgConvert
-app.language_toggle:
-  en: 中文
-  zh-CN: English
-app.language_toggle_tooltip:
-  en: Switch the interface to Chinese
-  zh-CN: 切换为英文界面
+app.language:
+  en: "Language: %{language}"
+  zh-CN: "语言：%{language}"
 app.quit:
   en: Quit ImgConvert
   zh-CN: 退出 ImgConvert

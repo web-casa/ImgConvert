@@ -1,0 +1,885 @@
+_version: 2
+app.title:
+  es: ImgConvert
+app.language:
+  es: "Idioma: %{language}"
+app.quit:
+  es: Salir de ImgConvert
+app.open_files:
+  es: Abrir…
+app.instance_blocked_title:
+  es: ImgConvert ya se está ejecutando
+app.instance_blocked:
+  es: "Hay otra instancia de ImgConvert abierta (versión %{version}, proceso %{pid}). Ambas versiones comparten un mismo archivo de configuración, así que solo una puede ejecutarse a la vez. Cierra la otra instancia de ImgConvert y vuelve a abrir esta."
+app.instance_blocked_unknown:
+  es: Hay otra instancia de ImgConvert abierta. Ambas versiones comparten un mismo archivo de configuración, así que solo una puede ejecutarse a la vez. Cierra la otra instancia de ImgConvert y vuelve a abrir esta.
+menu.edit:
+  es: Edición
+menu.file:
+  es: Archivo
+settings.save_failed:
+  es: "No se pudo guardar la configuración: %{detail}"
+queue.title:
+  es: Cola
+queue.add_files:
+  es: Añadir archivos
+queue.paste:
+  es: Pegar
+queue.clipboard_empty:
+  es: Copia una imagen o rutas de archivo absolutas y vuelve a pegar.
+queue.item_format_label:
+  es: "Formato de destino de %{name}: %{format}"
+queue.target_format:
+  es: Formato de destino de este archivo
+queue.global_format:
+  es: "Global · %{format}"
+queue.follow_global:
+  es: Usar formato global
+queue.reset_formats:
+  es: Restablecer formatos
+queue.clear:
+  es: Vaciar
+queue.cancel_import:
+  es: Detener
+queue.empty_title:
+  es: Aún no hay imágenes
+queue.empty_description:
+  es: Suelta aquí imágenes o carpetas, añade archivos o pega una imagen o rutas de archivo copiadas.
+queue.drop_hint:
+  es: Suelta para añadir a la cola
+queue.importing:
+  es: Importando…
+queue.item_count:
+  es: "%{count} elementos"
+queue.item_count_one:
+  es: "%{count} elemento"
+queue.import_added:
+  es: "Se añadieron %{added} archivos"
+queue.import_added_one:
+  es: "Se añadió %{added} archivo"
+queue.import_added_skipped:
+  es: "Se añadieron %{added} archivos, %{skipped} omitidos"
+queue.import_added_skipped_one:
+  es: "Se añadió %{added} archivo, %{skipped} omitidos"
+queue.import_nothing:
+  es: No se encontraron imágenes compatibles
+queue.import_failed:
+  es: "No se pudo importar: %{detail}"
+queue.import_cancelled:
+  es: Importación cancelada
+queue.thumbnail_unavailable:
+  es: Sin vista previa
+status.pending:
+  es: Pendiente
+status.running:
+  es: Convirtiendo…
+status.done:
+  es: Listo
+status.skipped:
+  es: Omitido
+status.error:
+  es: Error
+status.saved:
+  es: "%{before} → %{after}"
+workflow.title:
+  es: Convertir
+workflow.format:
+  es: Formato de salida
+workflow.output_dir:
+  es: Carpeta de salida
+workflow.choose_output:
+  es: Elegir carpeta
+workflow.output_not_chosen:
+  es: Se elige al empezar
+workflow.start:
+  es: Iniciar
+workflow.cancel:
+  es: Cancelar
+workflow.cancelling:
+  es: Cancelando…
+workflow.announce_started:
+  es: "Convirtiendo un lote de %{count}"
+workflow.progress:
+  es: "%{done} de %{total} completados"
+workflow.batch_progress:
+  es: Progreso de la conversión por lotes
+workflow.summary_cancelled:
+  es: "Cancelado tras %{done} de %{total}"
+workflow.failed:
+  es: "Error en el lote: %{detail}"
+workflow.already_running:
+  es: Ya hay un lote en curso
+workflow.nothing_to_convert:
+  es: Añade primero imágenes a la cola
+settings.title:
+  es: Ajustes de conversión
+settings.core_section:
+  es: Formato y calidad
+settings.target_format:
+  es: Formato de destino
+settings.quality:
+  es: Calidad
+settings.quality_upper_bound:
+  es: Límite superior de calidad
+settings.quality_effective:
+  es: "%{requested} → %{effective}"
+settings.output_section:
+  es: Comportamiento de salida
+settings.concurrency:
+  es: Simultaneidad
+settings.concurrency_auto:
+  es: Automática
+settings.existing_files:
+  es: Archivos existentes
+settings.overwrite_ask:
+  es: Preguntar
+settings.overwrite_skip:
+  es: Omitir
+settings.overwrite_overwrite:
+  es: Sobrescribir
+settings.output_suffix:
+  es: Sufijo del nombre de archivo
+settings.add_output_suffix:
+  es: Añadir sufijo
+settings.output_suffix_hint:
+  es: Se añade antes de la extensión. Admite texto Unicode; máximo 48 caracteres y 128 bytes.
+settings.output_suffix_adjusted:
+  es: Se reemplazaron los caracteres de ruta no admitidos y se aplicó el límite de longitud seguro.
+settings.output_suffix_required:
+  es: Escribe al menos un carácter o desactiva este interruptor para omitir el sufijo.
+settings.suffix_disabled_collision_hint:
+  es: Sin sufijo y con el mismo formato de destino, una salida puede coincidir con su original. Los archivos existentes siguen la opción «Archivos existentes».
+settings.file_name_template:
+  es: Plantilla de nombre de archivo
+settings.file_name_template_hint:
+  es: Se usa cuando «Añadir sufijo» está desactivado. Admite %name%, %extension% y %date%.
+settings.compression_section:
+  es: Políticas de compresión
+settings.lossless_label:
+  es: Sin pérdida
+settings.lossless_description:
+  es: Prioriza píxeles sin pérdida cuando el formato de destino lo admite; el tamaño de salida puede no ser el mínimo.
+settings.skip_larger_label:
+  es: Conservar solo salidas más pequeñas
+settings.skip_larger_description:
+  es: Desactivado de forma predeterminada. Si se activa, solo se escribe un resultado de mapa de bits cuando es más pequeño que su original. Déjalo desactivado si el formato requerido importa más que el tamaño. No afecta a la rasterización de SVG.
+settings.multi_candidate_label:
+  es: Probar el candidato más pequeño
+settings.multi_candidate_description:
+  es: Prueba candidatos de codificación equivalentes y conserva el resultado más pequeño; la conversión puede tardar algo más.
+settings.auto_quality_label:
+  es: Calidad automática
+settings.auto_quality_description:
+  es: JPEG/WebP buscan la calidad más baja que alcanza la puntuación objetivo para minimizar el tamaño.
+settings.generation_protection_label:
+  es: Conservar solo recodificaciones con pérdida que compensen
+settings.generation_protection_description:
+  es: Desactivado de forma predeterminada. Si se activa, una imagen con pérdida solo se escribe en otro formato con pérdida cuando ahorra suficiente espacio. Déjalo desactivado si el formato solicitado es obligatorio.
+settings.color_section:
+  es: Gestión del color
+settings.convert_to_srgb_label:
+  es: Convertir a sRGB
+settings.convert_to_srgb_description:
+  es: Usa el perfil ICC incrustado para convertir los píxeles a sRGB y elimina el perfil anterior para una visualización uniforme.
+settings.result_cache_label:
+  es: Caché de resultados
+settings.result_cache_description:
+  es: Reutiliza las salidas existentes cuando el original y los ajustes no han cambiado; útil para lotes repetidos.
+settings.clear_result_cache:
+  es: Vaciar caché de resultados
+settings.clearing_result_cache:
+  es: Vaciando caché…
+settings.result_cache_cleared:
+  es: "Se eliminaron %{count} registros de la caché de resultados."
+settings.clear_result_cache_failed:
+  es: "No se pudo vaciar la caché de resultados: %{detail}"
+settings.format_parameters:
+  es: Parámetros de formato
+settings.progressive_jpeg:
+  es: JPEG progresivo
+settings.trellis_scans:
+  es: Escaneos trellis
+settings.png_optimization_level:
+  es: Nivel de optimización PNG
+settings.experimental_quantize:
+  es: Cuantización experimental
+settings.color_count:
+  es: Número de colores
+settings.webp_method:
+  es: Método
+settings.near_lossless:
+  es: Casi sin pérdida
+settings.near_lossless_off:
+  es: Desactivado
+settings.sharp_yuv:
+  es: Sharp YUV
+settings.avif_speed:
+  es: Velocidad
+settings.avif_chroma_subsampling:
+  es: Submuestreo de croma
+settings.target_score:
+  es: Puntuación objetivo
+settings.minimum_quality:
+  es: Calidad mínima
+settings.quality_floor_off:
+  es: Desactivada
+workflow.preset:
+  es: Ajuste preestablecido
+workflow.custom_settings:
+  es: Ajustes personalizados
+workflow.save_preset:
+  es: Guardar ajustes actuales
+workflow.preset_name:
+  es: Nombre del ajuste
+workflow.delete_preset:
+  es: Eliminar ajuste
+workflow.delete_preset_named:
+  es: "Eliminar ajuste «%{name}»"
+workflow.delete_preset_title:
+  es: "¿Eliminar «%{name}»?"
+workflow.delete_preset_description:
+  es: Esta acción no se puede deshacer.
+workflow.delete:
+  es: Eliminar
+workflow.preset_limit:
+  es: "Puedes guardar hasta %{count} ajustes personalizados."
+workflow.presets.web_sharing:
+  es: Compartir en la web
+workflow.presets.web_sharing_description:
+  es: WebP, 2048 px en el lado más largo, solo con metadatos de color.
+workflow.presets.email:
+  es: Adjunto de correo
+workflow.presets.email_description:
+  es: JPEG, 1600 px en el lado más largo, con un objetivo de 1 MiB.
+workflow.presets.high_quality:
+  es: Archivo de alta calidad
+workflow.presets.high_quality_description:
+  es: AVIF de alta calidad con todos los metadatos compatibles conservados.
+workflow.presets.private_sharing:
+  es: Compartir en privado
+workflow.presets.private_sharing_description:
+  es: JPEG, 2048 px en el lado más largo, sin ningún metadato.
+workflow.pdf_section:
+  es: PDF a imágenes
+workflow.pdf_pages:
+  es: Intervalo de páginas (vacío para todas)
+workflow.pdf_pages_placeholder:
+  es: "Por ejemplo: 1-3, 5, 8-10"
+workflow.pdf_pages_hint:
+  es: Las páginas empiezan en 1. Combina páginas e intervalos; hasta 500 páginas por tarea.
+workflow.pdf_dpi:
+  es: Resolución de renderizado (DPI)
+workflow.pdf_dpi_hint:
+  es: "Solo se aplica a archivos PDF. Intervalo: 72–600 DPI; valor predeterminado: 150."
+workflow.pdf_dpi_hint_active:
+  es: Las páginas PDF se renderizan primero con estos DPI; después se aplica la regla de redimensionado por lotes si está activada.
+workflow.pdf_range_invalid:
+  es: Intervalo de páginas no válido. Usa un formato como 1-3, 5, 8-10.
+workflow.pdf_range_out_of_bounds:
+  es: "El intervalo de páginas supera las %{count} páginas de este documento."
+workflow.pdf_range_required:
+  es: "Este documento es extenso. Selecciona las páginas explícitamente; hasta %{count} a la vez."
+workflow.pdf_range_too_long:
+  es: El intervalo de páginas es demasiado largo.
+workflow.pdf_too_many_pages:
+  es: "Se pueden convertir hasta %{count} páginas PDF por tarea."
+workflow.resize_section:
+  es: Regla de redimensionado por lotes
+workflow.resize_mode:
+  es: Modo de redimensionado
+workflow.resize_modes.none:
+  es: Mantener tamaño original
+workflow.resize_modes.fit:
+  es: Ajustar al ancho y alto
+workflow.resize_modes.width:
+  es: Fijar ancho
+workflow.resize_modes.height:
+  es: Fijar alto
+workflow.resize_modes.longest_edge:
+  es: Fijar lado más largo
+workflow.resize_modes.percentage:
+  es: Escalar por porcentaje
+workflow.width:
+  es: Ancho (px)
+workflow.height:
+  es: Alto (px)
+workflow.size:
+  es: Tamaño (px)
+workflow.percentage:
+  es: Escala (%)
+workflow.allow_upscale:
+  es: Permitir ampliar imágenes más pequeñas
+workflow.compression_policy_disabled:
+  es: «Conservar solo salidas más pequeñas» y «Conservar solo recodificaciones con pérdida que compensen» no se aplican al redimensionar.
+workflow.target_section:
+  es: Tamaño de archivo objetivo
+workflow.target_enable:
+  es: Intentar no superar un tamaño objetivo
+workflow.target_kib:
+  es: Tamaño objetivo (KiB)
+workflow.target_hint:
+  es: Disponible para JPEG/WebP con pérdida. La calidad actual es el máximo y se respeta la calidad mínima.
+workflow.target_unsupported:
+  es: Elige JPEG o WebP con pérdida antes de activar el tamaño objetivo.
+workflow.metadata_section:
+  es: Metadatos de privacidad
+workflow.metadata_policy:
+  es: Política de conservación
+workflow.metadata.strip_all:
+  es: Eliminar todos los metadatos
+workflow.metadata.strip_all_description:
+  es: Convierte a sRGB los píxeles con perfil y luego elimina ICC, EXIF, XMP e IPTC para compartir públicamente.
+workflow.metadata.color_only:
+  es: Conservar solo el perfil de color
+workflow.metadata.color_only_description:
+  es: Conserva el perfil ICC completo para la representación del color; pueden quedar identificadores del perfil o del dispositivo.
+workflow.metadata.preserve_all:
+  es: Conservar todos los metadatos compatibles
+workflow.metadata.preserve_all_description:
+  es: Conserva ICC, EXIF, XMP e IPTC cuando sea posible.
+workflow.invalid_configuration:
+  es: Corrige los ajustes resaltados antes de empezar
+preview.open:
+  es: Comparar
+preview.title:
+  es: Vista previa antes y después
+preview.pdf_page:
+  es: "Página %{page} del PDF"
+preview.before:
+  es: Original
+preview.after:
+  es: Convertida
+preview.loading:
+  es: Generando una vista previa exacta…
+preview.refresh:
+  es: Actualizar vista previa
+preview.stale:
+  es: Los ajustes de conversión han cambiado. Actualiza para ver la vista previa convertida.
+preview.close:
+  es: Cerrar
+preview.reveal:
+  es: Arrastra para comparar antes y después
+preview.dimensions:
+  es: "%{width} × %{height}"
+preview.output_size:
+  es: "Salida estimada: %{size}"
+preview.quality:
+  es: "Calidad seleccionada: %{quality}"
+preview.target_met:
+  es: Tamaño objetivo alcanzado
+preview.target_not_met:
+  es: No se puede alcanzar el objetivo dentro del límite de calidad mínima
+preview.error:
+  es: "No se pudo generar la vista previa comparativa: %{detail}"
+preview.cancelled:
+  es: Vista previa cancelada
+warning.output_backup_retained:
+  es: "Convertido, pero se conserva la copia de seguridad de la salida anterior: %{path}"
+warning.modified_time_not_preserved:
+  es: "Convertido, pero no se pudo conservar la fecha de modificación: %{path}"
+warning.temporary_file_retained:
+  es: "Convertido, pero no se pudo eliminar el archivo temporal: %{path}"
+warning.color_profile_converted_for_resize:
+  es: Los píxeles se convirtieron a sRGB antes de redimensionar y se eliminó el perfil ICC original, que ya no era válido.
+warning.invalid_color_profile_discarded:
+  es: El perfil ICC incrustado no era válido y se eliminó según la política de privacidad. Los píxeles usan sus valores decodificados, por lo que los colores pueden diferir de la aplicación de origen.
+warning.invalid_color_profile_ignored_for_preview:
+  es: El perfil ICC incrustado no es válido. Se conserva en el archivo convertido según lo solicitado, pero esta vista previa usa los valores de píxel decodificados sin ese perfil.
+warning.target_size_not_met:
+  es: "Objetivo: %{target}; el candidato utilizable más pequeño fue de %{actual} y no pudo alcanzar el objetivo dentro del límite de calidad mínima."
+warning.pdf_pages_skipped_existing:
+  es: "Se conservaron %{count} salidas de página existentes."
+warning.pdf_render_warnings:
+  es: "La página %{page} del PDF generó %{count} advertencias de compatibilidad; puede faltar parte del contenido."
+safety.queued_input_conflict_title:
+  es: Se evitó sobrescribir un original en cola
+safety.queued_input_conflict_message:
+  es: "%{count} rutas de salida coinciden con otra entrada de la cola. Para proteger los originales, esos elementos no se escribirán; el resto puede continuar."
+safety.continue_remaining:
+  es: Continuar con el resto
+safety.continue_conversion:
+  es: Continuar conversión
+safety.source_overwrite_title:
+  es: El archivo original podría reemplazarse
+safety.source_overwrite:
+  es: Reemplazar original
+safety.source_overwrite_message:
+  es: "%{count} archivos de salida son el mismo archivo que su original. Si continúas, se reemplazará el original y no se podrá deshacer."
+safety.source_overwrite_single_message:
+  es: "Esta salida es el mismo archivo que su original: %{path}. Si confirmas, se reemplazará el original y no se podrá deshacer."
+safety.source_overwrite_will_skip_message:
+  es: "%{count} archivos de salida coinciden con su original. Con «Omitir» seleccionado, esos originales no se modificarán."
+safety.confirm_overwrite_title:
+  es: Confirmar sobrescritura
+safety.output_exists:
+  es: "El archivo de salida ya existe: %{path}"
+safety.pdf_outputs_exist:
+  es: "Este PDF tiene %{count} salidas de página existentes. ¿Sobrescribir esos archivos?"
+safety.overwrite:
+  es: Sobrescribir
+safety.skip:
+  es: Omitir
+safety.planning:
+  es: Comprobando rutas de salida…
+safety.plan_failed:
+  es: "No se pudieron comprobar las rutas de salida: %{detail}"
+safety.restart_needed:
+  es: La cola o los ajustes han cambiado. Vuelve a empezar.
+diagnostics.title:
+  es: Diagnóstico de complementos
+diagnostics.open:
+  es: Diagnóstico de complementos
+diagnostics.description:
+  es: Proveedores opcionales de importación HEIC, rutas de búsqueda de manifiestos y detección de auxiliares. macOS usa ImageIO del sistema; Windows prefiere WIC; Linux puede usar heif-convert.
+diagnostics.refresh:
+  es: Actualizar
+diagnostics.close:
+  es: Cerrar
+diagnostics.loading:
+  es: Leyendo diagnóstico de complementos…
+diagnostics.load_error:
+  es: "No se pudo cargar el diagnóstico de complementos: %{detail}"
+diagnostics.choose_heic_helper:
+  es: Elegir auxiliar HEIC
+diagnostics.manual_helper_enabled:
+  es: Auxiliar manual activado
+diagnostics.manual_helper_unavailable:
+  es: Auxiliar manual no disponible
+diagnostics.set_helper_failed:
+  es: "No se pudo configurar el auxiliar manual: %{detail}"
+diagnostics.helper_cleared:
+  es: Auxiliar manual eliminado
+diagnostics.clear_helper_failed:
+  es: "No se pudo eliminar el auxiliar manual: %{detail}"
+diagnostics.heic_enabled:
+  es: La importación opcional de HEIC está activada
+diagnostics.heic_disabled:
+  es: La importación opcional de HEIC está desactivada
+diagnostics.extensions:
+  es: "Extensiones: %{extensions}"
+diagnostics.type:
+  es: Tipo
+diagnostics.license:
+  es: Licencia
+diagnostics.system_imageio:
+  es: ImageIO del sistema
+diagnostics.windows_wic:
+  es: Windows WIC
+diagnostics.system_helper:
+  es: Auxiliar del sistema
+diagnostics.executable:
+  es: Ejecutable
+diagnostics.argv:
+  es: argv
+diagnostics.no_external_args:
+  es: Sin argumentos de proceso externo
+diagnostics.no_provider:
+  es: No se encontró ningún proveedor de manifiesto ni auxiliar del sistema utilizable.
+diagnostics.summary_title:
+  es: Resumen de detección
+diagnostics.external_codecs:
+  es: Códecs externos
+diagnostics.manual_helper:
+  es: Auxiliar manual
+diagnostics.enabled:
+  es: Activado
+diagnostics.disabled:
+  es: Desactivado
+diagnostics.available:
+  es: Disponible
+diagnostics.unavailable:
+  es: No disponible
+diagnostics.not_configured:
+  es: Sin configurar
+diagnostics.accepted_manifests:
+  es: Manifiestos aceptados
+diagnostics.rejected_manifests:
+  es: Manifiestos rechazados
+diagnostics.system_codecs:
+  es: Códecs del sistema
+diagnostics.system_helpers:
+  es: Auxiliares del sistema
+diagnostics.license_boundary_title:
+  es: Límites de licencia y canal
+diagnostics.license_boundary_body:
+  es: La aplicación principal no incluye códecs HEIC, no enlaza libheif y no distribuye x265. La importación HEIC se realiza mediante auxiliares/proveedores opcionales de solo decodificación del entorno del usuario; la licencia del complemento, el código fuente/NOTICE y los riesgos de patentes son responsabilidad de quien distribuye el complemento. Las versiones de tienda o Flatpak pueden desactivar la detección de códecs externos para mantener limpio el paquete principal. Windows comprueba primero las extensiones HEIF/HEVC de WIC del sistema; si faltan, sigue la indicación del diagnóstico para instalar las extensiones del sistema o usa un auxiliar independiente sin incluir códecs HEIC.
+diagnostics.system_codecs_title:
+  es: Códecs del sistema
+diagnostics.no_system_codecs:
+  es: Esta plataforma no tiene entradas de detección de códecs del sistema.
+diagnostics.manual_helper_title:
+  es: Auxiliar manual
+diagnostics.choose:
+  es: Elegir
+diagnostics.clear:
+  es: Quitar
+diagnostics.selected:
+  es: Seleccionado
+diagnostics.not_configured_helper:
+  es: No hay ningún auxiliar manual configurado.
+diagnostics.system_helpers_title:
+  es: Auxiliares del sistema
+diagnostics.no_system_helpers:
+  es: En esta plataforma no se buscan auxiliares del sistema.
+diagnostics.manifest_search_title:
+  es: Búsqueda de manifiestos
+diagnostics.no_manifest_dirs:
+  es: En esta plataforma no se busca en ningún directorio de manifiestos.
+diagnostics.no_license:
+  es: Sin aviso de licencia
+diagnostics.status_accepted:
+  es: Disponible
+diagnostics.status_ready:
+  es: Listo
+diagnostics.status_rejected:
+  es: Rechazado
+diagnostics.status_missing:
+  es: Falta
+diagnostics.status_empty:
+  es: Vacío
+diagnostics.status_untrusted:
+  es: No fiable
+diagnostics.status_unreadable:
+  es: Ilegible
+diagnostics.status_not_directory:
+  es: No es un directorio
+diagnostics.status_unsupported:
+  es: No activado
+diagnostics.status_disabled:
+  es: Desactivado
+diagnostics.found:
+  es: Encontrado
+diagnostics.missing:
+  es: Falta
+diagnostics.active:
+  es: Activo
+diagnostics.inactive:
+  es: Inactivo
+diagnostics.provider_manifest:
+  es: Complemento de manifiesto
+diagnostics.source_explicit:
+  es: Ruta personalizada
+diagnostics.source_platform:
+  es: Plataforma actual
+diagnostics.source_flatpak_extension:
+  es: Extensión de Flatpak
+diagnostics.messages.details_hidden:
+  es: Los detalles solo están disponibles en versiones de desarrollo.
+diagnostics.messages.external_codecs_build_disabled:
+  es: La detección de códecs/auxiliares externos está desactivada en esta versión.
+diagnostics.messages.external_codecs_build_disabled_flatpak_enabled:
+  es: La detección de códecs/auxiliares externos está desactivada en esta versión; la extensión de códecs de Flatpak sigue activada.
+diagnostics.messages.external_codecs_environment_disabled:
+  es: "%{detail} desactiva la detección de códecs/auxiliares externos."
+diagnostics.messages.external_codecs_environment_disabled_flatpak_enabled:
+  es: "%{detail} desactiva la detección de códecs/auxiliares externos; la extensión de códecs de Flatpak sigue activada."
+diagnostics.messages.external_codec_trust_unsupported:
+  es: El modelo de confianza para auxiliares HEIC externos no está activado en esta plataforma.
+diagnostics.messages.selected_helper_not_configured:
+  es: No hay ningún auxiliar manual configurado.
+diagnostics.messages.selected_helper_unavailable:
+  es: "El auxiliar seleccionado no está disponible: %{detail}"
+diagnostics.messages.directory_missing:
+  es: No se encontró el directorio.
+diagnostics.messages.path_not_directory:
+  es: La ruta no es un directorio.
+diagnostics.messages.directory_untrusted:
+  es: Otros usuarios pueden escribir en el directorio o en uno de sus directorios superiores.
+diagnostics.messages.manifest_not_found:
+  es: No se encontró ningún manifiesto imgconvert-codec-*.json.
+diagnostics.messages.directory_unreadable:
+  es: "No se pudo leer el directorio: %{detail}"
+diagnostics.messages.manifest_rejected:
+  es: "Manifiesto rechazado: %{detail}"
+diagnostics.messages.path_environment_missing:
+  es: PATH no está definido.
+diagnostics.messages.helper_not_found_in_trusted_path:
+  es: No se encontró ningún ejecutable en un directorio de confianza de PATH.
+diagnostics.messages.wic_unsupported_platform:
+  es: La decodificación HEIC con Windows WIC solo está disponible en Windows.
+diagnostics.messages.wic_available:
+  es: "Se detectó un decodificador HEIC de Windows WIC: %{detail}"
+diagnostics.messages.wic_missing:
+  es: No se detectó ningún decodificador HEIC de Windows WIC.
+diagnostics.messages.wic_probe_failed:
+  es: "Error al detectar HEIC con Windows WIC: %{detail}"
+diagnostics.messages.windows_heif_install_hint:
+  es: Instala Microsoft HEIF Image Extensions y HEVC Video Extensions y vuelve a intentarlo. Los dispositivos administrados pueden implementarlas mediante Microsoft Store, winget o un paquete de aplicación sin conexión.
+diagnostics.messages.unknown:
+  es: "Diagnóstico %{code}: %{detail}"
+workflow.ready:
+  es: "%{count} archivos listos"
+workflow.ready_one:
+  es: "%{count} archivo listo"
+workflow.ready_empty:
+  es: Añade archivos para empezar
+settings.appearance_section:
+  es: Apariencia
+settings.theme:
+  es: Tema
+settings.theme_system:
+  es: Sistema
+settings.theme_light:
+  es: Claro
+settings.theme_dark:
+  es: Oscuro
+settings.reduce_motion_label:
+  es: Reducir movimiento
+settings.reduce_motion_description:
+  es: Acorta o elimina las animaciones de la interfaz.
+queue.page_count:
+  es: "%{count} páginas"
+queue.page_count_one:
+  es: "%{count} página"
+impact.title:
+  es: Escenario de almacenamiento y medioambiental
+impact.open:
+  es: Escenario
+impact.batch_open:
+  es: Escenario del lote
+impact.smaller:
+  es: "Salida %{bytes} más pequeña"
+impact.larger:
+  es: "Salida %{bytes} más grande"
+impact.same:
+  es: Tamaño de salida sin cambios
+impact.boundary:
+  es: Un archivo más pequeño no implica espacio en disco liberado, ahorro de electricidad ni emisiones evitadas.
+impact.excluded:
+  es: No se ha confirmado un resultado ráster estático único comparable. Se excluyen documentos, animaciones, salidas múltiples, AVIF/HEIC con estado de secuencia desconocido y resultados heredados.
+impact.batch:
+  es: "Lote: %{count} resultados aptos; %{excluded} resultados completados excluidos. Este escenario compartido es independiente de los paneles individuales."
+impact.storage:
+  es: Escenario de almacenamiento
+impact.local:
+  es: "Local o desconocido: solo bytes"
+impact.cloud:
+  es: Explorar supuestos de almacenamiento en la nube
+impact.originals:
+  es: Archivos originales
+impact.hypothetical:
+  es: Suponer que las salidas reemplazan a los originales
+impact.confirmed:
+  es: He reemplazado los originales (declarado por el usuario)
+impact.retained:
+  es: Se conservan los originales
+impact.days:
+  es: Días de conservación (0–3650)
+impact.copies:
+  es: Copias
+impact.copies_default:
+  es: 1–3
+impact.invalid:
+  es: Introduce un número entero de días entre 0 y 3650.
+impact.estimate:
+  es: Estimación del escenario de almacenamiento en la nube
+impact.no_reduction:
+  es: Sin reducción neta de salida; no hay estimación de beneficio ambiental positivo.
+impact.retained_notice:
+  es: Conservar los originales no permite estimar una reducción positiva de almacenamiento.
+impact.limits:
+  es: Asignación de capacidad media; un intervalo de supuestos, no reducciones logradas ni netas, ni un intervalo de confianza. El reemplazo declarado por el usuario sigue siendo una estimación.
+impact.method:
+  es: Método y fuentes (disponibles sin conexión)
+impact.formula:
+  es: "Modelo v1.0.0: capacidad (TB) × horas de conservación × 0,65–1,2 Wh/TB·h × PUE 1,1–1,185 × copias = energía (Wh). Energía ÷ 1000 × 473 g CO₂/kWh = gramos de CO₂. La intensidad de la red es la media mundial de 2024; los factores históricos no describen a un proveedor actual ni a un dispositivo local."
+impact.privacy:
+  es: Excluye la energía de conversión, las redes, la fabricación de hardware, la eliminación y los efectos rebote. Los parámetros permanecen en la memoria del panel, se restablecen al cerrar y no se guardan ni se suben. Los tamaños de archivo usan KB/MB binarios; el modelo usa TB decimales.
+impact.close:
+  es: Cerrar
+update.open:
+  es: Actualizaciones
+update.title:
+  es: Actualizaciones
+update.manual:
+  es: Las actualizaciones de esta versión preliminar se proporcionan manualmente.
+update.idle:
+  es: Busca una versión más reciente.
+update.checking:
+  es: Buscando actualizaciones
+update.current:
+  es: Tienes la última versión
+update.available:
+  es: Hay una actualización disponible
+update.downloading:
+  es: Descargando y verificando la actualización
+update.ready:
+  es: Actualización verificada. Instálala cuando termine el lote.
+update.installing:
+  es: Instalando la actualización
+update.installed:
+  es: Actualización instalada. Sal de ImgConvert y vuelve a abrirlo para usarla.
+update.current_version:
+  es: "Versión actual: %{version}"
+update.new_version:
+  es: "Nueva versión: %{version}"
+update.bytes:
+  es: "%{bytes} bytes descargados"
+update.check:
+  es: Buscar actualizaciones
+update.download:
+  es: Descargar actualización
+update.install:
+  es: Instalar actualización
+update.close:
+  es: Cerrar
+update.batch_active:
+  es: Espera a que termine el lote actual antes de instalar.
+queue.import_partial:
+  es: "Se añadieron %{added} archivos. %{detail}"
+queue.import_partial_one:
+  es: "Se añadió %{added} archivo. %{detail}"
+queue.clipboard_invalid_paths:
+  es: "%{count} rutas de archivo no se pudieron representar como UTF-8. Elige archivos con nombres compatibles."
+queue.clipboard_invalid_paths_one:
+  es: "%{count} ruta de archivo no se pudo representar como UTF-8. Elige archivos con nombres compatibles."
+queue.clipboard_path_issues:
+  es: "Omitidos: %{skipped}. Rutas ilegibles: %{errors}. Comprueba que los archivos existen y se pueden leer."
+queue.clipboard_truncated:
+  es: El análisis alcanzó su límite. Importa menos archivos a la vez.
+queue.clipboard_image_issues:
+  es: "No se pudieron importar %{count} imágenes. Copia una imagen compatible dentro de los límites de tamaño y vuelve a intentarlo."
+queue.clipboard_image_issues_one:
+  es: "No se pudo importar %{count} imagen. Copia una imagen compatible dentro de los límites de tamaño y vuelve a intentarlo."
+queue.clipboard_unavailable:
+  es: No se pudo leer el portapapeles. Vuelve a intentarlo o añade archivos con el selector de archivos.
+queue.clipboard_image_failed:
+  es: No se pudo leer la imagen. Copia una imagen compatible dentro de los límites de tamaño y vuelve a intentarlo.
+legal.privacy_open:
+  es: Privacidad
+legal.licenses_open:
+  es: Acerca de
+legal.privacy_title:
+  es: Privacidad y soporte
+legal.licenses_title:
+  es: Acerca de y licencias
+legal.offline_policy:
+  es: Lee la política de privacidad incluida con esta aplicación. El enlace de soporte abre el navegador.
+legal.version:
+  es: "ImgConvert %{version} · Apache-2.0 · Textos de licencia del proyecto y de terceros"
+legal.support:
+  es: Soporte en GitHub
+legal.close:
+  es: Cerrar
+errors.fileNotFound:
+  es: "Archivo no encontrado: %{path}"
+errors.permissionDenied:
+  es: "Permiso denegado: %{path}"
+errors.outputPermissionDenied:
+  es: "No se puede escribir en el directorio de salida: %{path}. Elige un directorio de salida y vuelve a intentarlo."
+errors.unsupportedFormat:
+  es: "Formato no compatible: %{format}"
+errors.outputExists:
+  es: "El archivo de salida ya existe: %{path}"
+errors.invalidOutputSuffix:
+  es: El sufijo del nombre de archivo contiene caracteres no admitidos o es demasiado largo.
+errors.sourceOverwriteConfirmationRequired:
+  es: "Se requiere una confirmación explícita antes de reemplazar un archivo original: %{path}"
+errors.outputConflictsWithInput:
+  es: "Para proteger un original en cola, esta salida no se escribió porque coincide con otra entrada: %{path}"
+errors.outputSafetyCheckFailed:
+  es: "No se pudo verificar que este lote conserve de forma segura los archivos originales. Comprueba el acceso al archivo afectado y vuelve a intentarlo: %{path}"
+errors.outputNotSmaller:
+  es: "Omitido porque la salida no es más pequeña que el original: %{path}"
+errors.pdfPasswordProtected:
+  es: "Este PDF está cifrado o protegido con contraseña y no se puede convertir: %{path}"
+errors.pdfSettingsInvalid:
+  es: "El intervalo de páginas o el valor de DPI del PDF no es válido: %{path}"
+errors.pdfResourceLimit:
+  es: "El archivo o la página PDF supera el límite seguro de recursos. Selecciona menos páginas o reduce los DPI: %{path}"
+errors.pdfInvalid:
+  es: "El PDF no es válido, está dañado o tiene contenido no compatible: %{path}"
+errors.conversionFailed:
+  es: "No se pudo convertir la imagen: %{path}"
+errors.batchFailed:
+  es: No se pudo completar la conversión por lotes.
+errors.importFailed:
+  es: No se pudo importar el archivo o la carpeta seleccionados.
+errors.clipboardImportFailed:
+  es: No se pudo importar la imagen del portapapeles.
+errors.nativeDialogFailed:
+  es: No se pudo abrir el selector de archivos del sistema.
+errors.thumbnailFailed:
+  es: "No se pudo generar una vista previa de la imagen: %{path}"
+errors.previewFailed:
+  es: "No se pudo generar una vista previa comparativa: %{path}"
+errors.codecConfigurationFailed:
+  es: No se pudo configurar el auxiliar HEIC.
+errors.taskFailed:
+  es: No se pudo completar la operación solicitada. Vuelve a intentarlo.
+queue.source_format:
+  es: "%{format} · Original"
+queue.remove:
+  es: Quitar
+queue.remove_item:
+  es: "Quitar %{name} de la cola"
+queue.scan_issues:
+  es: "Omitidos: %{skipped}. Rutas ilegibles: %{errors}."
+errors.outputSafetyCheckFailedGeneric:
+  es: No se pudo verificar que este lote conserve de forma segura los archivos originales. Comprueba el acceso a los archivos y vuelve a intentarlo.
+settings.clear_result_cache_failed_generic:
+  es: No se pudo vaciar la caché de resultados. Comprueba el acceso a los archivos y vuelve a intentarlo.
+warning.bit_depth_reduced:
+  es: "Precisión reducida de %{from} bits a %{to} bits."
+warning.alpha_flattened:
+  es: La transparencia se combinó sobre un fondo opaco.
+queue.animated:
+  es: Animada · no compatible
+queue.animation_unknown:
+  es: Animación sin verificar
+workflow.animation_summary:
+  es: "%{count} archivos · %{animated} animados (no compatibles) · %{unknown} sin verificar"
+workflow.animation_summary_one:
+  es: "%{count} archivo · %{animated} animados (no compatibles) · %{unknown} sin verificar"
+status.warnings:
+  es: Advertencias
+queue.add_folders:
+  es: Añadir carpetas
+queue.supported_formats:
+  es: Formatos de entrada
+queue.compare_item:
+  es: "Comparar %{name}"
+queue.impact_item:
+  es: "Escenario de almacenamiento de %{name}"
+queue.progress_item:
+  es: "Progreso de conversión de %{name}"
+settings.tab_format:
+  es: Formato
+settings.tab_output:
+  es: Salida
+settings.tab_processing:
+  es: Ajustes
+settings.tab_privacy:
+  es: Privacidad
+settings.tab_has_issue:
+  es: "%{tab}, requiere atención"
+settings.format_hint_jpeg:
+  es: Se abre en todas partes
+settings.format_hint_png:
+  es: Sin pérdida, con transparencia
+settings.format_hint_webp:
+  es: Pensado para la web
+settings.format_hint_avif:
+  es: Archivos más pequeños
+workflow.preset_manage:
+  es: Guardar y gestionar ajustes
+settings.cache_section:
+  es: Caché
+status.smaller_percent:
+  es: "−%{percent}%"
+status.larger_percent:
+  es: "+%{percent}%"
+workflow.summary_saved:
+  es: "%{summary} · ahorro de %{saved}"
+workflow.summary_done:
+  es: "%{count} completados"
+workflow.summary_skipped:
+  es: "%{count} omitidos"
+workflow.summary_failed:
+  es: "%{count} con error"
+status.same_size:
+  es: Mismo tamaño
+status.smaller_under_one:
+  es: −<1%
+status.larger_under_one:
+  es: "+<1%"

@@ -1,0 +1,885 @@
+_version: 2
+app.title:
+  zh-TW: ImgConvert
+app.language:
+  zh-TW: "語言：%{language}"
+app.quit:
+  zh-TW: 結束 ImgConvert
+app.open_files:
+  zh-TW: 開啟…
+app.instance_blocked_title:
+  zh-TW: ImgConvert 已在執行
+app.instance_blocked:
+  zh-TW: "另一個 ImgConvert（版本 %{version}，處理程序 %{pid}）正在執行。兩個版本共用同一份設定檔，因此同一時間只能執行一個。請先結束另一個 ImgConvert，再重新開啟。"
+app.instance_blocked_unknown:
+  zh-TW: 另一個 ImgConvert 正在執行。兩個版本共用同一份設定檔，因此同一時間只能執行一個。請先結束另一個 ImgConvert，再重新開啟。
+menu.edit:
+  zh-TW: 編輯
+menu.file:
+  zh-TW: 檔案
+settings.save_failed:
+  zh-TW: "設定無法儲存：%{detail}"
+queue.title:
+  zh-TW: 佇列
+queue.add_files:
+  zh-TW: 加入檔案
+queue.paste:
+  zh-TW: 貼上
+queue.clipboard_empty:
+  zh-TW: 複製圖片或完整檔案路徑後，再次貼上。
+queue.item_format_label:
+  zh-TW: "%{name} 的目標格式：%{format}"
+queue.target_format:
+  zh-TW: 此檔案的目標格式
+queue.global_format:
+  zh-TW: "全域 · %{format}"
+queue.follow_global:
+  zh-TW: 跟隨全域格式
+queue.reset_formats:
+  zh-TW: 重設格式
+queue.clear:
+  zh-TW: 清空
+queue.cancel_import:
+  zh-TW: 停止
+queue.empty_title:
+  zh-TW: 還沒有圖片
+queue.empty_description:
+  zh-TW: 拖入圖片或資料夾、加入檔案，或貼上複製的圖片和檔案路徑。
+queue.drop_hint:
+  zh-TW: 放開即可加入佇列
+queue.importing:
+  zh-TW: 正在匯入…
+queue.item_count:
+  zh-TW: "%{count} 個檔案"
+queue.item_count_one:
+  zh-TW: "%{count} 個檔案"
+queue.import_added:
+  zh-TW: "已加入 %{added} 個檔案"
+queue.import_added_one:
+  zh-TW: "已加入 %{added} 個檔案"
+queue.import_added_skipped:
+  zh-TW: "已加入 %{added} 個檔案，略過 %{skipped} 個"
+queue.import_added_skipped_one:
+  zh-TW: "已加入 %{added} 個檔案，略過 %{skipped} 個"
+queue.import_nothing:
+  zh-TW: 找不到支援的圖片
+queue.import_failed:
+  zh-TW: "無法匯入：%{detail}"
+queue.import_cancelled:
+  zh-TW: 匯入已取消
+queue.thumbnail_unavailable:
+  zh-TW: 無預覽
+status.pending:
+  zh-TW: 等待中
+status.running:
+  zh-TW: 轉換中…
+status.done:
+  zh-TW: 完成
+status.skipped:
+  zh-TW: 已略過
+status.error:
+  zh-TW: 失敗
+status.saved:
+  zh-TW: "%{before} → %{after}"
+workflow.title:
+  zh-TW: 轉換
+workflow.format:
+  zh-TW: 輸出格式
+workflow.output_dir:
+  zh-TW: 輸出資料夾
+workflow.choose_output:
+  zh-TW: 選擇資料夾
+workflow.output_not_chosen:
+  zh-TW: 開始時選擇
+workflow.start:
+  zh-TW: 開始轉換
+workflow.cancel:
+  zh-TW: 取消
+workflow.cancelling:
+  zh-TW: 正在取消…
+workflow.announce_started:
+  zh-TW: "開始轉換，共 %{count} 個檔案"
+workflow.progress:
+  zh-TW: "已完成 %{done} / %{total}"
+workflow.batch_progress:
+  zh-TW: 批次轉換進度
+workflow.summary_cancelled:
+  zh-TW: "已取消，完成 %{done} / %{total}"
+workflow.failed:
+  zh-TW: "批次轉換失敗：%{detail}"
+workflow.already_running:
+  zh-TW: 已有批次工作正在執行
+workflow.nothing_to_convert:
+  zh-TW: 請先把圖片加入佇列
+settings.title:
+  zh-TW: 轉換設定
+settings.core_section:
+  zh-TW: 格式與品質
+settings.target_format:
+  zh-TW: 目標格式
+settings.quality:
+  zh-TW: 品質
+settings.quality_upper_bound:
+  zh-TW: 品質上限
+settings.quality_effective:
+  zh-TW: "%{requested} → %{effective}"
+settings.output_section:
+  zh-TW: 輸出行為
+settings.concurrency:
+  zh-TW: 並行
+settings.concurrency_auto:
+  zh-TW: 自動
+settings.existing_files:
+  zh-TW: 已存在的檔案
+settings.overwrite_ask:
+  zh-TW: 詢問
+settings.overwrite_skip:
+  zh-TW: 略過
+settings.overwrite_overwrite:
+  zh-TW: 覆寫
+settings.output_suffix:
+  zh-TW: 檔名後綴
+settings.add_output_suffix:
+  zh-TW: 加入後綴
+settings.output_suffix_hint:
+  zh-TW: 會加在副檔名之前；支援自訂 Unicode 文字，最長 48 個字元且不超過 128 位元組。
+settings.output_suffix_adjusted:
+  zh-TW: 已取代不支援的路徑字元，並依安全長度限制儲存。
+settings.output_suffix_required:
+  zh-TW: 要使用後綴，請至少輸入一個字元；不需要後綴可關閉此開關。
+settings.suffix_disabled_collision_hint:
+  zh-TW: 關閉後綴且目標格式相同時，可能與原圖同名；已存在的檔案依「已存在的檔案」的選擇處理。
+settings.file_name_template:
+  zh-TW: 檔名範本
+settings.file_name_template_hint:
+  zh-TW: 關閉「加入後綴」後使用。支援 %name%、%extension%、%date%。
+settings.compression_section:
+  zh-TW: 壓縮策略
+settings.lossless_label:
+  zh-TW: 無損壓縮
+settings.lossless_description:
+  zh-TW: 優先保持像素不失真；僅在目標格式支援時可用，檔案大小不一定最小。
+settings.skip_larger_label:
+  zh-TW: 僅保留較小的輸出
+settings.skip_larger_description:
+  zh-TW: 預設關閉。啟用後僅在點陣圖輸出小於來源檔案時寫入；若需要指定格式以相容舊系統（例如 PNG），請保持關閉。SVG 點陣化不受此設定影響。
+settings.multi_candidate_label:
+  zh-TW: 多候選取最小
+settings.multi_candidate_description:
+  zh-TW: 嘗試多個等效的編碼候選，並寫入檔案最小的結果，耗時會略為增加。
+settings.auto_quality_label:
+  zh-TW: 自動品質
+settings.auto_quality_description:
+  zh-TW: JPEG/WebP 會搜尋達到目標分數的最低品質，盡量縮小檔案。
+settings.generation_protection_label:
+  zh-TW: 僅保留有損重新編碼的收益
+settings.generation_protection_description:
+  zh-TW: 預設關閉。啟用後，有損圖片再次輸出為有損格式時，必須達到足夠的檔案縮減才會寫入；若需要指定格式，請保持關閉。
+settings.color_section:
+  zh-TW: 色彩管理
+settings.convert_to_srgb_label:
+  zh-TW: 轉為 sRGB
+settings.convert_to_srgb_description:
+  zh-TW: 使用內嵌 ICC 將像素轉換為 sRGB，並移除舊 ICC，適合統一網頁和一般檢視器的顯示。
+settings.result_cache_label:
+  zh-TW: 結果快取
+settings.result_cache_description:
+  zh-TW: 來源檔案與設定未變更時重複使用既有輸出，適合重複處理同一批檔案。
+settings.clear_result_cache:
+  zh-TW: 清除結果快取
+settings.clearing_result_cache:
+  zh-TW: 正在清除快取…
+settings.result_cache_cleared:
+  zh-TW: "已清除 %{count} 筆結果快取記錄。"
+settings.clear_result_cache_failed:
+  zh-TW: "無法清除結果快取：%{detail}"
+settings.format_parameters:
+  zh-TW: 格式參數
+settings.progressive_jpeg:
+  zh-TW: 漸進式 JPEG
+settings.trellis_scans:
+  zh-TW: Trellis 掃描最佳化
+settings.png_optimization_level:
+  zh-TW: PNG 最佳化等級
+settings.experimental_quantize:
+  zh-TW: 實驗性減色
+settings.color_count:
+  zh-TW: 顏色數
+settings.webp_method:
+  zh-TW: 方法
+settings.near_lossless:
+  zh-TW: 近無損
+settings.near_lossless_off:
+  zh-TW: 關閉
+settings.sharp_yuv:
+  zh-TW: 銳化 YUV
+settings.avif_speed:
+  zh-TW: 速度
+settings.avif_chroma_subsampling:
+  zh-TW: 色度取樣
+settings.target_score:
+  zh-TW: 目標分數
+settings.minimum_quality:
+  zh-TW: 最低品質
+settings.quality_floor_off:
+  zh-TW: 關閉
+workflow.preset:
+  zh-TW: 情境預設集
+workflow.custom_settings:
+  zh-TW: 自訂設定
+workflow.save_preset:
+  zh-TW: 儲存目前設定
+workflow.preset_name:
+  zh-TW: 預設集名稱
+workflow.delete_preset:
+  zh-TW: 刪除預設集
+workflow.delete_preset_named:
+  zh-TW: "刪除預設集「%{name}」"
+workflow.delete_preset_title:
+  zh-TW: "刪除「%{name}」？"
+workflow.delete_preset_description:
+  zh-TW: 此操作無法復原。
+workflow.delete:
+  zh-TW: 刪除
+workflow.preset_limit:
+  zh-TW: "最多儲存 %{count} 個自訂預設集。"
+workflow.presets.web_sharing:
+  zh-TW: 網頁分享
+workflow.presets.web_sharing_description:
+  zh-TW: WebP、最長邊 2048 px，僅保留色彩描述檔。
+workflow.presets.email:
+  zh-TW: 電子郵件附件
+workflow.presets.email_description:
+  zh-TW: JPEG、最長邊 1600 px，目標 1 MiB。
+workflow.presets.high_quality:
+  zh-TW: 高品質封存
+workflow.presets.high_quality_description:
+  zh-TW: 高品質 AVIF，保留所有支援的中繼資料。
+workflow.presets.private_sharing:
+  zh-TW: 隱私分享
+workflow.presets.private_sharing_description:
+  zh-TW: JPEG、最長邊 2048 px，並移除所有中繼資料。
+workflow.pdf_section:
+  zh-TW: PDF 轉圖片
+workflow.pdf_pages:
+  zh-TW: 頁面範圍（留空表示全部）
+workflow.pdf_pages_placeholder:
+  zh-TW: 例如 1-3, 5, 8-10
+workflow.pdf_pages_hint:
+  zh-TW: 頁碼從 1 開始；可組合單頁和範圍，一次最多 500 頁。
+workflow.pdf_dpi:
+  zh-TW: 轉譯解析度（DPI）
+workflow.pdf_dpi_hint:
+  zh-TW: 僅對 PDF 輸入生效，範圍 72–600 DPI，預設 150。
+workflow.pdf_dpi_hint_active:
+  zh-TW: 先依 DPI 轉譯 PDF；如啟用批次尺寸規則，再對轉譯結果調整尺寸。
+workflow.pdf_range_invalid:
+  zh-TW: 頁面範圍格式無效，請使用 1-3, 5, 8-10 這類寫法。
+workflow.pdf_range_out_of_bounds:
+  zh-TW: "頁面範圍超出文件總頁數（%{count} 頁）。"
+workflow.pdf_range_required:
+  zh-TW: "文件頁數較多，請明確選擇頁面；一次最多 %{count} 頁。"
+workflow.pdf_range_too_long:
+  zh-TW: 頁面範圍輸入過長。
+workflow.pdf_too_many_pages:
+  zh-TW: "一次最多轉換 %{count} 個 PDF 頁面。"
+workflow.resize_section:
+  zh-TW: 批次尺寸規則
+workflow.resize_mode:
+  zh-TW: 調整方式
+workflow.resize_modes.none:
+  zh-TW: 保持原尺寸
+workflow.resize_modes.fit:
+  zh-TW: 限制在寬高內
+workflow.resize_modes.width:
+  zh-TW: 指定寬度
+workflow.resize_modes.height:
+  zh-TW: 指定高度
+workflow.resize_modes.longest_edge:
+  zh-TW: 指定最長邊
+workflow.resize_modes.percentage:
+  zh-TW: 依百分比
+workflow.width:
+  zh-TW: 寬度（px）
+workflow.height:
+  zh-TW: 高度（px）
+workflow.size:
+  zh-TW: 尺寸（px）
+workflow.percentage:
+  zh-TW: 比例（%）
+workflow.allow_upscale:
+  zh-TW: 允許放大較小的圖片
+workflow.compression_policy_disabled:
+  zh-TW: 調整尺寸時，「僅保留較小的輸出」和「僅保留有損重新編碼的收益」不適用。
+workflow.target_section:
+  zh-TW: 目標檔案大小
+workflow.target_enable:
+  zh-TW: 嘗試不超過指定大小
+workflow.target_kib:
+  zh-TW: 目標大小（KiB）
+workflow.target_hint:
+  zh-TW: 僅支援有損 JPEG/WebP；以目前品質作為上限，並遵守最低品質。
+workflow.target_unsupported:
+  zh-TW: 請選擇有損 JPEG 或 WebP 後再啟用目標大小。
+workflow.metadata_section:
+  zh-TW: 隱私中繼資料
+workflow.metadata_policy:
+  zh-TW: 保留策略
+workflow.metadata.strip_all:
+  zh-TW: 移除所有中繼資料
+workflow.metadata.strip_all_description:
+  zh-TW: 先將帶有描述檔的像素轉為 sRGB，再移除 ICC、EXIF、XMP 與 IPTC。
+workflow.metadata.color_only:
+  zh-TW: 僅保留色彩描述檔
+workflow.metadata.color_only_description:
+  zh-TW: 保留完整 ICC 以維持色彩；其中仍可能包含描述檔或裝置識別資訊。
+workflow.metadata.preserve_all:
+  zh-TW: 保留所有支援項目
+workflow.metadata.preserve_all_description:
+  zh-TW: 盡量保留 ICC、EXIF、XMP 與 IPTC。
+workflow.invalid_configuration:
+  zh-TW: 開始前請先修正標紅的設定
+preview.open:
+  zh-TW: 前後對比
+preview.title:
+  zh-TW: 前後對比預覽
+preview.pdf_page:
+  zh-TW: "PDF 第 %{page} 頁"
+preview.before:
+  zh-TW: 原圖
+preview.after:
+  zh-TW: 轉換後
+preview.loading:
+  zh-TW: 正在產生精確預覽…
+preview.refresh:
+  zh-TW: 重新整理預覽
+preview.stale:
+  zh-TW: 轉換設定已變更，請重新整理以更新轉換後預覽。
+preview.close:
+  zh-TW: 關閉
+preview.reveal:
+  zh-TW: 拖曳檢視轉換前後
+preview.dimensions:
+  zh-TW: "%{width} × %{height}"
+preview.output_size:
+  zh-TW: "預估輸出 %{size}"
+preview.quality:
+  zh-TW: "實際品質 %{quality}"
+preview.target_met:
+  zh-TW: 已達到目標大小
+preview.target_not_met:
+  zh-TW: 在最低品質限制內無法達到目標大小
+preview.error:
+  zh-TW: "無法產生對比預覽：%{detail}"
+preview.cancelled:
+  zh-TW: 預覽已取消
+warning.output_backup_retained:
+  zh-TW: "轉換完成，但原輸出備份仍保留在：%{path}"
+warning.modified_time_not_preserved:
+  zh-TW: "轉換完成，但未能保留修改時間：%{path}"
+warning.temporary_file_retained:
+  zh-TW: "轉換完成，但未能刪除暫存檔：%{path}"
+warning.color_profile_converted_for_resize:
+  zh-TW: 調整尺寸前已將像素轉換為 sRGB，並移除不再相符的原 ICC 描述檔。
+warning.invalid_color_profile_discarded:
+  zh-TW: 內嵌的 ICC 描述檔無效；已依隱私設定移除，像素以原始解碼值輸出，顏色可能與來源應用程式不同。
+warning.invalid_color_profile_ignored_for_preview:
+  zh-TW: 內嵌的 ICC 描述檔無效。轉換後的檔案會依設定繼續保留該描述檔，但目前的顯示預覽使用不含該描述檔的已解碼像素。
+warning.target_size_not_met:
+  zh-TW: "目標為 %{target}；已輸出 %{actual} 的最小候選，但在最低品質限制內仍未達到目標。"
+warning.pdf_pages_skipped_existing:
+  zh-TW: "已保留 %{count} 個已存在的頁面檔案。"
+warning.pdf_render_warnings:
+  zh-TW: "PDF 第 %{page} 頁轉譯時出現 %{count} 個相容性警告，結果可能缺少部分內容。"
+safety.queued_input_conflict_title:
+  zh-TW: 已阻止覆寫佇列中的原圖
+safety.queued_input_conflict_message:
+  zh-TW: "有 %{count} 個輸出路徑與佇列中的其他輸入檔案相同。為保護原圖，這些項目不會寫入；其餘項目可以繼續轉換。"
+safety.continue_remaining:
+  zh-TW: 繼續其餘項目
+safety.continue_conversion:
+  zh-TW: 繼續轉換
+safety.source_overwrite_title:
+  zh-TW: 可能覆寫原圖
+safety.source_overwrite:
+  zh-TW: 確認覆寫原圖
+safety.source_overwrite_message:
+  zh-TW: "有 %{count} 個輸出檔案與原圖是同一個檔案。繼續後將取代原圖，且無法復原。"
+safety.source_overwrite_single_message:
+  zh-TW: "此輸出與原圖是同一個檔案：%{path}。確認後將取代原圖，且無法復原。"
+safety.source_overwrite_will_skip_message:
+  zh-TW: "有 %{count} 個輸出檔案與原圖同名。目前設為「略過」，這些原圖不會被修改。"
+safety.confirm_overwrite_title:
+  zh-TW: 確認覆寫
+safety.output_exists:
+  zh-TW: "輸出檔案已存在：%{path}"
+safety.pdf_outputs_exist:
+  zh-TW: "此 PDF 有 %{count} 個頁面輸出已存在。是否覆寫這些檔案？"
+safety.overwrite:
+  zh-TW: 覆寫
+safety.skip:
+  zh-TW: 略過
+safety.planning:
+  zh-TW: 正在檢查輸出路徑…
+safety.plan_failed:
+  zh-TW: "無法檢查輸出路徑：%{detail}"
+safety.restart_needed:
+  zh-TW: 佇列或設定已變更，請重新開始。
+diagnostics.title:
+  zh-TW: 外掛程式診斷
+diagnostics.open:
+  zh-TW: 外掛程式診斷
+diagnostics.description:
+  zh-TW: HEIC 選用匯入提供者、資訊清單搜尋路徑與輔助程式偵測。macOS 使用系統 ImageIO；Windows 優先使用 WIC；Linux 可用 heif-convert。
+diagnostics.refresh:
+  zh-TW: 重新整理
+diagnostics.close:
+  zh-TW: 關閉
+diagnostics.loading:
+  zh-TW: 正在讀取外掛程式診斷…
+diagnostics.load_error:
+  zh-TW: "無法讀取外掛程式診斷：%{detail}"
+diagnostics.choose_heic_helper:
+  zh-TW: 選擇 HEIC 輔助程式
+diagnostics.manual_helper_enabled:
+  zh-TW: 手動指定的輔助程式已啟用
+diagnostics.manual_helper_unavailable:
+  zh-TW: 手動指定的輔助程式無法使用
+diagnostics.set_helper_failed:
+  zh-TW: "設定手動指定的輔助程式失敗：%{detail}"
+diagnostics.helper_cleared:
+  zh-TW: 已清除手動指定的輔助程式
+diagnostics.clear_helper_failed:
+  zh-TW: "清除手動指定的輔助程式失敗：%{detail}"
+diagnostics.heic_enabled:
+  zh-TW: HEIC 選用匯入已啟用
+diagnostics.heic_disabled:
+  zh-TW: HEIC 選用匯入未啟用
+diagnostics.extensions:
+  zh-TW: "副檔名：%{extensions}"
+diagnostics.type:
+  zh-TW: 類型
+diagnostics.license:
+  zh-TW: 授權
+diagnostics.system_imageio:
+  zh-TW: 系統 ImageIO
+diagnostics.windows_wic:
+  zh-TW: Windows WIC
+diagnostics.system_helper:
+  zh-TW: 系統輔助程式
+diagnostics.executable:
+  zh-TW: 執行檔
+diagnostics.argv:
+  zh-TW: argv
+diagnostics.no_external_args:
+  zh-TW: 無外部處理程序參數
+diagnostics.no_provider:
+  zh-TW: 未發現可用的資訊清單提供者或系統輔助程式。
+diagnostics.summary_title:
+  zh-TW: 偵測摘要
+diagnostics.external_codecs:
+  zh-TW: 外部編解碼器
+diagnostics.manual_helper:
+  zh-TW: 手動指定的輔助程式
+diagnostics.enabled:
+  zh-TW: 啟用
+diagnostics.disabled:
+  zh-TW: 停用
+diagnostics.available:
+  zh-TW: 可用
+diagnostics.unavailable:
+  zh-TW: 無法使用
+diagnostics.not_configured:
+  zh-TW: 未設定
+diagnostics.accepted_manifests:
+  zh-TW: 可用的資訊清單
+diagnostics.rejected_manifests:
+  zh-TW: 已拒絕的資訊清單
+diagnostics.system_codecs:
+  zh-TW: 系統編解碼器
+diagnostics.system_helpers:
+  zh-TW: 系統輔助程式
+diagnostics.license_boundary_title:
+  zh-TW: 授權與通路邊界
+diagnostics.license_boundary_body:
+  zh-TW: 主程式不內建 HEIC 編解碼器，不連結 libheif，不散布 x265。HEIC 僅透過使用者環境中的選用 decode-only 輔助程式／提供者匯入；外掛程式授權、原始碼／NOTICE 與專利風險需由外掛程式散布者另行處理。商店或 Flatpak 組建可透過停用外部編解碼器自動探索來維持主套件邊界。Windows 優先偵測系統 WIC HEIF/HEVC 延伸模組；缺少時可依診斷提示安裝系統延伸模組，或使用獨立的輔助程式，不把 HEIC 編解碼器打包進主程式。
+diagnostics.system_codecs_title:
+  zh-TW: 系統編解碼器
+diagnostics.no_system_codecs:
+  zh-TW: 目前平台沒有系統編解碼器偵測項目。
+diagnostics.manual_helper_title:
+  zh-TW: 手動指定的輔助程式
+diagnostics.choose:
+  zh-TW: 選擇
+diagnostics.clear:
+  zh-TW: 清除
+diagnostics.selected:
+  zh-TW: 已選取
+diagnostics.not_configured_helper:
+  zh-TW: 未設定手動指定的輔助程式。
+diagnostics.system_helpers_title:
+  zh-TW: 系統輔助程式
+diagnostics.no_system_helpers:
+  zh-TW: 目前平台不偵測系統輔助程式。
+diagnostics.manifest_search_title:
+  zh-TW: 資訊清單搜尋
+diagnostics.no_manifest_dirs:
+  zh-TW: 目前平台不搜尋資訊清單目錄。
+diagnostics.no_license:
+  zh-TW: 無授權聲明
+diagnostics.status_accepted:
+  zh-TW: 可用
+diagnostics.status_ready:
+  zh-TW: 就緒
+diagnostics.status_rejected:
+  zh-TW: 已拒絕
+diagnostics.status_missing:
+  zh-TW: 缺少
+diagnostics.status_empty:
+  zh-TW: 空
+diagnostics.status_untrusted:
+  zh-TW: 不受信任
+diagnostics.status_unreadable:
+  zh-TW: 無法讀取
+diagnostics.status_not_directory:
+  zh-TW: 非目錄
+diagnostics.status_unsupported:
+  zh-TW: 未啟用
+diagnostics.status_disabled:
+  zh-TW: 已停用
+diagnostics.found:
+  zh-TW: 已找到
+diagnostics.missing:
+  zh-TW: 缺少
+diagnostics.active:
+  zh-TW: 已啟用
+diagnostics.inactive:
+  zh-TW: 未啟用
+diagnostics.provider_manifest:
+  zh-TW: 資訊清單外掛程式
+diagnostics.source_explicit:
+  zh-TW: 自訂路徑
+diagnostics.source_platform:
+  zh-TW: 目前平台
+diagnostics.source_flatpak_extension:
+  zh-TW: Flatpak 延伸模組
+diagnostics.messages.details_hidden:
+  zh-TW: 詳細資訊僅在開發組建中顯示。
+diagnostics.messages.external_codecs_build_disabled:
+  zh-TW: 此組建已停用外部編解碼器／輔助程式自動探索。
+diagnostics.messages.external_codecs_build_disabled_flatpak_enabled:
+  zh-TW: 此組建已停用外部編解碼器／輔助程式自動探索；Flatpak 編解碼器延伸模組仍然啟用。
+diagnostics.messages.external_codecs_environment_disabled:
+  zh-TW: "%{detail} 已停用外部編解碼器／輔助程式自動探索。"
+diagnostics.messages.external_codecs_environment_disabled_flatpak_enabled:
+  zh-TW: "%{detail} 已停用外部編解碼器／輔助程式自動探索；Flatpak 編解碼器延伸模組仍然啟用。"
+diagnostics.messages.external_codec_trust_unsupported:
+  zh-TW: 目前平台尚未啟用外部 HEIC 輔助程式信任模型。
+diagnostics.messages.selected_helper_not_configured:
+  zh-TW: 尚未設定手動指定的輔助程式。
+diagnostics.messages.selected_helper_unavailable:
+  zh-TW: "所選的輔助程式無法使用：%{detail}"
+diagnostics.messages.directory_missing:
+  zh-TW: 目錄不存在。
+diagnostics.messages.path_not_directory:
+  zh-TW: 該路徑不是目錄。
+diagnostics.messages.directory_untrusted:
+  zh-TW: 目錄或其上層目錄可被其他使用者寫入。
+diagnostics.messages.manifest_not_found:
+  zh-TW: 未發現 imgconvert-codec-*.json 資訊清單。
+diagnostics.messages.directory_unreadable:
+  zh-TW: "無法讀取目錄：%{detail}"
+diagnostics.messages.manifest_rejected:
+  zh-TW: "資訊清單已拒絕：%{detail}"
+diagnostics.messages.path_environment_missing:
+  zh-TW: 未設定 PATH。
+diagnostics.messages.helper_not_found_in_trusted_path:
+  zh-TW: 未在受信任的 PATH 目錄中找到執行檔。
+diagnostics.messages.wic_unsupported_platform:
+  zh-TW: Windows WIC HEIC 解碼僅在 Windows 上可用。
+diagnostics.messages.wic_available:
+  zh-TW: "已偵測到 Windows WIC HEIC 解碼器：%{detail}"
+diagnostics.messages.wic_missing:
+  zh-TW: 未偵測到 Windows WIC HEIC 解碼器。
+diagnostics.messages.wic_probe_failed:
+  zh-TW: "Windows WIC HEIC 偵測失敗：%{detail}"
+diagnostics.messages.windows_heif_install_hint:
+  zh-TW: 安裝 Microsoft HEIF Image Extensions 和 HEVC Video Extensions 後重試；企業裝置可透過 Microsoft Store、winget 或離線應用程式套件部署。
+diagnostics.messages.unknown:
+  zh-TW: "診斷 %{code}：%{detail}"
+workflow.ready:
+  zh-TW: "%{count} 個檔案待轉換"
+workflow.ready_one:
+  zh-TW: "%{count} 個檔案待轉換"
+workflow.ready_empty:
+  zh-TW: 請先加入檔案
+settings.appearance_section:
+  zh-TW: 外觀
+settings.theme:
+  zh-TW: 主題
+settings.theme_system:
+  zh-TW: 跟隨系統
+settings.theme_light:
+  zh-TW: 淺色
+settings.theme_dark:
+  zh-TW: 深色
+settings.reduce_motion_label:
+  zh-TW: 減少動畫
+settings.reduce_motion_description:
+  zh-TW: 縮短或關閉介面動畫。
+queue.page_count:
+  zh-TW: "%{count} 頁"
+queue.page_count_one:
+  zh-TW: "%{count} 頁"
+impact.title:
+  zh-TW: 儲存與環境情境
+impact.open:
+  zh-TW: 儲存情境
+impact.batch_open:
+  zh-TW: 批次情境
+impact.smaller:
+  zh-TW: "輸出減少 %{bytes}"
+impact.larger:
+  zh-TW: "輸出增加 %{bytes}"
+impact.same:
+  zh-TW: 輸出大小不變
+impact.boundary:
+  zh-TW: 檔案變小不代表磁碟空間已釋放，也不代表已經節電或減碳。
+impact.excluded:
+  zh-TW: 無法確認可比較的單一靜態點陣結果，暫不估算。PDF、動畫、多重輸出、AVIF/HEIC 序列狀態未知以及舊版本結果均不納入。
+impact.batch:
+  zh-TW: "批次：%{count} 個符合資格的結果，另有 %{excluded} 個已完成結果未計入。以下統一假設獨立於單一檔案面板。"
+impact.storage:
+  zh-TW: 儲存情境
+impact.local:
+  zh-TW: 本機或未知：僅顯示位元組變化
+impact.cloud:
+  zh-TW: 探索雲端儲存假設
+impact.originals:
+  zh-TW: 原始檔案狀態
+impact.hypothetical:
+  zh-TW: 假設以輸出取代原圖
+impact.confirmed:
+  zh-TW: 我已取代原圖（自行確認）
+impact.retained:
+  zh-TW: 仍保留原圖
+impact.days:
+  zh-TW: 保留天數（0–3650）
+impact.copies:
+  zh-TW: 副本數
+impact.copies_default:
+  zh-TW: 1–3
+impact.invalid:
+  zh-TW: 請輸入 0 至 3650 的整數天數。
+impact.estimate:
+  zh-TW: 雲端儲存情境估算
+impact.no_reduction:
+  zh-TW: 輸出沒有淨減少，不計算正向環境效益。
+impact.retained_notice:
+  zh-TW: 原圖仍保留，不計算正向儲存減排。
+impact.limits:
+  zh-TW: 採用平均容量分攤模型；這是情境範圍，不是實際或淨減排，也不是信賴區間。即使自行確認取代，仍然只是估算。
+impact.method:
+  zh-TW: 方法與來源（可離線閱讀）
+impact.formula:
+  zh-TW: 模型 v1.0.0：容量（TB）× 保留時數 × 0.65–1.2 Wh/TB·h × PUE 1.1–1.185 × 副本數 = 電量（Wh）。電量 ÷ 1000 × 473 g CO₂/kWh = 公克 CO₂。碳強度為 2024 年全球平均；歷史係數不代表目前供應商或本機裝置。
+impact.privacy:
+  zh-TW: 不含轉換耗電、網路、硬體製造、處置及反彈效應。參數只在目前面板的記憶體中使用，關閉即重設，不儲存、不上傳。檔案大小以二進位 KB/MB 顯示；模型使用十進位 TB。
+impact.close:
+  zh-TW: 關閉
+update.open:
+  zh-TW: 更新
+update.title:
+  zh-TW: 更新
+update.manual:
+  zh-TW: 此預覽版採用手動更新。
+update.idle:
+  zh-TW: 檢查是否有新版本。
+update.checking:
+  zh-TW: 正在檢查更新
+update.current:
+  zh-TW: 已是最新版本
+update.available:
+  zh-TW: 有可用的更新
+update.downloading:
+  zh-TW: 正在下載並驗證更新
+update.ready:
+  zh-TW: 更新已通過驗證。請在批次結束後安裝。
+update.installing:
+  zh-TW: 正在安裝更新
+update.installed:
+  zh-TW: 更新已安裝。請結束並重新開啟 ImgConvert。
+update.current_version:
+  zh-TW: "目前版本：%{version}"
+update.new_version:
+  zh-TW: "新版本：%{version}"
+update.bytes:
+  zh-TW: "已下載 %{bytes} 位元組"
+update.check:
+  zh-TW: 檢查更新
+update.download:
+  zh-TW: 下載更新
+update.install:
+  zh-TW: 安裝更新
+update.close:
+  zh-TW: 關閉
+update.batch_active:
+  zh-TW: 請等待目前批次結束後再安裝。
+queue.import_partial:
+  zh-TW: "已加入 %{added} 個檔案。%{detail}"
+queue.import_partial_one:
+  zh-TW: "已加入 %{added} 個檔案。%{detail}"
+queue.clipboard_invalid_paths:
+  zh-TW: "%{count} 個檔案路徑無法以 UTF-8 表示。請選擇名稱受支援的檔案。"
+queue.clipboard_invalid_paths_one:
+  zh-TW: "%{count} 個檔案路徑無法以 UTF-8 表示。請選擇名稱受支援的檔案。"
+queue.clipboard_path_issues:
+  zh-TW: "略過 %{skipped} 項；%{errors} 個路徑無法讀取。請確認檔案存在且具有讀取權限。"
+queue.clipboard_truncated:
+  zh-TW: 掃描已達上限。請分批匯入較少的檔案。
+queue.clipboard_image_issues:
+  zh-TW: "%{count} 張圖片無法匯入。請複製未超出大小限制的受支援圖片後重試。"
+queue.clipboard_image_issues_one:
+  zh-TW: "%{count} 張圖片無法匯入。請複製未超出大小限制的受支援圖片後重試。"
+queue.clipboard_unavailable:
+  zh-TW: 無法讀取剪貼簿。請重試，或透過檔案選擇器加入檔案。
+queue.clipboard_image_failed:
+  zh-TW: 無法讀取圖片。請複製未超出大小限制的受支援圖片後重試。
+legal.privacy_open:
+  zh-TW: 隱私權
+legal.licenses_open:
+  zh-TW: 關於
+legal.privacy_title:
+  zh-TW: 隱私權與支援
+legal.licenses_title:
+  zh-TW: 關於與開放原始碼授權
+legal.offline_policy:
+  zh-TW: 閱讀此應用程式隨附的隱私權政策。支援連結會開啟瀏覽器。
+legal.version:
+  zh-TW: "ImgConvert %{version} · Apache-2.0 · 專案與第三方授權全文"
+legal.support:
+  zh-TW: GitHub 專案支援
+legal.close:
+  zh-TW: 關閉
+errors.fileNotFound:
+  zh-TW: "找不到檔案：%{path}"
+errors.permissionDenied:
+  zh-TW: "沒有權限存取：%{path}"
+errors.outputPermissionDenied:
+  zh-TW: "沒有權限寫入輸出目錄：%{path}。請點選「輸出目錄」選擇資料夾後重試。"
+errors.unsupportedFormat:
+  zh-TW: "不支援的格式：%{format}"
+errors.outputExists:
+  zh-TW: "輸出檔案已存在：%{path}"
+errors.invalidOutputSuffix:
+  zh-TW: 檔案後綴包含無效字元或過長，請修改後重試。
+errors.sourceOverwriteConfirmationRequired:
+  zh-TW: "需要明確確認後才能覆寫原圖：%{path}"
+errors.outputConflictsWithInput:
+  zh-TW: "為保護佇列中的原圖，未寫入與其他輸入同名的輸出：%{path}"
+errors.outputSafetyCheckFailed:
+  zh-TW: "無法確認本批工作會安全保留原圖，請檢查相關檔案權限後重試：%{path}"
+errors.outputNotSmaller:
+  zh-TW: "已略過：輸出檔案未小於來源檔案：%{path}"
+errors.pdfPasswordProtected:
+  zh-TW: "PDF 已加密或受密碼保護，目前無法轉換：%{path}"
+errors.pdfSettingsInvalid:
+  zh-TW: "PDF 頁面範圍或 DPI 設定無效：%{path}"
+errors.pdfResourceLimit:
+  zh-TW: "PDF 檔案或頁面超過安全資源上限；請減少頁面、降低 DPI 後重試：%{path}"
+errors.pdfInvalid:
+  zh-TW: "PDF 無效、損毀或包含暫不支援的內容：%{path}"
+errors.conversionFailed:
+  zh-TW: "無法轉換圖片：%{path}"
+errors.batchFailed:
+  zh-TW: 批次轉換無法完成。
+errors.importFailed:
+  zh-TW: 無法匯入所選的檔案或資料夾。
+errors.clipboardImportFailed:
+  zh-TW: 無法匯入剪貼簿圖片。
+errors.nativeDialogFailed:
+  zh-TW: 無法開啟系統檔案選擇器。
+errors.thumbnailFailed:
+  zh-TW: "無法產生圖片預覽：%{path}"
+errors.previewFailed:
+  zh-TW: "無法產生對比預覽：%{path}"
+errors.codecConfigurationFailed:
+  zh-TW: 無法設定 HEIC helper。
+errors.taskFailed:
+  zh-TW: 要求無法完成，請重試。
+queue.source_format:
+  zh-TW: "%{format} · 來源"
+queue.remove:
+  zh-TW: 移除
+queue.remove_item:
+  zh-TW: "從佇列移除 %{name}"
+queue.scan_issues:
+  zh-TW: "略過 %{skipped} 項；%{errors} 個路徑無法讀取。"
+errors.outputSafetyCheckFailedGeneric:
+  zh-TW: 無法確認本批工作會安全保留原圖，請檢查檔案權限後重試。
+settings.clear_result_cache_failed_generic:
+  zh-TW: 無法清空結果快取，請檢查檔案權限後重試。
+warning.bit_depth_reduced:
+  zh-TW: "精度已從 %{from} 位元降至 %{to} 位元。"
+warning.alpha_flattened:
+  zh-TW: 透明區域已合成到不透明背景。
+queue.animated:
+  zh-TW: 動畫 · 暫不支援
+queue.animation_unknown:
+  zh-TW: 動畫狀態未確認
+workflow.animation_summary:
+  zh-TW: "%{count} 個檔案 · %{animated} 個動畫（暫不支援）· %{unknown} 個狀態未確認"
+workflow.animation_summary_one:
+  zh-TW: "%{count} 個檔案 · %{animated} 個動畫（暫不支援）· %{unknown} 個狀態未確認"
+status.warnings:
+  zh-TW: 有警告
+queue.add_folders:
+  zh-TW: 加入資料夾
+queue.supported_formats:
+  zh-TW: 支援匯入的格式
+queue.compare_item:
+  zh-TW: "對比 %{name}"
+queue.impact_item:
+  zh-TW: "%{name} 的儲存情境"
+queue.progress_item:
+  zh-TW: "%{name} 的轉換進度"
+settings.tab_format:
+  zh-TW: 格式
+settings.tab_output:
+  zh-TW: 輸出
+settings.tab_processing:
+  zh-TW: 處理
+settings.tab_privacy:
+  zh-TW: 隱私權
+settings.tab_has_issue:
+  zh-TW: "%{tab}，有需要處理的設定"
+settings.format_hint_jpeg:
+  zh-TW: 相容所有裝置
+settings.format_hint_png:
+  zh-TW: 無損，保留透明
+settings.format_hint_webp:
+  zh-TW: 網頁通用
+settings.format_hint_avif:
+  zh-TW: 檔案最小
+workflow.preset_manage:
+  zh-TW: 儲存與管理預設集
+settings.cache_section:
+  zh-TW: 快取
+status.smaller_percent:
+  zh-TW: "節省 %{percent}%"
+status.larger_percent:
+  zh-TW: "增加 %{percent}%"
+workflow.summary_saved:
+  zh-TW: "%{summary} · 節省 %{saved}"
+workflow.summary_done:
+  zh-TW: "完成 %{count}"
+workflow.summary_skipped:
+  zh-TW: "略過 %{count}"
+workflow.summary_failed:
+  zh-TW: "失敗 %{count}"
+status.same_size:
+  zh-TW: 大小不變
+status.smaller_under_one:
+  zh-TW: 節省不到 1%
+status.larger_under_one:
+  zh-TW: 增加不到 1%
