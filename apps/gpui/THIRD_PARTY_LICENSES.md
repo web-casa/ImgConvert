@@ -323,7 +323,7 @@ project documentation (docs/LEGAL.md).
 - chrono@0.4.45 — MIT OR Apache-2.0 — https://github.com/chronotope/chrono
 - cipher@0.4.4 — MIT OR Apache-2.0 — Authors: RustCrypto Developers — https://github.com/RustCrypto/traits
 - clang-sys@1.9.1 — Apache-2.0 — Authors: Kyle Mayes <kyle@mayeses.com> — https://github.com/KyleMayes/clang-sys
-- clipboard-win@5.4.1 — BSL-1.0 — Authors: Douman <douman@gmx.se> — https://github.com/DoumanAsh/clipboard-win
+- clipboard-win@5.4.3 — BSL-1.0 — Authors: Douman <douman@gmx.se> — https://github.com/DoumanAsh/clipboard-win
 - cmake@0.1.58 — MIT OR Apache-2.0 — Authors: Alex Crichton <alex@alexcrichton.com> — https://github.com/rust-lang/cmake-rs
 - cocoa-foundation@0.2.1 — MIT OR Apache-2.0 — Authors: The Servo Project Developers — https://github.com/servo/core-foundation-rs
 - cocoa@0.26.1 — MIT OR Apache-2.0 — Authors: The Servo Project Developers — https://github.com/servo/core-foundation-rs
@@ -13334,7 +13334,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### BSL-1.0
 
 Used by:
-- clipboard-win@5.4.1
+- clipboard-win@5.4.3
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
