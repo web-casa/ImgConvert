@@ -11,15 +11,15 @@
 
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
-    ActiveTheme as _, Icon, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
+    ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
-    FontWeight, ImageSource, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _,
-    Render, Role, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
-    TestSupportExt as _, TitlebarOptions, Window, WindowBounds, WindowOptions, div, img, px, rems,
-    size,
+    FontWeight, Image, ImageFormat, ImageSource, InteractiveElement as _, IntoElement, ObjectFit,
+    ParentElement as _, Render, Role, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, Subscription, TestSupportExt as _, TitlebarOptions, Window, WindowBounds,
+    WindowOptions, div, img, px, rems, size,
 };
 use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
@@ -28,6 +28,7 @@ use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
 use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, COMPACT_WIDTH_REM, WorkflowPanel};
+use std::sync::{Arc, OnceLock};
 
 use crate::toggle_language;
 
@@ -165,7 +166,6 @@ impl Workspace {
     }
 
     fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let glass = cx.glass();
         let pill = ButtonRounded::Size(cx.theme().radius_full());
         h_flex()
             .id("workspace-header")
@@ -175,22 +175,8 @@ impl Workspace {
             .px_5()
             .gap_3()
             .items_center()
-            .child(
-                div()
-                    .size_7()
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(cx.theme().radius_tokens().md)
-                    .bg(cx.theme().tokens.primary)
-                    .shadow(glass.primary_shadows())
-                    .child(
-                        Icon::new(IconName::RefreshCw)
-                            .small()
-                            .text_color(cx.theme().primary_foreground),
-                    ),
-            )
+            // The brand mark is decoration: the title beside it names the app.
+            .child(img(brand_mark()).size_7().flex_none())
             .child(
                 div()
                     .id("workspace-title")
@@ -369,4 +355,16 @@ pub fn open_main_window(cx: &mut App) -> gpui_kit::Result<(AnyWindowHandle, Enti
         cx,
         |window, cx| cx.new(|cx| Workspace::new(window, cx)),
     )
+}
+
+/// The brand mark at title-bar size (`assets/brand/logo-mark-small.svg`), decoded once.
+fn brand_mark() -> Arc<Image> {
+    static MARK: OnceLock<Arc<Image>> = OnceLock::new();
+    MARK.get_or_init(|| {
+        Arc::new(Image::from_bytes(
+            ImageFormat::Svg,
+            include_bytes!("../../../../../assets/brand/logo-mark-small.svg").to_vec(),
+        ))
+    })
+    .clone()
 }

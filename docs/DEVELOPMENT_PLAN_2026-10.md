@@ -106,7 +106,7 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 
 | 编号 | 事项 | 出处 | 去向 |
 |---|---|---|---|
-| L1 | `assets/brand/` 图标迁移 | 阶段 1 | 挂到阶段 5 资源迁移，作为删除 `src-tauri` 的前置检查（迁移方案 `:507`） |
+| L1 | `assets/brand/` 图标迁移 | 阶段 1 | 挂到阶段 5 资源迁移，作为删除 `src-tauri` 的前置检查（迁移方案 `:507`）。2026-10-23 新标识（像素半圆）的母版与生成脚本已放进 `assets/brand/`，`src-tauri/icons` 与网站、文档站图标都由它生成；剩 GPUI 打包接入 |
 | L2 | 0.3.x 补丁发布与三平台 QA（关闭 G1） | 阶段 1 | 与 R1、S8 同期 |
 | L3 | Windows Store 实跑 | `docs/ROADMAP.md:225` | 阶段 4/5 |
 | L4 | ROADMAP P0.5 的 AVIF `maxThreads=1` 多核观测遗留项 | `docs/ROADMAP.md:101` | 阶段 4 测量时顺带 |
