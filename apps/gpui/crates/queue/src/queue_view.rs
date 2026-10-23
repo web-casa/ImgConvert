@@ -28,7 +28,7 @@ use gpui_kit::{
     TestSupportExt as _, Window, div, img, px, size,
 };
 use imgconvert_gpui_shared::command_error::format_command_error;
-use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::i18n::{tr, tr_count, tr_with};
 use imgconvert_gpui_shared::queue_model::{ImportFeedback, ThumbnailTicket};
 use imgconvert_gpui_shared::theme::ActiveGlass as _;
 use imgconvert_gpui_shared::{
@@ -308,14 +308,14 @@ impl QueueView {
                                 .id("queue-count")
                                 .test_support()
                                 .role(Role::Label)
-                                .aria_value(tr_with("queue.item_count", &[("count", &count)]))
+                                .aria_value(tr_count("queue.item_count", "count", count, &[]))
                                 .px_2()
                                 .py_0p5()
                                 .rounded(cx.theme().radius_full())
                                 .bg(glass.chip())
                                 .text_xs()
                                 .text_color(cx.theme().muted_foreground)
-                                .child(tr_with("queue.item_count", &[("count", &count)])),
+                                .child(tr_count("queue.item_count", "count", count, &[])),
                         )
                     }),
             )
@@ -388,11 +388,13 @@ impl QueueView {
             match queue.feedback() {
                 ImportFeedback::None => return None,
                 ImportFeedback::Added { added, skipped: 0 } => {
-                    tr_with("queue.import_added", &[("added", added)])
+                    tr_count("queue.import_added", "added", *added, &[])
                 }
-                ImportFeedback::Added { added, skipped } => tr_with(
+                ImportFeedback::Added { added, skipped } => tr_count(
                     "queue.import_added_skipped",
-                    &[("added", added), ("skipped", skipped)],
+                    "added",
+                    *added,
+                    &[("skipped", skipped)],
                 ),
                 ImportFeedback::Clipboard { added, issues } => {
                     let detail = issues
@@ -401,9 +403,11 @@ impl QueueView {
                         .collect::<Vec<_>>()
                         .join(" ");
                     if *added > 0 {
-                        tr_with(
+                        tr_count(
                             "queue.import_partial",
-                            &[("added", added), ("detail", &detail)],
+                            "added",
+                            *added,
+                            &[("detail", &detail)],
                         )
                     } else {
                         tr_with("queue.import_failed", &[("detail", &detail)])
@@ -417,7 +421,7 @@ impl QueueView {
                     cancelled,
                 } => {
                     let mut parts =
-                        vec![tr_with("queue.import_added", &[("added", added)]).to_string()];
+                        vec![tr_count("queue.import_added", "added", *added, &[]).to_string()];
                     if *skipped > 0 || *errors > 0 {
                         parts.push(
                             tr_with(
@@ -989,7 +993,7 @@ fn row_meta(item: &QueueItem) -> SharedString {
         parts.push(format!("{width} × {height}"));
     }
     if let Some(pages) = item.page_count {
-        parts.push(tr_with("queue.page_count", &[("count", &pages)]).to_string());
+        parts.push(tr_count("queue.page_count", "count", pages, &[]).to_string());
     }
     let folder = std::path::Path::new(item.path.as_ref())
         .parent()

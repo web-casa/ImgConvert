@@ -88,6 +88,26 @@ pub fn tr_with(key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> SharedStri
     SharedString::from(interpolate(&template, args))
 }
 
+/// [`tr_with`] for a message about `count` things, passed as the `name`
+/// placeholder: when `count` is one, the `<key>_one` variant is used, so
+/// English reads "1 file" rather than "1 files". Every such variant exists
+/// in both locales (Chinese has no plural, so its text is the same).
+pub fn tr_count(
+    key: &str,
+    name: &str,
+    count: usize,
+    args: &[(&str, &dyn std::fmt::Display)],
+) -> SharedString {
+    let key = if count == 1 {
+        format!("{key}_one")
+    } else {
+        key.to_owned()
+    };
+    let mut all: Vec<(&str, &dyn std::fmt::Display)> = vec![(name, &count)];
+    all.extend_from_slice(args);
+    tr_with(&key, &all)
+}
+
 fn interpolate(template: &str, args: &[(&str, &dyn std::fmt::Display)]) -> String {
     let mut text = String::with_capacity(template.len());
     let mut rest = template;
@@ -181,6 +201,84 @@ mod tests {
         set_locale(Locale::English);
         let text = tr_with("queue.item_count", &[("count", &42)]);
         assert_eq!(text.as_ref(), "42 items");
+    }
+
+    /// Key, count placeholder, other arguments, text for one, text for two.
+    type CountCase<'a> = (
+        &'a str,
+        &'a str,
+        &'a [(&'a str, &'a dyn std::fmt::Display)],
+        &'a str,
+        &'a str,
+    );
+
+    #[test]
+    fn counted_messages_use_the_singular_for_one() {
+        let _guard = LOCALE_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        set_locale(Locale::English);
+        let cases: [CountCase<'_>; 8] = [
+            ("queue.item_count", "count", &[], "1 item", "2 items"),
+            (
+                "workflow.ready",
+                "count",
+                &[],
+                "1 file ready",
+                "2 files ready",
+            ),
+            (
+                "queue.import_added",
+                "added",
+                &[],
+                "Added 1 file",
+                "Added 2 files",
+            ),
+            (
+                "queue.import_added_skipped",
+                "added",
+                &[("skipped", &3)],
+                "Added 1 file, skipped 3",
+                "Added 2 files, skipped 3",
+            ),
+            (
+                "queue.import_partial",
+                "added",
+                &[("detail", &"x")],
+                "Added 1 file. x",
+                "Added 2 files. x",
+            ),
+            ("queue.page_count", "count", &[], "1 page", "2 pages"),
+            (
+                "queue.clipboard_image_issues",
+                "count",
+                &[],
+                "1 image couldn’t be imported. Copy a supported image within the size limits and try again.",
+                "2 images couldn’t be imported. Copy a supported image within the size limits and try again.",
+            ),
+            (
+                "workflow.animation_summary",
+                "count",
+                &[("animated", &0), ("unknown", &1)],
+                "1 file · 0 animated (unsupported) · 1 unverified",
+                "2 files · 0 animated (unsupported) · 1 unverified",
+            ),
+        ];
+        for (key, name, args, one, two) in cases {
+            assert_eq!(tr_count(key, name, 1, args).as_ref(), one, "{key}");
+            assert_eq!(tr_count(key, name, 2, args).as_ref(), two, "{key}");
+        }
+        // Chinese has one form, and never falls back to English.
+        set_locale(Locale::SimplifiedChinese);
+        assert_eq!(
+            tr_count("queue.item_count", "count", 1, &[]).as_ref(),
+            "1 个文件"
+        );
+        assert_eq!(
+            tr_count("queue.import_added", "added", 1, &[]).as_ref(),
+            "已添加 1 个文件"
+        );
+        set_locale(Locale::English);
     }
 
     #[test]

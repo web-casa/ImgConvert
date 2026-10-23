@@ -30,7 +30,7 @@ use imgconvert_backend::convert::{self, ConvertOptions};
 use imgconvert_backend::settings::Settings;
 use imgconvert_gpui_shared::conversion::options_for_item;
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
-use imgconvert_gpui_shared::i18n::{tr, tr_with};
+use imgconvert_gpui_shared::i18n::{tr, tr_count, tr_with};
 use imgconvert_gpui_shared::progress_bridge::{self, StartError};
 use imgconvert_gpui_shared::tasks;
 use imgconvert_gpui_shared::theme::ActiveGlass as _;
@@ -567,13 +567,11 @@ impl Render for WorkflowPanel {
             .iter()
             .filter(|item| item.is_pending_conversion())
             .count();
-        let summary = tr_with(
+        let summary = tr_count(
             "workflow.animation_summary",
-            &[
-                ("count", &count),
-                ("animated", &animated),
-                ("unknown", &unknown),
-            ],
+            "count",
+            count,
+            &[("animated", &animated), ("unknown", &unknown)],
         );
         v_flex()
             .id("workflow-panel")
