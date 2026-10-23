@@ -7193,6 +7193,19 @@ impl Window {
         true
     }
 
+    /// The accessibility node the last frame built for the element whose id
+    /// path ends with `id`, as a platform adapter receives it. Panics when
+    /// several nodes' ids end with `id`.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn a11y_node_for_test(&self, id: impl Into<ElementId>) -> Option<accesskit::Node> {
+        let id = id.into();
+        match self.a11y.test_node_ids.get(&id).copied() {
+            Some(Some(node)) => self.a11y.test_node_actions.get(&node).cloned(),
+            Some(None) => panic!("several accessibility nodes have element id {id:?}"),
+            None => None,
+        }
+    }
+
     /// Toggles the inspector mode on this window.
     #[cfg(any(feature = "inspector", debug_assertions))]
     pub fn toggle_inspector(&mut self, cx: &mut App) {

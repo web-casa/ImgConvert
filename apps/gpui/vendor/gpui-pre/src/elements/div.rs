@@ -1435,6 +1435,15 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self
     }
 
+    /// Mark this element as a live region: assistive technology announces
+    /// its value when the value changes, or when the region turns live,
+    /// without moving focus to it. `Live::Polite` waits for the current
+    /// speech to finish; `Live::Assertive` interrupts it.
+    fn aria_live(mut self, live: accesskit::Live) -> Self {
+        self.interactivity().aria.live = Some(live);
+        self
+    }
+
     /// Set the minimum numeric value for this element.
     fn aria_min_numeric_value(mut self, value: f64) -> Self {
         self.interactivity().aria.min_numeric_value = Some(value);
@@ -2117,6 +2126,7 @@ pub(crate) struct AriaProperties {
     pub(crate) numeric_value_step: Option<f64>,
     pub(crate) value: Option<SharedString>,
     pub(crate) placeholder: Option<SharedString>,
+    pub(crate) live: Option<accesskit::Live>,
     pub(crate) orientation: Option<accesskit::Orientation>,
     pub(crate) level: Option<usize>,
     pub(crate) position_in_set: Option<usize>,
@@ -3602,6 +3612,9 @@ impl Interactivity {
         }
         if let Some(placeholder) = &self.aria.placeholder {
             node.set_placeholder(placeholder.to_string());
+        }
+        if let Some(live) = self.aria.live {
+            node.set_live(live);
         }
         if let Some(orientation) = self.aria.orientation {
             node.set_orientation(orientation);

@@ -4054,3 +4054,288 @@ fn a11y_press_opens_the_appearance_popover(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// What assistive technology would be told this frame: the one-frame
+/// announcement, if any, and the status line's value and live setting.
+fn announcements(
+    window: &mut gpui_kit::Window,
+    cx: &mut gpui_kit::App,
+) -> (
+    Option<(String, gpui_kit::Live)>,
+    Option<String>,
+    Option<gpui_kit::Live>,
+) {
+    window.render_frame(cx);
+    let announcement = window
+        .a11y_node_for_test("workflow-announcement")
+        .map(|node| {
+            let live = node.live().expect("an announcement is a live region");
+            let value = node.value().unwrap_or_default().to_owned();
+            // Windows and Linux adapters announce a live region by its name.
+            assert_eq!(node.label(), Some(value.as_str()));
+            (value, live)
+        });
+    let status = window
+        .a11y_node_for_test("workflow-status")
+        .expect("the status line is in the accessibility tree");
+    (
+        announcement,
+        status.value().map(str::to_owned),
+        status.live(),
+    )
+}
+
+/// Lets the frame after an announcement run, which takes it down again.
+fn next_frame(window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    window.simulate_next_frame(cx);
+    window.render_frame(cx);
+}
+
+/// A batch's start and end are announced once each, without moving to the
+/// status line; progress and later queue edits are not. The status line
+/// itself always reads what it shows.
+#[gpui_kit::test]
+fn batch_milestones_are_announced_once(cx: &mut TestAppContext) {
+    use gpui_kit::Live;
+    use imgconvert_backend::convert::BatchSummary;
+    use imgconvert_backend::progress::BatchId;
+
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let (batch, queue) = cx.update(|cx| {
+        let models = AppModels::global(cx);
+        (models.batch().clone(), models.queue().clone())
+    });
+    let jobs: Vec<gpui_kit::SharedString> = vec!["a".into(), "b".into()];
+    let summary = BatchSummary {
+        total: 2,
+        completed: 2,
+        skipped: 0,
+        failed: 0,
+        cancelled: false,
+    };
+    cx.update_window(handle, |_, window, cx| {
+        window.simulate_a11y_activation();
+        let (announcement, status, live) = announcements(window, cx);
+        assert_eq!(announcement, None, "what is already the case is not news");
+        assert_eq!(status.as_deref(), Some("Add files to begin"));
+        assert_eq!(live, None, "the status line itself is never live");
+    })
+    .unwrap();
+
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.begin(BatchId::new(41), jobs.clone());
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, status, live) = announcements(window, cx);
+        assert_eq!(
+            announcement,
+            Some(("Converting a batch of 2".to_owned(), Live::Polite))
+        );
+        assert_eq!(
+            status.as_deref(),
+            Some("0 of 2 done"),
+            "it reads what it shows"
+        );
+        assert_eq!(live, None);
+        next_frame(window, cx);
+        assert_eq!(announcements(window, cx).0, None, "announced once");
+    })
+    .unwrap();
+
+    // More renders while it runs announce nothing new.
+    cx.update(|cx| batch.update(cx, |_, cx| cx.notify()));
+    cx.update_window(handle, |_, window, cx| {
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.finish_without_summary(Some(summary.clone()));
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, status, _) = announcements(window, cx);
+        let (text, live) = announcement.expect("the finish is announced");
+        assert_eq!(live, Live::Polite);
+        assert_eq!(Some(text.clone()), status, "with the summary it shows");
+        assert!(text.starts_with("2 done"), "{text}");
+        next_frame(window, cx);
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+
+    // Editing the queue afterwards can change the summary; it is not news.
+    cx.update(|cx| queue.update(cx, |_, cx| cx.notify()));
+    cx.update_window(handle, |_, window, cx| {
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+
+    // The next batch with the same outcome is announced again; begun and
+    // finished between two renders, it still says that it started.
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.begin(BatchId::new(42), jobs.clone());
+            batch.finish_without_summary(Some(summary.clone()));
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, _, _) = announcements(window, cx);
+        let (text, _) = announcement.expect("a new batch's finish is news");
+        assert!(
+            text.starts_with("Converting a batch of 2 2 done"),
+            "its start, then the same outcome: {text}"
+        );
+        next_frame(window, cx);
+    })
+    .unwrap();
+
+    // Cancelling is announced once, then the cancelled outcome once.
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.begin(BatchId::new(43), jobs.clone());
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        assert!(announcements(window, cx).0.is_some());
+        next_frame(window, cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.request_cancel();
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, _, _) = announcements(window, cx);
+        assert_eq!(announcement, Some(("Cancelling…".to_owned(), Live::Polite)));
+        next_frame(window, cx);
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.finish_without_summary(Some(BatchSummary {
+                completed: 1,
+                cancelled: true,
+                ..summary.clone()
+            }));
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, status, _) = announcements(window, cx);
+        let (text, _) = announcement.expect("the cancelled outcome is announced");
+        assert_eq!(Some(text.clone()), status);
+        assert!(text.starts_with("Cancelled after 1 of 2"), "{text}");
+        next_frame(window, cx);
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+}
+
+/// A settings write failing is announced at once, and an error already
+/// standing does not silence a batch failing after it.
+#[gpui_kit::test]
+fn settings_and_batch_failures_are_both_announced(cx: &mut TestAppContext) {
+    use gpui_kit::Live;
+    use imgconvert_backend::progress::BatchId;
+
+    let _locale = locale_guard();
+    let dir = std::env::temp_dir().join(format!(
+        "imgconvert-gpui-announce-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    cx.update(|cx| {
+        let path = dir.join("settings.json");
+        services::init_with_settings(cx, move || SettingsModel::from_disk(path, AppLocale::EnUs));
+    });
+    let (handle, _workspace) = open_workspace(cx);
+    let (batch, settings) = cx.update(|cx| {
+        let models = AppModels::global(cx);
+        (models.batch().clone(), models.settings().clone())
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.simulate_a11y_activation();
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+
+    // A folder where the record belongs makes the next write fail, on every
+    // platform and whoever runs the test.
+    let blocker = dir.join("settings.json");
+    std::fs::create_dir_all(&blocker).unwrap();
+    let write = cx.update(|cx| {
+        settings.update(cx, |model, cx| {
+            model.update(cx, |s| s.reduce_motion = !s.reduce_motion);
+            model.flush(cx)
+        })
+    });
+    assert!(write.is_err(), "the write must fail");
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, status, _) = announcements(window, cx);
+        let (text, live) = announcement.expect("the failed write is announced");
+        assert_eq!(live, Live::Assertive);
+        assert_eq!(Some(text), status);
+        next_frame(window, cx);
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+
+    // With that error still standing, a batch failing is still announced.
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.begin(BatchId::new(43), vec!["a".into()]);
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, _, _) = announcements(window, cx);
+        assert!(announcement.is_some(), "the start is announced");
+        next_frame(window, cx);
+    })
+    .unwrap();
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.fail("disk full".into());
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let (announcement, _, _) = announcements(window, cx);
+        let (text, live) = announcement.expect("the failure is announced");
+        assert_eq!(live, Live::Assertive);
+        assert_eq!(text, "The batch conversion could not be completed.");
+        next_frame(window, cx);
+    })
+    .unwrap();
+
+    // The error clearing on a successful write is not announced.
+    std::fs::remove_dir_all(&blocker).unwrap();
+    let write = cx.update(|cx| {
+        settings.update(cx, |model, cx| {
+            model.update(cx, |s| s.reduce_motion = !s.reduce_motion);
+            model.flush(cx)
+        })
+    });
+    assert!(write.is_ok());
+    cx.update_window(handle, |_, window, cx| {
+        assert_eq!(announcements(window, cx).0, None);
+    })
+    .unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+}
