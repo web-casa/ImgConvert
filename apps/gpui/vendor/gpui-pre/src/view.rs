@@ -487,6 +487,10 @@ fn prepaint_view(
                     && element_state.cache_key.text_style == text_style
                     && !window.dirty_views.contains(&entity_id)
                     && !window.refreshing
+                    // A reused prepaint does not rebuild the subtree's
+                    // accessibility nodes, so they would vanish from the
+                    // tree while assistive technology is active.
+                    && !window.a11y.is_active()
                 {
                     let prepaint_start = window.prepaint_index();
                     window.reuse_prepaint(element_state.prepaint_range.clone());

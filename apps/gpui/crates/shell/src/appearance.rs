@@ -42,7 +42,11 @@ pub fn appearance_popover(cx: &App) -> Popover {
                 .rounded(pill)
                 .icon(IconName::Palette)
                 .accessibility_label(tr("settings.appearance_section"))
-                .tooltip(tr("settings.appearance_section")),
+                .tooltip(tr("settings.appearance_section"))
+                // The popover opens on its trigger's mouse-down. A click
+                // listener is what makes the button pressable by assistive
+                // technology, whose press GPUI performs as a pointer click.
+                .on_click(|_, _, _| {}),
         )
         .content(|_, window, cx| render_appearance(window, cx))
 }

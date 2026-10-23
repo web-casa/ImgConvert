@@ -210,18 +210,18 @@
              let accepts_text_input = input_handler.accepts_text_input(self, cx);
              self.platform_window.set_input_handler(input_handler);
              accepts_text_input
-@@ -3441,6 +3521,11 @@
-         // schedule another frame here to render the new focus state and dispatch the
-         // resulting focus events.
+@@ -3443,6 +3523,11 @@
          if self.focus != focus_before_listeners {
-+            self.refresh();
-+        }
+             self.refresh();
+         }
 +        // Cleanup happened after paint; refresh only after leaving draw phases.
 +        #[cfg(target_os = "macos")]
 +        if text_input_cleanup {
-             self.refresh();
-         }
++            self.refresh();
++        }
          self.needs_present.set(true);
+ 
+         #[cfg(feature = "profiler")]
 @@ -5260,9 +5345,10 @@
  
          if focus_handle.is_focused(self) {
@@ -236,6 +236,210 @@
          }
      }
  
+@@ -6915,25 +7001,9 @@
+ 
+         // Fall back to built-in action handling.
+         match request.action {
+-            accesskit::Action::Click => {
+-                if let Some(bounds) = self.a11y.node_bounds.get(&request.target_node).copied() {
+-                    let center = bounds.center();
+-                    let mouse_down = PlatformInput::MouseDown(crate::MouseDownEvent {
+-                        button: MouseButton::Left,
+-                        position: center,
+-                        modifiers: Modifiers::default(),
+-                        click_count: 1,
+-                        first_mouse: false,
+-                    });
+-                    let mouse_up = PlatformInput::MouseUp(MouseUpEvent {
+-                        button: MouseButton::Left,
+-                        position: center,
+-                        modifiers: Modifiers::default(),
+-                        click_count: 1,
+-                    });
+-                    self.dispatch_event(mouse_down, cx);
+-                    self.dispatch_event(mouse_up, cx);
+-                }
++            accesskit::Action::Click => self.a11y_click(request.target_node, true, cx),
++            accesskit::Action::ScrollIntoView => {
++                self.a11y_scroll_into_view(request.target_node);
+             }
+             accesskit::Action::Focus => {
+                 if let Some(focus_id) = self.a11y.focus_ids.get(&request.target_node).copied()
+@@ -6955,6 +7025,174 @@
+         }
+     }
+ 
++    /// Clicks a node as a pointer would, at a point of its visible part where
++    /// the node's own hitbox receives the click and no other element above
++    /// it acts on a pointer press: the middle first, then the rest of a
++    /// three-by-three grid. A node scrolled out of its container's viewport is scrolled
++    /// into view and, when `retry` is set, clicked two frames later: the
++    /// first frame applies the scroll, the second hit-tests the new layout.
++    /// Otherwise nothing is clicked, because a click at the node's stale or
++    /// covered position would activate whatever is drawn there.
++    fn a11y_click(&mut self, node: accesskit::NodeId, retry: bool, cx: &mut App) {
++        let Some(bounds) = self.a11y.node_bounds.get(&node).copied() else {
++            return;
++        };
++        let visible = match self.a11y.node_clips.get(&node) {
++            Some(clip) => bounds.intersect(clip),
++            None => bounds,
++        };
++        let reaches = |position: Point<Pixels>| match self.a11y.node_hitboxes.get(&node) {
++            Some(hitbox) => {
++                let hit_test = self.rendered_frame.hit_test(position);
++                let hovered = &hit_test.ids[..hit_test.hover_hitbox_count];
++                hovered.iter().position(|id| id == hitbox).is_some_and(|index| {
++                    !hovered[..index]
++                        .iter()
++                        .any(|id| self.a11y.pointer_hitboxes.contains(id))
++                })
++            }
++            None => true,
++        };
++        let position = (!visible.is_empty())
++            .then(|| {
++                [
++                    (0.5, 0.5),
++                    (0.25, 0.5),
++                    (0.75, 0.5),
++                    (0.5, 0.25),
++                    (0.5, 0.75),
++                    (0.25, 0.25),
++                    (0.75, 0.25),
++                    (0.25, 0.75),
++                    (0.75, 0.75),
++                ]
++                .map(
++                    |(x, y)| {
++                        visible.origin
++                            + point(visible.size.width * x, visible.size.height * y)
++                    },
++                )
++            })
++            .and_then(|points| points.into_iter().find(|position| reaches(*position)));
++        if let Some(position) = position {
++            let mouse_down = PlatformInput::MouseDown(crate::MouseDownEvent {
++                button: MouseButton::Left,
++                position,
++                modifiers: Modifiers::default(),
++                click_count: 1,
++                first_mouse: false,
++            });
++            let mouse_up = PlatformInput::MouseUp(MouseUpEvent {
++                button: MouseButton::Left,
++                position,
++                modifiers: Modifiers::default(),
++                click_count: 1,
++            });
++            self.dispatch_event(mouse_down, cx);
++            self.dispatch_event(mouse_up, cx);
++        } else if retry && self.a11y_scroll_into_view(node) {
++            self.on_next_frame(move |window, _| {
++                window.on_next_frame(move |window, cx| window.a11y_click(node, false, cx));
++            });
++        } else {
++            log::debug!("a11y: not clicking {node:?}; no pointer could reach it");
++        }
++    }
++
++    /// Scrolls the containers enclosing `node`, innermost first, until the
++    /// node lies inside each viewport (its start edge, when it is larger than
++    /// the viewport). Returns whether any container moved.
++    fn a11y_scroll_into_view(&mut self, node: accesskit::NodeId) -> bool {
++        fn delta(start: Pixels, end: Pixels, view_start: Pixels, view_end: Pixels) -> Pixels {
++            if start < view_start || end - start > view_end - view_start {
++                view_start - start
++            } else if end > view_end {
++                view_end - end
++            } else {
++                px(0.)
++            }
++        }
++
++        let (Some(mut target), Some(containers)) = (
++            self.a11y.node_bounds.get(&node).copied(),
++            self.a11y.node_scroll_containers.get(&node).cloned(),
++        ) else {
++            return false;
++        };
++        let mut moved = false;
++        for container in containers.iter().rev() {
++            let view = container.viewport;
++            let mut offset = container.offset.borrow_mut();
++            let previous = *offset;
++            if container.scrolls.x {
++                offset.x = (offset.x
++                    + delta(target.left(), target.right(), view.left(), view.right()))
++                .clamp(-container.max_offset.x, px(0.));
++            }
++            if container.scrolls.y {
++                offset.y = (offset.y
++                    + delta(target.top(), target.bottom(), view.top(), view.bottom()))
++                .clamp(-container.max_offset.y, px(0.));
++            }
++            let applied = *offset - previous;
++            if applied != Point::default() {
++                moved = true;
++                target = target + applied;
++            }
++        }
++        if moved {
++            self.refresh();
++        }
++        moved
++    }
++
++    /// Activates accessibility as assistive technology would; the next frame
++    /// builds the tree. The test platform has no accessibility adapter.
++    #[cfg(any(test, feature = "test-support"))]
++    pub fn simulate_a11y_activation(&mut self) {
++        self.a11y.simulate_activation();
++        self.refresh();
++    }
++
++    /// Requests `action` on the accessibility node of the element whose id
++    /// path ends with `id`, as assistive technology would. Returns whether
++    /// the request was dispatched, not whether it had an effect: `false`
++    /// when the last frame had no such node or the node does not declare
++    /// the action (a platform adapter would not offer it). Panics when
++    /// several nodes' ids end with `id`, rather than picking one.
++    #[cfg(any(test, feature = "test-support"))]
++    pub fn simulate_a11y_action(
++        &mut self,
++        id: impl Into<ElementId>,
++        action: accesskit::Action,
++        cx: &mut App,
++    ) -> bool {
++        let id = id.into();
++        let node = match self.a11y.test_node_ids.get(&id).copied() {
++            Some(Some(node)) => node,
++            Some(None) => panic!("several accessibility nodes have element id {id:?}"),
++            None => return false,
++        };
++        let declared = self
++            .a11y
++            .test_node_actions
++            .get(&node)
++            .is_some_and(|declared| declared.supports_action(action));
++        if !declared {
++            return false;
++        }
++        self.handle_a11y_action(
++            accesskit::ActionRequest {
++                action,
++                target_tree: accesskit::TreeId::ROOT,
++                target_node: node,
++                data: None,
++            },
++            cx,
++        );
++        true
++    }
++
+     /// Toggles the inspector mode on this window.
+     #[cfg(any(feature = "inspector", debug_assertions))]
+     pub fn toggle_inspector(&mut self, cx: &mut App) {
 --- a/src/app/test_context.rs
 +++ b/src/app/test_context.rs
 @@ -614,6 +614,30 @@
@@ -284,3 +488,270 @@
 +        }
          self.order.insert_or_replace(order, ());
      }
+--- a/src/element.rs
++++ b/src/element.rs
+@@ -378,7 +378,24 @@
+                                 y1: ((bounds.origin.y.0 + bounds.size.height.0) * scale) as f64,
+                             });
+                             self.element.write_a11y_info(&mut node);
++                            if let Some(containers) = window.a11y.scroll_chain() {
++                                node.add_action(accesskit::Action::ScrollIntoView);
++                                window.a11y.node_scroll_containers.insert(node_id, containers);
++                            }
++                            let clip = window.content_mask().bounds;
++                            window.a11y.node_clips.insert(node_id, clip);
+                             window.a11y.node_bounds.insert(node_id, bounds);
++                            #[cfg(any(test, feature = "test-support"))]
++                            if let Some(element_id) = global_id.0.last() {
++                                window
++                                    .a11y
++                                    .test_node_ids
++                                    .entry(element_id.clone())
++                                    .and_modify(|node| *node = None)
++                                    .or_insert(Some(node_id));
++                            }
++                            #[cfg(any(test, feature = "test-support"))]
++                            window.a11y.test_node_actions.insert(node_id, node.clone());
+                             pushed_a11y_node = window.a11y.nodes.push(node_id, node);
+                             #[cfg(debug_assertions)]
+                             if pushed_a11y_node {
+--- a/src/elements/div.rs
++++ b/src/elements/div.rs
+@@ -2392,10 +2392,44 @@
+                             } else {
+                                 None
+                             };
++                            let a11y_active = window.a11y.is_active();
++                            if a11y_active && let Some(hitbox) = &hitbox {
++                                if let Some(global_id) = global_id {
++                                    window
++                                        .a11y
++                                        .set_node_hitbox(global_id.accesskit_node_id(), hitbox.id);
++                                }
++                                if !self.click_listeners.is_empty()
++                                    || !self.mouse_down_listeners.is_empty()
++                                    || !self.mouse_up_listeners.is_empty()
++                                {
++                                    window.a11y.pointer_hitboxes.insert(hitbox.id);
++                                }
++                            }
+ 
+-                            let scroll_offset =
++                            let (scroll_offset, max_offset) =
+                                 self.clamp_scroll_position(bounds, &style, window, cx);
++                            // Children prepainted inside `f` record this
++                            // container so assistive technology can scroll
++                            // them into view.
++                            let scroll_container = self
++                                .scroll_offset
++                                .clone()
++                                .filter(|_| a11y_active)
++                                .map(|offset| crate::window::a11y::A11yScrollContainer {
++                                    offset,
++                                    viewport: window.content_mask().bounds,
++                                    max_offset,
++                                    scrolls: style.overflow.map(|overflow| overflow == Overflow::Scroll),
++                                });
++                            let pushed_container = scroll_container.is_some();
++                            if let Some(container) = scroll_container {
++                                window.a11y.push_scroll_container(container);
++                            }
+                             let result = f(&style, scroll_offset, hitbox, window, cx);
++                            if pushed_container {
++                                window.a11y.pop_scroll_container();
++                            }
+                             (result, element_state)
+                         },
+                     )
+@@ -2431,13 +2465,15 @@
+             || window.is_inspector_picking(cx)
+     }
+ 
++    /// Clamps the scroll offset to the content; returns the offset and the
++    /// maximum scroll distance on each axis.
+     fn clamp_scroll_position(
+         &self,
+         bounds: Bounds<Pixels>,
+         style: &Style,
+         window: &mut Window,
+         _cx: &mut App,
+-    ) -> Point<Pixels> {
++    ) -> (Point<Pixels>, Point<Pixels>) {
+         fn round_to_two_decimals(pixels: Pixels) -> Pixels {
+             const ROUNDING_FACTOR: f32 = 100.0;
+             (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
+@@ -2490,9 +2526,9 @@
+                 scroll_handle_state.bounds = bounds;
+             }
+ 
+-            *scroll_offset
++            (*scroll_offset, scroll_max)
+         } else {
+-            Point::default()
++            (Point::default(), Point::default())
+         }
+     }
+ 
+--- a/src/window/a11y.rs
++++ b/src/window/a11y.rs
+@@ -96,6 +96,14 @@
+ //!
+ //! These are cleared at the start of a frame, and re-populated during painting.
+ //!
++//! Nodes without a listener for the requested action fall back to built-in
++//! handling. `Click` synthesizes a mouse click, so it first checks that the
++//! node's own hitbox would receive one at the chosen point: a node scrolled
++//! out of its container's viewport, or covered by another element, is
++//! scrolled into view and clicked on a later frame instead of clicking
++//! whatever happens to be drawn at its old position. `ScrollIntoView` moves
++//! the enclosing scroll containers recorded in [`A11y::node_scroll_containers`].
++//!
+ //! [`NodeId`]: accesskit::NodeId
+ 
+ use crate::*;
+@@ -106,7 +114,9 @@
+ use accesskit::{Action, NodeId, TreeUpdate};
+ use collections::{FxHashMap, FxHashSet};
+ use smallvec::SmallVec;
++use std::cell::RefCell;
+ use std::hash::{Hash, Hasher};
++use std::rc::Rc;
+ use std::sync::{
+     Arc,
+     atomic::{AtomicBool, Ordering},
+@@ -115,6 +125,18 @@
+ /// The fixed AccessKit node ID used for the root of every window's a11y tree.
+ pub(crate) const ROOT_NODE_ID: NodeId = NodeId(0);
+ 
++/// A scroll container that encloses accessibility nodes: the part of the
++/// window it shows, its live scroll offset and range, and the axes it
++/// scrolls on (an `overflow_y_scroll` container never moves sideways, even
++/// when its content is wider).
++#[derive(Clone)]
++pub(crate) struct A11yScrollContainer {
++    pub(crate) offset: Rc<RefCell<Point<Pixels>>>,
++    pub(crate) viewport: Bounds<Pixels>,
++    pub(crate) max_offset: Point<Pixels>,
++    pub(crate) scrolls: Point<bool>,
++}
++
+ /// A listener for an accessibility action on a specific node.
+ pub(crate) type A11yActionListener =
+     Box<dyn FnMut(Option<&accesskit::ActionData>, &mut Window, &mut App) + 'static>;
+@@ -148,6 +170,30 @@
+     pub(crate) nodes: A11yNodeBuilder,
+     pub(crate) focus_ids: FxHashMap<NodeId, FocusId>,
+     pub(crate) node_bounds: FxHashMap<NodeId, Bounds<Pixels>>,
++    /// The content mask in effect where each node was prepainted: the part
++    /// of the window its ancestors let it draw into.
++    pub(crate) node_clips: FxHashMap<NodeId, Bounds<Pixels>>,
++    /// The hitbox each node's own element inserted, if any.
++    pub(crate) node_hitboxes: FxHashMap<NodeId, HitboxId>,
++    /// Hitboxes of elements that act on a pointer press (click, mouse-down
++    /// or mouse-up listeners), accessible or not; a press is not delivered
++    /// where one of them covers the target, since it could take the press.
++    pub(crate) pointer_hitboxes: FxHashSet<HitboxId>,
++    /// The scroll containers enclosing each node, outermost first. Nodes in
++    /// the same containers share one chain.
++    pub(crate) node_scroll_containers: FxHashMap<NodeId, Rc<[A11yScrollContainer]>>,
++    /// The scroll containers enclosing the element being prepainted, and a
++    /// shared snapshot of them for the nodes pushed there.
++    scroll_stack: Vec<A11yScrollContainer>,
++    scroll_chain: Option<Rc<[A11yScrollContainer]>>,
++    /// Each node by the last segment of its element id, so tests can request
++    /// actions the way assistive technology does; `None` marks an id that
++    /// more than one node ended with.
++    #[cfg(any(test, feature = "test-support"))]
++    pub(crate) test_node_ids: FxHashMap<ElementId, Option<NodeId>>,
++    /// The actions each node declared, as a platform adapter sees them.
++    #[cfg(any(test, feature = "test-support"))]
++    pub(crate) test_node_actions: FxHashMap<NodeId, accesskit::Node>,
+     pub(crate) action_listeners: FxHashMap<NodeId, Vec<(Action, A11yActionListener)>>,
+     /// The window's title, used to label the root node so assistive
+     /// technology can tell windows apart.
+@@ -176,6 +222,16 @@
+             nodes: A11yNodeBuilder::new(),
+             focus_ids: FxHashMap::default(),
+             node_bounds: FxHashMap::default(),
++            node_clips: FxHashMap::default(),
++            node_hitboxes: FxHashMap::default(),
++            pointer_hitboxes: FxHashSet::default(),
++            node_scroll_containers: FxHashMap::default(),
++            scroll_stack: Vec::new(),
++            scroll_chain: None,
++            #[cfg(any(test, feature = "test-support"))]
++            test_node_ids: FxHashMap::default(),
++            #[cfg(any(test, feature = "test-support"))]
++            test_node_actions: FxHashMap::default(),
+             action_listeners: FxHashMap::default(),
+             window_title,
+             last_focus_without_node: None,
+@@ -221,6 +277,38 @@
+         self.active_this_frame
+     }
+ 
++    /// Activates accessibility as if assistive technology had requested it.
++    /// The test platform has no adapter to do so.
++    #[cfg(any(test, feature = "test-support"))]
++    pub(crate) fn simulate_activation(&mut self) {
++        self.active_flag.store(true, Ordering::SeqCst);
++    }
++
++    /// Enters a scroll container for the elements prepainted inside it.
++    pub(crate) fn push_scroll_container(&mut self, container: A11yScrollContainer) {
++        self.scroll_stack.push(container);
++        self.scroll_chain = Some(self.scroll_stack.as_slice().into());
++    }
++
++    /// Leaves the innermost scroll container.
++    pub(crate) fn pop_scroll_container(&mut self) {
++        self.scroll_stack.pop();
++        self.scroll_chain =
++            (!self.scroll_stack.is_empty()).then(|| self.scroll_stack.as_slice().into());
++    }
++
++    /// The scroll containers enclosing the element being prepainted.
++    pub(crate) fn scroll_chain(&self) -> Option<Rc<[A11yScrollContainer]>> {
++        self.scroll_chain.clone()
++    }
++
++    /// Records the hitbox that a node's own element inserted.
++    pub(crate) fn set_node_hitbox(&mut self, node_id: NodeId, hitbox: HitboxId) {
++        if self.nodes.has_node(node_id) {
++            self.node_hitboxes.insert(node_id, hitbox);
++        }
++    }
++
+     pub(crate) fn set_focusable(&mut self, node_id: NodeId, focus_id: FocusId) {
+         self.focus_ids.insert(node_id, focus_id);
+     }
+@@ -275,6 +363,16 @@
+     pub(crate) fn begin_frame(&mut self) {
+         self.focus_ids.clear();
+         self.node_bounds.clear();
++        self.node_clips.clear();
++        self.node_hitboxes.clear();
++        self.pointer_hitboxes.clear();
++        self.node_scroll_containers.clear();
++        self.scroll_stack.clear();
++        self.scroll_chain = None;
++        #[cfg(any(test, feature = "test-support"))]
++        self.test_node_ids.clear();
++        #[cfg(any(test, feature = "test-support"))]
++        self.test_node_actions.clear();
+         self.action_listeners.clear();
+         self.nodes.begin_frame(self.window_title.as_ref());
+     }
+--- a/src/view.rs
++++ b/src/view.rs
+@@ -487,6 +487,10 @@
+                     && element_state.cache_key.text_style == text_style
+                     && !window.dirty_views.contains(&entity_id)
+                     && !window.refreshing
++                    // A reused prepaint does not rebuild the subtree's
++                    // accessibility nodes, so they would vanish from the
++                    // tree while assistive technology is active.
++                    && !window.a11y.is_active()
+                 {
+                     let prepaint_start = window.prepaint_index();
+                     window.reuse_prepaint(element_state.prepaint_range.clone());
