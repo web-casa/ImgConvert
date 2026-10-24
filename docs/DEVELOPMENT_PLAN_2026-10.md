@@ -98,9 +98,9 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 | G3-1 | Developer ID 签名 + 公证 + staple，x64 与 arm64 各一 | **已完成**（2026-10-24）：`gpui-macos-dmg.yml` run 40053216932，arm64/x64 DMG 均 Developer ID 签名、公证并 staple 验证；arm64 在 macOS 13.6 虚拟机经 Gatekeeper 放行并启动 |
 | G3-2 | MAS 构建脚本迁移、App Store Connect 校验、TestFlight 实机沙盒验收（含重启、拒绝、取消、写权限授权路径） | **部分完成**：`gpui-macos-mas.yml` run 40057440166 通用 PKG 通过 App Store Connect 校验（仅校验，未上传）；TestFlight 上传与实机沙盒验收待用户决定 |
 | G3-3 | Kit UI 测试覆盖每个对话框与主流程；像素敏感性测试接入 macOS 与 Linux CI；拖放/取消/淘汰路径的无头测试 | 可立即执行 |
-| G3-4 | 真实 GUI 自动化在 macOS 跑通 | **已完成**：`gpui-macos-gui-smoke.yml` run 40059789780 在 arm64/x64 托管 runner 启动真实应用、导入并转换，按 PID 核对窗口、精确核对 5 个输出 |
+| G3-4 | 真实 GUI 自动化在 macOS 跑通 | **已完成**：`gpui-macos-gui-smoke.yml` run 40059789780（最终候选 `8a2744e` 复跑 run 40085939946 通过） 在 arm64/x64 托管 runner 启动真实应用、导入并转换，按 PID 核对窗口、精确核对 5 个输出 |
 | G3-5 | 对完整候选重跑阶段 0 测量并与基线比较，不劣于基线 | **已完成**（2026-10-24）：main `6fb4487` 在同一虚拟机全部场景有效，各项不劣于 Tauri 参照（用户批准以虚拟机代替裸机），见 `GPUI_BASELINE.md` §6.1 |
-| G3-6 | `docs/RELEASE_QA.md` macOS 条目逐项通过 | 等 G3-1/2 |
+| G3-6 | `docs/RELEASE_QA.md` macOS 条目逐项通过 | **部分完成**（2026-10-24）：main `8a2744e` 的两架构公证 DMG、MAS 校验、图片语料、arm64 安装/升级（保留 0.3.1 设置）/卸载均通过，见 `GPUI_G3_MACOS_QA.md`；剩 TestFlight 实机验收与 x64 实机生命周期 |
 
 ### 2.4 更早阶段遗留
 
