@@ -9,6 +9,10 @@
 # Mac App Store mode also reads GPUI_MAS_INSTALLER_IDENTITY, APPLE_TEAM_ID and
 # GPUI_MAS_PROFILE (the provisioning profile to embed).
 set -euo pipefail
+trap 'echo "package-gpui-macos.sh: failed at line $LINENO" >&2' ERR
+# Callers capture stdout for the artifact path: everything the tools print
+# goes to stderr, and only the final path is written to the saved stdout.
+exec 3>&1 1>&2
 
 binary=$1
 out=$2
@@ -89,17 +93,17 @@ if [ "$mas" = 1 ]; then
   # The sandbox template plus the identifiers the profile grants.
   entitlements=$(mktemp)
   cp "$root/apps/gpui/packaging/entitlements.macos.mas.plist" "$entitlements"
-  plutil -insert com.apple.application-identifier -string "$APPLE_TEAM_ID.com.ivmm.imgconvert" "$entitlements"
-  plutil -insert com.apple.developer.team-identifier -string "$APPLE_TEAM_ID" "$entitlements"
+  # PlistBuddy key paths use ':', so the dotted keys stay single keys.
+  /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $APPLE_TEAM_ID.com.ivmm.imgconvert" "$entitlements"
+  /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $APPLE_TEAM_ID" "$entitlements"
   codesign --force --sign "$identity" --options runtime --timestamp --entitlements "$entitlements" "$app"
   rm -f "$entitlements"
   codesign --verify --deep --strict --verbose=2 "$app"
   pkg="$out/ImgConvert_${short_version}_mas.pkg"
   rm -f "$pkg"
-  # Only the package path goes to stdout: callers capture it.
-  xcrun productbuild --sign "$GPUI_MAS_INSTALLER_IDENTITY" --component "$app" /Applications "$pkg" >&2
+  xcrun productbuild --sign "$GPUI_MAS_INSTALLER_IDENTITY" --component "$app" /Applications "$pkg"
   echo "$short_version" > "$out/VERSION"
-  echo "$pkg"
+  echo "$pkg" >&3
   exit 0
 fi
 
@@ -123,4 +127,4 @@ if [ "$identity" != "-" ]; then
   codesign --force --sign "$identity" --timestamp "$dmg"
 fi
 echo "$short_version" > "$out/VERSION"
-echo "$dmg"
+echo "$dmg" >&3
