@@ -5152,3 +5152,37 @@ fn disabled_commands_are_disabled_for_assistive_technology(cx: &mut TestAppConte
     })
     .unwrap();
 }
+
+#[gpui_kit::test]
+fn a_running_batch_holds_off_idle_sleep_until_it_settles(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (_handle, workspace) = open_workspace(cx);
+    let dir = std::env::temp_dir().join(format!("imgconvert-idle-sleep-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    std::fs::write(dir.join("a.png"), one_by_one_png()).unwrap();
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |settings| {
+                    settings.format = "png".into();
+                    settings.result_cache = false;
+                })
+            });
+        imgconvert_gpui_queue::import::import_paths(vec![dir.join("a.png")], cx);
+    });
+    wait_for_import(cx);
+    assert_eq!(cx.active_idle_sleep_preventions(), 0);
+    let workflow = cx.update(|cx| workspace.read(cx).workflow().clone());
+    cx.update(|cx| {
+        workflow.update(cx, |panel, cx| {
+            panel.start_with_output_dir(dir.join("out"), None, cx);
+        });
+    });
+    assert_eq!(cx.active_idle_sleep_preventions(), 1);
+    wait_for_batch_to_settle(cx);
+    cx.run_until_parked();
+    assert_eq!(cx.active_idle_sleep_preventions(), 0);
+    std::fs::remove_dir_all(dir).ok();
+}
