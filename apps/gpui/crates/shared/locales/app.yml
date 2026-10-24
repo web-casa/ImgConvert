@@ -11,6 +11,18 @@ app.language_title:
 app.quit:
   en: Quit ImgConvert
   zh-CN: 退出 ImgConvert
+app.quit_confirm_title:
+  en: "Stop converting and quit?"
+  zh-CN: "停止转换并退出？"
+app.quit_confirm_body:
+  en: "Files already converted are kept. The remaining files are not converted."
+  zh-CN: "已转换完成的文件会保留，其余文件不会再转换。"
+app.quit_confirm_stop:
+  en: "Stop and Quit"
+  zh-CN: "停止并退出"
+app.quit_confirm_keep:
+  en: "Keep Converting"
+  zh-CN: "继续转换"
 app.open_files:
   en: Open…
   zh-CN: 打开…

@@ -36,6 +36,8 @@ pub enum StartError {
     Empty,
     #[error("the previous batch is still finishing")]
     Settling,
+    #[error("the application is quitting")]
+    Quitting,
     #[error(transparent)]
     Batch(#[from] BatchError),
 }
@@ -55,6 +57,9 @@ pub fn start_batch(
     concurrency: Option<usize>,
     cx: &mut App,
 ) -> Result<BatchId, StartError> {
+    if crate::lifecycle::is_quitting(cx) {
+        return Err(StartError::Quitting);
+    }
     if jobs.is_empty() || jobs.len() != options.len() {
         return Err(StartError::Empty);
     }

@@ -17,7 +17,7 @@ use gpui_kit::{
 use imgconvert_backend::instance_lock::InstanceInfo;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 
-use crate::Quit;
+use crate::{Quit, lifecycle};
 
 pub struct BlockedView {
     /// `None` when the marker could not be read (Windows blocks readers of
@@ -97,7 +97,10 @@ pub fn open_blocked_window(
             ..Default::default()
         },
         cx,
-        |_, cx| cx.new(|cx| BlockedView::new(other, cx)),
+        |window, cx| {
+            window.on_window_should_close(cx, |_, cx| lifecycle::window_should_close(cx));
+            cx.new(|cx| BlockedView::new(other, cx))
+        },
     )?;
     Ok(handle)
 }

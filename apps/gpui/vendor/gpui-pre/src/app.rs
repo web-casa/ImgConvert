@@ -395,6 +395,24 @@ impl MissingGlyphCallbackSlot {
     }
 }
 
+/// Why the platform asks to terminate the application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminateReason {
+    /// The user quit the application (for example from the Dock menu).
+    UserQuit,
+    /// The session ends: log out, restart or shut down.
+    SessionEnd,
+}
+
+/// The application's answer to a termination request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminateReply {
+    /// Terminate now.
+    Now,
+    /// Keep running; the application quits later by itself if it wants to.
+    Cancel,
+}
+
 /// Defines when the application should automatically quit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum QuitMode {
@@ -2589,6 +2607,26 @@ impl App {
     /// Get a map from an action name to the documentation.
     pub fn action_documentation(&self) -> &HashMap<&'static str, &'static str> {
         self.actions.documentation()
+    }
+
+    /// Registers the handler asked before the platform terminates the
+    /// application (macOS `applicationShouldTerminate:`, which also runs for
+    /// [`App::quit`]). If the application state is busy the answer is
+    /// [`TerminateReply::Now`].
+    pub fn on_should_terminate(
+        &self,
+        mut handler: impl FnMut(TerminateReason, &mut App) -> TerminateReply + 'static,
+    ) {
+        let this = self.this.clone();
+        self.platform.on_should_terminate(Box::new(move |reason| {
+            let Some(app) = this.upgrade() else {
+                return TerminateReply::Now;
+            };
+            match app.try_borrow_mut() {
+                Ok(mut cx) => handler(reason, &mut cx),
+                Err(_) => TerminateReply::Now,
+            }
+        }));
     }
 
     /// Register a callback to be invoked when the application is about to quit.

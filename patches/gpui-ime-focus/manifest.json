@@ -4,10 +4,10 @@
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "6e27bacff995b731ce4da454f91aa5e085caa0e478aeaa8e6fdbfda9ec7ae1cd",
+      "patch_sha256": "2171a1caa7958464a53f6619d812e43fde0e7cda18ff36cb32182894f6bca59d",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
-        "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
+        "src/platform.rs": "5df225cb6f6f3cd499ba73786e01735d1791ec496d4058901fa34d515137c263",
         "src/window.rs": "118c7ba2750470dc5410094c006a1ab73d4575e2f6b880aa581212038ec6ca41",
         "src/app/test_context.rs": "d7a2a41a93fe276ab0959085ea2468fbce66ac051035292032835e9ff064c4b1",
         "src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1",
@@ -15,15 +15,17 @@
         "src/elements/div.rs": "d63603c0173d6418359f95118cc8f0e571f829e07055e1ae2744620d1527d233",
         "src/window/a11y.rs": "41fc2b84c80fde64a242530ec144dadeb98af0e78c99f570aead2fa2d04ffacb",
         "src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
-        "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823"
+        "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823",
+        "src/app.rs": "b7b7934647efcd0276735fbce30cdfbef8d71d31a9320d1c2f3103899e0fde87"
       }
     },
     "gpui-pre-macos": {
       "version": "0.3.8",
       "archive_sha256": "0d756813ff1cd741a502af60fd18869e0677795936d7349642b41c49f43120c0",
-      "patch_sha256": "3b42cd67de7dbf52b524ea9674e8f37809728c1a830158f503b4260c9e606c7b",
+      "patch_sha256": "80643287aadb5254ffbc9f42757285d1246b39c848a73d605166856ac34aea5a",
       "patched_files": {
-        "src/window.rs": "d1c6f20bef9b345591674a11acf2f97d9d62fdb0344f3ac0ab0a60fadf282134"
+        "src/window.rs": "d1c6f20bef9b345591674a11acf2f97d9d62fdb0344f3ac0ab0a60fadf282134",
+        "src/platform.rs": "f8e3871dc351b9c04f338f0d3843dfb13d691918218301b719027c48cac18623"
       }
     },
     "gpui-base": {

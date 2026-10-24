@@ -7,6 +7,14 @@ app.language_title:
   zh-TW: 語言
 app.quit:
   zh-TW: 結束 ImgConvert
+app.quit_confirm_title:
+  zh-TW: "停止轉換並結束？"
+app.quit_confirm_body:
+  zh-TW: "已轉換完成的檔案會保留，其餘檔案不會再轉換。"
+app.quit_confirm_stop:
+  zh-TW: "停止並結束"
+app.quit_confirm_keep:
+  zh-TW: "繼續轉換"
 app.open_files:
   zh-TW: 開啟…
 app.instance_blocked_title:
