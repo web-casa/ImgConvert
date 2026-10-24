@@ -3831,6 +3831,7 @@ dependencies = [
  "imgconvert-gpui-queue",
  "imgconvert-gpui-shared",
  "imgconvert-gpui-workflow",
+ "serde",
  "serde_json",
 ]
 
