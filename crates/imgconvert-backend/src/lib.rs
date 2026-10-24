@@ -25,6 +25,7 @@ pub mod progress;
 pub mod result_cache;
 pub mod service;
 pub mod thumbnail;
+pub mod write_journal;
 
 /// Settings persistence, per-channel paths and the single-instance marker
 /// live in the platform crate; shells reach them through this facade.

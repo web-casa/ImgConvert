@@ -3,8 +3,8 @@
 
 use gpui_kit::Global;
 use imgconvert_backend::instance_lock::{self, AcquireOutcome, InstanceInfo, InstanceLock};
-use imgconvert_backend::paths;
 use imgconvert_backend::settings::Settings;
+use imgconvert_backend::{paths, write_journal};
 use imgconvert_gpui::{init_app, open_blocked_window, open_main_window, probe_driver};
 use imgconvert_gpui_shared::i18n::Locale;
 use imgconvert_gpui_shared::{SettingsModel, perf_probe, services};
@@ -56,6 +56,11 @@ fn main() {
                 return;
             }
         };
+        // Before any conversion and while holding the marker, so every
+        // journal found belongs to a process that has ended.
+        if instance_lock.is_some() {
+            recover_interrupted_writes();
+        }
         cx.set_global(HeldInstanceLock(instance_lock));
         init_app(cx);
         match open_main_window(cx) {
@@ -69,6 +74,33 @@ fn main() {
             }
         }
     });
+}
+
+/// Resolves output writes a previous run left unfinished (a forced quit, a
+/// crash) and starts this run's write journal.
+fn recover_interrupted_writes() {
+    let Some(dir) = paths::app_data_dir().map(|dir| dir.join(write_journal::JOURNAL_DIR_NAME))
+    else {
+        return;
+    };
+    match write_journal::recover_and_install(&dir) {
+        Ok(report) => {
+            for path in &report.restored {
+                eprintln!(
+                    "imgconvert: restored the previous output {}",
+                    path.display()
+                );
+            }
+            if !report.removed.is_empty() || report.retained > 0 {
+                eprintln!(
+                    "imgconvert: removed {} leftover file(s) of interrupted writes; {} kept for later",
+                    report.removed.len(),
+                    report.retained
+                );
+            }
+        }
+        Err(error) => eprintln!("imgconvert: cannot start the write journal: {error}"),
+    }
 }
 
 /// Takes the single-instance marker. Without a data directory or on an I/O

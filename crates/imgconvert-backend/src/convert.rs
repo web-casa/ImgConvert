@@ -31,6 +31,7 @@ use crate::pdf;
 pub use crate::pdf::PdfConvertOptions;
 use crate::progress::{BatchId, ProgressSink};
 use crate::result_cache;
+use crate::write_journal;
 use imgconvert_platform::{atomic_output, external_codecs};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1229,6 +1230,7 @@ fn temp_file(out: &Path) -> Result<(PathBuf, File), ConversionError> {
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
         let tmp = parent.join(format!(".imgconvert-{pid}-{nanos}-{counter}.tmp"));
+        write_journal::note_tmp(&tmp);
         match OpenOptions::new().write(true).create_new(true).open(&tmp) {
             Ok(file) => return Ok((tmp, file)),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -1248,10 +1250,15 @@ fn write_output(
         fs::create_dir_all(parent).map_err(|e| output_io_error("无法创建输出目录", out, &e))?;
     }
 
-    match mode {
+    let _op = write_journal::Op::start();
+    let result = match mode {
         WriteMode::Replace => replace_output(out, bytes),
         WriteMode::CreateNew => write_new_output(out, bytes),
+    };
+    if let Some(parent) = out.parent() {
+        write_journal::sync_dir(parent);
     }
+    result
 }
 
 fn write_temp_output(out: &Path, bytes: &[u8]) -> Result<PathBuf, ConversionError> {
@@ -1310,6 +1317,7 @@ where
         let cleanup = cleanup_partial_note(tmp);
         error.append(&cleanup)
     })?;
+    write_journal::note_backup(out, &backup);
     if let Err(error) = rename(out, &backup) {
         if error.kind() == std::io::ErrorKind::NotFound {
             // The destination disappeared after the initial replacement attempt. It is now safe
@@ -1336,7 +1344,11 @@ where
             let detail = output_io_error("无法写入输出文件", out, &rename_error);
             match rename(&backup, out) {
                 Ok(()) => Err(detail.append(&format!("; 原文件已恢复{cleanup}"))),
-                Err(restore_error) => Err(detail.append(&format!(
+                Err(restore_error) => Err({
+                    write_journal::retain_current();
+                    detail
+                }
+                .append(&format!(
                     "; 无法恢复原文件，备份位于 {}: {restore_error}{cleanup}",
                     backup.display()
                 ))),
@@ -1441,8 +1453,12 @@ fn write_new_output(out: &Path, bytes: &[u8]) -> Result<Option<ConvertWarning>, 
         Ok(atomic_output::Committed {
             leftover_temp: Some(_),
             ..
-        }) => Ok(Some(ConvertWarning::TemporaryFileRetained {
-            path: tmp.to_string_lossy().to_string(),
+        }) => Ok(Some({
+            // The next start removes the leftover link.
+            write_journal::retain_current();
+            ConvertWarning::TemporaryFileRetained {
+                path: tmp.to_string_lossy().to_string(),
+            }
         })),
         Err(error) => {
             let detail = conversion_error_for_commit(out, &error);
