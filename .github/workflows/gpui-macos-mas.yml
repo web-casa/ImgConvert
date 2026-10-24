@@ -226,14 +226,12 @@ jobs:
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
           GPUI_UPLOAD_BUILD: ${{ inputs.upload_build }}
         run: |
-          args=(--pkg="$GPUI_PKG")
-          result=validated
+          node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG"
+          echo "GPUI_MAS_RESULT=validated" >> "$GITHUB_ENV"
           if [ "$GPUI_UPLOAD_BUILD" = "true" ]; then
-            args+=(--upload)
-            result=uploaded
+            node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG" --upload
+            echo "GPUI_MAS_RESULT=uploaded" >> "$GITHUB_ENV"
           fi
-          node scripts/submit-macos-mas-pkg.mjs "${args[@]}"
-          echo "GPUI_MAS_RESULT=$result" >> "$GITHUB_ENV"
 
       - name: Record checksums
         if: always()
