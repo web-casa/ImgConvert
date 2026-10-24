@@ -100,8 +100,10 @@ impl ActionBar {
     }
 
     /// The status line: a failed settings write outranks everything (the
-    /// person should know their choices are not being kept), then the
-    /// batch, then the panel's transient notice, then readiness.
+    /// person should know their choices are not being kept), then a running
+    /// batch, then the panel's transient notice, then an ended batch's
+    /// summary, then readiness. A notice is cleared when a batch starts, so
+    /// one that exists after a batch ended is the newer message.
     fn status(&self, cx: &App) -> (SharedString, bool) {
         if let Some(detail) = self.settings.read(cx).last_error() {
             return (
@@ -109,12 +111,17 @@ impl ActionBar {
                 true,
             );
         }
-        if let Some(text) = self.batch_text(cx) {
-            let failed = matches!(self.batch.read(cx).phase(), BatchPhase::Failed(_));
-            return (text, failed);
+        let phase = self.batch.read(cx).phase();
+        let running = matches!(phase, BatchPhase::Running | BatchPhase::Cancelling);
+        let failed = matches!(phase, BatchPhase::Failed(_));
+        if running && let Some(text) = self.batch_text(cx) {
+            return (text, false);
         }
         if let Some(notice) = self.panel.read(cx).notice_text() {
             return (notice, false);
+        }
+        if let Some(text) = self.batch_text(cx) {
+            return (text, failed);
         }
         let count = self.queue.read(cx).len();
         if count == 0 {

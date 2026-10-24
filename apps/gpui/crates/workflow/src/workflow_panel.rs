@@ -175,6 +175,9 @@ impl WorkflowPanel {
     /// Sets and persists the output folder without a prompt (the picker
     /// callback, tests and the perf probe).
     pub fn set_output_dir(&mut self, dir: PathBuf, cx: &mut Context<Self>) {
+        if self.notice == Some(Notice::OutputNotFolder) {
+            self.notice = None;
+        }
         self.output_session_grant = Some(dir.clone());
         let dir = dir.to_string_lossy().into_owned();
         self.settings.update(cx, |settings, cx| {
