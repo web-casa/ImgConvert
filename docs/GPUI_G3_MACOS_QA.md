@@ -57,7 +57,13 @@ x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 的启�
 
 ## 结论
 
-除 TestFlight 实机验收（G3-2 剩余部分）、App Review 录屏与 x64 实机生命周期外，`RELEASE_QA.md` 的 macOS 条目在本候选上通过（上文注明了哪些是虚拟机原生、哪些是 CI 或共用路径证据）。G3-6 记为“部分完成，等待 TestFlight”。
+上文各项在本候选上通过，并注明了哪些是虚拟机原生、哪些是 CI 或共用路径证据。G3-6 记为**部分完成**，尚缺：
+
+1. TestFlight：上传通用 PKG，用处理后的构建在 Intel 与 Apple 芯片实机上验收沙盒路径（G3-2 剩余部分）。
+2. `MAS_APP_REVIEW_SUBMISSION.md` 的 App Store Connect 负责人清单：年龄分级问卷、隐私标签、实际 app 截图、元数据准确性、新的 `CFBundleVersion`、干净账号的连续录屏与审核备注。
+3. x64：Intel 硬件上的图片语料与安装/升级/卸载生命周期。x64 目前只有托管 runner 上源码构建 app 的 GUI 冒烟（含 ImageIO HEIC，见下表）和签名 DMG 的工作流校验。
+
+以上都需要用户的账号、实机或决定，不在本次自动化范围内。
 
 ## 证据
 

@@ -100,7 +100,7 @@ G3：`docs/RELEASE_QA.md` macOS 条目全部通过；两架构 DMG 公证完成�
 | G3-3 | Kit UI 测试覆盖每个对话框与主流程；像素敏感性测试接入 macOS 与 Linux CI；拖放/取消/淘汰路径的无头测试 | 可立即执行 |
 | G3-4 | 真实 GUI 自动化在 macOS 跑通 | **已完成**：`gpui-macos-gui-smoke.yml` run 40059789780（最终候选 `8a2744e` 复跑 run 40085939946 通过） 在 arm64/x64 托管 runner 启动真实应用、导入并转换，按 PID 核对窗口、精确核对 5 个输出 |
 | G3-5 | 对完整候选重跑阶段 0 测量并与基线比较，不劣于基线 | **已完成**（2026-10-24）：main `6fb4487` 在同一虚拟机全部场景有效，两侧都有数据的指标不劣于 Tauri 参照，10k 只有 GPUI 数据（用户批准以虚拟机代替裸机），见 `GPUI_BASELINE.md` §6.1 |
-| G3-6 | `docs/RELEASE_QA.md` macOS 条目逐项通过 | **部分完成**（2026-10-24）：main `8a2744e` 的两架构公证 DMG、MAS 校验、图片语料、arm64 安装/升级（保留 0.3.1 设置）/卸载均通过，见 `GPUI_G3_MACOS_QA.md`；剩 TestFlight 实机验收、App Review 录屏与 x64 实机生命周期 |
+| G3-6 | `docs/RELEASE_QA.md` macOS 条目逐项通过 | **部分完成**（2026-10-24）：main `8a2744e` 的两架构公证 DMG、MAS 校验、图片语料、arm64 安装/升级（保留 0.3.1 设置）/卸载均通过，见 `GPUI_G3_MACOS_QA.md`；剩 TestFlight 实机验收、App Store Connect 负责人清单（含 App Review 录屏）与 x64 实机语料/生命周期 |
 
 ### 2.4 更早阶段遗留
 
