@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   zh-TW: "停止並結束"
 app.quit_confirm_keep:
   zh-TW: "繼續轉換"
+menu.about:
+  zh-TW: "關於 ImgConvert"
+menu.settings:
+  zh-TW: "設定…"
+menu.services:
+  zh-TW: "服務"
+menu.hide:
+  zh-TW: "隱藏 ImgConvert"
+menu.hide_others:
+  zh-TW: "隱藏其他"
+menu.show_all:
+  zh-TW: "顯示全部"
+menu.close_window:
+  zh-TW: "關閉視窗"
+menu.undo:
+  zh-TW: "還原"
+menu.redo:
+  zh-TW: "重做"
+menu.cut:
+  zh-TW: "剪下"
+menu.copy:
+  zh-TW: "拷貝"
+menu.select_all:
+  zh-TW: "全選"
+menu.window:
+  zh-TW: "視窗"
+menu.minimize:
+  zh-TW: "縮到最小"
+menu.zoom:
+  zh-TW: "縮放"
+menu.fullscreen:
+  zh-TW: "進入全螢幕"
 app.open_files:
   zh-TW: 開啟…
 app.instance_blocked_title:

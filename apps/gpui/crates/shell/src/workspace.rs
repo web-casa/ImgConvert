@@ -9,7 +9,7 @@
 //! navigation rail is gone; theme and reduced motion live in the header's
 //! Appearance popover.
 
-use crate::lifecycle;
+use crate::{OpenSettings, lifecycle};
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
     ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
@@ -275,9 +275,22 @@ impl Render for Workspace {
                     })
             })
             .key_context("Workspace")
-            .on_action(|_: &gpui_kit::component::input::Paste, _, cx| {
+            .on_action(|_: &gpui_kit::component::input::Paste, window, cx| {
+                // A read-only or disabled text field has no paste handler of
+                // its own; Edit > Paste there must not import files.
+                if window
+                    .context_stack()
+                    .iter()
+                    .any(|context| context.contains("Input"))
+                {
+                    return;
+                }
                 imgconvert_gpui_queue::clipboard::paste(cx);
             })
+            .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
+                let form = this.workflow.read(cx).settings_form().clone();
+                form.update(cx, |form, cx| form.focus_format(window, cx));
+            }))
             .track_focus(&self.focus_handle)
             .relative()
             .size_full()

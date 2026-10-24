@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   ko: "중지 후 종료"
 app.quit_confirm_keep:
   ko: "계속 변환"
+menu.about:
+  ko: "ImgConvert에 관하여"
+menu.settings:
+  ko: "설정…"
+menu.services:
+  ko: "서비스"
+menu.hide:
+  ko: "ImgConvert 가리기"
+menu.hide_others:
+  ko: "기타 가리기"
+menu.show_all:
+  ko: "모두 보기"
+menu.close_window:
+  ko: "윈도우 닫기"
+menu.undo:
+  ko: "실행 취소"
+menu.redo:
+  ko: "실행 복귀"
+menu.cut:
+  ko: "오려두기"
+menu.copy:
+  ko: "복사하기"
+menu.select_all:
+  ko: "전체 선택"
+menu.window:
+  ko: "윈도우"
+menu.minimize:
+  ko: "최소화"
+menu.zoom:
+  ko: "확대/축소"
+menu.fullscreen:
+  ko: "전체 화면 시작"
 app.open_files:
   ko: 열기…
 app.instance_blocked_title:

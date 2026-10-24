@@ -497,7 +497,8 @@ impl MacPlatform {
                     match menu_type {
                         SystemMenuType::Services => {
                             let app: id = msg_send![APP_CLASS, sharedApplication];
-                            app.setServicesMenu_(item);
+                            // AppKit fills the menu itself, not the item.
+                            app.setServicesMenu_(submenu);
                         }
                     }
 

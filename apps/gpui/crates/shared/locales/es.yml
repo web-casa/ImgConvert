@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   es: "Detener y salir"
 app.quit_confirm_keep:
   es: "Seguir convirtiendo"
+menu.about:
+  es: "Acerca de ImgConvert"
+menu.settings:
+  es: "Ajustes…"
+menu.services:
+  es: "Servicios"
+menu.hide:
+  es: "Ocultar ImgConvert"
+menu.hide_others:
+  es: "Ocultar otros"
+menu.show_all:
+  es: "Mostrar todo"
+menu.close_window:
+  es: "Cerrar ventana"
+menu.undo:
+  es: "Deshacer"
+menu.redo:
+  es: "Rehacer"
+menu.cut:
+  es: "Cortar"
+menu.copy:
+  es: "Copiar"
+menu.select_all:
+  es: "Seleccionar todo"
+menu.window:
+  es: "Ventana"
+menu.minimize:
+  es: "Minimizar"
+menu.zoom:
+  es: "Zoom"
+menu.fullscreen:
+  es: "Entrar en pantalla completa"
 app.open_files:
   es: Abrir…
 app.instance_blocked_title:

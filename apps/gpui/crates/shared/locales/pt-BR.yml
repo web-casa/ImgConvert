@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   pt-BR: "Parar e sair"
 app.quit_confirm_keep:
   pt-BR: "Continuar convertendo"
+menu.about:
+  pt-BR: "Sobre o ImgConvert"
+menu.settings:
+  pt-BR: "Ajustes…"
+menu.services:
+  pt-BR: "Serviços"
+menu.hide:
+  pt-BR: "Ocultar ImgConvert"
+menu.hide_others:
+  pt-BR: "Ocultar Outros"
+menu.show_all:
+  pt-BR: "Mostrar Tudo"
+menu.close_window:
+  pt-BR: "Fechar Janela"
+menu.undo:
+  pt-BR: "Desfazer"
+menu.redo:
+  pt-BR: "Refazer"
+menu.cut:
+  pt-BR: "Recortar"
+menu.copy:
+  pt-BR: "Copiar"
+menu.select_all:
+  pt-BR: "Selecionar Tudo"
+menu.window:
+  pt-BR: "Janela"
+menu.minimize:
+  pt-BR: "Minimizar"
+menu.zoom:
+  pt-BR: "Zoom"
+menu.fullscreen:
+  pt-BR: "Entrar em Tela Cheia"
 app.open_files:
   pt-BR: Abrir…
 app.instance_blocked_title:
