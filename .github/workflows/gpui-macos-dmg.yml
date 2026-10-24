@@ -1,17 +1,18 @@
 name: GPUI macOS DMG
 
 # Builds the GPUI app for both macOS architectures, signs it with the
-# Developer ID identity, notarizes and staples the DMG, and uploads it as a
-# workflow artifact. It never creates or edits a GitHub Release; it is the
-# G3-1 evidence for the migration (docs/GPUI_MIGRATION_PLAN.md).
+# Developer ID identity and, when asked, notarizes and staples the DMG
+# through scripts/notarize-macos-dmg.mjs. The DMG, its checksum and the
+# notarization receipt are workflow artifacts; this workflow never creates
+# or edits a GitHub Release. It is the G3-1 evidence of the migration plan.
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit, branch or tag to build.
-        required: true
-        default: main
+        description: Commit, branch or tag to build (empty builds the dispatched commit).
+        required: false
+        default: ""
         type: string
       notarize:
         description: Submit the signed DMG to Apple notarization and staple it.
@@ -23,18 +24,21 @@ permissions:
   contents: read
 
 concurrency:
-  group: gpui-macos-dmg-${{ inputs.ref }}
+  group: gpui-macos-dmg-${{ inputs.ref || github.sha }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
+  NODE_VERSION: "24"
+  # LSMinimumSystemVersion is 12.0; native dependencies must target it too.
+  MACOSX_DEPLOYMENT_TARGET: "12.0"
 
 jobs:
   gpui-macos-dmg:
     name: GPUI macOS DMG (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
@@ -48,28 +52,65 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Verify macOS runner architecture
         run: |
           actual="$(uname -m)"
           test "$actual" = "${{ matrix.uname_arch }}" || { echo "expected ${{ matrix.uname_arch }}, got $actual"; exit 1; }
 
-      - name: Check direct signing/notarization secrets
+      - name: Check signing and notarization secrets
         env:
+          NOTARIZE: ${{ inputs.notarize }}
           APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
           APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          for name in APPLE_DIRECT_CERTIFICATE APPLE_DIRECT_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+          for name in APPLE_DIRECT_CERTIFICATE APPLE_DIRECT_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD; do
             test -n "${!name}" || { echo "$name secret is required"; exit 1; }
           done
+          if [ "$NOTARIZE" = "true" ]; then
+            if [ -n "$APPLE_API_KEY" ] || [ -n "$APPLE_API_ISSUER" ] || [ -n "$APPLE_API_KEY_BASE64" ]; then
+              for name in APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_BASE64; do
+                test -n "${!name}" || { echo "$name secret is required with API notarization"; exit 1; }
+              done
+            else
+              for name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+                test -n "${!name}" || { echo "$name secret is required without API notarization"; exit 1; }
+              done
+            fi
+          fi
 
       - name: Install native codec build tools
-        run: brew install cmake meson ninja
+        run: |
+          brew install cmake meson ninja
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            # libaom 3.11 checks NASM help using a flag that changed in NASM 3.
+            nasm_version="2.16.03"
+            nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+            nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+            curl --fail --location --silent --show-error \
+              "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+              --output "$nasm_archive"
+            echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+              | shasum -a 256 -c -
+            mkdir "$nasm_root"
+            unzip -q "$nasm_archive" -d "$nasm_root"
+            nasm_bin="$nasm_root/nasm-$nasm_version"
+            echo "$nasm_bin" >> "$GITHUB_PATH"
+            export PATH="$nasm_bin:$PATH"
+            nasm -v
+          fi
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
 
@@ -81,18 +122,27 @@ jobs:
           APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
           APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          IMGCONVERT_DIRECT_SIGNING_IDENTITY: ${{ secrets.IMGCONVERT_DIRECT_SIGNING_IDENTITY }}
         run: |
-          printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/direct.p12"
-          test -s "$RUNNER_TEMP/direct.p12" || { echo "decoded direct certificate is empty"; exit 1; }
+          p12="$RUNNER_TEMP/gpui-direct-signing.p12"
+          trap 'rm -f "$p12"' EXIT
+          if ! printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 --decode > "$p12" 2>/dev/null; then
+            printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 -D > "$p12"
+          fi
+          test -s "$p12" || { echo "decoded direct certificate is empty"; exit 1; }
+          security list-keychains -d user | tr -d '" ' > "$RUNNER_TEMP/keychains-before"
+          security default-keychain -d user | tr -d '" ' > "$RUNNER_TEMP/default-keychain-before"
           security create-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
-          security default-keychain -s gpui-build.keychain
+          security list-keychains -d user -s gpui-build.keychain $(cat "$RUNNER_TEMP/keychains-before")
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
           security set-keychain-settings -t 3600 -u gpui-build.keychain
-          security import "$RUNNER_TEMP/direct.p12" -k gpui-build.keychain \
+          security import "$p12" -k gpui-build.keychain \
             -P "$APPLE_DIRECT_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" gpui-build.keychain
-          rm -f "$RUNNER_TEMP/direct.p12"
-          identity="$(security find-identity -v -p codesigning gpui-build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" gpui-build.keychain >/dev/null
+          identity="$IMGCONVERT_DIRECT_SIGNING_IDENTITY"
+          if [ -z "$identity" ]; then
+            identity="$(security find-identity -v -p codesigning gpui-build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          fi
           test -n "$identity" || { echo "Developer ID Application identity not found"; exit 1; }
           echo "GPUI_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
 
@@ -101,36 +151,73 @@ jobs:
           mkdir -p dist
           dmg="$(scripts/package-gpui-macos.sh apps/gpui/target/release/imgconvert-gpui dist "$GPUI_SIGNING_IDENTITY")"
           echo "GPUI_DMG=$dmg" >> "$GITHUB_ENV"
-          codesign --verify --deep --strict --verbose=2 dist/ImgConvert.app
-          codesign -d --verbose=2 dist/ImgConvert.app 2>&1 | grep -E "Authority=Developer ID Application|flags=.*runtime"
+          echo "IMGCONVERT_EXPECTED_BUNDLE_VERSION=$(cat dist/VERSION)" >> "$GITHUB_ENV"
+          details="$(codesign -d --verbose=2 dist/ImgConvert.app 2>&1)"
+          grep -q "Authority=Developer ID Application" <<< "$details" || { echo "not signed with Developer ID"; exit 1; }
+          grep -q "flags=.*runtime" <<< "$details" || { echo "hardened runtime missing"; exit 1; }
 
-      - name: Notarize and staple the DMG
+      - name: Prepare App Store Connect API key
         if: ${{ inputs.notarize }}
         env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_KEY_BASE64" ]; then
+            key_path="$RUNNER_TEMP/gpui-notary-api-key.p8"
+            if ! printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$key_path" 2>/dev/null; then
+              printf '%s' "$APPLE_API_KEY_BASE64" | base64 -D > "$key_path"
+            fi
+            test -s "$key_path" || { echo "decoded API key is empty"; exit 1; }
+            echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+          fi
+
+      - name: Notarize, staple and verify the DMG
+        if: ${{ inputs.notarize }}
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          xcrun notarytool submit "$GPUI_DMG" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" --wait --timeout 60m --output-format json | tee dist/notarization.json
-          grep -q '"status" *: *"Accepted"' dist/notarization.json || { echo "notarization was not accepted"; exit 1; }
-          xcrun stapler staple "$GPUI_DMG"
-          xcrun stapler validate "$GPUI_DMG"
-          spctl --assess --type open --context context:primary-signature --verbose=2 "$GPUI_DMG"
+          IMGCONVERT_NOTARY_SOURCE_SHA="$(git rev-parse HEAD)" \
+            node scripts/notarize-macos-dmg.mjs \
+              --dmg="$GPUI_DMG" \
+              --receipt=dist/notarization.json \
+              --expected-architectures=${{ matrix.uname_arch }}
+
+      - name: Verify the signed DMG
+        if: ${{ !inputs.notarize }}
+        run: |
+          node scripts/check-macos-bundle-artifacts.mjs --bundles=dmg --artifact="$GPUI_DMG" \
+            --require-signed --expected-architectures=${{ matrix.uname_arch }}
 
       - name: Record checksums
-        run: shasum -a 256 dist/*.dmg | tee dist/SHA256SUMS
+        if: always()
+        run: |
+          if ls dist/*.dmg >/dev/null 2>&1; then
+            shasum -a 256 dist/*.dmg | tee dist/SHA256SUMS
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
-          name: gpui-macos-${{ matrix.arch }}-dmg
-          if-no-files-found: error
+          name: gpui-macos-${{ matrix.uname_arch }}-${{ inputs.notarize && 'notarized' || 'signed' }}-${{ github.run_id }}
+          if-no-files-found: warn
           retention-days: 14
           path: |
             dist/*.dmg
             dist/SHA256SUMS
             dist/notarization.json
 
-      - name: Remove the build keychain
+      - name: Remove the build keychain and API key
         if: always()
-        run: security delete-keychain gpui-build.keychain 2>/dev/null || true
+        run: |
+          if [ -s "$RUNNER_TEMP/keychains-before" ]; then
+            security list-keychains -d user -s $(cat "$RUNNER_TEMP/keychains-before")
+          fi
+          if [ -s "$RUNNER_TEMP/default-keychain-before" ]; then
+            security default-keychain -d user -s "$(cat "$RUNNER_TEMP/default-keychain-before")"
+          fi
+          security delete-keychain gpui-build.keychain 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/gpui-notary-api-key.p8"
