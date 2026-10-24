@@ -111,6 +111,17 @@
   </tr>
 </table>
 
+## 下一版本预览（0.4，原生 GPUI）
+
+<p align="center">
+  <a href="docs/assets/screenshots/gpui/workspace-zh-CN.png">
+    <img src="docs/assets/screenshots/gpui/workspace-zh-CN.png" width="100%" alt="ImgConvert 0.4 GPUI workspace">
+  </a>
+</p>
+<p align="center">
+  <sub>即将推出的 0.4 桌面版基于原生 GPUI 重写，支持九种界面语言。尚未发布，当前下载仍为 v0.3.1。</sub>
+</p>
+
 ## 核心能力
 
 | 能力       | 说明                                                                                           |
