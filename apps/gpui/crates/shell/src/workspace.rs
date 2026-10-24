@@ -288,8 +288,9 @@ impl Render for Workspace {
                 imgconvert_gpui_queue::clipboard::paste(cx);
             })
             .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
-                let form = this.workflow.read(cx).settings_form().clone();
-                form.update(cx, |form, cx| form.focus_format(window, cx));
+                this.workflow.update(cx, |workflow, cx| {
+                    workflow.focus_conversion_settings(window, cx);
+                });
             }))
             .track_focus(&self.focus_handle)
             .relative()

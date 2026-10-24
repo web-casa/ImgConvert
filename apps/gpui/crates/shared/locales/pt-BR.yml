@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   pt-BR: "Zoom"
 menu.fullscreen:
-  pt-BR: "Entrar em Tela Cheia"
+  pt-BR: "Alternar Tela Cheia"
 app.open_files:
   pt-BR: Abrir…
 app.instance_blocked_title:

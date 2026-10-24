@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   fr: "Réduire/agrandir"
 menu.fullscreen:
-  fr: "Passer en plein écran"
+  fr: "Basculer le plein écran"
 app.open_files:
   fr: Ouvrir…
 app.instance_blocked_title:

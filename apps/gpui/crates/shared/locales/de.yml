@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   de: "Zoomen"
 menu.fullscreen:
-  de: "Vollbildmodus aktivieren"
+  de: "Vollbildmodus ein/aus"
 app.open_files:
   de: Öffnen …
 app.instance_blocked_title:

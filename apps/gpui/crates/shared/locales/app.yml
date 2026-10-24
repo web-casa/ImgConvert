@@ -69,8 +69,8 @@ menu.zoom:
   en: "Zoom"
   zh-CN: "缩放"
 menu.fullscreen:
-  en: "Enter Full Screen"
-  zh-CN: "进入全屏幕"
+  en: "Toggle Full Screen"
+  zh-CN: "切换全屏幕"
 app.open_files:
   en: Open…
   zh-CN: 打开…

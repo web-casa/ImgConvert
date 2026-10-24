@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   zh-TW: "縮放"
 menu.fullscreen:
-  zh-TW: "進入全螢幕"
+  zh-TW: "切換全螢幕"
 app.open_files:
   zh-TW: 開啟…
 app.instance_blocked_title:

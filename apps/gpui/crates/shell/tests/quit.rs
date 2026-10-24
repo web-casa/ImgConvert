@@ -184,7 +184,7 @@ fn the_menus_follow_the_macos_layout(cx: &mut TestAppContext) {
         items(2),
         ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All"]
     );
-    assert_eq!(items(3), ["Minimize", "Zoom", "Enter Full Screen"]);
+    assert_eq!(items(3), ["Minimize", "Zoom", "Toggle Full Screen"]);
 }
 
 #[gpui_kit::test]

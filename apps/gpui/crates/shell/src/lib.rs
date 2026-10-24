@@ -54,6 +54,10 @@ pub fn init_app(cx: &mut App) {
     cx.on_action(|_: &OpenFiles, cx| imgconvert_gpui_queue::import::pick_and_import(cx));
     cx.on_action(|_: &About, cx| {
         in_active_window(cx, |window, cx| {
+            // Choosing About again must not stack a second copy.
+            if gpui_kit::component::WindowExt::has_active_dialog(window, cx) {
+                return;
+            }
             imgconvert_gpui_app_settings::legal::open_licenses(window, cx);
         });
     });
