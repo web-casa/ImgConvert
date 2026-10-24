@@ -351,6 +351,8 @@ preview.previous_page:
   ko: 이전 페이지
 preview.next_page:
   ko: 다음 페이지
+preview.page_position:
+  ko: "%{count}페이지 중 %{index}페이지"
 preview.before:
   ko: 원본
 preview.after:

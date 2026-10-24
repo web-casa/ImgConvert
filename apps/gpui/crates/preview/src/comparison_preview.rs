@@ -21,8 +21,9 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Div, Entity, FocusHandle, FontWeight, ImageSource,
     InteractiveElement as _, IntoElement, KeyDownEvent, ObjectFit, ParentElement as _, Render,
-    RenderImage, SharedString, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    Subscription, TestSupportExt as _, Window, div, img, px, relative, transparent_black,
+    RenderImage, Role, SharedString, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, relative,
+    transparent_black,
 };
 use imgconvert_backend::convert::ConvertWarning;
 use imgconvert_backend::preview::{self, PreviewOptions};
@@ -175,6 +176,11 @@ impl ComparisonPreview {
         self.summary.as_ref()
     }
 
+    /// The source image as shown, for tests that check what was rendered.
+    pub fn before_image(&self) -> Option<Arc<RenderImage>> {
+        self.before.clone()
+    }
+
     pub fn has_images(&self) -> bool {
         self.before.is_some() && self.after.is_some()
     }
@@ -185,9 +191,12 @@ impl ComparisonPreview {
 
     /// Shows another page of a PDF's selection: the next (`step` 1) or the
     /// previous (`step` -1) one, regenerating the preview. Ignored while a
-    /// generation runs or when there is no other page.
+    /// generation runs, while the preview is stale, or when there is no
+    /// other page.
     pub fn step_pdf_page(&mut self, step: isize, cx: &mut Context<Self>) {
-        if self.loading {
+        // A stale summary may list pages the current range no longer selects;
+        // Refresh first.
+        if self.loading || self.stale {
             return;
         }
         let Some(summary) = self.summary.as_ref() else {
@@ -651,11 +660,18 @@ impl ComparisonPreview {
                         .icon(IconName::ChevronLeft)
                         .accessibility_label(tr("preview.previous_page"))
                         .tooltip(tr("preview.previous_page"))
-                        .disabled_for_all(first || self.loading)
+                        .disabled_for_all(first || self.loading || self.stale)
                         .on_click(cx.listener(|this, _, _, cx| this.step_pdf_page(-1, cx))),
                 )
                 .child(
                     div()
+                        .id("preview-page-position")
+                        .test_support()
+                        .role(Role::Label)
+                        .aria_label(tr_with(
+                            "preview.page_position",
+                            &[("index", &(index + 1)), ("count", &pages.len())],
+                        ))
                         .text_xs()
                         .child(format!("{} / {}", index + 1, pages.len())),
                 )
@@ -666,7 +682,7 @@ impl ComparisonPreview {
                         .icon(IconName::ChevronRight)
                         .accessibility_label(tr("preview.next_page"))
                         .tooltip(tr("preview.next_page"))
-                        .disabled_for_all(last || self.loading)
+                        .disabled_for_all(last || self.loading || self.stale)
                         .on_click(cx.listener(|this, _, _, cx| this.step_pdf_page(1, cx))),
                 ),
         )

@@ -351,6 +351,8 @@ preview.previous_page:
   ja: 前のページ
 preview.next_page:
   ja: 次のページ
+preview.page_position:
+  ja: "%{count} ページ中 %{index} ページ目"
 preview.before:
   ja: 元画像
 preview.after:

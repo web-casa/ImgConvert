@@ -351,6 +351,8 @@ preview.previous_page:
   fr: Page précédente
 preview.next_page:
   fr: Page suivante
+preview.page_position:
+  fr: "Page %{index} sur %{count}"
 preview.before:
   fr: Original
 preview.after:
