@@ -170,16 +170,18 @@ WebKit XPC 归属：每次运行归属到 2 个新出现的 `com.apple.WebKit.*`
 
 | 指标 | Tauri 0.3.x | GPUI PoC | GPUI 完整候选 |
 |---|---|---|---|
-| readyMs（startup，中位数） | 1164 ms 热 / 3673 ms 冷 | 404 ms 热（5/5 有效，p95 1093 ms；首次运行含 runtime shader 编译）/ 1432 ms 冷（3/3 有效，`--purge`） | |
-| idleRssBytes（startup） | 159.3 MiB | 49.5 MiB 热 / 42.1 MiB 冷（单进程，−69%） | |
-| importMs（1k / 10k） | 96 ms / 虚拟机不可测 | 97 ms（3/3 有效）/ 1550 ms（2/2 有效） | |
-| scrollIntervalP99Ms（1k） | 402 ms | 52 ms（刷新周期估计 49 ms，虚拟机软件渲染上限；p50 48 ms；整段 0→底→0 三角波，11 k px/s） | |
-| idleRssBytes（import 1k） | 862.5 MiB | 163.0 MiB（−81%；滚完全程后缩略图缓存占到 128 MiB 预算） | |
-| quiescenceMs（10k） | 虚拟机不可测 | 162 ms | 必须有数据 |
-| scrollIntervalP99Ms（10k） | 虚拟机不可测 | 53 ms（p50 46 ms，111 k px/s） | 必须有数据 |
-| scrollLongIntervals（10k） | 虚拟机不可测 | 237（刷新周期 49 ms，几乎每个间隔都 >33 ms；只有分位数可比） | 必须有数据 |
-| idleRssBytes（import 10k） | 虚拟机不可测 | 258.1 MiB | 必须有数据 |
-| batchPeakRssBytes（1k，AVIF） | 1123 MiB（batchMs 33.4 s，n=2，人工点击） | 155.3 MiB（batchMs 30.7 s，3/3 有效，`--batch-out --batch-format=avif` 自动触发；WebP 对照 76.5 MiB / 10.9 s） | |
+| readyMs（startup，中位数） | 1164 ms 热 / 3673 ms 冷 | 404 ms 热（5/5 有效，p95 1093 ms；首次运行含 runtime shader 编译）/ 1432 ms 冷（3/3 有效，`--purge`） | 384 ms 热（5/5，p95 1187 ms，首次运行含 shader 编译）/ 1463 ms 冷（3/3，`--purge`） |
+| idleRssBytes（startup） | 159.3 MiB | 49.5 MiB 热 / 42.1 MiB 冷（单进程，−69%） | 57.9 MiB 热 / 58.0 MiB 冷（−64%） |
+| importMs（1k / 10k） | 96 ms / 虚拟机不可测 | 97 ms（3/3 有效）/ 1550 ms（2/2 有效） | 77 ms（3/3）/ 1727 ms（2/2） |
+| scrollIntervalP99Ms（1k） | 402 ms | 52 ms（刷新周期估计 49 ms，虚拟机软件渲染上限；p50 48 ms；整段 0→底→0 三角波，11 k px/s） | 33.5 ms（刷新周期 16.7 ms，p50 16.7 ms） |
+| idleRssBytes（import 1k） | 862.5 MiB | 163.0 MiB（−81%；滚完全程后缩略图缓存占到 128 MiB 预算） | 179.8 MiB（−79%） |
+| quiescenceMs（10k） | 虚拟机不可测 | 162 ms | 218 ms |
+| scrollIntervalP99Ms（10k） | 虚拟机不可测 | 53 ms（p50 46 ms，111 k px/s） | 32.8 ms（p50 16.7 ms） |
+| scrollLongIntervals（10k） | 虚拟机不可测 | 237（刷新周期 49 ms，几乎每个间隔都 >33 ms；只有分位数可比） | 6（刷新周期 16.6 ms） |
+| idleRssBytes（import 10k） | 虚拟机不可测 | 258.1 MiB | 172.3 MiB |
+| batchPeakRssBytes（1k，AVIF） | 1123 MiB（batchMs 33.4 s，n=2，人工点击） | 155.3 MiB（batchMs 30.7 s，3/3 有效，`--batch-out --batch-format=avif` 自动触发；WebP 对照 76.5 MiB / 10.9 s） | 178.5 MiB（batchMs 31.3 s，3/3，1000/1000 完成） |
+
+GPUI 完整候选采集记录（2026-10-24，G3-5，同一台 Parallels 虚拟机、同一语料与脚本，main `6fb4487` 发布构建，二进制 SHA-256 前缀 `0f343865`，原始文件在测试机 `~/imgc-glass/g3-perf/*.json`）：全部场景有效（startup 热 5/5、冷 3/3，import 1k 3/3、10k 2/2，AVIF 批次 3/3、每次 1000 项完成）。与 PoC 相比，虚拟机此时的刷新周期为 16.7 ms（PoC 时 49 ms），滚动分位数随之下降，不能把这部分改善归因于应用；启动与 1k 导入后的空闲内存因完整功能（设置面板、预览、诊断等）比 PoC 高 8–17 MiB，10k 导入后反而低 86 MiB（缩略图缓存按预算回收），批次峰值高 23 MiB、耗时相当。按用户 2026-10-24 批准的虚拟机例外，完整候选在全部同等指标上不劣于 Tauri 参照，**G3-5 通过**。
 
 GPUI PoC 采集记录（2026-10-17，同一台 Parallels 虚拟机，`apps/gpui` 发布构建，二进制 SHA-256 前缀 `ebf787c8`，gpui-kit 0.7.1 默认 `runtime_shaders`，脚本 `measure-desktop-baseline.mjs --label=gpui`，原始文件 `artifacts/baseline/gpui-*.json`）：
 
