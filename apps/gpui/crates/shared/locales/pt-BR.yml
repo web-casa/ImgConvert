@@ -111,6 +111,8 @@ workflow.failed:
   pt-BR: "Falha no lote: %{detail}"
 workflow.already_running:
   pt-BR: Já há um lote em andamento
+workflow.output_not_folder:
+  pt-BR: Escolha uma pasta para a saída, não um arquivo
 workflow.nothing_to_convert:
   pt-BR: Adicione imagens à fila primeiro
 settings.title:

@@ -111,6 +111,8 @@ workflow.failed:
   ja: "一括変換に失敗しました: %{detail}"
 workflow.already_running:
   ja: 一括変換はすでに実行中です
+workflow.output_not_folder:
+  ja: 出力先にはファイルではなくフォルダーを選んでください
 workflow.nothing_to_convert:
   ja: 先に画像をキューに追加してください
 settings.title:

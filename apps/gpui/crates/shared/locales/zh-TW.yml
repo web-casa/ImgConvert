@@ -111,6 +111,8 @@ workflow.failed:
   zh-TW: "批次轉換失敗：%{detail}"
 workflow.already_running:
   zh-TW: 已有批次工作正在執行
+workflow.output_not_folder:
+  zh-TW: 請為輸出選擇資料夾，而不是檔案
 workflow.nothing_to_convert:
   zh-TW: 請先把圖片加入佇列
 settings.title:

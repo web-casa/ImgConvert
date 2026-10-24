@@ -167,6 +167,9 @@ workflow.failed:
 workflow.already_running:
   en: A batch is already running
   zh-CN: 已有批量任务正在运行
+workflow.output_not_folder:
+  en: Choose a folder for the output, not a file
+  zh-CN: 请为输出选择文件夹，而不是文件
 workflow.nothing_to_convert:
   en: Add images to the queue first
   zh-CN: 请先把图片加入队列

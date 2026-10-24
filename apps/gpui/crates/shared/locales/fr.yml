@@ -111,6 +111,8 @@ workflow.failed:
   fr: "Échec du lot : %{detail}"
 workflow.already_running:
   fr: Un lot est déjà en cours
+workflow.output_not_folder:
+  fr: Choisissez un dossier pour la sortie, pas un fichier
 workflow.nothing_to_convert:
   fr: Ajoutez d’abord des images à la file
 settings.title:

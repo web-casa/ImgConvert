@@ -111,6 +111,8 @@ workflow.failed:
   es: "Error en el lote: %{detail}"
 workflow.already_running:
   es: Ya hay un lote en curso
+workflow.output_not_folder:
+  es: Elige una carpeta para la salida, no un archivo
 workflow.nothing_to_convert:
   es: Añade primero imágenes a la cola
 settings.title:
