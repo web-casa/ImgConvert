@@ -159,7 +159,7 @@ jobs:
           test "$actual" = "$expected" || { echo "unexpected outputs: $actual"; exit 1; }
           for file in "$smoke"/out/*; do test -s "$file" || { echo "empty output $file"; exit 1; }; done
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: gpui-macos-gui-smoke-${{ matrix.uname_arch }}-${{ github.run_id }}-${{ github.run_attempt }}

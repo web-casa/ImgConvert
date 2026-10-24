@@ -196,7 +196,7 @@ jobs:
             echo "Run this workflow again later with source_run_id=$SOURCE_RUN_ID."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ success() && steps.notarization.outputs.notarization_status == 'Accepted' }}
         with:
           name: imgconvert-macos-${{ inputs.architecture }}-dmg-notarized-${{ inputs.source_run_id }}

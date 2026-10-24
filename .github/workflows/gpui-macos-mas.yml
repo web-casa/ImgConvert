@@ -93,7 +93,7 @@ jobs:
       - name: Build the Store-feature GPUI binary
         run: cargo build --manifest-path apps/gpui/Cargo.toml --release --locked --no-default-features -p imgconvert-gpui
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: gpui-store-binary-${{ matrix.uname_arch }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
@@ -240,7 +240,7 @@ jobs:
             shasum -a 256 dist/*.pkg | tee dist/SHA256SUMS
           fi
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           # Named by the result: a failed run uploads as "unvalidated".

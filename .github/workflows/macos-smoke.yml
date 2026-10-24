@@ -167,7 +167,7 @@ jobs:
 
       - name: Upload Apple Silicon AVIF benchmark report
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: imgconvert-macos-arm64-avif-benchmark
           if-no-files-found: error
@@ -306,7 +306,7 @@ jobs:
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
         run: APPLE_SIGNING_IDENTITY="$IMGCONVERT_DIRECT_EFFECTIVE_SIGNING_IDENTITY" pnpm run release:macos
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.notarize_direct }}
         with:
           name: imgconvert-macos-arm64-dmg-pending
@@ -327,7 +327,7 @@ jobs:
             --submit-only \
             --receipt=src-tauri/target/release/bundle/dmg/notarization.json
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_direct && !inputs.notarize_direct }}
         with:
           name: imgconvert-macos-arm64-dmg
@@ -335,7 +335,7 @@ jobs:
           retention-days: 3
           path: src-tauri/target/release/bundle/dmg/*.dmg
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.notarize_direct }}
         with:
           name: imgconvert-macos-notarization-receipt
@@ -392,7 +392,7 @@ jobs:
             "${apps[0]}" \
             "src-tauri/target/universal-apple-darwin/release/bundle/macos/ImgConvert_${version}_mas.app.zip"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
         with:
           name: imgconvert-macos-universal-mas-app
@@ -400,7 +400,7 @@ jobs:
           retention-days: 3
           path: src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.zip
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mas_candidate }}
         with:
           name: imgconvert-macos-universal-mas-pkg
@@ -506,7 +506,7 @@ jobs:
           case "${dmgs[0]}" in *$'\n'*|*$'\r'*) echo "artifact path contains a newline"; exit 1 ;; esac
           echo "IMGCONVERT_MACOS_DMG=${dmgs[0]}" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: imgconvert-macos-arm64-dmg-pending
           if-no-files-found: error
@@ -529,7 +529,7 @@ jobs:
             --dmg="$IMGCONVERT_MACOS_DMG" \
             --receipt=src-tauri/target/release/bundle/dmg/notarization.json
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: imgconvert-macos-notarization-receipt
           if-no-files-found: error
