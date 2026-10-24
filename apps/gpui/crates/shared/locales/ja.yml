@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   ja: "拡大/縮小"
 menu.fullscreen:
-  ja: "フルスクリーンにする"
+  ja: "フルスクリーン切り替え"
 app.open_files:
   ja: 開く…
 app.instance_blocked_title:

@@ -46,7 +46,7 @@ menu.minimize:
 menu.zoom:
   ko: "확대/축소"
 menu.fullscreen:
-  ko: "전체 화면 시작"
+  ko: "전체 화면 전환"
 app.open_files:
   ko: 열기…
 app.instance_blocked_title:
