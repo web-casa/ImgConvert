@@ -13,7 +13,26 @@
          ignore_disabled_input: bool,
 --- a/src/platform.rs
 +++ b/src/platform.rs
-@@ -1175,6 +1175,10 @@
+@@ -36,7 +36,7 @@
+     objc2_core_foundation::CFRetained<objc2_core_video::CVImageBuffer>;
+ 
+ use crate::{
+-    Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, Bounds,
++    Action, AnyWindowHandle, App, TerminateReason, TerminateReply, AsyncWindowContext, BackgroundExecutor, Bounds,
+     DEFAULT_WINDOW_SIZE, DevicePixels, DispatchEventResult, Edges, ExternalDragPayload, Font,
+     FontId, FontMetrics, FontRun, ForegroundExecutor, GlyphId, GpuSpecs, Hsla, ImageSource, Keymap,
+     LineLayout, MissingGlyphSink, Pixels, PlatformGestures, PlatformInput, Point, Priority,
+@@ -414,6 +414,9 @@
+     fn open_with_system(&self, path: &Path);
+ 
+     fn on_quit(&self, callback: Box<dyn FnMut() -> bool>);
++    /// Asks whether the application may terminate now (macOS
++    /// `applicationShouldTerminate:`). Other platforms never ask.
++    fn on_should_terminate(&self, _callback: Box<dyn FnMut(TerminateReason) -> TerminateReply>) {}
+     fn on_reopen(&self, callback: Box<dyn FnMut()>);
+     /// Registers the callback invoked when the system is about to sleep.
+     fn on_system_sleep(&self, callback: Box<dyn FnMut()>);
+@@ -1175,6 +1178,10 @@
      fn capslock(&self) -> Capslock;
      fn set_input_handler(&mut self, input_handler: PlatformInputHandler);
      fn take_input_handler(&mut self) -> Option<PlatformInputHandler>;
@@ -24,7 +43,7 @@
      /// Apply the focused text region's [`TextInputConfiguration`] to the
      /// platform's text input session (e.g. attributes of the hidden editable
      /// element on web). Called only when the configuration changes, because
-@@ -1930,6 +1934,8 @@
+@@ -1930,6 +1937,8 @@
  pub struct PlatformInputHandler {
      cx: AsyncWindowContext,
      handler: Box<dyn InputHandler>,
@@ -33,7 +52,7 @@
  }
  
  #[expect(missing_docs)]
-@@ -1942,7 +1948,12 @@
+@@ -1942,7 +1951,12 @@
  )]
  impl PlatformInputHandler {
      pub fn new(cx: AsyncWindowContext, handler: Box<dyn InputHandler>) -> Self {
@@ -47,7 +66,7 @@
      }
  
      pub fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
-@@ -2016,6 +2027,21 @@
+@@ -2016,6 +2030,21 @@
              .ok();
      }
  
@@ -69,7 +88,7 @@
      pub fn paste(&mut self, item: ClipboardItem) {
          self.cx
              .update(|window, cx| self.handler.paste(item, window, cx))
-@@ -2185,6 +2211,13 @@
+@@ -2185,6 +2214,13 @@
  ///
  /// <https://developer.apple.com/documentation/appkit/nstextinputclient>
  pub trait InputHandler: 'static {
@@ -950,3 +969,57 @@
  pub use action::*;
  pub use anyhow::Result;
  pub use app::*;
+--- a/src/app.rs
++++ b/src/app.rs
+@@ -395,6 +395,24 @@
+     }
+ }
+ 
++/// Why the platform asks to terminate the application.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum TerminateReason {
++    /// The user quit the application (for example from the Dock menu).
++    UserQuit,
++    /// The session ends: log out, restart or shut down.
++    SessionEnd,
++}
++
++/// The application's answer to a termination request.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum TerminateReply {
++    /// Terminate now.
++    Now,
++    /// Keep running; the application quits later by itself if it wants to.
++    Cancel,
++}
++
+ /// Defines when the application should automatically quit.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+ pub enum QuitMode {
+@@ -2591,6 +2609,26 @@
+         self.actions.documentation()
+     }
+ 
++    /// Registers the handler asked before the platform terminates the
++    /// application (macOS `applicationShouldTerminate:`, which also runs for
++    /// [`App::quit`]). If the application state is busy the answer is
++    /// [`TerminateReply::Now`].
++    pub fn on_should_terminate(
++        &self,
++        mut handler: impl FnMut(TerminateReason, &mut App) -> TerminateReply + 'static,
++    ) {
++        let this = self.this.clone();
++        self.platform.on_should_terminate(Box::new(move |reason| {
++            let Some(app) = this.upgrade() else {
++                return TerminateReply::Now;
++            };
++            match app.try_borrow_mut() {
++                Ok(mut cx) => handler(reason, &mut cx),
++                Err(_) => TerminateReply::Now,
++            }
++        }));
++    }
++
+     /// Register a callback to be invoked when the application is about to quit.
+     /// It is not possible to cancel the quit event at this point.
+     pub fn on_app_quit<Fut>(

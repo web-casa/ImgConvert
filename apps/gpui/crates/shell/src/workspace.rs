@@ -9,6 +9,7 @@
 //! navigation rail is gone; theme and reduced motion live in the header's
 //! Appearance popover.
 
+use crate::lifecycle;
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
     ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
@@ -25,6 +26,7 @@ use imgconvert_gpui_diagnostics::{PluginDiagnostics, open_plugin_diagnostics};
 use imgconvert_gpui_impact::{ImpactSubject, ImpactView, open_environmental_impact};
 use imgconvert_gpui_preview::{ComparisonPreview, open_comparison_preview};
 use imgconvert_gpui_queue::{QueueView, QueueViewEvent};
+
 use imgconvert_gpui_shared::i18n::tr;
 use imgconvert_gpui_shared::theme::{self, ActiveGlass as _, GlassStyled as _};
 use imgconvert_gpui_workflow::{ActionBar, ActionBarEvent, COMPACT_WIDTH_REM, WorkflowPanel};
@@ -349,8 +351,12 @@ pub fn open_main_window(cx: &mut App) -> gpui_kit::Result<(AnyWindowHandle, Enti
             ..Default::default()
         },
         cx,
-        |window, cx| cx.new(|cx| Workspace::new(window, cx)),
+        |window, cx| {
+            window.on_window_should_close(cx, |_, cx| lifecycle::window_should_close(cx));
+            cx.new(|cx| Workspace::new(window, cx))
+        },
     )
+    .inspect(|(handle, _)| lifecycle::set_main_window(*handle, cx))
 }
 
 /// The brand mark at title-bar size (`assets/brand/logo-mark-small.svg`), decoded once.

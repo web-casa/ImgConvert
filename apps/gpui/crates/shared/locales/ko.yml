@@ -7,6 +7,14 @@ app.language_title:
   ko: 언어
 app.quit:
   ko: ImgConvert 종료
+app.quit_confirm_title:
+  ko: "변환을 중지하고 종료할까요?"
+app.quit_confirm_body:
+  ko: "이미 변환된 파일은 유지됩니다. 나머지 파일은 변환되지 않습니다."
+app.quit_confirm_stop:
+  ko: "중지 후 종료"
+app.quit_confirm_keep:
+  ko: "계속 변환"
 app.open_files:
   ko: 열기…
 app.instance_blocked_title:

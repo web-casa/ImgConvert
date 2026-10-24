@@ -7,6 +7,14 @@ app.language_title:
   ja: 言語
 app.quit:
   ja: ImgConvert を終了
+app.quit_confirm_title:
+  ja: "変換を中止して終了しますか？"
+app.quit_confirm_body:
+  ja: "変換済みのファイルは残ります。残りのファイルは変換されません。"
+app.quit_confirm_stop:
+  ja: "中止して終了"
+app.quit_confirm_keep:
+  ja: "変換を続ける"
 app.open_files:
   ja: 開く…
 app.instance_blocked_title:

@@ -8,22 +8,18 @@
 pub mod appearance;
 pub mod blocked;
 pub mod language;
+pub mod lifecycle;
 pub mod probe_driver;
 pub mod workspace;
 
-use std::time::Duration;
-
 use gpui_kit::{App, KeyBinding, Menu, MenuItem, actions};
 use imgconvert_gpui_shared::i18n::{self, Locale, tr};
-use imgconvert_gpui_shared::{AppModels, Services, services, settings_model, theme};
+use imgconvert_gpui_shared::{AppModels, services, settings_model, theme};
 
 pub use blocked::open_blocked_window;
 pub use workspace::{Workspace, open_main_window};
 
 actions!(imgconvert, [Quit, OpenFiles]);
-
-/// How long quitting waits for in-flight atomic writes.
-pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Initializes Kit, services (which load the persisted settings), the product
 /// theme and locale from those settings, key bindings, menus and global actions. Call once
@@ -35,13 +31,11 @@ pub fn init_app(cx: &mut App) {
     imgconvert_gpui_app_settings::init(cx);
     let locale = AppModels::global(cx).settings().read(cx).settings().locale;
     i18n::set_locale(Locale::from_app_locale(locale));
+    // A fallback: the coordinator flushes on every path it controls.
     settings_model::flush_on_quit(cx);
+    lifecycle::install(cx);
 
-    cx.on_action(|_: &Quit, cx| {
-        settings_model::flush(cx);
-        let _ = Services::shutdown(cx, SHUTDOWN_TIMEOUT);
-        cx.quit();
-    });
+    cx.on_action(|_: &Quit, cx| lifecycle::request_quit(cx));
     cx.on_action(|_: &OpenFiles, cx| imgconvert_gpui_queue::import::pick_and_import(cx));
 
     // Bind before building the menus so shortcuts show next to their items.

@@ -7,6 +7,14 @@ app.language_title:
   fr: Langue
 app.quit:
   fr: Quitter ImgConvert
+app.quit_confirm_title:
+  fr: "Arrêter la conversion et quitter ?"
+app.quit_confirm_body:
+  fr: "Les fichiers déjà convertis sont conservés. Les fichiers restants ne seront pas convertis."
+app.quit_confirm_stop:
+  fr: "Arrêter et quitter"
+app.quit_confirm_keep:
+  fr: "Continuer la conversion"
 app.open_files:
   fr: Ouvrir…
 app.instance_blocked_title:

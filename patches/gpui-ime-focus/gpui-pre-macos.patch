@@ -57,3 +57,104 @@
      fn prompt(
          &self,
          level: PromptLevel,
+--- a/src/platform.rs
++++ b/src/platform.rs
+@@ -36,7 +36,7 @@
+     CursorStyle, ForegroundExecutor, GraphicalEnvironment, KeyContext, Keymap, Menu, MenuItem,
+     OsMenu, OwnedMenu, PathPromptOptions, Platform, PlatformDisplay, PlatformKeyboardLayout,
+     PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Result, SystemMenuType, Task,
+-    ThermalState, WindowAppearance, WindowKind, WindowParams, WindowingRequest,
++    TerminateReason, TerminateReply, ThermalState, WindowAppearance, WindowKind, WindowParams, WindowingRequest,
+     popup::PopupNotSupportedError,
+ };
+ use gpui_util::{ResultExt, new_std_command};
+@@ -103,6 +103,10 @@
+                 sel!(applicationShouldHandleReopen:hasVisibleWindows:),
+                 should_handle_reopen as extern "C" fn(&mut Object, Sel, id, bool),
+             );
++            decl.add_method(
++                sel!(applicationShouldTerminate:),
++                should_terminate as extern "C" fn(&mut Object, Sel, id) -> NSUInteger,
++            );
+             decl.add_method(
+                 sel!(applicationWillTerminate:),
+                 will_terminate as extern "C" fn(&mut Object, Sel, id),
+@@ -197,6 +201,7 @@
+     on_system_wake: Option<Box<dyn FnMut()>>,
+     system_power_observers_registered: bool,
+     quit: Option<Box<dyn FnMut() -> bool>>,
++    should_terminate: Option<Box<dyn FnMut(TerminateReason) -> TerminateReply>>,
+     menu_command: Option<Box<dyn FnMut(&dyn Action)>>,
+     validate_menu_command: Option<Box<dyn FnMut(&dyn Action) -> bool>>,
+     will_open_menu: Option<Box<dyn FnMut()>>,
+@@ -260,6 +265,7 @@
+             find_pasteboard: Pasteboard::find(),
+             reopen: None,
+             quit: None,
++            should_terminate: None,
+             menu_command: None,
+             validate_menu_command: None,
+             will_open_menu: None,
+@@ -1061,6 +1067,10 @@
+         self.0.lock().quit = Some(callback);
+     }
+ 
++    fn on_should_terminate(&self, callback: Box<dyn FnMut(TerminateReason) -> TerminateReply>) {
++        self.0.lock().should_terminate = Some(callback);
++    }
++
+     fn on_reopen(&self, callback: Box<dyn FnMut()>) {
+         self.0.lock().reopen = Some(callback);
+     }
+@@ -1469,6 +1479,51 @@
+     }
+ }
+ 
++/// `NSApplicationTerminateReply` values.
++const NS_TERMINATE_CANCEL: NSUInteger = 0;
++const NS_TERMINATE_NOW: NSUInteger = 1;
++/// `kAEQuitReason` ('why?'): present on the quit Apple Event when the
++/// session ends (log out, restart, shut down).
++const AE_QUIT_REASON: u32 = 0x7768_793f;
++
++extern "C" fn should_terminate(this: &mut Object, _: Sel, _: id) -> NSUInteger {
++    let platform = unsafe { get_mac_platform(this) };
++    let mut lock = platform.0.lock();
++    let Some(mut callback) = lock.should_terminate.take() else {
++        return NS_TERMINATE_NOW;
++    };
++    drop(lock);
++    let reason = if unsafe { session_is_ending() } {
++        TerminateReason::SessionEnd
++    } else {
++        TerminateReason::UserQuit
++    };
++    let reply = callback(reason);
++    platform.0.lock().should_terminate.get_or_insert(callback);
++    match reply {
++        TerminateReply::Now => NS_TERMINATE_NOW,
++        TerminateReply::Cancel => NS_TERMINATE_CANCEL,
++    }
++}
++
++/// Whether the Apple Event being handled is a quit with a session-end
++/// reason.
++unsafe fn session_is_ending() -> bool {
++    unsafe {
++        let manager: id = msg_send![class!(NSAppleEventManager), sharedAppleEventManager];
++        let event: id = msg_send![manager, currentAppleEvent];
++        if event == nil {
++            return false;
++        }
++        let reason: id = msg_send![event, attributeDescriptorForKeyword: AE_QUIT_REASON];
++        if reason == nil {
++            return false;
++        }
++        let code: u32 = msg_send![reason, enumCodeValue];
++        code != 0
++    }
++}
++
+ extern "C" fn will_terminate(this: &mut Object, _: Sel, _: id) {
+     let platform = unsafe { get_mac_platform(this) };
+     let mut lock = platform.0.lock();

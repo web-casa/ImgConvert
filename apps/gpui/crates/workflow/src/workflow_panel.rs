@@ -455,7 +455,8 @@ impl WorkflowPanel {
             decided.concurrency,
             cx,
         ) {
-            Ok(_) => None,
+            // The quit coordinator owns the status line once quitting.
+            Ok(_) | Err(StartError::Quitting) => None,
             Err(StartError::Empty) => Some(Notice::NothingToConvert),
             Err(StartError::Settling) => Some(Notice::AlreadyRunning),
             Err(StartError::Batch(error)) => Some(Notice::Failed(error.to_string())),
@@ -499,7 +500,8 @@ impl WorkflowPanel {
     fn start_into(&mut self, dir: PathBuf, format: String, cx: &mut Context<Self>) {
         let (keys, options, concurrency) = self.prepare_jobs(&dir, &format, cx);
         self.notice = match progress_bridge::start_batch(keys, options, concurrency, cx) {
-            Ok(_) => None,
+            // The quit coordinator owns the status line once quitting.
+            Ok(_) | Err(StartError::Quitting) => None,
             Err(StartError::Empty) => Some(Notice::NothingToConvert),
             Err(StartError::Settling) => Some(Notice::AlreadyRunning),
             Err(StartError::Batch(error)) => Some(Notice::Failed(error.to_string())),

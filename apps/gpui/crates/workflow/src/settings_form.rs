@@ -54,7 +54,7 @@ use imgconvert_gpui_shared::a11y::{DisabledForAll as _, dialog_title};
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
-use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, SettingsModel};
+use imgconvert_gpui_shared::{AppModels, BatchModel, QueueModel, SettingsModel, lifecycle};
 
 /// Sentinel id of the preset select when no preset matches.
 const CUSTOM_PRESET_VALUE: &str = "__custom";
@@ -599,6 +599,14 @@ impl SettingsForm {
             ));
         }
 
+        let form = cx.entity().downgrade();
+        lifecycle::on_before_quit(
+            move |cx| {
+                let _ = form.update(cx, SettingsForm::commit_drafts);
+            },
+            cx,
+        );
+
         Self {
             settings: models.settings().clone(),
             queue: models.queue().clone(),
@@ -953,6 +961,27 @@ impl SettingsForm {
     /// Parses and clamps a numeric field like the Svelte `setNumber`:
     /// `Number("")` is 0 (then clamped to the minimum); text that is not a
     /// finite number is ignored.
+    /// The text input behind a number field.
+    pub fn number_input(&self, field: NumberField) -> Option<&Entity<InputState>> {
+        self.numbers
+            .iter()
+            .find(|(candidate, _)| *candidate == field)
+            .map(|(_, state)| state)
+    }
+
+    /// Commits number fields that still hold typed text (they otherwise
+    /// commit on blur or Enter). Run before quitting so a draft is not lost.
+    pub fn commit_drafts(&mut self, cx: &mut Context<Self>) {
+        for (field, state) in self.numbers.clone() {
+            let text = state.read(cx).value().to_string();
+            // An untouched field shows the stored value; committing it could
+            // still clamp a value the record holds outside the field's range.
+            if text != field.text(&self.snapshot(cx)) {
+                self.commit_number(field, &text, cx);
+            }
+        }
+    }
+
     pub fn commit_number(&mut self, field: NumberField, text: &str, cx: &mut Context<Self>) {
         let trimmed = text.trim();
         let parsed = if trimmed.is_empty() {
