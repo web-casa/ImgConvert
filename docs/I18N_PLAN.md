@@ -151,6 +151,7 @@ errors: {
 | `PermissionDenied` | `permissionDenied` | `path` | 已知文件/目录权限拒绝 |
 | `UnsupportedFormat` | `unsupportedFormat` | `format` | 不支持的输入或目标格式 |
 | `OutputExists` | `outputExists` | `path` | 输出路径已存在且策略不允许覆盖 |
+| `DuplicateOutput` | `duplicateOutput` | `path` | 同一批次内两个文件得到同一输出路径，后一个不转换 |
 | `OutputNotSmaller` | `outputNotSmaller` | `path` | skip-if-larger / 代际防护导致的跳过 |
 | `ConversionFailed` | `conversionFailed` | `path` | 其余单文件转换失败 |
 | `BatchFailed` | `batchFailed` | 无 | 批量协调或进度通道失败 |

@@ -786,7 +786,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   ko: "원본 파일을 대체하려면 명시적인 확인이 필요합니다: %{path}"
 errors.duplicateOutput:
-  ko: "이 일괄 작업의 다른 파일이 같은 출력에 기록하므로 이 파일은 변환되지 않았습니다. 둘 중 하나의 이름을 바꾸거나 따로 변환하세요: %{path}"
+  ko: "이 일괄 작업의 다른 파일이 같은 출력 파일로 저장되므로 이 파일은 변환되지 않았습니다. 따로 변환하거나, 출력이 달라지도록 파일 이름 또는 이름 설정을 바꾸세요: %{path}"
 errors.outputConflictsWithInput:
   ko: "대기열의 원본을 보호하기 위해, 다른 입력과 일치하는 이 출력은 기록되지 않았습니다: %{path}"
 errors.outputSafetyCheckFailed:
