@@ -91,6 +91,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/smoke/in" "$RUNNER_TEMP/smoke/out" "$RUNNER_TEMP/smoke/home"
           cp "$fixtures/precision16.png" "$fixtures/pages3.pdf" "$RUNNER_TEMP/smoke/in/"
           sips -s format jpeg "$fixtures/precision16.png" --out "$RUNNER_TEMP/smoke/in/precision16-copy.jpg" >/dev/null
+          # A still HEIC exercises the ImageIO decoder on each architecture.
+          sips -s format heic "$fixtures/precision16.png" --out "$RUNNER_TEMP/smoke/in/still.heic" >/dev/null
           ls -la "$RUNNER_TEMP/smoke/in"
 
       - name: Launch the app, import and convert
@@ -150,9 +152,9 @@ jobs:
           done
           ! grep -qx 'no window' "$smoke/windows.txt" || { echo "no app window was on screen"; exit 1; }
           ls -la "$smoke/out"
-          # Exactly the expected outputs, each non-empty: two images and the
-          # three pages of pages3.pdf.
-          expected="pages3_done-page-001.avif pages3_done-page-002.avif pages3_done-page-003.avif precision16-copy_done.avif precision16_done.avif"
+          # Exactly the expected outputs, each non-empty: two images, a HEIC
+          # decoded through ImageIO and the three pages of pages3.pdf.
+          expected="pages3_done-page-001.avif pages3_done-page-002.avif pages3_done-page-003.avif precision16-copy_done.avif precision16_done.avif still_done.avif"
           actual="$(cd "$smoke/out" && ls | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')"
           test "$actual" = "$expected" || { echo "unexpected outputs: $actual"; exit 1; }
           for file in "$smoke"/out/*; do test -s "$file" || { echo "empty output $file"; exit 1; }; done
