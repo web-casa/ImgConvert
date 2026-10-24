@@ -152,7 +152,8 @@ jobs:
       - name: Package and sign the app and DMG
         run: |
           mkdir -p dist
-          dmg="$(scripts/package-gpui-macos.sh apps/gpui/target/release/imgconvert-gpui dist "$GPUI_SIGNING_IDENTITY")"
+          dmg="$(GPUI_BUILD_NUMBER="${{ github.run_number }}" \
+            scripts/package-gpui-macos.sh apps/gpui/target/release/imgconvert-gpui dist "$GPUI_SIGNING_IDENTITY")"
           echo "GPUI_DMG=$dmg" >> "$GITHUB_ENV"
           echo "IMGCONVERT_EXPECTED_BUNDLE_VERSION=$(cat dist/VERSION)" >> "$GITHUB_ENV"
           details="$(codesign -d --verbose=2 dist/ImgConvert.app 2>&1)"

@@ -15,6 +15,11 @@ on:
         required: false
         default: ""
         type: string
+      build_number:
+        description: CFBundleVersion, a positive integer above every build App Store Connect has processed (empty uses the run number).
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -177,6 +182,9 @@ jobs:
           fi
           test -n "$app_identity" || { echo "Apple Distribution identity not found"; exit 1; }
           test -n "$installer_identity" || { echo "Mac Installer Distribution identity not found"; exit 1; }
+          case "$app_identity$installer_identity" in
+            *$'\n'*|*$'\r'*) echo "signing identity contains a newline"; exit 1 ;;
+          esac
           echo "GPUI_MAS_APP_IDENTITY=$app_identity" >> "$GITHUB_ENV"
           echo "GPUI_MAS_INSTALLER_IDENTITY=$installer_identity" >> "$GITHUB_ENV"
 
@@ -189,7 +197,7 @@ jobs:
           printf '%s' "$IMGCONVERT_MAS_PROVISION_PROFILE_BASE64" | base64 --decode > "$profile" 2>/dev/null \
             || printf '%s' "$IMGCONVERT_MAS_PROVISION_PROFILE_BASE64" | base64 -D > "$profile"
           test -s "$profile" || { echo "decoded provisioning profile is empty"; exit 1; }
-          pkg="$(GPUI_MAS=1 GPUI_MAS_PROFILE="$profile" \
+          pkg="$(GPUI_MAS=1 GPUI_MAS_PROFILE="$profile" GPUI_BUILD_NUMBER="${{ inputs.build_number || github.run_number }}" \
             scripts/package-gpui-macos.sh dist/imgconvert-gpui-universal dist "$GPUI_MAS_APP_IDENTITY")"
           echo "GPUI_PKG=$pkg" >> "$GITHUB_ENV"
           echo "IMGCONVERT_EXPECTED_BUNDLE_VERSION=$(cat dist/VERSION)" >> "$GITHUB_ENV"
@@ -200,14 +208,19 @@ jobs:
         run: |
           node scripts/check-macos-bundle-artifacts.mjs --bundles=app --artifact=dist/ImgConvert.app \
             --require-signed --require-mas --expected-architectures=arm64,x86_64
-          pkgutil --check-signature "$GPUI_PKG"
+          signature="$(pkgutil --check-signature "$GPUI_PKG")"
+          printf '%s\n' "$signature"
+          grep -Eq "Mac Installer Distribution|3rd Party Mac Developer Installer" <<< "$signature" \
+            || { echo "the package is not signed with a Mac Installer Distribution certificate"; exit 1; }
 
       - name: Validate with App Store Connect (no upload)
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
-        run: node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG"
+        run: |
+          node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG"
+          echo "GPUI_MAS_RESULT=validated" >> "$GITHUB_ENV"
 
       - name: Record checksums
         if: always()
@@ -219,7 +232,8 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: gpui-macos-universal-mas-${{ github.run_id }}-${{ github.run_attempt }}
+          # Named by the result: a failed run uploads as "unvalidated".
+          name: gpui-macos-universal-mas-${{ env.GPUI_MAS_RESULT || 'unvalidated' }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           retention-days: 14
           path: |
