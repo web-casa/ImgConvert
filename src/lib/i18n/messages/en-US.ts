@@ -342,6 +342,8 @@ export const enUS = {
     invalidOutputSuffix: "The file-name suffix contains unsupported characters or is too long.",
     sourceOverwriteConfirmationRequired:
       "Explicit confirmation is required before replacing a source file: {path}",
+    duplicateOutput:
+      "Another file in this batch writes the same output, so this one was not converted. Rename one of them or convert them separately: {path}",
     outputConflictsWithInput:
       "To protect a queued source, this output was not written because it matches another input: {path}",
     outputSafetyCheckFailed:

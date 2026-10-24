@@ -20,6 +20,7 @@ pub fn format_command_error(error: &CommandError) -> SharedString {
             ("errors.sourceOverwriteConfirmationRequired", Some("path"))
         }
         ErrorCode::OutputConflictsWithInput => ("errors.outputConflictsWithInput", Some("path")),
+        ErrorCode::DuplicateOutput => ("errors.duplicateOutput", Some("path")),
         ErrorCode::OutputSafetyCheckFailed => ("errors.outputSafetyCheckFailed", Some("path")),
         ErrorCode::OutputNotSmaller => ("errors.outputNotSmaller", Some("path")),
         ErrorCode::PdfPasswordProtected => ("errors.pdfPasswordProtected", Some("path")),
@@ -79,6 +80,7 @@ mod tests {
                 ErrorCode::InvalidOutputSuffix,
                 ErrorCode::SourceOverwriteConfirmationRequired,
                 ErrorCode::OutputConflictsWithInput,
+                ErrorCode::DuplicateOutput,
                 ErrorCode::OutputSafetyCheckFailed,
                 ErrorCode::OutputNotSmaller,
                 ErrorCode::PdfPasswordProtected,

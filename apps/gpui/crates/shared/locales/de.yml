@@ -785,6 +785,8 @@ errors.invalidOutputSuffix:
   de: Das Dateinamensuffix enthält nicht unterstützte Zeichen oder ist zu lang.
 errors.sourceOverwriteConfirmationRequired:
   de: "Vor dem Ersetzen einer Quelldatei ist eine ausdrückliche Bestätigung erforderlich: %{path}"
+errors.duplicateOutput:
+  de: "Eine andere Datei in diesem Stapel schreibt dieselbe Ausgabe, daher wurde diese nicht konvertiert. Benenne eine davon um oder konvertiere sie getrennt: %{path}"
 errors.outputConflictsWithInput:
   de: "Zum Schutz einer Quelle in der Warteliste wurde diese Ausgabe nicht geschrieben, da sie einer anderen Eingabe entspricht: %{path}"
 errors.outputSafetyCheckFailed:

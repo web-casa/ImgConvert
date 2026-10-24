@@ -785,6 +785,8 @@ errors.invalidOutputSuffix:
   pt-BR: O sufixo do nome contém caracteres não suportados ou é longo demais.
 errors.sourceOverwriteConfirmationRequired:
   pt-BR: "É necessária uma confirmação explícita antes de substituir um arquivo de origem: %{path}"
+errors.duplicateOutput:
+  pt-BR: "Outro arquivo deste lote gera a mesma saída, então este não foi convertido. Renomeie um deles ou converta-os separadamente: %{path}"
 errors.outputConflictsWithInput:
   pt-BR: "Para proteger uma origem na fila, esta saída não foi gravada porque coincide com outra entrada: %{path}"
 errors.outputSafetyCheckFailed:

@@ -2781,10 +2781,10 @@ fn prepare_batch_work_with_protected_inputs(
                         preflight_events.push(BatchProgressEvent::FileError {
                             index,
                             input: options.input,
-                            error: CommandError::batch_failed(format!(
-                                "输出路径在本批次内重复: {}",
-                                output.display()
-                            )),
+                            error: CommandError::duplicate_output(
+                                output.to_string_lossy().to_string(),
+                                format!("输出路径在本批次内重复: {}", output.display()),
+                            ),
                         });
                         continue 'jobs;
                     }
@@ -6018,7 +6018,13 @@ pub(crate) mod tests {
                 pdf: None,
             })
             .collect();
-        let progress = crate::progress::NullSink;
+        let errors = std::sync::Mutex::new(Vec::new());
+        let progress = crate::progress::FnSink::new(|_, event| {
+            if let BatchProgressEvent::FileError { error, .. } = event {
+                errors.lock().unwrap().push(error);
+            }
+            Ok(())
+        });
         let summary = convert_batch(
             options,
             &progress,
@@ -6034,6 +6040,16 @@ pub(crate) mod tests {
         assert_eq!(summary.failed, 1);
         assert!(!summary.cancelled);
         assert!(out_dir.join("sample.jpg").exists());
+        let errors = errors.into_inner().unwrap();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(
+            errors[0].code,
+            crate::command_error::ErrorCode::DuplicateOutput
+        );
+        assert_eq!(
+            errors[0].params.as_ref().unwrap()["path"],
+            out_dir.join("sample.jpg").to_string_lossy().as_ref()
+        );
 
         fs::remove_dir_all(dir).unwrap();
     }
