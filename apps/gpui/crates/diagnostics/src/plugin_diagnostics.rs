@@ -28,7 +28,7 @@ use imgconvert_backend::external_codecs::{
     ManifestDiagnostic, ManifestSearchDirDiagnostic, SelectedHelperDiagnostic,
     SystemCodecDiagnostic, SystemHelperDiagnostic,
 };
-use imgconvert_gpui_shared::a11y::DisabledForAll as _;
+use imgconvert_gpui_shared::a11y::{DisabledForAll as _, dialog_title};
 use imgconvert_gpui_shared::file_prompt::{self, PromptKind};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::tasks;
@@ -784,7 +784,7 @@ pub fn open_plugin_diagnostics(window: &mut Window, cx: &mut App) -> Entity<Plug
             // The footer's own close button is the one way out besides
             // Escape: Kit's corner button is named "Close" in every language.
             .close_button(false)
-            .title(tr("diagnostics.title"))
+            .title(dialog_title(tr("diagnostics.title")))
             .w(px(760.))
             .content(move |content, _, _| content.child(content_entity.clone()))
             .footer(

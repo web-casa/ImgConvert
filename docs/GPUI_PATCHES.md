@@ -1,12 +1,12 @@
 # GPUI 补丁登记
 
-当前 GPUI workspace 已用 `[patch.crates-io]` 接入 `gpui-pre` / `gpui-pre-macos` 0.3.8 的 IME 焦点修复、共享焦点 Tab 排序修复，以及辅助功能“按下”与滚动入视修复。Kit 五包仍为 0.7.1，所有依赖版本不变，锁文件仅移除这两项 registry 来源/checksum。正常 `cargo build --locked` 直接使用接入后的源码。
+当前 GPUI workspace 已用 `[patch.crates-io]` 接入 `gpui-pre` / `gpui-pre-macos` 0.3.8 的 IME 焦点修复、共享焦点 Tab 排序修复、辅助功能“按下”与滚动入视修复，以及 `gpui-base` 0.7.1 的对话框角色修复。Kit 五包仍为 0.7.1，所有依赖版本不变，锁文件仅移除这三项 registry 来源/checksum。正常 `cargo build --locked` 直接使用接入后的源码。
 
 迁移方案 §3.1 要求阻塞 bug 先向上游提交最小复现；正式本地补丁须记录目的、来源、验证与退出条件，不 vendor 整个框架。最小复现已获用户明确授权，并于 2026-10-19 提交 [longbridge/gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605)，内容见 [GPUI_IME_REPRO.md](GPUI_IME_REPRO.md)，没有公开账号路径或原始媒体；不把实验构件当作产品修复。
 
 ## 已接入：macOS owner 焦点、原生会话清理与共享 Tab 排序
 
-差分与可重复准备工具见 [`patches/gpui-ime-focus`](../patches/gpui-ime-focus/README.md)，正式来源目录为 `apps/gpui/vendor/gpui-pre` 与 `gpui-pre-macos`；只保留这两个必须修改的 crate 的运行源码、Windows 构建资源、完整 Apache 许可及原始 manifest/README，共 116 个文件。移除上游示例/测试 target 和媒体，清单设为不可发布，两包不成为 workspace 成员；Kit、组件库和其他平台实现继续来自 registry。来源为接入前锁定的 Apache-2.0 `gpui-pre` / `gpui-pre-macos` 0.3.8 原始 crates.io 归档；两包完整 SHA256、补丁及修改后文件校验值保存在候选 manifest。准备工具拒绝旧输出、错误包/锁版本、路径穿越/链接，仅在本检出 `apps/gpui/target/tmp` 新目录生成本地源码与 opt-in config，不下载、不执行 Cargo、不改 registry、产品清单或锁。含 emoji 的路径由真实 Cargo TOML 解析回归覆盖。
+差分与可重复准备工具见 [`patches/gpui-ime-focus`](../patches/gpui-ime-focus/README.md)，正式来源目录为 `apps/gpui/vendor/gpui-pre`、`gpui-pre-macos` 与 `gpui-base`（后者见下文“对话框的角色与名称”）；只保留这三个必须修改的 crate 的运行源码、Windows 构建资源、完整 Apache 许可及原始 manifest/README，共 319 个文件。移除上游示例/测试 target 和媒体，清单设为不可发布，两包不成为 workspace 成员；Kit、组件库和其他平台实现继续来自 registry。来源为接入前锁定的 Apache-2.0 `gpui-pre` / `gpui-pre-macos` 0.3.8 原始 crates.io 归档；两包完整 SHA256、补丁及修改后文件校验值保存在候选 manifest。准备工具拒绝旧输出、错误包/锁版本、路径穿越/链接，仅在本检出 `apps/gpui/target/tmp` 新目录生成本地源码与 opt-in config，不下载、不执行 Cargo、不改 registry、产品清单或锁。含 emoji 的路径由真实 Cargo TOML 解析回归覆盖。
 
 候选在注册时保留 FocusId 与 entity client identity，绘制后依据最终焦点选中真实处理器，覆盖输入→输入/只读区域/无输入、绘制中焦点转移和控件移除。先对旧 owner 清 marked range / 提交 undo transaction，再同步调用该窗口 view 的 `inputContext.discardMarkedText`；当前版本还在该 context 仍属本窗口时停用/重新激活会话，保留 view/context 到回调结束，检查关闭状态、key window / first responder 及其他活动 context，防止抢走别的窗口输入。期间平台 handler 为空且不持 native mutex；全局 context 只用于身份保护，不作取消目标，也不安排延迟清理任务。绘制后的清理在退出绘制阶段后补帧；首次晚到焦点只对缺失目标尝试一次恢复，永久缺失不持续重绘。同帧 A→B→A 未安装过 B 时保留 A 组合。无 entity identity 的 custom handler 退回 FocusId；复用同一 FocusId 的自定义 client 需明确提供不同稳定身份。
 
@@ -68,6 +68,14 @@
 - 遗留：Kit 的 `Switch`、`Select`、`Slider`、`Input` 不实现 `InteractiveElement`，无法从外部设置，它们禁用时仍会被报告为可用（共 9 处）。需要 Kit 上游提供接口。另外，Linux 上 AccessKit 的 AT-SPI 适配层对 `Button` / `Link` 角色不读取 `disabled`，仍报告为可用（单选角色则报告为只读），所以本修复目前只在 macOS 与 Windows 生效；这需要改 AccessKit，记为遗留。两点均已写入经用户授权提交的 [longbridge/gpui-kit#3660](https://github.com/longbridge/gpui-kit/issues/3660)。Kit 的 `DropdownButton`、`ButtonGroup` 也不传递该状态，本应用目前没有用到。
 - 验证：UI 测试 `disabled_commands_are_disabled_for_assistive_technology`：空队列时开始节点是 disabled，不声明“按下”和“聚焦”；加入待转换文件后不再 disabled；批次运行时格式卡片（单选角色）是 disabled 且不可聚焦。去掉 `set_disabled` 时该测试失败。
 - 退出条件：上游 GPUI/Kit 提供等效接口后删除。
+
+## 已接入：对话框的角色与名称（`gpui-base` 焦点陷阱、`gpui-pre` 对话框命名）
+
+- 问题：G3 收口复验时，用 VoiceOver 打开“关于与开源许可”，只听到“你当前在‘窗口’中”，不读对话框标题。原因有两层：Kit 0.7.1 的 `gpui-base` 用 `FocusTrapContainer` 包住模态宿主，但这个容器没有转发 `a11y_role` / `write_a11y_info` / `a11y_synthetic_children`，宿主的 `Role::Dialog` 被整个丢掉，所有对话框在辅助功能树里都只是一个无名分组；即使角色保留，Kit 的宿主也从不设置名称（标题只是一个元素，不是字符串）。
+- 修改：新接入第三个源码覆盖 `apps/gpui/vendor/gpui-base`（0.7.1，只改 `src/focus_trap.rs`：容器转发上述三个方法）。同一 `gpui-pre` 的 `window/a11y.rs` 在生成树更新前，把没有名称的 `Dialog` / `AlertDialog` 节点按文档顺序命名为其子树中第一个 `Heading` 的名称；测试支持新增 `Window::a11y_nodes_with_role_for_test`，`a11y_node_for_test` 改为返回最终化后的节点。
+- 产品侧：shared 新增 `a11y::dialog_title`（带 `Heading` 角色与名称的标题），隐私、关于与许可、插件诊断、更新、影响分析、对比预览和输出安全确认六类对话框改用它。
+- 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生 VoiceOver 复验记录在 `GPUI_G2_ACCEPTANCE.md`。
+- 退出条件：上游 Kit 让焦点陷阱保留元素的辅助功能信息并为模态宿主设置名称后删除。尚未向上游提交，需用户授权。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
 

@@ -1,19 +1,19 @@
 {
-  "workspace_lock_sha256": "53cd05b1c1b9ef665d0726fe2b55dca03c6182e8d1ad0e9250a7587b510fc3f7",
+  "workspace_lock_sha256": "1a782c5465bb2404a17ccd02dae2306bdf5b27bbc7aac880d9a723eecb0152f4",
   "crates": {
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "44bfb871bdb20d2179500ddcc5e2e2045fbb74dcf4f4acc903dae1a1c00786b6",
+      "patch_sha256": "7e761d53905f855a9ee14c7c6d99af164d3a82fdfbb161107a1d5c64d75e33c1",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
         "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
-        "src/window.rs": "848464f8beb54e6152b432cbe1ee9c1a1a006481509a1b789337eb06ef60295f",
+        "src/window.rs": "118c7ba2750470dc5410094c006a1ab73d4575e2f6b880aa581212038ec6ca41",
         "src/app/test_context.rs": "d7a2a41a93fe276ab0959085ea2468fbce66ac051035292032835e9ff064c4b1",
         "src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1",
         "src/element.rs": "498036b2f1bb5f65f7cd7a3ed353a393a70c3f7b7885ee2e5f330ad5cf37cda4",
         "src/elements/div.rs": "d63603c0173d6418359f95118cc8f0e571f829e07055e1ae2744620d1527d233",
-        "src/window/a11y.rs": "94cd7f61a27c4d657fc025948974e1f81123990b839340911adf580d7695fb29",
+        "src/window/a11y.rs": "e12b674de4f593964c6cc881c7c52d50fbb29a114b508c33385512c849a0a2b5",
         "src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
         "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823"
       }
@@ -24,6 +24,14 @@
       "patch_sha256": "3b42cd67de7dbf52b524ea9674e8f37809728c1a830158f503b4260c9e606c7b",
       "patched_files": {
         "src/window.rs": "d1c6f20bef9b345591674a11acf2f97d9d62fdb0344f3ac0ab0a60fadf282134"
+      }
+    },
+    "gpui-base": {
+      "version": "0.7.1",
+      "archive_sha256": "3cf698677b253118459f552fe15513858c669d79a25837a94e480db2ae330050",
+      "patch_sha256": "4fc284cc961bb43a39d01285026cfecdcc62eb00b09af0a776db99b77e3e03aa",
+      "patched_files": {
+        "src/focus_trap.rs": "07927ea6c2aa6bcdb13acfa4cb5ea04535177a18de46de94484d57438015186b"
       }
     }
   },

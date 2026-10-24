@@ -28,7 +28,7 @@ use gpui_kit::{
 use imgconvert_backend::convert::ConvertWarning;
 use imgconvert_backend::preview::{self, PreviewOptions};
 use imgconvert_backend::settings::Settings;
-use imgconvert_gpui_shared::a11y::DisabledForAll as _;
+use imgconvert_gpui_shared::a11y::{DisabledForAll as _, dialog_title};
 use imgconvert_gpui_shared::conversion::{options_for_item, warning_texts};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::images::{decode_png, format_bytes};
@@ -841,7 +841,7 @@ pub fn open_comparison_preview(
             // The footer's own close button is the one way out besides
             // Escape: Kit's corner button is named "Close" in every language.
             .close_button(false)
-            .title(tr("preview.title"))
+            .title(dialog_title(tr("preview.title")))
             .w(px(880.))
             .content(move |content, _, _| content.child(content_entity.clone()))
             .footer(

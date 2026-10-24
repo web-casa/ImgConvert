@@ -13,7 +13,8 @@ import tempfile
 import prepare
 
 VENDOR = prepare.REPO / "apps/gpui/vendor"
-NAMES = {"gpui-pre", "gpui-pre-macos"}
+VERSIONS = {"gpui-pre": "0.3.8", "gpui-pre-macos": "0.3.8", "gpui-base": "0.7.1"}
+NAMES = set(VERSIONS)
 KIT = {"gpui-kit", "gpui-base", "gpui-component", "gpui-kit-assets", "gpui-component-macros"}
 
 
@@ -41,7 +42,7 @@ def verify_sources():
     lock = (prepare.REPO / "apps/gpui/Cargo.lock").read_bytes()
     if prepare.sha256(lock) != manifest["workspace_lock_sha256"]:
         raise ValueError("active product lock differs from the verified matrix")
-    # Prove that activation changed only the sources of the two existing crates.
+    # Prove that activation changed only the sources of the overridden crates.
     upstream = lock.decode("utf-8")
     for name in sorted(NAMES):
         crate = manifest["crates"][name]
@@ -52,7 +53,7 @@ def verify_sources():
             'source = "registry+https://github.com/rust-lang/crates.io-index"\n' +
             f'checksum = "{crate["archive_sha256"]}"\n')
     if prepare.sha256(upstream.encode("utf-8")) != manifest["upstream_lock_sha256"]:
-        raise ValueError("activation changed dependencies beyond the two source overrides")
+        raise ValueError("activation changed dependencies beyond the reviewed source overrides")
     inventory = json.loads((prepare.HERE / "vendor-files.json").read_text(encoding="utf-8"))
     actual = {}
     for path in VENDOR.rglob("*"):
@@ -63,7 +64,7 @@ def verify_sources():
     if actual != inventory:
         raise ValueError("source override inventory differs (missing, extra, or modified files)")
     if {Path(p).parts[0] for p in actual} != NAMES:
-        raise ValueError("only the two reviewed crates may be vendored")
+        raise ValueError("only the reviewed crates may be vendored")
     for name, crate in manifest["crates"].items():
         if prepare.sha256((prepare.HERE / f"{name}.patch").read_bytes()) != crate["patch_sha256"]:
             raise ValueError(f"patch checksum mismatch: {name}")
@@ -94,7 +95,7 @@ def verify_metadata(data):
         elif name in NAMES:
             raise ValueError(f"active override not selected: {name}")
     for name in KIT | NAMES:
-        if versions.get(name) != ({"0.3.8"} if name in NAMES else {"0.7.1"}):
+        if versions.get(name) != {VERSIONS.get(name, "0.7.1")}:
             raise ValueError(f"wrong framework version matrix: {name}")
 
 
@@ -128,7 +129,7 @@ def main():
             verify_archives(args.archives)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"IME source verification failed: {error}\n")
-    print(f"PASS: {len(inventory)} verified runtime/manifest/license files; two active overrides")
+    print(f"PASS: {len(inventory)} verified runtime/manifest/license files; {len(NAMES)} active overrides")
 
 
 if __name__ == "__main__":

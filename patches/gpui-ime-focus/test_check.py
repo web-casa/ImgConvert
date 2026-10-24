@@ -40,7 +40,7 @@ class CheckerTests(unittest.TestCase):
 
     def test_rejects_version_outside_product_lock(self):
         data = copy.deepcopy(self.metadata)
-        next(p for p in data["packages"] if p["name"] == "gpui-base")["version"] = "0.7.2"
+        next(p for p in data["packages"] if p["name"] == "gpui-component")["version"] = "0.7.2"
         with patch.object(check.subprocess, "run", return_value=self.response(data)) as run:
             with self.assertRaisesRegex(ValueError, "dependency outside the product lock"):
                 check.check(self.stage, True)

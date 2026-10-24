@@ -23,6 +23,7 @@ use gpui_kit::component::button::ButtonVariant;
 use gpui_kit::{App, SharedString, WeakEntity, Window};
 use imgconvert_backend::convert::{ConversionPlanEntry, ConvertOptions};
 use imgconvert_backend::settings::OverwriteMode;
+use imgconvert_gpui_shared::a11y::dialog_title;
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::GlassStyled as _;
 
@@ -276,7 +277,7 @@ pub fn advance(
             .glass_dialog(cx)
             .confirm()
             .keyboard(escape_closes)
-            .title(title.clone())
+            .title(dialog_title(title.clone()))
             .description(description.clone())
             .ok_text(ok_text.clone())
             .ok_variant(ok_variant)

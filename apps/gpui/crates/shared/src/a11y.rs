@@ -3,8 +3,11 @@
 
 //! Accessibility helpers shared by the views.
 
-use gpui_kit::InteractiveElement;
 use gpui_kit::component::Disableable;
+use gpui_kit::{
+    InteractiveElement, IntoElement, ParentElement as _, Role, SharedString,
+    StatefulInteractiveElement as _, div,
+};
 
 /// Disables a control for the pointer, the keyboard and assistive
 /// technology alike. Kit's `disabled` covers the first two only: it has no
@@ -18,3 +21,16 @@ pub trait DisabledForAll: Disableable + InteractiveElement {
 }
 
 impl<T: Disableable + InteractiveElement> DisabledForAll for T {}
+
+/// A dialog title that assistive technology names the dialog after. Kit's
+/// modal host has the dialog role but no name, so VoiceOver announced an
+/// opened dialog only as "window"; the vendored GPUI names an unlabeled
+/// dialog after its first heading.
+pub fn dialog_title(title: impl Into<SharedString>) -> impl IntoElement {
+    let title = title.into();
+    div()
+        .id("dialog-heading")
+        .role(Role::Heading)
+        .aria_label(title.clone())
+        .child(title)
+}
