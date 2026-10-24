@@ -380,6 +380,13 @@ impl A11y {
     /// Finalize the tree and produce a [`TreeUpdate`] for the platform adapter.
     pub(crate) fn end_frame(&mut self, frame: debug::FrameDebugInfo) -> TreeUpdate {
         let update = self.nodes.finalize();
+        // Tests read nodes as the adapter receives them, after finalization.
+        #[cfg(any(test, feature = "test-support"))]
+        for (id, node) in &update.nodes {
+            if let Some(recorded) = self.test_node_actions.get_mut(id) {
+                *recorded = node.clone();
+            }
+        }
         self.debug.capture(
             &update,
             self.nodes.focus,
@@ -673,7 +680,8 @@ impl A11yNodeBuilder {
             _ => self.focus.unwrap_or(ROOT_NODE_ID),
         };
 
-        let nodes = std::mem::take(&mut self.all_nodes);
+        let mut nodes = std::mem::take(&mut self.all_nodes);
+        name_dialogs_after_headings(&mut nodes);
         let update = TreeUpdate {
             nodes,
             tree: Some(accesskit::Tree::new(ROOT_NODE_ID)),
@@ -728,6 +736,45 @@ impl A11yNodeBuilder {
         }
 
         update
+    }
+}
+
+/// Kit's modal hosts carry the dialog role but no name, so VoiceOver
+/// announced an opened dialog only as "window". Name each unlabeled dialog
+/// after the first heading in its subtree, in document order.
+fn name_dialogs_after_headings(nodes: &mut [(NodeId, accesskit::Node)]) {
+    let index: FxHashMap<NodeId, usize> = nodes
+        .iter()
+        .enumerate()
+        .map(|(ix, (id, _))| (*id, ix))
+        .collect();
+    for dialog in 0..nodes.len() {
+        let node = &nodes[dialog].1;
+        if !matches!(
+            node.role(),
+            accesskit::Role::Dialog | accesskit::Role::AlertDialog
+        ) || node.label().is_some()
+        {
+            continue;
+        }
+        let mut stack: Vec<NodeId> = node.children().iter().rev().copied().collect();
+        let mut visited = FxHashSet::default();
+        let mut label = None;
+        while let Some(id) = stack.pop() {
+            let Some(&ix) = index.get(&id) else { continue };
+            if !visited.insert(id) {
+                continue;
+            }
+            let child = &nodes[ix].1;
+            if child.role() == accesskit::Role::Heading {
+                label = child.label().map(str::to_owned);
+                break;
+            }
+            stack.extend(child.children().iter().rev().copied());
+        }
+        if let Some(label) = label {
+            nodes[dialog].1.set_label(label);
+        }
     }
 }
 

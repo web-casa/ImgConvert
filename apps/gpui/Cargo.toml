@@ -87,3 +87,5 @@ arboard = { path = "../../vendor/arboard" }
 # macOS IME client/session lifecycle; provenance and removal: docs/GPUI_PATCHES.md.
 gpui-pre = { path = "vendor/gpui-pre" }
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
+# Focus-trap containers keep their element's accessibility role; see docs/GPUI_PATCHES.md.
+gpui-base = { path = "vendor/gpui-base" }

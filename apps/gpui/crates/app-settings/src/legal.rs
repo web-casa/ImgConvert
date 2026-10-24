@@ -15,6 +15,7 @@ use gpui_kit::{
     TestSupportExt as _, Window, div,
 };
 use gpui_kit::{Global, KeyBinding};
+use imgconvert_gpui_shared::a11y::dialog_title;
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::GlassStyled as _;
 
@@ -221,7 +222,7 @@ fn open(kind: DocumentKind, window: &mut Window, cx: &mut App) -> Entity<LegalDi
             // The footer's own close button is the one way out besides
             // Escape: Kit's corner button is named "Close" in every language.
             .close_button(false)
-            .title(kind.title())
+            .title(dialog_title(kind.title()))
             .w(
                 (window.rem_size() * 40.)
                     .min(window.viewport_size().width - window.rem_size() * 2.),

@@ -25,7 +25,7 @@ use gpui_kit::{
     App, AppContext as _, Context, Entity, Global, IntoElement, ParentElement as _, Render,
     Styled as _, Subscription, TestSupportExt as _, Window, div, rems,
 };
-use imgconvert_gpui_shared::a11y::DisabledForAll as _;
+use imgconvert_gpui_shared::a11y::{DisabledForAll as _, dialog_title};
 use imgconvert_gpui_shared::i18n::{tr, tr_with};
 use imgconvert_gpui_shared::theme::GlassStyled as _;
 use imgconvert_gpui_shared::{AppModels, tasks};
@@ -412,7 +412,7 @@ pub fn open_updates(window: &mut Window, cx: &mut App) -> Option<Entity<UpdatesD
             // The footer's own close button is the one way out besides
             // Escape: Kit's corner button is named "Close" in every language.
             .close_button(false)
-            .title(tr("update.title"))
+            .title(dialog_title(tr("update.title")))
             .w(window.rem_size() * 32.)
             .content(move |body, _, _| body.child(content.clone()))
             .footer(

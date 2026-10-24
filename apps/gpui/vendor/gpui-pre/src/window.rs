@@ -7193,6 +7193,18 @@ impl Window {
         true
     }
 
+    /// The accessibility nodes with `role` that the last frame built, as a
+    /// platform adapter receives them.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn a11y_nodes_with_role_for_test(&self, role: accesskit::Role) -> Vec<accesskit::Node> {
+        self.a11y
+            .test_node_actions
+            .values()
+            .filter(|node| node.role() == role)
+            .cloned()
+            .collect()
+    }
+
     /// The accessibility node the last frame built for the element whose id
     /// path ends with `id`, as a platform adapter receives it. Panics when
     /// several nodes' ids end with `id`.

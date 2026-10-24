@@ -23,6 +23,7 @@ use imgconvert_backend::environmental_impact::{
     self as model, ByteReductionMeasurement, ConversionImpactResult, DEFAULT_RETENTION_DAYS,
     ImpactQuantity, ReplacementStatus, STORAGE_IMPACT_MODEL_V1, UnavailableReason,
 };
+use imgconvert_gpui_shared::a11y::dialog_title;
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::GlassStyled as _;
@@ -613,7 +614,7 @@ pub fn open_environmental_impact(
             // The footer's own close button is the one way out besides
             // Escape: Kit's corner button is named "Close" in every language.
             .close_button(false)
-            .title(tr("impact.title"))
+            .title(dialog_title(tr("impact.title")))
             // Kit dialogs take pixels; follow the rem scale by hand.
             .w(window.rem_size() * 35.)
             .content(move |content, _, _| content.child(content_entity.clone()))

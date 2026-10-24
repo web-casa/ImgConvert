@@ -47,12 +47,10 @@
      }
  
      pub fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
-@@ -2014,6 +2025,21 @@
-         self.cx
-             .update(|window, cx| self.handler.unmark_text(window, cx))
+@@ -2016,6 +2027,21 @@
              .ok();
-+    }
-+
+     }
+ 
 +    #[cfg(target_os = "macos")]
 +    pub(crate) fn set_focus_id(&mut self, focus_id: crate::FocusId) {
 +        self.focus_id = Some(focus_id);
@@ -66,9 +64,11 @@
 +    #[cfg(target_os = "macos")]
 +    pub(crate) fn unmark_text_in_window(&mut self, window: &mut Window, cx: &mut App) {
 +        self.handler.unmark_text(window, cx);
-     }
- 
++    }
++
      pub fn paste(&mut self, item: ClipboardItem) {
+         self.cx
+             .update(|window, cx| self.handler.paste(item, window, cx))
 @@ -2185,6 +2211,13 @@
  ///
  /// <https://developer.apple.com/documentation/appkit/nstextinputclient>
@@ -265,7 +265,7 @@
              }
              accesskit::Action::Focus => {
                  if let Some(focus_id) = self.a11y.focus_ids.get(&request.target_node).copied()
-@@ -6955,6 +7025,187 @@
+@@ -6955,6 +7025,199 @@
          }
      }
  
@@ -437,6 +437,18 @@
 +        true
 +    }
 +
++    /// The accessibility nodes with `role` that the last frame built, as a
++    /// platform adapter receives them.
++    #[cfg(any(test, feature = "test-support"))]
++    pub fn a11y_nodes_with_role_for_test(&self, role: accesskit::Role) -> Vec<accesskit::Node> {
++        self.a11y
++            .test_node_actions
++            .values()
++            .filter(|node| node.role() == role)
++            .cloned()
++            .collect()
++    }
++
 +    /// The accessibility node the last frame built for the element whose id
 +    /// path ends with `id`, as a platform adapter receives it. Panics when
 +    /// several nodes' ids end with `id`.
@@ -518,7 +530,7 @@
          self.app
 --- a/src/tab_stop.rs
 +++ b/src/tab_stop.rs
-@@ -85,6 +85,10 @@
+@@ -85,7 +85,11 @@
              tab_stop: focus_handle.tab_stop,
              path,
          };
@@ -530,6 +542,7 @@
 +        }
          self.order.insert_or_replace(order, ());
      }
+ 
 --- a/src/element.rs
 +++ b/src/element.rs
 @@ -378,7 +378,24 @@
@@ -838,6 +851,76 @@
          self.action_listeners.clear();
          self.nodes.begin_frame(self.window_title.as_ref());
      }
+@@ -282,6 +380,13 @@
+     /// Finalize the tree and produce a [`TreeUpdate`] for the platform adapter.
+     pub(crate) fn end_frame(&mut self, frame: debug::FrameDebugInfo) -> TreeUpdate {
+         let update = self.nodes.finalize();
++        // Tests read nodes as the adapter receives them, after finalization.
++        #[cfg(any(test, feature = "test-support"))]
++        for (id, node) in &update.nodes {
++            if let Some(recorded) = self.test_node_actions.get_mut(id) {
++                *recorded = node.clone();
++            }
++        }
+         self.debug.capture(
+             &update,
+             self.nodes.focus,
+@@ -575,7 +680,8 @@
+             _ => self.focus.unwrap_or(ROOT_NODE_ID),
+         };
+ 
+-        let nodes = std::mem::take(&mut self.all_nodes);
++        let mut nodes = std::mem::take(&mut self.all_nodes);
++        name_dialogs_after_headings(&mut nodes);
+         let update = TreeUpdate {
+             nodes,
+             tree: Some(accesskit::Tree::new(ROOT_NODE_ID)),
+@@ -633,6 +739,45 @@
+     }
+ }
+ 
++/// Kit's modal hosts carry the dialog role but no name, so VoiceOver
++/// announced an opened dialog only as "window". Name each unlabeled dialog
++/// after the first heading in its subtree, in document order.
++fn name_dialogs_after_headings(nodes: &mut [(NodeId, accesskit::Node)]) {
++    let index: FxHashMap<NodeId, usize> = nodes
++        .iter()
++        .enumerate()
++        .map(|(ix, (id, _))| (*id, ix))
++        .collect();
++    for dialog in 0..nodes.len() {
++        let node = &nodes[dialog].1;
++        if !matches!(
++            node.role(),
++            accesskit::Role::Dialog | accesskit::Role::AlertDialog
++        ) || node.label().is_some()
++        {
++            continue;
++        }
++        let mut stack: Vec<NodeId> = node.children().iter().rev().copied().collect();
++        let mut visited = FxHashSet::default();
++        let mut label = None;
++        while let Some(id) = stack.pop() {
++            let Some(&ix) = index.get(&id) else { continue };
++            if !visited.insert(id) {
++                continue;
++            }
++            let child = &nodes[ix].1;
++            if child.role() == accesskit::Role::Heading {
++                label = child.label().map(str::to_owned);
++                break;
++            }
++            stack.extend(child.children().iter().rev().copied());
++        }
++        if let Some(label) = label {
++            nodes[dialog].1.set_label(label);
++        }
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     // Import specific items rather than glob-importing `super`, which would pull
 --- a/src/view.rs
 +++ b/src/view.rs
 @@ -487,6 +487,10 @@

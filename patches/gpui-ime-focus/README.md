@@ -1,8 +1,8 @@
 # macOS IME focus source overrides
 
-The GPUI workspace applies `[patch.crates-io]` to `gpui-pre` and `gpui-pre-macos` **0.3.8** under `apps/gpui/vendor`. Kit/base/component/assets/macros remain the original locked **0.7.1** packages. Normal Cargo builds use the overrides directly; no preparation, alternate config, or lock rewriting is required.
+The GPUI workspace applies `[patch.crates-io]` to `gpui-pre` and `gpui-pre-macos` **0.3.8** and to `gpui-base` **0.7.1** under `apps/gpui/vendor`. Kit/component/assets/macros remain the original locked **0.7.1** packages. Normal Cargo builds use the overrides directly; no preparation, alternate config, or lock rewriting is required.
 
-Only the two modified crates' runtime sources, required Windows resources, original manifests/README and complete Apache license texts are retained (116 files). Upstream example/test targets and their media are omitted, and local manifests cannot publish. The source overrides are excluded from application workspace membership. [gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605) was posted with explicit authorization before activation. The migration plan §3.1, source registration in [GPUI_PATCHES.md](../../docs/GPUI_PATCHES.md), and G2's remaining native acceptance requirements continue to apply.
+Only the three modified crates' runtime sources, required Windows resources, original manifests/README and complete Apache license texts are retained (319 files). Upstream example/test targets and their media are omitted, and local manifests cannot publish. The source overrides are excluded from application workspace membership. [gpui-kit#3605](https://github.com/longbridge/gpui-kit/issues/3605) was posted with explicit authorization before activation. The migration plan §3.1, source registration in [GPUI_PATCHES.md](../../docs/GPUI_PATCHES.md), and G2's remaining native acceptance requirements continue to apply.
 
 ## Normal builds and source audit
 
@@ -14,7 +14,7 @@ python3 patches/gpui-ime-focus/verify.py --archives \
   "$HOME/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f"
 ```
 
-`verify.py` checks every retained byte against `vendor-files.json`, validates the eleven modified source files against the reviewed diffs, rejects extra/missing/modified files and links, and verifies the resolved packages come from the actual product paths. Reconstructing the original registry entries must reproduce the pre-activation lock hash: only the two source entries changed, with no version changes. Archive audit uses the existing safe extractor and compares every retained byte with the pinned archives plus patches; only removal of example/test targets and `publish = false` changes manifests. It creates temporary data only below the owned `apps/gpui/target/tmp` root. The architecture guard runs source checks; GPUI CI also verifies actual metadata after its normal builds/tests. Source files and the product lock use LF on all checkouts.
+`verify.py` checks every retained byte against `vendor-files.json`, validates the twelve modified source files against the reviewed diffs, rejects extra/missing/modified files and links, and verifies the resolved packages come from the actual product paths. Reconstructing the original registry entries must reproduce the pre-activation lock hash: only the three source entries changed, with no version changes. Archive audit uses the existing safe extractor and compares every retained byte with the pinned archives plus patches; only removal of example/test targets and `publish = false` changes manifests. It creates temporary data only below the owned `apps/gpui/target/tmp` root. The architecture guard runs source checks; GPUI CI also verifies actual metadata after its normal builds/tests. Source files and the product lock use LF on all checkouts.
 
 ## Shared tab-stop registration
 
@@ -31,6 +31,10 @@ The same `gpui-pre` source also changes `element.rs`, `elements/div.rs`, `window
 ## Disabled state for assistive technology
 
 `elements/div.rs` also gains `InteractiveElement::aria_disabled(bool)`, which sets AccessKit's `disabled` property. Kit's `disabled` only withholds the click handler, so a disabled button was announced as available. ImgConvert calls it through `a11y::DisabledForAll::disabled_for_all` on Kit buttons (`disabled_commands_are_disabled_for_assistive_technology`).
+
+## Dialog role and name
+
+`gpui-base`'s `FocusTrapContainer` wraps Kit's modal host but did not forward `a11y_role`, `write_a11y_info` or `a11y_synthetic_children`, so the host's `Role::Dialog` never reached the tree and every dialog was an unnamed group; VoiceOver announced an opened dialog only as "window". The vendored `src/focus_trap.rs` forwards the three methods. `gpui-pre`'s `window/a11y.rs` names an unlabeled `Dialog`/`AlertDialog` node after the first `Heading` in its subtree, in document order, and test support gains `Window::a11y_nodes_with_role_for_test`; `a11y_node_for_test` now returns the finalized node. ImgConvert renders dialog titles through `a11y::dialog_title` (`dialogs_are_named_after_their_titles_for_assistive_technology`).
 
 ## Ownership and behavior
 

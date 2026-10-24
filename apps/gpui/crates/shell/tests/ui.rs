@@ -4976,6 +4976,37 @@ fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
     }
 }
 
+/// An opened dialog is announced by its title: Kit's modal host has the
+/// dialog role but no name, so VoiceOver said only "window".
+#[gpui_kit::test]
+fn dialogs_are_named_after_their_titles_for_assistive_technology(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, _workspace) = open_workspace(cx);
+    let mut dialogs = vec![
+        ("plugin-diagnostics", "Plugin diagnostics"),
+        ("privacy-open", "Privacy and support"),
+        ("licenses-open", "About and licenses"),
+    ];
+    if cfg!(feature = "updater") {
+        dialogs.push(("updates-open", "Updates"));
+    }
+    for (trigger, title) in dialogs {
+        cx.update_window(handle, |_, window, cx| {
+            window.simulate_a11y_activation();
+            window.render_frame(cx);
+            window.click(trigger, cx);
+            window.render_frame(cx);
+            assert!(window.has_active_dialog(cx), "{trigger}");
+            let hosts = window.a11y_nodes_with_role_for_test(gpui_kit::Role::Dialog);
+            assert_eq!(hosts.len(), 1, "{trigger}: one modal host");
+            assert_eq!(hosts[0].label(), Some(title), "{trigger}");
+            window.close_dialog(cx);
+            window.render_frame(cx);
+        })
+        .unwrap();
+    }
+}
+
 /// A disabled command is announced as disabled, not only drawn that way:
 /// Kit's `disabled` alone cannot tell AccessKit.
 #[gpui_kit::test]

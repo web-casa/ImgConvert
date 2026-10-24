@@ -48,7 +48,8 @@ class IntegrationTests(unittest.TestCase):
     def test_archive_audit_can_create_its_owned_temporary_root(self):
         cargo_home = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
         cache = next(p for p in (cargo_home / "registry/cache").glob("*")
-                     if all((p / f"{name}-0.3.8.crate").is_file() for name in verify.NAMES))
+                     if all((p / f"{name}-{version}.crate").is_file()
+                            for name, version in verify.VERSIONS.items()))
         directory = self.directory / "new-target/tmp"
         with patch.object(prepare, "owned_tmp", return_value=directory):
             verify.verify_archives(cache)
@@ -68,10 +69,11 @@ class IntegrationTests(unittest.TestCase):
                      "manifest_path": str(prepare.REPO / f"apps/gpui/crates/{folder}/Cargo.toml")}
                     for folder, name in names.items()]
         members = [p["id"] for p in packages]
-        packages += [{"id": name, "name": name, "version": "0.3.8", "source": None,
-                      "manifest_path": str(self.vendor / name / "Cargo.toml")} for name in verify.NAMES]
+        packages += [{"id": name, "name": name, "version": version, "source": None,
+                      "manifest_path": str(self.vendor / name / "Cargo.toml")}
+                     for name, version in verify.VERSIONS.items()]
         packages += [{"id": name, "name": name, "version": "0.7.1", "source": "registry+test",
-                      "manifest_path": "unused"} for name in verify.KIT]
+                      "manifest_path": "unused"} for name in verify.KIT - verify.NAMES]
         data = {"packages": packages, "workspace_members": members}
         verify.verify_metadata(data)
         fallback = copy.deepcopy(data)
