@@ -112,6 +112,17 @@
   </tr>
 </table>
 
+## Next version preview (0.4, native GPUI)
+
+<p align="center">
+  <a href="docs/assets/screenshots/gpui/workspace-en-US.png">
+    <img src="docs/assets/screenshots/gpui/workspace-en-US.png" width="100%" alt="ImgConvert 0.4 GPUI workspace">
+  </a>
+</p>
+<p align="center">
+  <sub>The upcoming 0.4 desktop app is rebuilt on native GPUI with nine interface languages. It is not released yet; v0.3.1 remains the current download.</sub>
+</p>
+
 ## Core capabilities
 
 | Capability          | Details                                                                                                                          |
