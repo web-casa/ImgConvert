@@ -1,0 +1,238 @@
+name: GPUI macOS MAS package
+
+# Builds the Store-feature GPUI app natively for arm64 and x64, joins them
+# into a universal binary, signs the sandboxed app with the Apple
+# Distribution identity and the embedded provisioning profile, builds the
+# installer package and validates it with App Store Connect. It never
+# uploads a build or submits for review: the package is a workflow artifact
+# (G3-2 of the migration plan).
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build (empty builds the dispatched commit).
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-macos-mas-${{ inputs.ref || github.sha }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  NODE_VERSION: "24"
+  MACOSX_DEPLOYMENT_TARGET: "12.0"
+  IMGCONVERT_DISABLE_EXTERNAL_CODECS: "1"
+  IMGCONVERT_DISABLE_UPDATER: "1"
+
+jobs:
+  build:
+    name: GPUI Store build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            uname_arch: arm64
+          - arch: x64
+            runner: macos-15-intel
+            uname_arch: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Verify macOS runner architecture
+        run: |
+          actual="$(uname -m)"
+          test "$actual" = "${{ matrix.uname_arch }}" || { echo "expected ${{ matrix.uname_arch }}, got $actual"; exit 1; }
+
+      - name: Install native codec build tools
+        run: |
+          brew install cmake meson ninja
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            # libaom 3.11 checks NASM help using a flag that changed in NASM 3.
+            nasm_version="2.16.03"
+            nasm_archive="$RUNNER_TEMP/nasm-$nasm_version-macosx.zip"
+            nasm_root="$RUNNER_TEMP/imgconvert-nasm-$nasm_version"
+            curl --fail --location --silent --show-error \
+              "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip" \
+              --output "$nasm_archive"
+            echo "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75  $nasm_archive" \
+              | shasum -a 256 -c -
+            mkdir "$nasm_root"
+            unzip -q "$nasm_archive" -d "$nasm_root"
+            nasm_bin="$nasm_root/nasm-$nasm_version"
+            echo "$nasm_bin" >> "$GITHUB_PATH"
+            export PATH="$nasm_bin:$PATH"
+            nasm -v
+          fi
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+
+      - name: Build the Store-feature GPUI binary
+        run: cargo build --manifest-path apps/gpui/Cargo.toml --release --locked --no-default-features -p imgconvert-gpui
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gpui-store-binary-${{ matrix.uname_arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 3
+          path: apps/gpui/target/release/imgconvert-gpui
+
+  package:
+    name: GPUI MAS package (universal)
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Check MAS secrets
+        env:
+          APPLE_MAS_CERTIFICATE: ${{ secrets.APPLE_MAS_CERTIFICATE }}
+          APPLE_MAS_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAS_CERTIFICATE_PASSWORD }}
+          APPLE_MAS_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_MAS_INSTALLER_CERTIFICATE }}
+          APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD }}
+          IMGCONVERT_MAS_PROVISION_PROFILE_BASE64: ${{ secrets.IMGCONVERT_MAS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        run: |
+          for name in APPLE_MAS_CERTIFICATE APPLE_MAS_CERTIFICATE_PASSWORD APPLE_MAS_INSTALLER_CERTIFICATE \
+            APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD IMGCONVERT_MAS_PROVISION_PROFILE_BASE64 KEYCHAIN_PASSWORD \
+            APPLE_TEAM_ID APPLE_ID APPLE_PASSWORD; do
+            test -n "${!name}" || { echo "$name secret is required"; exit 1; }
+          done
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: gpui-store-binary-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: binaries
+
+      - name: Join the architectures
+        run: |
+          mkdir -p dist
+          lipo -create \
+            "binaries/gpui-store-binary-arm64-${{ github.run_id }}-${{ github.run_attempt }}/imgconvert-gpui" \
+            "binaries/gpui-store-binary-x86_64-${{ github.run_id }}-${{ github.run_attempt }}/imgconvert-gpui" \
+            -output dist/imgconvert-gpui-universal
+          chmod +x dist/imgconvert-gpui-universal
+          lipo -archs dist/imgconvert-gpui-universal
+
+      - name: Import Apple MAS signing certificates
+        env:
+          APPLE_MAS_CERTIFICATE: ${{ secrets.APPLE_MAS_CERTIFICATE }}
+          APPLE_MAS_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAS_CERTIFICATE_PASSWORD }}
+          APPLE_MAS_INSTALLER_CERTIFICATE: ${{ secrets.APPLE_MAS_INSTALLER_CERTIFICATE }}
+          APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          IMGCONVERT_MAS_SIGNING_IDENTITY: ${{ secrets.IMGCONVERT_MAS_SIGNING_IDENTITY }}
+          IMGCONVERT_MAS_INSTALLER_IDENTITY: ${{ secrets.IMGCONVERT_MAS_INSTALLER_IDENTITY }}
+        run: |
+          trap 'rm -f "$RUNNER_TEMP"/gpui-mas-*.p12' EXIT
+          decode() {
+            if ! printf '%s' "$1" | base64 --decode > "$2" 2>/dev/null; then
+              printf '%s' "$1" | base64 -D > "$2"
+            fi
+            test -s "$2" || { echo "decoded certificate is empty"; exit 1; }
+          }
+          security list-keychains -d user | sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/' > "$RUNNER_TEMP/keychains-before"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" gpui-mas.keychain
+          keychains=(gpui-mas.keychain)
+          while IFS= read -r keychain; do keychains+=("$keychain"); done < "$RUNNER_TEMP/keychains-before"
+          security list-keychains -d user -s "${keychains[@]}"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" gpui-mas.keychain
+          security set-keychain-settings -t 3600 -u gpui-mas.keychain
+          decode "$APPLE_MAS_CERTIFICATE" "$RUNNER_TEMP/gpui-mas-app.p12"
+          decode "$APPLE_MAS_INSTALLER_CERTIFICATE" "$RUNNER_TEMP/gpui-mas-installer.p12"
+          security import "$RUNNER_TEMP/gpui-mas-app.p12" -k gpui-mas.keychain \
+            -P "$APPLE_MAS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          security import "$RUNNER_TEMP/gpui-mas-installer.p12" -k gpui-mas.keychain \
+            -P "$APPLE_MAS_INSTALLER_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" gpui-mas.keychain >/dev/null
+          app_identity="$IMGCONVERT_MAS_SIGNING_IDENTITY"
+          if [ -z "$app_identity" ]; then
+            app_identity="$(security find-identity -v -p codesigning gpui-mas.keychain | awk -F'"' '/Apple Distribution|3rd Party Mac Developer Application/ { print $2; exit }')"
+          fi
+          installer_identity="$IMGCONVERT_MAS_INSTALLER_IDENTITY"
+          if [ -z "$installer_identity" ]; then
+            installer_identity="$(security find-identity -v -p basic gpui-mas.keychain | awk -F'"' '/Mac Installer Distribution|3rd Party Mac Developer Installer/ { print $2; exit }')"
+          fi
+          test -n "$app_identity" || { echo "Apple Distribution identity not found"; exit 1; }
+          test -n "$installer_identity" || { echo "Mac Installer Distribution identity not found"; exit 1; }
+          echo "GPUI_MAS_APP_IDENTITY=$app_identity" >> "$GITHUB_ENV"
+          echo "GPUI_MAS_INSTALLER_IDENTITY=$installer_identity" >> "$GITHUB_ENV"
+
+      - name: Package and sign the MAS app and installer
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          IMGCONVERT_MAS_PROVISION_PROFILE_BASE64: ${{ secrets.IMGCONVERT_MAS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          profile="$RUNNER_TEMP/gpui-embedded.provisionprofile"
+          printf '%s' "$IMGCONVERT_MAS_PROVISION_PROFILE_BASE64" | base64 --decode > "$profile" 2>/dev/null \
+            || printf '%s' "$IMGCONVERT_MAS_PROVISION_PROFILE_BASE64" | base64 -D > "$profile"
+          test -s "$profile" || { echo "decoded provisioning profile is empty"; exit 1; }
+          pkg="$(GPUI_MAS=1 GPUI_MAS_PROFILE="$profile" \
+            scripts/package-gpui-macos.sh dist/imgconvert-gpui-universal dist "$GPUI_MAS_APP_IDENTITY")"
+          echo "GPUI_PKG=$pkg" >> "$GITHUB_ENV"
+          echo "IMGCONVERT_EXPECTED_BUNDLE_VERSION=$(cat dist/VERSION)" >> "$GITHUB_ENV"
+
+      - name: Verify the MAS app
+        env:
+          IMGCONVERT_MAS_NETWORK_CLIENT: forbidden
+        run: |
+          node scripts/check-macos-bundle-artifacts.mjs --bundles=app --artifact=dist/ImgConvert.app \
+            --require-signed --require-mas --expected-architectures=arm64,x86_64
+          pkgutil --check-signature "$GPUI_PKG"
+
+      - name: Validate with App Store Connect (no upload)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+        run: node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG"
+
+      - name: Record checksums
+        if: always()
+        run: |
+          if ls dist/*.pkg >/dev/null 2>&1; then
+            shasum -a 256 dist/*.pkg | tee dist/SHA256SUMS
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: gpui-macos-universal-mas-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            dist/*.pkg
+            dist/SHA256SUMS
+
+      - name: Remove the build keychain and profile
+        if: always()
+        run: |
+          if [ -s "$RUNNER_TEMP/keychains-before" ]; then
+            keychains=()
+            while IFS= read -r keychain; do keychains+=("$keychain"); done < "$RUNNER_TEMP/keychains-before"
+            security list-keychains -d user -s "${keychains[@]}"
+          fi
+          security delete-keychain gpui-mas.keychain 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/gpui-embedded.provisionprofile"

@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Assembles the GPUI build into ImgConvert.app and a DMG, signed with the
-# given identity (or ad hoc with "-"). Notarization is a separate step.
+# Assembles the GPUI build into ImgConvert.app and either a DMG (direct
+# distribution, signed with the given identity or ad hoc with "-") or, with
+# GPUI_MAS=1, a Mac App Store installer package. Notarization and App Store
+# validation are separate steps.
 #
 # Usage: scripts/package-gpui-macos.sh <binary> <out-dir> [identity]
+# Mac App Store mode also reads GPUI_MAS_INSTALLER_IDENTITY, APPLE_TEAM_ID and
+# GPUI_MAS_PROFILE (the provisioning profile to embed).
 set -euo pipefail
 
 binary=$1
 out=$2
 identity=${3:--}
+mas=${GPUI_MAS:-0}
 root=${IMGCONVERT_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 
 test -x "$binary" || { echo "not an executable: $binary" >&2; exit 1; }
@@ -68,6 +73,29 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 plutil -lint "$app/Contents/Info.plist" >/dev/null
+
+if [ "$mas" = 1 ]; then
+  : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required for the Mac App Store package}"
+  : "${GPUI_MAS_PROFILE:?GPUI_MAS_PROFILE (provisioning profile) is required}"
+  : "${GPUI_MAS_INSTALLER_IDENTITY:?GPUI_MAS_INSTALLER_IDENTITY is required}"
+  [[ $APPLE_TEAM_ID =~ ^[A-Z0-9]{10}$ ]] || { echo "APPLE_TEAM_ID must be a 10-character team ID" >&2; exit 1; }
+  [ "$identity" != "-" ] || { echo "the Mac App Store package needs a signing identity" >&2; exit 1; }
+  cp "$GPUI_MAS_PROFILE" "$app/Contents/embedded.provisionprofile"
+  # The sandbox template plus the identifiers the profile grants.
+  entitlements=$(mktemp)
+  cp "$root/apps/gpui/packaging/entitlements.macos.mas.plist" "$entitlements"
+  plutil -insert com.apple.application-identifier -string "$APPLE_TEAM_ID.com.ivmm.imgconvert" "$entitlements"
+  plutil -insert com.apple.developer.team-identifier -string "$APPLE_TEAM_ID" "$entitlements"
+  codesign --force --sign "$identity" --options runtime --timestamp --entitlements "$entitlements" "$app"
+  rm -f "$entitlements"
+  codesign --verify --deep --strict --verbose=2 "$app"
+  pkg="$out/ImgConvert_${short_version}_universal_mas.pkg"
+  rm -f "$pkg"
+  xcrun productbuild --sign "$GPUI_MAS_INSTALLER_IDENTITY" --component "$app" /Applications "$pkg"
+  echo "$short_version" > "$out/VERSION"
+  echo "$pkg"
+  exit 0
+fi
 
 sign_args=(--force --sign "$identity")
 if [ "$identity" != "-" ]; then
