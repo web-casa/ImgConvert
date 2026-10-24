@@ -113,7 +113,10 @@ function finalizeAcceptedDmg(dmg, submissionId, credentials, profile, expectedAr
   printNotarizationLog(submissionId, credentials);
   // The ticket download from Apple's CDN fails transiently ("network
   // connection was lost", exit 68) even after notarization was accepted.
-  withRetries(() => run("xcrun", ["stapler", "staple", dmg], "stapler staple"));
+  // A stalled download should fall into the retry rather than the job timeout.
+  withRetries(() =>
+    run("xcrun", ["stapler", "staple", dmg], "stapler staple", { timeoutMs: 3 * 60_000 }),
+  );
   run(
     "spctl",
     ["--assess", "--type", "open", "--context", "context:primary-signature", "-v", dmg],
@@ -574,9 +577,9 @@ function sleepSync(milliseconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
-function run(command, args, label) {
+function run(command, args, label, { timeoutMs } = {}) {
   console.log(`\n> ${label}`);
-  const result = spawnSync(command, args, { cwd: repoRoot, stdio: "inherit" });
+  const result = spawnSync(command, args, { cwd: repoRoot, stdio: "inherit", timeout: timeoutMs });
   if (result.error) throw new Error(`${label} failed to start: ${result.error.message}`);
   if (result.status !== 0) {
     throw new Error(`${label} failed with exit code ${result.status ?? 1}`);
