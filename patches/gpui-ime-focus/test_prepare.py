@@ -38,7 +38,7 @@ class PrepareTests(unittest.TestCase):
         config = prepare.prepare(self.cache, self.directory / "candidate")
         self.assertTrue(config.is_file())
         self.assertIn("[patch.crates-io]", config.read_text())
-        for name in ["gpui-pre", "gpui-pre-macos"]:
+        for name in verify.VERSIONS:
             self.assertTrue((config.parent / name / "Cargo.toml").is_file())
             self.assertTrue((config.parent / name / "LICENSE-APACHE").is_file())
 
