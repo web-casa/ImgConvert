@@ -2465,6 +2465,8 @@ fn decode_jpeg_thumbnail(input: &[u8], max_edge: u32) -> Result<ImageData> {
     if source_max_edge <= max_edge.saturating_mul(2) {
         return JpegCodec.decode(input);
     }
+    // mozjpeg 在 EOF 处自动补 EOI,截断文件会得到“有效”缩略图。
+    ensure_jpeg_complete(input)?;
 
     match catch_unwind(AssertUnwindSafe(|| {
         decode_jpeg_thumbnail_scaled(input, max_edge)
@@ -4965,9 +4967,19 @@ fn write_webp_chunk(out: &mut Vec<u8>, fourcc: &[u8; 4], data: &[u8]) -> Result<
 
 // ---------- JPEG ----------
 
-/// 截断的 JPEG 会被解码器用填充像素“成功”解出;这里按段表走到首个 SOS,
-/// 要求其后的熵编码数据之后存在 EOI。熵编码数据经字节填充,不会出现裸 FFD9,
-/// 而 APP 段里的 EXIF 缩略图在 SOS 之前,不会误判。结构异常时交给解码器判断。
+/// 截断的 JPEG 会被解码器用填充像素“成功”解出;这里按段长与熵编码字节填充
+/// 规则走完整个标记序列,要求以真实的 EOI 结束。段内载荷(EXIF 缩略图、扫描间
+/// 的 APP/COM 等)里的 FFD9 不会被当作结束。结构异常时交给解码器判断。
+fn ensure_jpeg_complete(bytes: &[u8]) -> Result<()> {
+    if jpeg_has_end_of_image(bytes) {
+        Ok(())
+    } else {
+        Err(Error::Decode(
+            "JPEG 数据不完整(缺少结束标记),文件可能被截断".into(),
+        ))
+    }
+}
+
 fn jpeg_has_end_of_image(bytes: &[u8]) -> bool {
     if !bytes.starts_with(&[0xff, 0xd8]) {
         return true;
@@ -5001,7 +5013,16 @@ fn jpeg_has_end_of_image(bytes: &[u8]) -> bool {
         }
         i += len;
         if marker == 0xda {
-            return bytes[i..].windows(2).any(|w| w == [0xff, 0xd9]);
+            // 熵编码数据:FF00 为填充,FFD0–FFD7 为复位标记,其余 FFxx 是下一个标记。
+            loop {
+                match bytes.get(i..i + 2) {
+                    None => return false,
+                    Some([0xff, 0x00 | 0xd0..=0xd7]) => i += 2,
+                    Some([0xff, 0xff]) => i += 1,
+                    Some([0xff, _]) => break,
+                    Some(_) => i += 1,
+                }
+            }
         }
     }
 }
@@ -5010,11 +5031,7 @@ struct JpegCodec;
 
 impl Codec for JpegCodec {
     fn decode(&self, bytes: &[u8]) -> Result<ImageData> {
-        if !jpeg_has_end_of_image(bytes) {
-            return Err(Error::Decode(
-                "JPEG 数据不完整(扫描数据后缺少 EOI 标记),文件可能被截断".into(),
-            ));
-        }
+        ensure_jpeg_complete(bytes)?;
         let mut img = decode_via_image(bytes, image::ImageFormat::Jpeg)?;
         let metadata = metadata_from_image_format(bytes, Format::Jpeg);
         img.icc = metadata.icc;
@@ -7570,6 +7587,22 @@ mod tests {
         assert_eq!(JpegCodec.decode(&with_app).unwrap().width, 64);
         assert!(JpegCodec.decode(&with_app[..with_app.len() - 10]).is_err());
         assert!(!jpeg_has_end_of_image(&with_app[..8]));
+
+        // 扫描之间的 COM 段载荷含 FFD9,在其后截断仍须拒绝。
+        let mut com_tail = jpg[..jpg.len() - 2].to_vec();
+        com_tail.extend_from_slice(&[0xff, 0xfe, 0x00, 0x04, 0xff, 0xd9]);
+        assert!(JpegCodec.decode(&com_tail).is_err());
+        com_tail.extend_from_slice(&[0xff, 0xd9]);
+        assert_eq!(JpegCodec.decode(&com_tail).unwrap().width, 64);
+    }
+
+    #[test]
+    fn jpeg_scaled_thumbnail_rejects_truncated_source() {
+        let jpg = JpegCodec
+            .encode(&synth(256, 256), &EncodeOptions::default())
+            .unwrap();
+        assert!(decode_jpeg_thumbnail(&jpg, 32).is_ok());
+        assert!(decode_jpeg_thumbnail(&jpg[..jpg.len() * 2 / 3], 32).is_err());
     }
 
     #[test]
