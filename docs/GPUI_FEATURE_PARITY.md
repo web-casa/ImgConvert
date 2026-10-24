@@ -30,7 +30,7 @@ GPUI 路径均以 `apps/gpui/crates/` 为根。
 
 ## 状态机与文案补齐
 
-- **错误本地化**：`shared/src/command_error.rs` 穷尽匹配共享的 23 个 ErrorCode，复用 Tauri 双语含义，校验 path/format 参数，缺失或复杂值回退 taskFailed；后端 detail 保留诊断用途，不作为用户文案。队列保留结构化错误，Error 与 Skipped 均可查看完整 tooltip，切换语言立即重译。全局格式 Select 也在队列和语言变化时同步 retained 选项，真实 UI 检查导入、移除及 Clear 后的来源标签。预览、计划/批次启动、诊断操作和清理缓存失败使用本地化反馈。
+- **错误本地化**：`shared/src/command_error.rs` 穷尽匹配共享的 24 个 ErrorCode，复用 Tauri 双语含义，校验 path/format 参数，缺失或复杂值回退 taskFailed；后端 detail 保留诊断用途，不作为用户文案。队列保留结构化错误，Error 与 Skipped 均可查看完整 tooltip，切换语言立即重译。全局格式 Select 也在队列和语言变化时同步 retained 选项，真实 UI 检查导入、移除及 Clear 后的来源标签。预览、计划/批次启动、诊断操作和清理缓存失败使用本地化反馈。
 - **扫描反馈**：保留 added/skipped/errors/truncated/cancelled 原始字段，渲染时翻译；注册生命周期覆盖前台提交，取消不追加部分结果。剪贴板反馈也保留问题类型与计数，避免工作线程把某种语言固定进模型。
 - **逐项移除**：域 key 作为按钮/行/状态标识，导入或批次运行/收尾时禁止；重建索引、维护缩略图预算、重置存活 Loading 项使其可重试、拒绝旧 ticket，并清理本项拥有的临时文件。Clear 仍保留独立测试。
 - **完成项**：下一批仅取 `is_pending_conversion`；修改逐项格式或 Reset formats 可显式让结果重新待转换。Done 项的源信息、缩略图和环境测量不会被下一批重置。目标体积与 PDF 页范围校验也只考察此次待转换项目。来源冲突保护继续包含整个队列，计划和执行 gate 内预检都按文件身份核对，硬链接别名也不能绕过。

@@ -784,7 +784,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   pt-BR: "É necessária uma confirmação explícita antes de substituir um arquivo de origem: %{path}"
 errors.duplicateOutput:
-  pt-BR: "Outro arquivo deste lote gera a mesma saída, então este não foi convertido. Renomeie um deles ou converta-os separadamente: %{path}"
+  pt-BR: "Outro arquivo deste lote seria salvo como o mesmo arquivo de saída, então este não foi convertido. Converta-os separadamente ou altere os nomes dos arquivos ou as configurações de nome para que as saídas sejam diferentes: %{path}"
 errors.outputConflictsWithInput:
   pt-BR: "Para proteger uma origem na fila, esta saída não foi gravada porque coincide com outra entrada: %{path}"
 errors.outputSafetyCheckFailed:

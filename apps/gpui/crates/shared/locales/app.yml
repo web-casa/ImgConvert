@@ -1205,8 +1205,8 @@ errors.sourceOverwriteConfirmationRequired:
   zh-CN: "需要明确确认后才能覆盖原图：%{path}"
 
 errors.duplicateOutput:
-  en: "Another file in this batch writes the same output, so this one was not converted. Rename one of them or convert them separately: %{path}"
-  zh-CN: "本批次中另一个文件会写入同一个输出，此文件未转换。可重命名其中一个，或分开转换：%{path}"
+  en: "Another file in this batch would be saved as the same output file, so this one was not converted. Convert them separately, or change the file names or naming settings so the outputs differ: %{path}"
+  zh-CN: "本批次中另一个文件会保存为同一个输出文件，此文件未转换。请分开转换，或修改文件名或命名设置，使输出不同：%{path}"
 errors.outputConflictsWithInput:
   en: "To protect a queued source, this output was not written because it matches another input: %{path}"
   zh-CN: "为保护队列中的原图，未写入与其他输入同名的输出：%{path}"

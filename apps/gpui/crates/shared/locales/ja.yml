@@ -784,7 +784,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   ja: "元ファイルを置き換えるには明示的な確認が必要です: %{path}"
 errors.duplicateOutput:
-  ja: "このバッチ内の別のファイルが同じ出力先に書き込むため、このファイルは変換されませんでした。どちらかの名前を変えるか、別々に変換してください：%{path}"
+  ja: "このバッチ内の別のファイルが同じ出力ファイルとして保存されるため、このファイルは変換されませんでした。別々に変換するか、出力が異なるようにファイル名または命名設定を変更してください：%{path}"
 errors.outputConflictsWithInput:
   ja: "キュー内の元ファイルを保護するため、別の入力と一致するこの出力は書き出されませんでした: %{path}"
 errors.outputSafetyCheckFailed:

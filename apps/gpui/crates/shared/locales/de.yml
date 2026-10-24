@@ -784,7 +784,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   de: "Vor dem Ersetzen einer Quelldatei ist eine ausdrückliche Bestätigung erforderlich: %{path}"
 errors.duplicateOutput:
-  de: "Eine andere Datei in diesem Stapel schreibt dieselbe Ausgabe, daher wurde diese nicht konvertiert. Benenne eine davon um oder konvertiere sie getrennt: %{path}"
+  de: "Eine andere Datei in diesem Stapel würde dieselbe Ausgabedatei erzeugen, daher wurde diese nicht konvertiert. Konvertiere sie getrennt oder ändere Dateinamen oder Benennungseinstellungen, damit sich die Ausgaben unterscheiden: %{path}"
 errors.outputConflictsWithInput:
   de: "Zum Schutz einer Quelle in der Warteliste wurde diese Ausgabe nicht geschrieben, da sie einer anderen Eingabe entspricht: %{path}"
 errors.outputSafetyCheckFailed:

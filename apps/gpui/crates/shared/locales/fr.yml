@@ -784,7 +784,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   fr: "Une confirmation explicite est requise avant de remplacer un fichier source : %{path}"
 errors.duplicateOutput:
-  fr: "Un autre fichier de ce lot produit la même sortie ; celui-ci n’a donc pas été converti. Renommez l’un d’eux ou convertissez-les séparément : %{path}"
+  fr: "Un autre fichier de ce lot serait enregistré sous le même fichier de sortie ; celui-ci n’a donc pas été converti. Convertissez-les séparément ou modifiez les noms de fichier ou les réglages de nommage pour que les sorties diffèrent : %{path}"
 errors.outputConflictsWithInput:
   fr: "Pour protéger une source en file, cette sortie n’a pas été écrite car elle correspond à une autre entrée : %{path}"
 errors.outputSafetyCheckFailed:

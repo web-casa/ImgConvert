@@ -319,7 +319,7 @@ export const zhCN = {
     invalidOutputSuffix: "文件后缀包含无效字符或过长，请修改后重试。",
     sourceOverwriteConfirmationRequired: "需要明确确认后才能覆盖原图：{path}",
     duplicateOutput:
-      "本批次中另一个文件会写入同一个输出，此文件未转换。可重命名其中一个，或分开转换：{path}",
+      "本批次中另一个文件会保存为同一个输出文件，此文件未转换。请分开转换，或修改文件名或命名设置，使输出不同：{path}",
     outputConflictsWithInput: "为保护队列中的原图，未写入与其他输入同名的输出：{path}",
     outputSafetyCheckFailed: "无法确认本批任务会安全保留原图，请检查相关文件权限后重试：{path}",
     outputNotSmaller: "已跳过：输出文件未小于源文件：{path}",

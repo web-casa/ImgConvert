@@ -35,6 +35,20 @@ describe("structured command errors", () => {
     expect(message).not.toContain("暂未纳入");
   });
 
+  it("explains a duplicate output path within a batch", async () => {
+    await setAppLocale("en-US");
+
+    const message = formatCommandError({
+      code: "duplicateOutput",
+      params: { path: "/out/animated.avif" },
+      detail: "输出路径在本批次内重复: /out/animated.avif",
+    });
+
+    expect(message).toContain("same output file");
+    expect(message).toContain("/out/animated.avif");
+    expect(message).not.toContain("本批次内重复");
+  });
+
   it("explains how to restore output-directory access", async () => {
     await setAppLocale("en-US");
 

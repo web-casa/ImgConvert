@@ -784,7 +784,7 @@ errors.invalidOutputSuffix:
 errors.sourceOverwriteConfirmationRequired:
   zh-TW: "需要明確確認後才能覆寫原圖：%{path}"
 errors.duplicateOutput:
-  zh-TW: "本批次中另一個檔案會寫入同一個輸出，此檔案未轉換。可重新命名其中一個，或分開轉換：%{path}"
+  zh-TW: "本批次中另一個檔案會儲存為同一個輸出檔案，此檔案未轉換。請分開轉換，或修改檔名或命名設定，讓輸出不同：%{path}"
 errors.outputConflictsWithInput:
   zh-TW: "為保護佇列中的原圖，未寫入與其他輸入同名的輸出：%{path}"
 errors.outputSafetyCheckFailed:
