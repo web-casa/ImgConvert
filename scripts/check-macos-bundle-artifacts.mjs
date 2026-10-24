@@ -94,6 +94,9 @@ const tauriConfig = JSON.parse(
   readFileSync(path.join(repoRoot, "src-tauri", "tauri.conf.json"), "utf8"),
 );
 const expectedName = tauriConfig.productName ?? "ImgConvert";
+// The GPUI app is versioned by its own crate; its packaging passes that
+// version here. Tauri bundles keep checking against package.json.
+const expectedBundleVersion = process.env.IMGCONVERT_EXPECTED_BUNDLE_VERSION || packageJson.version;
 const expectedArchitectures = resolveExpectedArchitectures();
 const bundleRoot = path.join(
   cargoTargetRoot(),
@@ -128,7 +131,7 @@ for (const bundle of options.bundles) {
       failures.push(`explicit artifact does not exist: ${artifact}`);
       continue;
     }
-    verifyArtifact(bundle, artifact, expectedName, packageJson.version);
+    verifyArtifact(bundle, artifact, expectedName, expectedBundleVersion);
   }
 }
 
