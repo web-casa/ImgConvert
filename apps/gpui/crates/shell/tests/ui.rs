@@ -563,7 +563,27 @@ fn comparison_preview_steps_through_the_selected_pdf_pages(cx: &mut TestAppConte
             (summary.source_page, summary.pdf_pages)
         })
     };
+    // The fixture's pages are red, green and blue: the rendered source image
+    // must be the page the summary names, not only report it.
+    let center = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let image = preview.read(cx).before_image().expect("a source image");
+            let size = image.size(0);
+            let (width, height) = (size.width.0 as usize, size.height.0 as usize);
+            let bytes = image.as_bytes(0).expect("one frame");
+            let at = ((height / 2) * width + width / 2) * 4;
+            // BGRA.
+            [bytes[at + 2], bytes[at + 1], bytes[at]]
+        })
+    };
+    let near =
+        |pixel: [u8; 3], rgb: [u8; 3]| pixel.iter().zip(rgb).all(|(a, b)| a.abs_diff(b) <= 8);
     assert_eq!(page(cx), (Some(1), vec![1, 2, 3]));
+    assert!(
+        near(center(cx), [255, 0, 0]),
+        "page 1 is red: {:?}",
+        center(cx)
+    );
     let controls = |cx: &mut TestAppContext| {
         cx.update_window(handle, |_, window, cx| {
             window.render_frame(cx);
@@ -582,6 +602,12 @@ fn comparison_preview_steps_through_the_selected_pdf_pages(cx: &mut TestAppConte
         })
         .unwrap();
         assert_eq!(page(cx).0, Some(expected));
+        let rgb = if expected == 2 {
+            [0, 153, 0]
+        } else {
+            [0, 0, 255]
+        };
+        assert!(near(center(cx), rgb), "page {expected}: {:?}", center(cx));
     }
     assert_eq!(controls(cx), (false, true), "last page");
     cx.update_window(handle, |_, window, cx| {
@@ -590,6 +616,27 @@ fn comparison_preview_steps_through_the_selected_pdf_pages(cx: &mut TestAppConte
     })
     .unwrap();
     assert_eq!(page(cx).0, Some(2));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("preview-page-position").label(),
+            Some("Page 2 of 3")
+        );
+    })
+    .unwrap();
+    // A changed page range makes the preview stale: the page buttons wait
+    // for Refresh instead of stepping through the old selection.
+    cx.update(|cx| {
+        AppModels::global(cx)
+            .settings()
+            .clone()
+            .update(cx, |settings, cx| {
+                settings.update(cx, |settings| settings.pdf_page_range = "1,3".into());
+            });
+    });
+    cx.run_until_parked();
+    assert!(cx.update(|cx| preview.read(cx).is_stale()));
+    assert_eq!(controls(cx), (true, true), "stale: both disabled");
     cx.update_window(handle, |_, window, cx| {
         window.press("escape", cx);
     })

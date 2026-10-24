@@ -351,6 +351,8 @@ preview.previous_page:
   zh-TW: 上一頁
 preview.next_page:
   zh-TW: 下一頁
+preview.page_position:
+  zh-TW: "第 %{index} 頁，共 %{count} 頁"
 preview.before:
   zh-TW: 原圖
 preview.after:
