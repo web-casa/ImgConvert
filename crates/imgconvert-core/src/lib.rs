@@ -4969,7 +4969,7 @@ fn write_webp_chunk(out: &mut Vec<u8>, fourcc: &[u8; 4], data: &[u8]) -> Result<
 
 /// 截断的 JPEG 会被解码器用填充像素“成功”解出;这里按段长与熵编码字节填充
 /// 规则走完整个标记序列,要求以真实的 EOI 结束。段内载荷(EXIF 缩略图、扫描间
-/// 的 APP/COM 等)里的 FFD9 不会被当作结束。结构异常时交给解码器判断。
+/// 的 APP/COM 等)里的 FFD9 不会被当作结束。
 fn ensure_jpeg_complete(bytes: &[u8]) -> Result<()> {
     if jpeg_has_end_of_image(bytes) {
         Ok(())
@@ -4987,8 +4987,8 @@ fn jpeg_has_end_of_image(bytes: &[u8]) -> bool {
     let mut i = 2;
     loop {
         if bytes.get(i) != Some(&0xff) {
-            // 数据用尽说明截断;非标记字节属结构异常,由解码器给出错误。
-            return i < bytes.len();
+            // 数据用尽或段间出现非标记字节:截断后被拼接了别的数据。
+            return false;
         }
         while bytes.get(i) == Some(&0xff) {
             i += 1;
@@ -4998,7 +4998,9 @@ fn jpeg_has_end_of_image(bytes: &[u8]) -> bool {
         };
         i += 1;
         match marker {
-            0x01 | 0xd0..=0xd8 => continue,
+            0x01 | 0xd0..=0xd7 => continue,
+            // 第二个 SOI:主图缺 EOI 后拼接了另一张 JPEG。
+            0xd8 => return false,
             0xd9 => return true,
             _ => {}
         }
@@ -7594,6 +7596,15 @@ mod tests {
         assert!(JpegCodec.decode(&com_tail).is_err());
         com_tail.extend_from_slice(&[0xff, 0xd9]);
         assert_eq!(JpegCodec.decode(&com_tail).unwrap().width, 64);
+
+        // 主图缺 EOI 后拼接完整 JPEG 或文本,同样视为截断。
+        let mut spliced = jpg[..jpg.len() / 2].to_vec();
+        spliced.extend_from_slice(&jpg);
+        assert!(!jpeg_has_end_of_image(&spliced));
+        let mut texted = jpg[..jpg.len() - 2].to_vec();
+        texted.extend_from_slice(&[0xff, 0xfe, 0x00, 0x02]);
+        texted.extend_from_slice(b"junk\xff\xd9");
+        assert!(!jpeg_has_end_of_image(&texted));
     }
 
     #[test]
