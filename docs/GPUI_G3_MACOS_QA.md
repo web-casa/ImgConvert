@@ -9,6 +9,7 @@
 | 源码 | main `8a2744e`（含 #79 截断 JPEG、#80 对话框辅助功能、#81 输出目录选择、#82 重复输出提示） |
 | Developer ID DMG | run 40086028282：arm64 `2af030c6…`，x86_64 `1bd40860…`；均已签名、公证并 staple（x64 首次 staple 遇网络中断，第 2 次尝试重跑失败作业后通过；之后合入的 PR #83 为今后的 staple 增加重试） |
 | MAS 通用 PKG | run 40086061849：`ImgConvert_0.4.0_mas.pkg validated by App Store Connect`（只校验，未上传） |
+| TestFlight 上传 | run 40095455028（main `d3b2c01`，CFBundleVersion 100）：经用户批准上传，`ImgConvert_0.4.0_mas.pkg uploaded to App Store Connect`；未提交审核 |
 | 真实 GUI 冒烟 | run 40085939946：arm64 与 x64 托管 runner 上用源码构建的未签名 app 均通过（不是上面的签名 DMG） |
 
 ## 自动化门槛
@@ -53,13 +54,13 @@ x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 的启�
 ## 商店与签名验收
 
 - Direct macOS：两架构 DMG 公证通过、staple 并经 Gatekeeper 评估（见上）。
-- Mac App Store：通用 PKG 已通过 App Store Connect 校验。上传 TestFlight、在 Intel 与 Apple 芯片实机上用处理后的构建验收沙盒路径（选文件、选输出目录、转换、重启后重新选择输出目录、媒体库隐私域允许/拒绝），需要用户决定并在实机上操作，**尚未进行**；`RELEASE_QA.md` 要求的 App Review 连续实机录屏同样未做。
+- Mac App Store：通用 PKG 已通过 App Store Connect 校验，并于 2026-10-24 经用户批准上传（构建号 100，run 40095455028）。在 Intel 与 Apple 芯片实机上用处理后的构建验收沙盒路径（选文件、选输出目录、转换、重启后重新选择输出目录、媒体库隐私域允许/拒绝），需要用户决定并在实机上操作，**尚未进行**；`RELEASE_QA.md` 要求的 App Review 连续实机录屏同样未做。
 
 ## 结论
 
 上文各项在本候选上通过，并注明了哪些是虚拟机原生、哪些是 CI 或共用路径证据。G3-6 记为**部分完成**，尚缺：
 
-1. TestFlight：上传通用 PKG，用处理后的构建在 Intel 与 Apple 芯片实机上验收沙盒路径（G3-2 剩余部分）。
+1. TestFlight：构建 100 已上传；尚待用处理后的构建在 Intel 与 Apple 芯片实机上验收沙盒路径（G3-2 剩余部分）。
 2. `MAS_APP_REVIEW_SUBMISSION.md` 的 App Store Connect 负责人清单：年龄分级问卷、隐私标签、实际 app 截图、元数据准确性、新的 `CFBundleVersion`、干净账号的连续录屏与审核备注。
 3. x64：Intel 硬件上的完整图片语料与安装/升级/卸载生命周期。x64 目前有托管 runner 上源码构建 GPUI app 的 GUI 冒烟（含 ImageIO HEIC，run 40091747027）和签名 DMG 的工作流校验。
 
