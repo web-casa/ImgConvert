@@ -22,6 +22,11 @@ test -x "$binary" || { echo "not an executable: $binary" >&2; exit 1; }
 version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/apps/gpui/Cargo.toml" | head -1)
 short_version=${version%%-*}
 [[ $short_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "unexpected version: $version" >&2; exit 1; }
+# CFBundleVersion is a separate, increasing build number (App Store Connect
+# rejects a build version it has already processed); CI passes its run
+# number, local builds default to 1.
+build_number=${GPUI_BUILD_NUMBER:-1}
+[[ $build_number =~ ^[1-9][0-9]{0,8}$ ]] || { echo "GPUI_BUILD_NUMBER must be a positive integer: $build_number" >&2; exit 1; }
 
 app="$out/ImgConvert.app"
 rm -rf "$app"
@@ -61,7 +66,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>ImgConvert</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$short_version</string>
-  <key>CFBundleVersion</key><string>$short_version</string>
+  <key>CFBundleVersion</key><string>$build_number</string>
   <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>LSApplicationCategoryType</key><string>public.app-category.photography</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
@@ -89,9 +94,10 @@ if [ "$mas" = 1 ]; then
   codesign --force --sign "$identity" --options runtime --timestamp --entitlements "$entitlements" "$app"
   rm -f "$entitlements"
   codesign --verify --deep --strict --verbose=2 "$app"
-  pkg="$out/ImgConvert_${short_version}_universal_mas.pkg"
+  pkg="$out/ImgConvert_${short_version}_mas.pkg"
   rm -f "$pkg"
-  xcrun productbuild --sign "$GPUI_MAS_INSTALLER_IDENTITY" --component "$app" /Applications "$pkg"
+  # Only the package path goes to stdout: callers capture it.
+  xcrun productbuild --sign "$GPUI_MAS_INSTALLER_IDENTITY" --component "$app" /Applications "$pkg" >&2
   echo "$short_version" > "$out/VERSION"
   echo "$pkg"
   exit 0
