@@ -171,7 +171,7 @@ WebKit XPC 归属：每次运行归属到 2 个新出现的 `com.apple.WebKit.*`
 | 指标 | Tauri 0.3.x | GPUI PoC | GPUI 完整候选 |
 |---|---|---|---|
 | readyMs（startup，中位数） | 1164 ms 热 / 3673 ms 冷 | 404 ms 热（5/5 有效，p95 1093 ms；首次运行含 runtime shader 编译）/ 1432 ms 冷（3/3 有效，`--purge`） | 384 ms 热（5/5，p95 1187 ms，首次运行含 shader 编译）/ 1463 ms 冷（3/3，`--purge`） |
-| idleRssBytes（startup） | 159.3 MiB | 49.5 MiB 热 / 42.1 MiB 冷（单进程，−69%） | 57.9 MiB 热 / 58.0 MiB 冷（−64% / −63%） |
+| idleRssBytes（startup） | 159.3 MiB | 49.5 MiB 热 / 42.1 MiB 冷（单进程，−69%） | 57.9 MiB 热 / 58.0 MiB 冷（相对热 159.3 MiB 为 −64%，相对冷 157.3 MiB 为 −63%） |
 | importMs（1k / 10k） | 96 ms / 虚拟机不可测 | 97 ms（3/3 有效）/ 1550 ms（2/2 有效） | 77 ms（3/3）/ 1727 ms（2/2） |
 | scrollIntervalP99Ms（1k） | 402 ms | 52 ms（刷新周期估计 49 ms，虚拟机软件渲染上限；p50 48 ms；整段 0→底→0 三角波，11 k px/s） | 33.5 ms（刷新周期 16.7 ms，p50 16.7 ms） |
 | idleRssBytes（import 1k） | 862.5 MiB | 163.0 MiB（−81%；滚完全程后缩略图缓存占到 128 MiB 预算） | 179.8 MiB（−79%） |

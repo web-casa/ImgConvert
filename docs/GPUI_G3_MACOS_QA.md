@@ -17,19 +17,19 @@ DMG 工作流对每个架构执行 `file`、`lipo -archs`、`otool -L`、深度�
 
 ## 图片语料（虚拟机 arm64，direct 候选）
 
-语料由脚本生成（CMYK JPEG、带透明 PNG、动画 WebP/GIF、路径与文字 SVG、引用外部图片的 SVG、静态 GIF、BMP、`sips` 生成的 HEIC 与 ImageIO 写出的双帧 HEIC、8000×8000 噪声 PNG、10000×10000 PNG、截断一半的 JPEG），经探针导入后以 AVIF 为目标转换。
+语料由脚本生成（CMYK JPEG、带透明 PNG、动画 WebP/GIF、路径与文字 SVG、引用外部图片的 SVG、静态 GIF、BMP、`sips` 生成的 HEIC 与 ImageIO 写出的双帧 HEIC、8000×8000 噪声 PNG、10000×10000 PNG、截断一半的 JPEG），经探针导入后以 AVIF 为目标转换；透明、SVG 与 data URI 用例另以小语料分别转 PNG/WebP/AVIF（无损）和 JPEG。
 
 | 用例 | 结果 |
 | --- | --- |
 | CMYK JPEG | 完成；输出转回 PNG 后 RGB 均值与源一致（57, 63, 105），未反相 |
-| 带透明 PNG | 完成；输出带 alpha，RGBA 均值与源一致（alpha 均值 63） |
+| 带透明 PNG | 无损转 PNG、WebP、AVIF：alpha 通道与源逐像素相同，可见像素 RGB 最大差 0；转 JPEG 按设计合成到白底 |
 | 动画 WebP / 动画 GIF | 拒绝，不写出首帧输出 |
-| 路径与文字 SVG | 完成 |
-| 引用外部图片的 SVG | 拒绝 |
+| 路径与文字 SVG | 转 PNG、WebP、AVIF、JPEG 四种输出均完成 |
+| 引用外部图片或 data URI 位图的 SVG | 均拒绝，无输出 |
 | 静态 GIF、BMP | 完成；BMP 输出 RGB 均值与源一致 |
 | 静态 HEIC（ImageIO） | 完成 |
 | 双帧 HEIC（ImageIO） | 拒绝，不写出首帧输出 |
-| 8000×8000 | 完成（91 MB 源，单图峰值 RSS 约 1.9 GiB；本次只有一张大图，未单独验证多张大图时的批次并行） |
+| 8000×8000 | 完成。单张：峰值 RSS 约 1.9 GiB；四张同批（8 GiB 内存、4 核虚拟机）：峰值 2.1 GiB，耗时 174 s，约为单张的四倍，即按内存预算串行，没有失控的并行 |
 | 10000×10000 | 在分配像素前拒绝 |
 | 截断 JPEG | 拒绝、无输出（修复前会以灰色填充“成功”输出，PR #79 修复） |
 
