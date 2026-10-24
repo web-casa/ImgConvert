@@ -977,19 +977,30 @@ impl SettingsForm {
             // An untouched field shows the stored value; committing it could
             // still clamp a value the record holds outside the field's range.
             if text != field.text(&self.snapshot(cx)) {
-                self.commit_number(field, &text, cx);
+                // The quit may follow a stopped batch whose model has not
+                // settled yet; the busy gate protects the form, not the quit.
+                if let Some(value) = self.number_value(field, &text, cx) {
+                    self.apply_number(field, value, cx);
+                }
             }
         }
     }
 
     pub fn commit_number(&mut self, field: NumberField, text: &str, cx: &mut Context<Self>) {
+        if let Some(value) = self.number_value(field, text, cx) {
+            self.edit(cx, |s| set_number(s, field, value));
+        }
+    }
+
+    /// The clamped value `text` commits to, or `None` when it is not a number.
+    fn number_value(&self, field: NumberField, text: &str, cx: &App) -> Option<i64> {
         let trimmed = text.trim();
         let parsed = if trimmed.is_empty() {
             0.0
         } else {
             match trimmed.parse::<f64>() {
                 Ok(value) if value.is_finite() => value,
-                _ => return,
+                _ => return None,
             }
         };
         let settings = self.snapshot(cx);
@@ -1004,12 +1015,13 @@ impl SettingsForm {
             NumberField::PdfDpi => (MIN_PDF_DPI, MAX_PDF_DPI),
         };
         let value = (parsed.round() as i64).clamp(min, max);
-        self.edit(cx, |s| match field {
-            NumberField::ResizeWidth => s.resize_width = value as u32,
-            NumberField::ResizeHeight => s.resize_height = value as u32,
-            NumberField::ResizeValue => s.resize_value = value as u32,
-            NumberField::TargetSizeKib => s.target_size_kib = value as u32,
-            NumberField::PdfDpi => s.pdf_dpi = value as u16,
+        Some(value)
+    }
+
+    /// Writes a committed number past the busy gate (quit only).
+    fn apply_number(&mut self, field: NumberField, value: i64, cx: &mut Context<Self>) {
+        self.settings.update(cx, |settings, cx| {
+            settings.update(cx, |s| set_number(s, field, value));
         });
     }
 
@@ -2457,6 +2469,16 @@ fn pdf_range_error_for_items(
             conversion_request::validate_pdf_page_range(&settings.pdf_page_range, item.page_count)
                 .err()
         })
+}
+
+fn set_number(settings: &mut Settings, field: NumberField, value: i64) {
+    match field {
+        NumberField::ResizeWidth => settings.resize_width = value as u32,
+        NumberField::ResizeHeight => settings.resize_height = value as u32,
+        NumberField::ResizeValue => settings.resize_value = value as u32,
+        NumberField::TargetSizeKib => settings.target_size_kib = value as u32,
+        NumberField::PdfDpi => settings.pdf_dpi = value as u16,
+    }
 }
 
 #[cfg(test)]

@@ -75,7 +75,15 @@
 - 修改：新接入第三个源码覆盖 `apps/gpui/vendor/gpui-base`（0.7.1，只改 `src/focus_trap.rs`：容器转发上述三个方法）。同一 `gpui-pre` 的 `window/a11y.rs` 在生成树更新前，把没有名称的 `Dialog` / `AlertDialog` 节点按文档顺序命名为其子树中第一个 `Heading` 的名称；测试支持新增 `Window::a11y_nodes_with_role_for_test`，`a11y_node_for_test` 改为返回最终化后的节点。
 - 产品侧：shared 新增 `a11y::dialog_title`（带 `Heading` 角色与名称的标题），隐私、关于与许可、插件诊断、更新、影响分析、对比预览、输出安全确认和删除预设确认八处对话框改用它。
 - 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题；删除预设确认断言 `AlertDialog` 节点同样以标题命名。命名规则跳过无名标题，不跨入嵌套对话框。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生复验（macOS 13.6 虚拟机）记录在 `GPUI_G2_ACCEPTANCE.md` 末节“G3 收口补测”。
-- 退出条件：上游 Kit 让焦点陷阱保留元素的辅助功能信息并为模态宿主设置名称后删除。尚未向上游提交，需用户授权。
+- 退出条件：上游 Kit 让焦点陷阱保留元素的辅助功能信息并为模态宿主设置名称后删除。焦点陷阱部分上游已在 longbridge/gpui-kit#3443 修复（0.7.1 之后）；命名部分已在 longbridge/gpui-kit#3595 补充本项目的 VoiceOver 实测（2026-10-24，经用户授权）。
+
+## 已接入：macOS 终止前询问应用（`applicationShouldTerminate:`）
+
+- 问题：gpui 只在 `applicationWillTerminate:` 回调应用，此时既不能取消也来不及等待；Dock 的“退出”、注销与关机因此不会停止批次、等待原子写，也不能先确认（`docs/GPUI_MACOS_LIFECYCLE_PLAN.md` L3）。
+- 修改：`gpui-pre` 新增 `TerminateReason`（用户退出 / 会话结束）、`TerminateReply`（立即 / 取消）、`Platform::on_should_terminate`（默认空实现，其他平台不受影响）与 `App::on_should_terminate`；应用状态正被借用时回复“取消”并从主队列重新发起退出，保证由应用决定。`gpui-pre-macos` 的应用委托实现 `applicationShouldTerminate:`，按当前 Apple Event 的 `kAEQuitReason`（`'why?'`）区分会话结束。
+- 产品侧：`shell/src/lifecycle.rs` 退出协调器统一处理 ⌘Q、关闭主窗口与系统终止。
+- 验证：单元测试覆盖终止决策表；UI 测试覆盖空闲退出、退出闩与草稿提交；macOS 13.6 虚拟机实测空闲时关窗、⌘Q、AppleEvent 退出均直接退出，批次中三者均弹出确认，Esc 继续转换，“停止并退出”在写入完成或超时后退出。
+- 退出条件：上游 gpui 提供可取消的终止询问后删除。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
 

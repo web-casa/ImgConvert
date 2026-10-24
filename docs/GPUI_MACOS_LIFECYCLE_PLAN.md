@@ -137,3 +137,11 @@
 | C | P2 | 选择器阶段的开始未计入活动；闩置位太晚 | 先置闩再采样；新增 `start_requested` |
 | C | P2 | 草稿经表单提交会被忙碌闸门拒绝 | `commit_drafts` 放在 `SettingsModel` |
 | C | P3 | macOS 无 `Maximized` 边界；坐标修补应明确 | 单独记录 `maximized`；坐标补丁列为必做 |
+
+## 7. 实现偏差记录
+
+- PR-A：会话结束在 `applicationShouldTerminate:` 内同步等待最多 5 s 后回复“立即”，未使用 `NSTerminateLater`，因此不需要 `TerminateDeferred` 状态。
+- PR-A：未注册 `on_reopen`：关闭唯一的窗口即退出应用，不会出现“无窗口但仍在运行”的状态。
+- PR-A：活动判定只看批次（`progress_bridge::is_busy`、`BatchService::is_active`）。规划中或输出安全确认中退出不再询问：此时尚未写任何文件，退出闩会拒绝之后的开始。
+- PR-A：确认前不关闭已打开的对话框：批次运行时不能再开始新批次，已打开的对话框不会导致写入。
+- PR-A：草稿只在最终退出时提交（“继续转换”不改动草稿），提交绕过表单的忙碌闸门。

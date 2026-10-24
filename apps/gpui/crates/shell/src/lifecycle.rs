@@ -82,11 +82,18 @@ fn batch_active(cx: &App) -> bool {
             .is_some_and(|services| services.batch().is_active())
 }
 
-/// Closes the latch to new batches and commits drafts. The latch comes first
-/// so a Start racing this request cannot begin a batch.
+/// Closes the latch to new batches before anything else, so a Start racing
+/// this request cannot begin a batch.
 fn begin_quit(cx: &mut App) {
     lifecycle::set_quitting(true, cx);
+}
+
+/// The quit is final: commit drafts, then flush. Drafts are committed only
+/// here so "Keep Converting" leaves them untouched.
+fn finish(cx: &mut App) {
+    set_phase(Phase::Exiting, cx);
     lifecycle::run_before_quit_hooks(cx);
+    settings_model::flush(cx);
 }
 
 /// Quit requested by the user (⌘Q, the menu, closing the main window).
@@ -131,8 +138,7 @@ pub fn window_should_close(cx: &mut App) -> bool {
 /// Flushes the settings and quits. The platform then asks
 /// [`should_terminate`] once more, which answers "now".
 fn exit(cx: &mut App) {
-    set_phase(Phase::Exiting, cx);
-    settings_model::flush(cx);
+    finish(cx);
     cx.quit();
 }
 
@@ -232,16 +238,14 @@ pub fn should_terminate(reason: TerminateReason, cx: &mut App) -> TerminateReply
         Termination::Now => TerminateReply::Now,
         Termination::Finish => {
             begin_quit(cx);
-            set_phase(Phase::Exiting, cx);
-            settings_model::flush(cx);
+            finish(cx);
             TerminateReply::Now
         }
         Termination::StopBriefly => {
             begin_quit(cx);
             progress_bridge::cancel_batch(cx);
             let _ = Services::shutdown(cx, SESSION_END_TIMEOUT);
-            set_phase(Phase::Exiting, cx);
-            settings_model::flush(cx);
+            finish(cx);
             TerminateReply::Now
         }
         Termination::Confirm => {

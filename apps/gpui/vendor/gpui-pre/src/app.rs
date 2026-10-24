@@ -2611,20 +2611,32 @@ impl App {
 
     /// Registers the handler asked before the platform terminates the
     /// application (macOS `applicationShouldTerminate:`, which also runs for
-    /// [`App::quit`]). If the application state is busy the answer is
-    /// [`TerminateReply::Now`].
+    /// [`App::quit`]). If the application state is borrowed when the platform
+    /// asks, the request is declined and repeated from the main queue, so the
+    /// handler always decides.
     pub fn on_should_terminate(
         &self,
         mut handler: impl FnMut(TerminateReason, &mut App) -> TerminateReply + 'static,
     ) {
         let this = self.this.clone();
+        let foreground = self.foreground_executor.clone();
         self.platform.on_should_terminate(Box::new(move |reason| {
             let Some(app) = this.upgrade() else {
                 return TerminateReply::Now;
             };
             match app.try_borrow_mut() {
                 Ok(mut cx) => handler(reason, &mut cx),
-                Err(_) => TerminateReply::Now,
+                Err(_) => {
+                    let this = this.clone();
+                    foreground
+                        .spawn(async move {
+                            if let Some(app) = this.upgrade() {
+                                app.borrow_mut().quit();
+                            }
+                        })
+                        .detach();
+                    TerminateReply::Cancel
+                }
             }
         }));
     }

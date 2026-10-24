@@ -107,3 +107,42 @@ fn quitting_commits_a_number_typed_without_blur(cx: &mut TestAppContext) {
         );
     });
 }
+
+#[gpui_kit::test]
+fn quitting_commits_a_draft_while_the_batch_model_has_not_settled(cx: &mut TestAppContext) {
+    let (handle, workspace) = open_workspace(cx);
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    cx.update_window(handle, |_, window, cx| {
+        let input = form
+            .read(cx)
+            .number_input(NumberField::PdfDpi)
+            .expect("pdf dpi input")
+            .clone();
+        input.update(cx, |input, cx| input.set_value("180", window, cx));
+    })
+    .unwrap();
+    cx.update(|cx| {
+        // A stopped batch whose model has not caught up yet keeps the form
+        // busy; the quit commit must not depend on it.
+        let batch = AppModels::global(cx).batch().clone();
+        batch.update(cx, |batch, _| {
+            batch.begin(
+                imgconvert_backend::progress::BatchId::new(1),
+                vec!["one".into()],
+            );
+        });
+        assert!(form.read(cx).is_busy(cx));
+        lifecycle::request_quit(cx);
+        assert_eq!(
+            AppModels::global(cx).settings().read(cx).settings().pdf_dpi,
+            180
+        );
+    });
+}

@@ -228,7 +228,7 @@
   "gpui-pre/src/_accessibility.rs": "bcdeb209fa6309f5c507d9e8918235e75c18751c1985d0ebed632de643d7ea2e",
   "gpui-pre/src/_ownership_and_data_flow.rs": "4edbde237dc322ceac8969028811fd30d87a8bd108475a642c4fb961b2770258",
   "gpui-pre/src/action.rs": "78bd18baf94baf08637d99a34a3fd147b5784ccbbfefcad3a4bb9a6577b18c12",
-  "gpui-pre/src/app.rs": "b7b7934647efcd0276735fbce30cdfbef8d71d31a9320d1c2f3103899e0fde87",
+  "gpui-pre/src/app.rs": "1cb16d82978385118fcb940c362df0dd74aea057edc0161a291a649cc7d59067",
   "gpui-pre/src/app/async_context.rs": "3a1948721bca22ccfae2926c6b40722ed3315a33e79c8d87885edc4bd610c115",
   "gpui-pre/src/app/bench_context.rs": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
   "gpui-pre/src/app/context.rs": "af9c74ba63623cf4f107861e041cddb72cca5b5c65695ab6531bb44fbf7b3573",
