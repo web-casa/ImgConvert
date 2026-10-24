@@ -1,0 +1,136 @@
+name: GPUI macOS DMG
+
+# Builds the GPUI app for both macOS architectures, signs it with the
+# Developer ID identity, notarizes and staples the DMG, and uploads it as a
+# workflow artifact. It never creates or edits a GitHub Release; it is the
+# G3-1 evidence for the migration (docs/GPUI_MIGRATION_PLAN.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build.
+        required: true
+        default: main
+        type: string
+      notarize:
+        description: Submit the signed DMG to Apple notarization and staple it.
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-macos-dmg-${{ inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  gpui-macos-dmg:
+    name: GPUI macOS DMG (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            uname_arch: arm64
+          - arch: x64
+            runner: macos-15-intel
+            uname_arch: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Verify macOS runner architecture
+        run: |
+          actual="$(uname -m)"
+          test "$actual" = "${{ matrix.uname_arch }}" || { echo "expected ${{ matrix.uname_arch }}, got $actual"; exit 1; }
+
+      - name: Check direct signing/notarization secrets
+        env:
+          APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
+          APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_DIRECT_CERTIFICATE APPLE_DIRECT_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            test -n "${!name}" || { echo "$name secret is required"; exit 1; }
+          done
+
+      - name: Install native codec build tools
+        run: brew install cmake meson ninja
+
+      - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
+
+      - name: Build the GPUI release binary
+        run: cargo build --manifest-path apps/gpui/Cargo.toml --release --locked -p imgconvert-gpui
+
+      - name: Import Apple direct signing certificate
+        env:
+          APPLE_DIRECT_CERTIFICATE: ${{ secrets.APPLE_DIRECT_CERTIFICATE }}
+          APPLE_DIRECT_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DIRECT_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/direct.p12"
+          test -s "$RUNNER_TEMP/direct.p12" || { echo "decoded direct certificate is empty"; exit 1; }
+          security create-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
+          security default-keychain -s gpui-build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
+          security set-keychain-settings -t 3600 -u gpui-build.keychain
+          security import "$RUNNER_TEMP/direct.p12" -k gpui-build.keychain \
+            -P "$APPLE_DIRECT_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" gpui-build.keychain
+          rm -f "$RUNNER_TEMP/direct.p12"
+          identity="$(security find-identity -v -p codesigning gpui-build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+          test -n "$identity" || { echo "Developer ID Application identity not found"; exit 1; }
+          echo "GPUI_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Package and sign the app and DMG
+        run: |
+          mkdir -p dist
+          dmg="$(scripts/package-gpui-macos.sh apps/gpui/target/release/imgconvert-gpui dist "$GPUI_SIGNING_IDENTITY")"
+          echo "GPUI_DMG=$dmg" >> "$GITHUB_ENV"
+          codesign --verify --deep --strict --verbose=2 dist/ImgConvert.app
+          codesign -d --verbose=2 dist/ImgConvert.app 2>&1 | grep -E "Authority=Developer ID Application|flags=.*runtime"
+
+      - name: Notarize and staple the DMG
+        if: ${{ inputs.notarize }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "$GPUI_DMG" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait --timeout 60m --output-format json | tee dist/notarization.json
+          grep -q '"status" *: *"Accepted"' dist/notarization.json || { echo "notarization was not accepted"; exit 1; }
+          xcrun stapler staple "$GPUI_DMG"
+          xcrun stapler validate "$GPUI_DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$GPUI_DMG"
+
+      - name: Record checksums
+        run: shasum -a 256 dist/*.dmg | tee dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gpui-macos-${{ matrix.arch }}-dmg
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/*.dmg
+            dist/SHA256SUMS
+            dist/notarization.json
+
+      - name: Remove the build keychain
+        if: always()
+        run: security delete-keychain gpui-build.keychain 2>/dev/null || true
