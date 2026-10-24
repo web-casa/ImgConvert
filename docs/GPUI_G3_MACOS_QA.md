@@ -7,9 +7,9 @@
 | 项目 | 值 |
 | --- | --- |
 | 源码 | main `8a2744e`（含 #79 截断 JPEG、#80 对话框辅助功能、#81 输出目录选择、#82 重复输出提示） |
-| Developer ID DMG | run 40086028282：arm64 `2af030c6…`，x86_64 `1bd40860…`；均已签名、公证并 staple（x64 首次 staple 遇网络中断，重跑失败作业后通过，见 PR #83） |
+| Developer ID DMG | run 40086028282：arm64 `2af030c6…`，x86_64 `1bd40860…`；均已签名、公证并 staple（x64 首次 staple 遇网络中断，第 2 次尝试重跑失败作业后通过；之后合入的 PR #83 为今后的 staple 增加重试） |
 | MAS 通用 PKG | run 40086061849：`ImgConvert_0.4.0_mas.pkg validated by App Store Connect`（只校验，未上传） |
-| 真实 GUI 冒烟 | run 40085939946：arm64 与 x64 托管 runner 均通过 |
+| 真实 GUI 冒烟 | run 40085939946：arm64 与 x64 托管 runner 上用源码构建的未签名 app 均通过（不是上面的签名 DMG） |
 
 ## 自动化门槛
 
@@ -17,7 +17,7 @@ DMG 工作流对每个架构执行 `file`、`lipo -archs`、`otool -L`、深度�
 
 ## 图片语料（虚拟机 arm64，direct 候选）
 
-语料由脚本生成（CMYK JPEG、带透明 PNG、动画 WebP/GIF、路径与文字 SVG、引用外部图片的 SVG、静态 GIF、BMP、`sips` 生成的 HEIC 与 ImageIO 写出的双帧 HEIC、8000×8000 噪声 PNG、10000×10000 PNG、截断一半的 JPEG），经探针导入后全部转 AVIF。
+语料由脚本生成（CMYK JPEG、带透明 PNG、动画 WebP/GIF、路径与文字 SVG、引用外部图片的 SVG、静态 GIF、BMP、`sips` 生成的 HEIC 与 ImageIO 写出的双帧 HEIC、8000×8000 噪声 PNG、10000×10000 PNG、截断一半的 JPEG），经探针导入后以 AVIF 为目标转换。
 
 | 用例 | 结果 |
 | --- | --- |
@@ -29,13 +29,13 @@ DMG 工作流对每个架构执行 `file`、`lipo -archs`、`otool -L`、深度�
 | 静态 GIF、BMP | 完成；BMP 输出 RGB 均值与源一致 |
 | 静态 HEIC（ImageIO） | 完成 |
 | 双帧 HEIC（ImageIO） | 拒绝，不写出首帧输出 |
-| 8000×8000 | 完成（91 MB 源，单图峰值 RSS 约 1.9 GiB，没有失控的批次并行） |
+| 8000×8000 | 完成（91 MB 源，单图峰值 RSS 约 1.9 GiB；本次只有一张大图，未单独验证多张大图时的批次并行） |
 | 10000×10000 | 在分配像素前拒绝 |
 | 截断 JPEG | 拒绝、无输出（修复前会以灰色填充“成功”输出，PR #79 修复） |
 
 补充发现：语料中同名不同扩展名的文件（`animated.gif` / `animated.webp`）映射到同一输出，后者原先显示批次级文案“批量转换无法完成”，已由 PR #82 改为专门提示。
 
-x64 的 ImageIO HEIC 路径：虚拟机为 arm64 且未安装 Rosetta。HEIC 解码位于两壳共用的 `imgconvert-platform`，在 `macos-15-intel` 托管 runner 上由 `macos-intel-smoke.yml` 的 HEIC 冒烟覆盖，本轮在 main 上重新运行（run 40088724030，`macOS Intel ImageIO Smoke` 通过，HEIC 导入并转换为 PNG）。
+x64 的 ImageIO HEIC 路径：虚拟机为 arm64 且未安装 Rosetta。HEIC 解码位于两壳共用的 `imgconvert-platform`，在 `macos-15-intel` 托管 runner 上由 `macos-intel-smoke.yml` 的 HEIC 冒烟覆盖（该冒烟构建的是 Tauri 壳，证明的是共用路径，不是 GPUI x64 包），本轮在 main 上重新运行（run 40088724030，`macOS Intel ImageIO Smoke` 通过，HEIC 导入并转换为 PNG）。
 
 ## 安装生命周期（虚拟机 arm64，独立 HOME）
 
@@ -48,16 +48,16 @@ x64 的 ImageIO HEIC 路径：虚拟机为 arm64 且未安装 Rosetta。HEIC 解
 5. 用安装后的 app 转换 JPEG、PNG、WebP、AVIF、SVG、静态 GIF、BMP 七种输入，7/7 完成。
 6. 卸载：删除 app 后可执行文件不存在，7 个输出与设置目录保留。
 
-x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 包的启动、导入与转换由托管 runner 的 GUI 冒烟覆盖。
+x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 的启动、导入与转换只有托管 runner 上源码构建 app 的 GUI 冒烟，签名 x64 DMG 只经过工作流内的签名/公证/Gatekeeper 校验。
 
 ## 商店与签名验收
 
 - Direct macOS：两架构 DMG 公证通过、staple 并经 Gatekeeper 评估（见上）。
-- Mac App Store：通用 PKG 已通过 App Store Connect 校验。上传 TestFlight、在 Intel 与 Apple 芯片实机上用处理后的构建验收沙盒路径（选文件、选输出目录、转换、重启后重新选择输出目录、媒体库隐私域允许/拒绝），需要用户决定并在实机上操作，**尚未进行**。
+- Mac App Store：通用 PKG 已通过 App Store Connect 校验。上传 TestFlight、在 Intel 与 Apple 芯片实机上用处理后的构建验收沙盒路径（选文件、选输出目录、转换、重启后重新选择输出目录、媒体库隐私域允许/拒绝），需要用户决定并在实机上操作，**尚未进行**；`RELEASE_QA.md` 要求的 App Review 连续实机录屏同样未做。
 
 ## 结论
 
-除 TestFlight 实机验收（G3-2 剩余部分）与 x64 实机生命周期外，`RELEASE_QA.md` 的 macOS 条目在本候选上通过。G3-6 记为“部分完成，等待 TestFlight”。
+除 TestFlight 实机验收（G3-2 剩余部分）、App Review 录屏与 x64 实机生命周期外，`RELEASE_QA.md` 的 macOS 条目在本候选上通过（上文注明了哪些是虚拟机原生、哪些是 CI 或共用路径证据）。G3-6 记为“部分完成，等待 TestFlight”。
 
 ## 证据
 
