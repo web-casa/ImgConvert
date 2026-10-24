@@ -317,7 +317,7 @@ jobs:
           }
           pnpm run release:windows:smoke -- @smokeArgs
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_direct }}
         with:
           name: imgconvert-windows-${{ matrix.arch }}-installers
@@ -340,7 +340,7 @@ jobs:
           pnpm run release:windows:msix
           pnpm run release:windows:msix:smoke -- --export-signed-dir=src-tauri/target/windows-msix/devsmoke
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.store_msix }}
         with:
           name: imgconvert-windows-${{ matrix.arch }}-msix-devsmoke
