@@ -107,7 +107,11 @@ pub fn start_batch(
     let settled_in_task = Rc::clone(&settled);
     let queue = models.queue().clone();
     let batch = models.batch().clone();
+    // Keeps App Nap from throttling the batch and idle sleep from cutting it
+    // short; released when the task ends, after the batch has settled.
+    let activity = cx.prevent_idle_sleep("Converting images");
     let task = cx.spawn(async move |cx: &mut AsyncApp| {
+        let _activity = activity.await.ok();
         let result = pump_events(receiver, running, &queue, &batch, id, &jobs, cx).await;
         settle(result, &queue, &batch, &jobs, cx);
         settled_in_task.set(true);
