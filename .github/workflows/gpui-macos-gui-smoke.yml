@@ -1,10 +1,13 @@
 name: GPUI macOS GUI smoke
 
 # Launches the real, windowed GPUI app on a hosted macOS runner (G3-4 of the
-# migration plan): the app bundle opens a window, imports a fixture folder
-# and converts it through its own UI flow, driven by the built-in probe
-# (IMGCONVERT_PERF_PROBE_IMPORT / _BATCH_OUT), and the outputs are checked.
-# Nothing is signed or published.
+# migration plan): the app bundle opens its window, and the built-in probe
+# (IMGCONVERT_PERF_PROBE_IMPORT / _BATCH_OUT) imports a fixture folder and
+# runs a batch through the app's batch service and models; the window and
+# the outputs are checked. Scope: the probe starts the batch through the
+# no-prompt test entry point, so the Start button, the folder picker and the
+# output-safety prompts are not exercised here (they have headless UI tests
+# and native VoiceOver runs). Nothing is signed or published.
 
 on:
   workflow_dispatch:
@@ -84,45 +87,75 @@ jobs:
       - name: Prepare fixtures
         run: |
           fixtures=apps/gpui/crates/shell/tests/fixtures
+          rm -rf "$RUNNER_TEMP/smoke"
           mkdir -p "$RUNNER_TEMP/smoke/in" "$RUNNER_TEMP/smoke/out" "$RUNNER_TEMP/smoke/home"
           cp "$fixtures/precision16.png" "$fixtures/pages3.pdf" "$RUNNER_TEMP/smoke/in/"
           sips -s format jpeg "$fixtures/precision16.png" --out "$RUNNER_TEMP/smoke/in/precision16-copy.jpg" >/dev/null
           ls -la "$RUNNER_TEMP/smoke/in"
 
-      - name: Launch the app, import and convert through the UI
+      - name: Launch the app, import and convert
         run: |
           smoke="$RUNNER_TEMP/smoke"
           log="$smoke/app.log"
-          open -n -W --stderr "$log" \
+          app="$PWD/dist/ImgConvert.app"
+          cleanup() {
+            for pid in $(pgrep -f "$app/Contents/MacOS/imgconvert" || true); do
+              kill "$pid" 2>/dev/null || true
+              sleep 2
+              kill -9 "$pid" 2>/dev/null || true
+            done
+          }
+          trap cleanup EXIT
+          open -n --stderr "$log" \
             --env HOME="$smoke/home" \
             --env IMGCONVERT_PERF_PROBE=1 \
             --env IMGCONVERT_PERF_PROBE_IMPORT="$smoke/in" \
             --env IMGCONVERT_PERF_PROBE_BATCH_OUT="$smoke/out" \
             --env IMGCONVERT_PERF_PROBE_BATCH_FORMAT=avif \
-            dist/ImgConvert.app &
-          for i in $(seq 1 300); do
-            grep -qE '"mark":"batch_(done|failed|cancelled)"' "$log" 2>/dev/null && break
+            "$app"
+          pid=""
+          for _ in $(seq 1 60); do
+            pid="$(pgrep -f "$app/Contents/MacOS/imgconvert" | head -1 || true)"
+            [ -n "$pid" ] && break
             sleep 1
           done
-          pid="$(pgrep -f 'dist/ImgConvert.app/Contents/MacOS/imgconvert' | head -1 || true)"
-          echo "app pid: ${pid:-none}"
-          # The window, seen by the window server (no accessibility consent needed).
-          osascript -l JavaScript -e '
+          test -n "$pid" || { echo "the app did not start"; exit 1; }
+          echo "app pid: $pid"
+          # The probe's own import and quiescence budgets are 10 and 5 minutes.
+          for _ in $(seq 1 960); do
+            grep -qE '"mark":"(batch_(done|failed|cancelled)|probe_error[a-z_]*)"' "$log" 2>/dev/null && break
+            kill -0 "$pid" 2>/dev/null || { echo "the app exited early"; break; }
+            sleep 1
+          done
+          # Let the final model update after batch_done render.
+          sleep 3
+          # The app's own window, seen by the window server (no accessibility
+          # consent needed): owned by this PID, normal layer, real size.
+          APP_PID="$pid" osascript -l JavaScript -e '
             ObjC.import("CoreGraphics");
+            const pid = Number($.NSProcessInfo.processInfo.environment.objectForKey("APP_PID").js);
             const list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0)));
-            const own = list.filter(w => w.kCGWindowOwnerName === "ImgConvert" && w.kCGWindowLayer === 0);
-            own.map(w => `${w.kCGWindowName || "(untitled)"} ${Math.round(w.kCGWindowBounds.Width)}x${Math.round(w.kCGWindowBounds.Height)}`).join("\n") || "no window";
+            const own = list.filter(w => w.kCGWindowOwnerPID === pid && w.kCGWindowLayer === 0
+              && w.kCGWindowBounds.Width >= 600 && w.kCGWindowBounds.Height >= 400);
+            own.map(w => `${Math.round(w.kCGWindowBounds.Width)}x${Math.round(w.kCGWindowBounds.Height)}`).join("\n") || "no window";
           ' | tee "$smoke/windows.txt"
-          screencapture -x "$smoke/screen.png" || true
-          [ -n "$pid" ] && kill "$pid" || true
-          sleep 2
+          screencapture -x "$smoke/screen.png" || echo "screenshot unavailable on this runner"
+          cleanup
           grep -o '"mark":"[a-z_]*"[^}]*' "$log" | tee "$smoke/marks.txt"
-          grep -q '"mark":"batch_done"' "$log" || { echo "the batch did not finish"; exit 1; }
+          if grep -qE '"mark":"(batch_failed|batch_cancelled|probe_error[a-z_]*)"' "$log"; then
+            echo "the probe reported a failure"; exit 1
+          fi
+          for mark in ready import_done probe_done batch_start batch_done; do
+            grep -q "\"mark\":\"$mark\"" "$log" || { echo "missing mark $mark"; exit 1; }
+          done
           ! grep -qx 'no window' "$smoke/windows.txt" || { echo "no app window was on screen"; exit 1; }
           ls -la "$smoke/out"
-          outputs=$(find "$smoke/out" -name '*.avif' | wc -l | tr -d ' ')
-          # Two images plus the three pages of pages3.pdf.
-          test "$outputs" -ge 5 || { echo "expected at least 5 AVIF outputs, found $outputs"; exit 1; }
+          # Exactly the expected outputs, each non-empty: two images and the
+          # three pages of pages3.pdf.
+          expected="pages3_done-page-001.avif pages3_done-page-002.avif pages3_done-page-003.avif precision16-copy_done.avif precision16_done.avif"
+          actual="$(cd "$smoke/out" && ls | LC_ALL=C sort | tr '\n' ' ' | sed 's/ $//')"
+          test "$actual" = "$expected" || { echo "unexpected outputs: $actual"; exit 1; }
+          for file in "$smoke"/out/*; do test -s "$file" || { echo "empty output $file"; exit 1; }; done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
