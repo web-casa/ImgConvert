@@ -766,9 +766,14 @@ fn name_dialogs_after_headings(nodes: &mut [(NodeId, accesskit::Node)]) {
                 continue;
             }
             let child = &nodes[ix].1;
-            if child.role() == accesskit::Role::Heading {
-                label = child.label().map(str::to_owned);
-                break;
+            match child.role() {
+                // A nested dialog's title names that dialog, not this one.
+                accesskit::Role::Dialog | accesskit::Role::AlertDialog => continue,
+                accesskit::Role::Heading if child.label().is_some() => {
+                    label = child.label().map(str::to_owned);
+                    break;
+                }
+                _ => {}
             }
             stack.extend(child.children().iter().rev().copied());
         }

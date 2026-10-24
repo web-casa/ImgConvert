@@ -4,7 +4,7 @@
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "7e761d53905f855a9ee14c7c6d99af164d3a82fdfbb161107a1d5c64d75e33c1",
+      "patch_sha256": "6e27bacff995b731ce4da454f91aa5e085caa0e478aeaa8e6fdbfda9ec7ae1cd",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
         "src/platform.rs": "ce397315ba0325fb102c56b62cd105d7c8ea815f9b0b1a5912640d7644b5cfd8",
@@ -13,7 +13,7 @@
         "src/tab_stop.rs": "a3407e5420036cd8ef30f90d27d4538ae59dfba34baab58914f682a7bdbf71c1",
         "src/element.rs": "498036b2f1bb5f65f7cd7a3ed353a393a70c3f7b7885ee2e5f330ad5cf37cda4",
         "src/elements/div.rs": "d63603c0173d6418359f95118cc8f0e571f829e07055e1ae2744620d1527d233",
-        "src/window/a11y.rs": "e12b674de4f593964c6cc881c7c52d50fbb29a114b508c33385512c849a0a2b5",
+        "src/window/a11y.rs": "41fc2b84c80fde64a242530ec144dadeb98af0e78c99f570aead2fa2d04ffacb",
         "src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
         "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823"
       }

@@ -50,7 +50,7 @@ use imgconvert_backend::settings::{
 use imgconvert_backend::workflow_presets::{
     self, CUSTOM_PRESET_ID_PREFIX, builtin_workflow_presets,
 };
-use imgconvert_gpui_shared::a11y::DisabledForAll as _;
+use imgconvert_gpui_shared::a11y::{DisabledForAll as _, dialog_title};
 use imgconvert_gpui_shared::choice::{Choice, ChoiceItem};
 use imgconvert_gpui_shared::i18n::{Locale, tr, tr_with};
 use imgconvert_gpui_shared::theme::{ActiveGlass as _, GlassStyled as _};
@@ -879,7 +879,10 @@ impl SettingsForm {
             let id = id.clone();
             dialog
                 .glass_dialog(cx)
-                .title(tr_with("workflow.delete_preset_title", &[("name", &name)]))
+                .title(dialog_title(tr_with(
+                    "workflow.delete_preset_title",
+                    &[("name", &name)],
+                )))
                 .description(tr("workflow.delete_preset_description"))
                 .ok_text(tr("workflow.delete"))
                 .ok_variant(ButtonVariant::Danger)

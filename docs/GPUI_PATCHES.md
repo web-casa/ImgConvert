@@ -73,8 +73,8 @@
 
 - 问题：G3 收口复验时，用 VoiceOver 打开“关于与开源许可”，只听到“你当前在‘窗口’中”，不读对话框标题。原因有两层：Kit 0.7.1 的 `gpui-base` 用 `FocusTrapContainer` 包住模态宿主，但这个容器没有转发 `a11y_role` / `write_a11y_info` / `a11y_synthetic_children`，宿主的 `Role::Dialog` 被整个丢掉，所有对话框在辅助功能树里都只是一个无名分组；即使角色保留，Kit 的宿主也从不设置名称（标题只是一个元素，不是字符串）。
 - 修改：新接入第三个源码覆盖 `apps/gpui/vendor/gpui-base`（0.7.1，只改 `src/focus_trap.rs`：容器转发上述三个方法）。同一 `gpui-pre` 的 `window/a11y.rs` 在生成树更新前，把没有名称的 `Dialog` / `AlertDialog` 节点按文档顺序命名为其子树中第一个 `Heading` 的名称；测试支持新增 `Window::a11y_nodes_with_role_for_test`，`a11y_node_for_test` 改为返回最终化后的节点。
-- 产品侧：shared 新增 `a11y::dialog_title`（带 `Heading` 角色与名称的标题），隐私、关于与许可、插件诊断、更新、影响分析、对比预览和输出安全确认六类对话框改用它。
-- 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生 VoiceOver 复验记录在 `GPUI_G2_ACCEPTANCE.md`。
+- 产品侧：shared 新增 `a11y::dialog_title`（带 `Heading` 角色与名称的标题），隐私、关于与许可、插件诊断、更新、影响分析、对比预览、输出安全确认和删除预设确认八处对话框改用它。
+- 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题；删除预设确认断言 `AlertDialog` 节点同样以标题命名。命名规则跳过无名标题，不跨入嵌套对话框。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生 VoiceOver 复验记录在 `GPUI_G2_ACCEPTANCE.md`。
 - 退出条件：上游 Kit 让焦点陷阱保留元素的辅助功能信息并为模态宿主设置名称后删除。尚未向上游提交，需用户授权。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
