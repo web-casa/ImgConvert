@@ -5,7 +5,9 @@ use gpui_kit::Global;
 use imgconvert_backend::instance_lock::{self, AcquireOutcome, InstanceInfo, InstanceLock};
 use imgconvert_backend::settings::Settings;
 use imgconvert_backend::{paths, write_journal};
-use imgconvert_gpui::{init_app, open_blocked_window, open_main_window, probe_driver};
+use imgconvert_gpui::{
+    init_app, open_blocked_window, open_main_window, probe_driver, window_state,
+};
 use imgconvert_gpui_shared::i18n::Locale;
 use imgconvert_gpui_shared::{SettingsModel, perf_probe, services};
 
@@ -63,6 +65,9 @@ fn main() {
         }
         cx.set_global(HeldInstanceLock(instance_lock));
         init_app(cx);
+        if let Some(dir) = paths::app_data_dir() {
+            window_state::install(dir.join(window_state::FILE_NAME), cx);
+        }
         match open_main_window(cx) {
             Ok((window, workspace)) => {
                 probe_driver::start(window, workspace, cx);

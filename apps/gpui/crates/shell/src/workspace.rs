@@ -9,15 +9,15 @@
 //! navigation rail is gone; theme and reduced motion live in the header's
 //! Appearance popover.
 
-use crate::{OpenSettings, lifecycle};
+use crate::{OpenSettings, lifecycle, window_state};
 use gpui_kit::component::button::{Button, ButtonRounded, ButtonVariants as _};
 use gpui_kit::component::{
     ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable,
-    FontWeight, Image, ImageFormat, ImageSource, InteractiveElement as _, IntoElement, ObjectFit,
+    AnyWindowHandle, App, AppContext as _, Context, Entity, FocusHandle, Focusable, FontWeight,
+    Image, ImageFormat, ImageSource, InteractiveElement as _, IntoElement, ObjectFit,
     ParentElement as _, Render, Role, StatefulInteractiveElement as _, Styled as _,
     StyledImage as _, Subscription, TestSupportExt as _, TitlebarOptions, Window, WindowBounds,
     WindowOptions, div, img, px, rems, size,
@@ -352,25 +352,35 @@ impl Render for Workspace {
 
 /// Opens the main window at a comfortable default size.
 pub fn open_main_window(cx: &mut App) -> gpui_kit::Result<(AnyWindowHandle, Entity<Workspace>)> {
-    let bounds = Bounds::centered(None, size(px(1_080.), px(720.)), cx);
+    let placement = window_state::open_options(cx);
+    let (min_w, min_h) = window_state::MIN_SIZE;
     gpui_kit::open_window(
         WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            window_bounds: Some(WindowBounds::Windowed(placement.bounds)),
+            display_id: placement.display,
             titlebar: Some(TitlebarOptions {
                 title: Some(tr("app.title")),
                 ..Default::default()
             }),
-            window_min_size: Some(size(px(760.), px(480.))),
+            window_min_size: Some(size(px(min_w), px(min_h))),
             app_id: Some("io.github.yeagoo.imgconvert".into()),
             ..Default::default()
         },
         cx,
         |window, cx| {
             window.on_window_should_close(cx, |_, cx| lifecycle::window_should_close(cx));
-            cx.new(|cx| Workspace::new(window, cx))
+            let workspace = cx.new(|cx| Workspace::new(window, cx));
+            workspace.update(cx, |_, cx| {
+                cx.observe_window_bounds(window, |_, window, cx| window_state::track(window, cx))
+                    .detach();
+            });
+            workspace
         },
     )
-    .inspect(|(handle, _)| lifecycle::set_main_window(*handle, cx))
+    .inspect(|(handle, _)| {
+        lifecycle::set_main_window(*handle, cx);
+        window_state::attach(*handle, &placement, cx);
+    })
 }
 
 /// The brand mark at title-bar size (`assets/brand/logo-mark-small.svg`), decoded once.

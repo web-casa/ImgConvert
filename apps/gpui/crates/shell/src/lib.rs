@@ -10,6 +10,7 @@ pub mod blocked;
 pub mod language;
 pub mod lifecycle;
 pub mod probe_driver;
+pub mod window_state;
 pub mod workspace;
 
 use gpui_kit::{App, KeyBinding, Menu, MenuItem, Window, actions};

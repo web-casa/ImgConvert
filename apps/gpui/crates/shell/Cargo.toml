@@ -29,6 +29,8 @@ imgconvert-gpui-diagnostics.workspace = true
 imgconvert-gpui-impact.workspace = true
 imgconvert-gpui-app-settings.workspace = true
 anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 gpui-kit = { workspace = true, features = ["test-support"] }
