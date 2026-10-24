@@ -4,7 +4,7 @@
     "gpui-pre": {
       "version": "0.3.8",
       "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
-      "patch_sha256": "2171a1caa7958464a53f6619d812e43fde0e7cda18ff36cb32182894f6bca59d",
+      "patch_sha256": "7ee77f0fc063fc5caa24f23a78faa256c7a0d47943f692c9f31c0e5b41d7be10",
       "patched_files": {
         "src/input.rs": "3d7a693cc4d62d507caddddfc8bf004f8efbb2ea61dd6cf1f0e1408bc3bdd1fe",
         "src/platform.rs": "5df225cb6f6f3cd499ba73786e01735d1791ec496d4058901fa34d515137c263",
@@ -16,7 +16,7 @@
         "src/window/a11y.rs": "41fc2b84c80fde64a242530ec144dadeb98af0e78c99f570aead2fa2d04ffacb",
         "src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
         "src/gpui.rs": "1a144b6938bfb4c72849829fb1f4aa3e07270d4f8d0f5d1ae92d0f367f920823",
-        "src/app.rs": "b7b7934647efcd0276735fbce30cdfbef8d71d31a9320d1c2f3103899e0fde87"
+        "src/app.rs": "1cb16d82978385118fcb940c362df0dd74aea057edc0161a291a649cc7d59067"
       }
     },
     "gpui-pre-macos": {
