@@ -4655,6 +4655,63 @@ fn next_frame(window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
     window.render_frame(cx);
 }
 
+/// The status line shows a running batch over a notice, a newer notice over
+/// an ended batch's summary, and drops a notice made during the batch once
+/// the batch ends.
+#[gpui_kit::test]
+fn status_line_orders_batch_progress_notices_and_summaries(cx: &mut TestAppContext) {
+    use imgconvert_backend::progress::BatchId;
+
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let batch = cx.update(|cx| AppModels::global(cx).batch().clone());
+    let status = |window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+        window.render_frame(cx);
+        window.find("workflow-status").value().map(str::to_owned)
+    };
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.begin(BatchId::new(61), vec!["a".into()]);
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        // With nothing queued, Start leaves a notice; the running batch
+        // still owns the status line.
+        workspace
+            .read(cx)
+            .workflow()
+            .clone()
+            .update(cx, |panel, cx| panel.start(window, cx));
+        assert_eq!(status(window, cx).as_deref(), Some("0 of 1 done"));
+    })
+    .unwrap();
+    cx.update(|cx| {
+        batch.update(cx, |batch, cx| {
+            batch.fail("boom".into());
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        assert_eq!(
+            status(window, cx).as_deref(),
+            Some("The batch conversion could not be completed."),
+            "the notice made during the batch ended with it"
+        );
+        workspace
+            .read(cx)
+            .workflow()
+            .clone()
+            .update(cx, |panel, cx| panel.start(window, cx));
+        assert_eq!(
+            status(window, cx).as_deref(),
+            Some("Add images to the queue first"),
+            "a newer notice shows over the ended batch"
+        );
+    })
+    .unwrap();
+}
+
 /// A batch's start and end are announced once each, without moving to the
 /// status line; progress and later queue edits are not. The status line
 /// itself always reads what it shows.
