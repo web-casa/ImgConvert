@@ -479,7 +479,13 @@ function verifyMasPlists(appPath, profile, identifier, temporaryRoot) {
   const teamId = readPlistValue(profilePath, "TeamIdentifier:0");
   const expectedApplicationId = teamId ? `${teamId}.${identifier}` : null;
   requirePlistValue(entitlementsPath, "com.apple.security.app-sandbox", "true");
-  requirePlistValue(entitlementsPath, "com.apple.security.network.client", "true");
+  // Tauri's WKWebView IPC needs outgoing network access in the sandbox; the
+  // GPUI app has no web view and must not ask for it.
+  if (process.env.IMGCONVERT_MAS_NETWORK_CLIENT === "forbidden") {
+    requirePlistKeyAbsent(entitlementsPath, "com.apple.security.network.client");
+  } else {
+    requirePlistValue(entitlementsPath, "com.apple.security.network.client", "true");
+  }
   requirePlistValue(entitlementsPath, "com.apple.security.files.user-selected.read-write", "true");
   requirePlistKeyAbsent(entitlementsPath, "com.apple.security.files.bookmarks.app-scope");
   requirePlistValue(entitlementsPath, "com.apple.developer.team-identifier", teamId);
