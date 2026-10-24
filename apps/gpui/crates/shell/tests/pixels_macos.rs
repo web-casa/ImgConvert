@@ -11,6 +11,7 @@ fn main() {
     if cfg!(target_os = "macos") {
         support::run_solid_red_frame();
         support::run_workspace_surface();
+        support::run_translucent_preview_image();
     } else {
         eprintln!("skipping macOS pixel harness on this platform");
     }

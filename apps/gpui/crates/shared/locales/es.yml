@@ -347,6 +347,10 @@ preview.title:
   es: Vista previa antes y después
 preview.pdf_page:
   es: "Página %{page} del PDF"
+preview.previous_page:
+  es: Página anterior
+preview.next_page:
+  es: Página siguiente
 preview.before:
   es: Original
 preview.after:

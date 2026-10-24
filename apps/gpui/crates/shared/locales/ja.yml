@@ -347,6 +347,10 @@ preview.title:
   ja: 変換前後のプレビュー
 preview.pdf_page:
   ja: "PDF %{page} ページ"
+preview.previous_page:
+  ja: 前のページ
+preview.next_page:
+  ja: 次のページ
 preview.before:
   ja: 元画像
 preview.after:

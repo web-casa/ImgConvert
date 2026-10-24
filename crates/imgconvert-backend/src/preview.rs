@@ -56,6 +56,10 @@ pub struct PreviewOptions {
     pub conversion: ConvertOptions,
     #[serde(default)]
     pub max_edge: Option<u32>,
+    /// One-based PDF page to show; must be one of the selected pages,
+    /// otherwise the first selected page is shown. Ignored for images.
+    #[serde(default)]
+    pub pdf_page: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +68,9 @@ pub struct PreviewResult {
     pub mime: &'static str,
     /// One-based PDF page shown by this preview; absent for ordinary images.
     pub source_page: Option<usize>,
+    /// One-based pages the PDF selection converts, in order; empty for
+    /// ordinary images. A preview can show any of them.
+    pub pdf_pages: Vec<usize>,
     pub source_width: u32,
     pub source_height: u32,
     pub output_width: u32,
@@ -251,14 +258,26 @@ pub fn generate_preview(
 
     let max_edge = options.max_edge.unwrap_or(DEFAULT_PREVIEW_EDGE);
     let is_cancelled = || cancel.is_cancelled();
+    let mut pdf_pages = Vec::new();
     let (source_width, source_height, source_page, workflow, mut pdf_warnings) =
         if pdf::is_pdf_path(input) {
             let document = pdf::PdfDocument::load(pdf::read_pdf_file(input)?)?;
             let selection = document.selection(options.conversion.pdf.as_ref())?;
-            let page_index = *selection
+            pdf_pages = selection.pages.iter().map(|index| index + 1).collect();
+            let first = *selection
                 .pages
                 .first()
                 .ok_or_else(|| "PDF 页码范围未选择任何页面".to_string())?;
+            let page_index = options
+                .pdf_page
+                .and_then(|page| {
+                    selection
+                        .pages
+                        .iter()
+                        .copied()
+                        .find(|index| index + 1 == page)
+                })
+                .unwrap_or(first);
             let cache = document.new_render_cache();
             let rendered = document.render_page(page_index, selection.dpi, &cache)?;
             let dimensions = (rendered.image.width, rendered.image.height);
@@ -322,6 +341,7 @@ pub fn generate_preview(
         input: input_value,
         mime: "image/png",
         source_page,
+        pdf_pages,
         source_width,
         source_height,
         output_width: workflow.width,
@@ -429,6 +449,7 @@ mod tests {
             input: "/tmp/source.png".to_string(),
             mime: "image/png",
             source_page: None,
+            pdf_pages: Vec::new(),
             source_width: 4,
             source_height: 2,
             output_width: 2,
@@ -462,6 +483,7 @@ mod tests {
             input: "/tmp/source.png".to_string(),
             mime: "image/png",
             source_page: None,
+            pdf_pages: Vec::new(),
             source_width: 1,
             source_height: 1,
             output_width: 1,
@@ -497,6 +519,7 @@ mod tests {
         );
         let result = generate_preview(
             PreviewOptions {
+                pdf_page: None,
                 conversion,
                 max_edge: Some(imgconvert_core::MIN_WORKFLOW_PREVIEW_EDGE),
             },
@@ -510,6 +533,42 @@ mod tests {
         assert!(result.before_bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
         assert!(result.after_bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
         assert!(!dir.join("source-imgconvert-smoke.jpg").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn preview_shows_a_chosen_selected_pdf_page_and_lists_the_selection() {
+        let dir = test_dir("pdf-pages");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("source.pdf");
+        fs::write(&input, crate::pdf::tests::minimal_pdf(4)).unwrap();
+        let preview = |page: Option<usize>| {
+            let mut conversion = convert::path_conversion_smoke_options(
+                input.to_string_lossy().to_string(),
+                Some(dir.to_string_lossy().to_string()),
+                "png".to_string(),
+            );
+            conversion.pdf = Some(crate::pdf::PdfConvertOptions {
+                dpi: 72,
+                page_range: Some("2-3".to_string()),
+            });
+            generate_preview(
+                PreviewOptions {
+                    pdf_page: page,
+                    conversion,
+                    max_edge: Some(imgconvert_core::MIN_WORKFLOW_PREVIEW_EDGE),
+                },
+                CancellationToken::new(),
+            )
+            .unwrap()
+        };
+        let chosen = preview(Some(3));
+        assert_eq!(chosen.source_page, Some(3));
+        assert_eq!(chosen.pdf_pages, vec![2, 3]);
+        // A page outside the selection falls back to its first page.
+        assert_eq!(preview(Some(4)).source_page, Some(2));
+        assert_eq!(preview(None).source_page, Some(2));
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -532,6 +591,7 @@ mod tests {
 
         let result = generate_preview(
             PreviewOptions {
+                pdf_page: None,
                 conversion,
                 max_edge: Some(imgconvert_core::MIN_WORKFLOW_PREVIEW_EDGE),
             },

@@ -3824,6 +3824,7 @@ version = "0.4.0-poc.1"
 dependencies = [
  "anyhow",
  "gpui-kit",
+ "image",
  "imgconvert-backend",
  "imgconvert-gpui-app-settings",
  "imgconvert-gpui-diagnostics",

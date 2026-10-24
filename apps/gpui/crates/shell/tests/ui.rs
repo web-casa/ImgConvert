@@ -520,6 +520,84 @@ fn settings_form_sections_render_and_edit_the_record(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// A PDF whose selection has several pages: the comparison dialog steps
+/// through them, regenerating each, with the ends disabled.
+#[gpui_kit::test]
+fn comparison_preview_steps_through_the_selected_pdf_pages(cx: &mut TestAppContext) {
+    let _locale = locale_guard();
+    let (handle, workspace) = open_workspace(cx);
+    let dir =
+        std::env::temp_dir().join(format!("imgconvert-gpui-pdf-pages-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("pages.pdf");
+    std::fs::write(&input, include_bytes!("fixtures/pages3.pdf")).unwrap();
+    cx.update(|cx| {
+        let models = AppModels::global(cx).clone();
+        models.settings().clone().update(cx, |settings, cx| {
+            settings.update(cx, |settings| settings.pdf_page_range = "1-3".into());
+        });
+        models.queue().update(cx, |queue, cx| {
+            queue.add_files(vec![imgconvert_backend::import::ImportScanFile {
+                path: input.to_string_lossy().into_owned(),
+                key: "pages".into(),
+                relative_dir: None,
+                metadata: None,
+            }]);
+            cx.notify();
+        });
+    });
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("compare:pages", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let preview = cx
+        .update(|cx| workspace.read(cx).comparison_preview())
+        .expect("the dialog holds the preview");
+    let page = |cx: &mut TestAppContext| {
+        wait_for_preview(cx, &preview);
+        cx.update(|cx| {
+            let summary = preview.read(cx).summary().cloned().expect("a preview");
+            (summary.source_page, summary.pdf_pages)
+        })
+    };
+    assert_eq!(page(cx), (Some(1), vec![1, 2, 3]));
+    let controls = |cx: &mut TestAppContext| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            (
+                window.find("preview-page-previous").disabled() == Some(true),
+                window.find("preview-page-next").disabled() == Some(true),
+            )
+        })
+        .unwrap()
+    };
+    assert_eq!(controls(cx), (true, false), "first page");
+    for expected in [2, 3] {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.click("preview-page-next", cx);
+        })
+        .unwrap();
+        assert_eq!(page(cx).0, Some(expected));
+    }
+    assert_eq!(controls(cx), (false, true), "last page");
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("preview-page-previous", cx);
+    })
+    .unwrap();
+    assert_eq!(page(cx).0, Some(2));
+    cx.update_window(handle, |_, window, cx| {
+        window.press("escape", cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[gpui_kit::test]
 fn comparison_preview_generates_marks_stale_and_releases(cx: &mut TestAppContext) {
     use imgconvert_gpui_preview::ComparisonPreview;
