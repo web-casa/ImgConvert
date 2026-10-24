@@ -864,7 +864,7 @@ settings.tab_has_issue:
 settings.format_hint_jpeg:
   pt-BR: Abre em qualquer lugar
 settings.format_hint_png:
-  pt-BR: Sem perdas, mantém alfa
+  pt-BR: Sem perdas, com alfa
 settings.format_hint_webp:
   pt-BR: Feito para a web
 settings.format_hint_avif:
