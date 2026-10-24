@@ -111,6 +111,8 @@ workflow.failed:
   de: "Stapel fehlgeschlagen: %{detail}"
 workflow.already_running:
   de: Ein Stapel läuft bereits
+workflow.output_not_folder:
+  de: Wähle für die Ausgabe einen Ordner, keine Datei
 workflow.nothing_to_convert:
   de: Füge zuerst Bilder zur Warteliste hinzu
 settings.title:

@@ -43,6 +43,8 @@ use crate::settings_form::{SettingsForm, SettingsTab};
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Notice {
     NothingToConvert,
+    /// The output picker returned a file.
+    OutputNotFolder,
     AlreadyRunning,
     InvalidConfiguration,
     Planning,
@@ -56,6 +58,7 @@ impl Notice {
     fn text(&self) -> SharedString {
         match self {
             Self::NothingToConvert => tr("workflow.nothing_to_convert"),
+            Self::OutputNotFolder => tr("workflow.output_not_folder"),
             Self::AlreadyRunning => tr("workflow.already_running"),
             Self::InvalidConfiguration => tr("workflow.invalid_configuration"),
             Self::Planning => tr("safety.planning"),
@@ -63,6 +66,18 @@ impl Notice {
             Self::RestartNeeded => tr("safety.restart_needed"),
             Self::Failed(_detail) => tr("errors.batchFailed"),
         }
+    }
+}
+
+/// The folder the output picker returned. macOS hands back a file typed
+/// into "Go to Folder" even from a folder-only panel; that is refused rather
+/// than stored as the output folder, where every conversion would fail.
+fn picked_output_dir(mut paths: Vec<PathBuf>) -> Result<PathBuf, Notice> {
+    let dir = paths.remove(0);
+    if dir.is_dir() {
+        Ok(dir)
+    } else {
+        Err(Notice::OutputNotFolder)
     }
 }
 
@@ -191,9 +206,14 @@ impl WorkflowPanel {
         let picker =
             file_prompt::prompt_paths(PromptKind::OutputFolder, tr("workflow.choose_output"), cx);
         cx.spawn_in(window, async move |this, cx| {
-            if let Some(mut paths) = picker.await {
-                let dir = paths.remove(0);
-                let _ = this.update(cx, |this, cx| this.set_output_dir(dir, cx));
+            if let Some(paths) = picker.await {
+                let _ = this.update(cx, |this, cx| match picked_output_dir(paths) {
+                    Ok(dir) => this.set_output_dir(dir, cx),
+                    Err(notice) => {
+                        this.notice = Some(notice);
+                        cx.notify();
+                    }
+                });
             }
         })
         .detach();
@@ -234,10 +254,17 @@ impl WorkflowPanel {
         let picker =
             file_prompt::prompt_paths(PromptKind::OutputFolder, tr("workflow.choose_output"), cx);
         cx.spawn_in(window, async move |this, cx| {
-            if let Some(mut paths) = picker.await {
-                let dir = paths.remove(0);
+            if let Some(paths) = picker.await {
                 let _ = cx.update(|window, cx| {
                     this.update(cx, |this, cx| {
+                        let dir = match picked_output_dir(paths) {
+                            Ok(dir) => dir,
+                            Err(notice) => {
+                                this.notice = Some(notice);
+                                cx.notify();
+                                return;
+                            }
+                        };
                         this.set_output_dir(dir.clone(), cx);
                         let format = this.selected_format(cx).to_string();
                         this.start_with_safety_checks(dir, format, window, cx);
@@ -643,6 +670,17 @@ mod tests {
         assert!(!output_grant_valid(true, dir, Some(Path::new("/other"))));
         assert!(output_grant_valid(true, dir, Some(dir)));
         assert!(output_grant_valid(false, dir, None));
+    }
+
+    #[test]
+    fn a_file_from_the_output_picker_is_refused() {
+        use super::{Notice, picked_output_dir};
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        assert_eq!(picked_output_dir(vec![dir.clone()]), Ok(dir.clone()));
+        assert_eq!(
+            picked_output_dir(vec![dir.join("Cargo.toml")]),
+            Err(Notice::OutputNotFolder)
+        );
     }
 
     use super::*;

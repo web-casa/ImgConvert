@@ -61,21 +61,10 @@ pub fn prompt_paths(
     let receiver = cx.prompt_for_paths(options_for(kind, prompt));
     async move {
         match receiver.await {
-            Ok(Ok(Some(paths))) => keep_picked(kind, paths),
+            Ok(Ok(Some(paths))) if !paths.is_empty() => Some(paths),
             _ => None,
         }
     }
-}
-
-/// The picked paths a caller can use. macOS hands back a file typed into
-/// "Go to Folder" even from a folder-only panel, so an output folder that is
-/// not a directory counts as no choice rather than becoming the output path.
-fn keep_picked(kind: PromptKind, paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
-    let paths: Vec<PathBuf> = match kind {
-        PromptKind::OutputFolder => paths.into_iter().filter(|path| path.is_dir()).collect(),
-        _ => paths,
-    };
-    (!paths.is_empty()).then_some(paths)
 }
 
 #[cfg(test)]
@@ -92,25 +81,5 @@ mod tests {
         assert!(!options.files && options.directories && !options.multiple);
         let options = options_for(PromptKind::SingleFile, "Choose".into());
         assert!(options.files && !options.directories && !options.multiple);
-    }
-
-    #[test]
-    fn an_output_folder_must_be_a_directory() {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let file = dir.join("Cargo.toml");
-        assert_eq!(
-            keep_picked(PromptKind::OutputFolder, vec![dir.clone()]),
-            Some(vec![dir.clone()])
-        );
-        assert_eq!(
-            keep_picked(PromptKind::OutputFolder, vec![file.clone()]),
-            None
-        );
-        assert_eq!(keep_picked(PromptKind::OutputFolder, vec![]), None);
-        // Imports take files and folders alike.
-        assert_eq!(
-            keep_picked(PromptKind::ImportPaths, vec![file.clone()]),
-            Some(vec![file])
-        );
     }
 }
