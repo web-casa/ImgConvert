@@ -4965,10 +4965,56 @@ fn write_webp_chunk(out: &mut Vec<u8>, fourcc: &[u8; 4], data: &[u8]) -> Result<
 
 // ---------- JPEG ----------
 
+/// 截断的 JPEG 会被解码器用填充像素“成功”解出;这里按段表走到首个 SOS,
+/// 要求其后的熵编码数据之后存在 EOI。熵编码数据经字节填充,不会出现裸 FFD9,
+/// 而 APP 段里的 EXIF 缩略图在 SOS 之前,不会误判。结构异常时交给解码器判断。
+fn jpeg_has_end_of_image(bytes: &[u8]) -> bool {
+    if !bytes.starts_with(&[0xff, 0xd8]) {
+        return true;
+    }
+    let mut i = 2;
+    loop {
+        if bytes.get(i) != Some(&0xff) {
+            // 数据用尽说明截断;非标记字节属结构异常,由解码器给出错误。
+            return i < bytes.len();
+        }
+        while bytes.get(i) == Some(&0xff) {
+            i += 1;
+        }
+        let Some(&marker) = bytes.get(i) else {
+            return false;
+        };
+        i += 1;
+        match marker {
+            0x01 | 0xd0..=0xd8 => continue,
+            0xd9 => return true,
+            _ => {}
+        }
+        let Some(len) = bytes
+            .get(i..i + 2)
+            .map(|b| usize::from(u16::from_be_bytes([b[0], b[1]])))
+        else {
+            return false;
+        };
+        if len < 2 || i + len > bytes.len() {
+            return false;
+        }
+        i += len;
+        if marker == 0xda {
+            return bytes[i..].windows(2).any(|w| w == [0xff, 0xd9]);
+        }
+    }
+}
+
 struct JpegCodec;
 
 impl Codec for JpegCodec {
     fn decode(&self, bytes: &[u8]) -> Result<ImageData> {
+        if !jpeg_has_end_of_image(bytes) {
+            return Err(Error::Decode(
+                "JPEG 数据不完整(扫描数据后缺少 EOI 标记),文件可能被截断".into(),
+            ));
+        }
         let mut img = decode_via_image(bytes, image::ImageFormat::Jpeg)?;
         let metadata = metadata_from_image_format(bytes, Format::Jpeg);
         img.icc = metadata.icc;
@@ -7497,6 +7543,33 @@ mod tests {
         assert_eq!(decoded.exif, Some(exif));
         assert_eq!(decoded.xmp, Some(xmp));
         assert_eq!(decoded.rgba8().unwrap(), img.rgba8().unwrap());
+    }
+
+    #[test]
+    fn jpeg_truncated_inside_scan_data_is_rejected() {
+        let jpg = JpegCodec
+            .encode(&synth(64, 64), &EncodeOptions::default())
+            .unwrap();
+        assert!(JpegCodec.decode(&jpg[..jpg.len() / 2]).is_err());
+        assert!(JpegCodec.decode(&jpg[..jpg.len() - 2]).is_err());
+
+        // 结束标记之后的附加数据(如 MPF 次图)不影响完整文件。
+        let mut trailing = jpg.clone();
+        trailing.extend_from_slice(b"trailer");
+        assert_eq!(JpegCodec.decode(&trailing).unwrap().width, 64);
+    }
+
+    #[test]
+    fn jpeg_eoi_inside_app_segment_does_not_hide_truncation() {
+        let jpg = JpegCodec
+            .encode(&synth(64, 64), &EncodeOptions::default())
+            .unwrap();
+        // 在 SOI 后插入一个内含 FFD9 的 APP1 段,模拟 EXIF 缩略图。
+        let mut with_app = vec![0xff, 0xd8, 0xff, 0xe1, 0x00, 0x06, 0xff, 0xd9, 0xff, 0xd9];
+        with_app.extend_from_slice(&jpg[2..]);
+        assert_eq!(JpegCodec.decode(&with_app).unwrap().width, 64);
+        assert!(JpegCodec.decode(&with_app[..with_app.len() - 10]).is_err());
+        assert!(!jpeg_has_end_of_image(&with_app[..8]));
     }
 
     #[test]
