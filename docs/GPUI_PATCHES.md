@@ -85,6 +85,13 @@
 - 验证：单元测试覆盖终止决策表；UI 测试覆盖空闲退出、退出闩与草稿提交；macOS 13.6 虚拟机实测空闲时关窗、⌘Q、AppleEvent 退出均直接退出，批次中三者均弹出确认，Esc 继续转换，“停止并退出”在写入完成或超时后退出。
 - 退出条件：上游 gpui 提供可取消的终止询问后删除。
 
+## 已接入：macOS 服务菜单
+
+- 问题：`gpui-pre-macos` 把服务菜单的 `NSMenuItem` 传给 `setServicesMenu:`，AppKit 需要的是其中的 `NSMenu`，服务菜单因此为空或无法使用。
+- 修改：改为传入子菜单（`src/platform.rs` 一行）。
+- 验证：macOS 13.6 虚拟机上应用菜单的“服务”子菜单列出系统服务。
+- 退出条件：上游修正后删除。
+
 ## 未采纳：macOS FocusLost 只清理系统候选框
 
 - 目的：清理组合输入时打开对话框后滞留的原生 `InputMethodCandidateList`。

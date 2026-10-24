@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   de: "Abbrechen und beenden"
 app.quit_confirm_keep:
   de: "Weiter konvertieren"
+menu.about:
+  de: "Über ImgConvert"
+menu.settings:
+  de: "Einstellungen …"
+menu.services:
+  de: "Dienste"
+menu.hide:
+  de: "ImgConvert ausblenden"
+menu.hide_others:
+  de: "Andere ausblenden"
+menu.show_all:
+  de: "Alle einblenden"
+menu.close_window:
+  de: "Fenster schließen"
+menu.undo:
+  de: "Widerrufen"
+menu.redo:
+  de: "Wiederholen"
+menu.cut:
+  de: "Ausschneiden"
+menu.copy:
+  de: "Kopieren"
+menu.select_all:
+  de: "Alles auswählen"
+menu.window:
+  de: "Fenster"
+menu.minimize:
+  de: "Im Dock ablegen"
+menu.zoom:
+  de: "Zoomen"
+menu.fullscreen:
+  de: "Vollbildmodus aktivieren"
 app.open_files:
   de: Öffnen …
 app.instance_blocked_title:

@@ -212,7 +212,7 @@
   "gpui-pre-macos/src/keyboard.rs": "d6cbb1b91f11a67836a094689989b1ea7d79df60d7fa7b1829e6e78e9a01ad2b",
   "gpui-pre-macos/src/open_type.rs": "44e8e2180363111982ec6a0dcbcb7b75362806a40eadf4aff565c9a8943f357b",
   "gpui-pre-macos/src/pasteboard.rs": "66744f8c74061c999547400dc9e3dccbc40ddd5c4749c60856ee3d5ce2b77a23",
-  "gpui-pre-macos/src/platform.rs": "f8e3871dc351b9c04f338f0d3843dfb13d691918218301b719027c48cac18623",
+  "gpui-pre-macos/src/platform.rs": "499832cd5b2241f835098e08112017087f0cd785b986d64209bd12791eb82324",
   "gpui-pre-macos/src/screen_capture.rs": "996c4308d93aea1c809e27baa2ac42b18d038a677cfdd599e481abf5ad200d4b",
   "gpui-pre-macos/src/system_notifications.rs": "df8374f075932996d58b99c043d97a82e1cefebab79e5b0f4648c8a3776ea5fe",
   "gpui-pre-macos/src/text_system.rs": "727a9c1961c7cbc3991d223a5337a9b70e611b4eea4480ff755a2da9f22ebc46",

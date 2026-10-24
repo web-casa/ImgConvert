@@ -146,3 +146,53 @@ fn quitting_commits_a_draft_while_the_batch_model_has_not_settled(cx: &mut TestA
         );
     });
 }
+
+#[gpui_kit::test]
+fn the_menus_follow_the_macos_layout(cx: &mut TestAppContext) {
+    open_workspace(cx);
+    let menus = cx.update(|cx| {
+        // Menus cache their labels; rebuild them in English.
+        imgconvert_gpui::set_language(Locale::English, cx);
+        cx.get_menus().expect("menus are installed")
+    });
+    let names: Vec<_> = menus.iter().map(|menu| menu.name.to_string()).collect();
+    assert_eq!(names, ["ImgConvert", "File", "Edit", "Window"]);
+    let items = |index: usize| -> Vec<String> {
+        menus[index]
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                gpui_kit::OwnedMenuItem::Action { name, .. } => Some(name.clone()),
+                gpui_kit::OwnedMenuItem::SystemMenu(menu) => Some(menu.name.to_string()),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(
+        items(0),
+        [
+            "About ImgConvert",
+            "Settings…",
+            "Services",
+            "Hide ImgConvert",
+            "Hide Others",
+            "Show All",
+            "Quit ImgConvert"
+        ]
+    );
+    assert_eq!(
+        items(2),
+        ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All"]
+    );
+    assert_eq!(items(3), ["Minimize", "Zoom", "Enter Full Screen"]);
+}
+
+#[gpui_kit::test]
+fn close_window_quits_like_the_close_button(cx: &mut TestAppContext) {
+    let (handle, _) = open_workspace(cx);
+    cx.update_window(handle, |_, window, cx| {
+        window.dispatch_action(Box::new(imgconvert_gpui::CloseWindow), cx);
+    })
+    .unwrap();
+    cx.update(|cx| assert_eq!(lifecycle::phase(cx), Phase::Exiting));
+}

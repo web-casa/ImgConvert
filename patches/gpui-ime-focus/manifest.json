@@ -22,10 +22,10 @@
     "gpui-pre-macos": {
       "version": "0.3.8",
       "archive_sha256": "0d756813ff1cd741a502af60fd18869e0677795936d7349642b41c49f43120c0",
-      "patch_sha256": "80643287aadb5254ffbc9f42757285d1246b39c848a73d605166856ac34aea5a",
+      "patch_sha256": "ccaf268b501613d137758775678e194e9047cd77d5b4d73f6c7ba83a90734b29",
       "patched_files": {
         "src/window.rs": "d1c6f20bef9b345591674a11acf2f97d9d62fdb0344f3ac0ab0a60fadf282134",
-        "src/platform.rs": "f8e3871dc351b9c04f338f0d3843dfb13d691918218301b719027c48cac18623"
+        "src/platform.rs": "499832cd5b2241f835098e08112017087f0cd785b986d64209bd12791eb82324"
       }
     },
     "gpui-base": {

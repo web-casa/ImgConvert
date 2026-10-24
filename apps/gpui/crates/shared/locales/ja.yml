@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   ja: "中止して終了"
 app.quit_confirm_keep:
   ja: "変換を続ける"
+menu.about:
+  ja: "ImgConvert について"
+menu.settings:
+  ja: "設定…"
+menu.services:
+  ja: "サービス"
+menu.hide:
+  ja: "ImgConvert を非表示"
+menu.hide_others:
+  ja: "ほかを非表示"
+menu.show_all:
+  ja: "すべてを表示"
+menu.close_window:
+  ja: "ウインドウを閉じる"
+menu.undo:
+  ja: "取り消す"
+menu.redo:
+  ja: "やり直す"
+menu.cut:
+  ja: "カット"
+menu.copy:
+  ja: "コピー"
+menu.select_all:
+  ja: "すべてを選択"
+menu.window:
+  ja: "ウインドウ"
+menu.minimize:
+  ja: "しまう"
+menu.zoom:
+  ja: "拡大/縮小"
+menu.fullscreen:
+  ja: "フルスクリーンにする"
 app.open_files:
   ja: 開く…
 app.instance_blocked_title:

@@ -15,6 +15,38 @@ app.quit_confirm_stop:
   fr: "Arrêter et quitter"
 app.quit_confirm_keep:
   fr: "Continuer la conversion"
+menu.about:
+  fr: "À propos de ImgConvert"
+menu.settings:
+  fr: "Réglages…"
+menu.services:
+  fr: "Services"
+menu.hide:
+  fr: "Masquer ImgConvert"
+menu.hide_others:
+  fr: "Masquer les autres"
+menu.show_all:
+  fr: "Tout afficher"
+menu.close_window:
+  fr: "Fermer la fenêtre"
+menu.undo:
+  fr: "Annuler"
+menu.redo:
+  fr: "Rétablir"
+menu.cut:
+  fr: "Couper"
+menu.copy:
+  fr: "Copier"
+menu.select_all:
+  fr: "Tout sélectionner"
+menu.window:
+  fr: "Fenêtre"
+menu.minimize:
+  fr: "Placer dans le Dock"
+menu.zoom:
+  fr: "Réduire/agrandir"
+menu.fullscreen:
+  fr: "Passer en plein écran"
 app.open_files:
   fr: Ouvrir…
 app.instance_blocked_title:

@@ -23,6 +23,54 @@ app.quit_confirm_stop:
 app.quit_confirm_keep:
   en: "Keep Converting"
   zh-CN: "继续转换"
+menu.about:
+  en: "About ImgConvert"
+  zh-CN: "关于 ImgConvert"
+menu.settings:
+  en: "Settings…"
+  zh-CN: "设置…"
+menu.services:
+  en: "Services"
+  zh-CN: "服务"
+menu.hide:
+  en: "Hide ImgConvert"
+  zh-CN: "隐藏 ImgConvert"
+menu.hide_others:
+  en: "Hide Others"
+  zh-CN: "隐藏其他"
+menu.show_all:
+  en: "Show All"
+  zh-CN: "全部显示"
+menu.close_window:
+  en: "Close Window"
+  zh-CN: "关闭窗口"
+menu.undo:
+  en: "Undo"
+  zh-CN: "撤销"
+menu.redo:
+  en: "Redo"
+  zh-CN: "重做"
+menu.cut:
+  en: "Cut"
+  zh-CN: "剪切"
+menu.copy:
+  en: "Copy"
+  zh-CN: "拷贝"
+menu.select_all:
+  en: "Select All"
+  zh-CN: "全选"
+menu.window:
+  en: "Window"
+  zh-CN: "窗口"
+menu.minimize:
+  en: "Minimize"
+  zh-CN: "最小化"
+menu.zoom:
+  en: "Zoom"
+  zh-CN: "缩放"
+menu.fullscreen:
+  en: "Enter Full Screen"
+  zh-CN: "进入全屏幕"
 app.open_files:
   en: Open…
   zh-CN: 打开…
