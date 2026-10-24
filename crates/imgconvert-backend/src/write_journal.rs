@@ -36,6 +36,9 @@ use serde::{Deserialize, Serialize};
 pub const JOURNAL_DIR_NAME: &str = "pending-writes";
 
 static JOURNAL: OnceLock<Journal> = OnceLock::new();
+/// One recovery at a time: two would read and delete each other's carried
+/// files.
+static RECOVERY: Mutex<()> = Mutex::new(());
 static NEXT_OP: AtomicU64 = AtomicU64::new(1);
 
 thread_local! {
@@ -243,6 +246,9 @@ pub fn retry_retained() -> RecoveryReport {
 }
 
 fn recover(dir: &Path, own: Option<&Path>) -> RecoveryReport {
+    let _serialized = RECOVERY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut report = RecoveryReport::default();
     let Ok(entries) = fs::read_dir(dir) else {
         return report;
@@ -257,30 +263,27 @@ fn recover(dir: &Path, own: Option<&Path>) -> RecoveryReport {
     let mut ops: BTreeMap<String, Vec<Record>> = BTreeMap::new();
     let mut ended = BTreeSet::new();
     let mut consumed = Vec::new();
+    let mut damaged = Vec::new();
     for journal in &journals {
-        match read_journal(journal) {
+        let records = match read_journal(journal) {
             Ok(records) => {
-                for record in records {
-                    match record {
-                        Record::End { op } => {
-                            ended.insert(op);
-                        }
-                        record => ops.entry(record.op().to_string()).or_default().push(record),
-                    }
-                }
                 consumed.push(journal.clone());
+                records
             }
-            Err(Unreadable::Missing) => {}
+            Err(Unreadable::Missing) => continue,
+            // Every readable record is still recovered; the file is kept
+            // under another name for inspection instead of retried.
             Err(Unreadable::Partly(records)) => {
-                // What could be read is still recovered; the file is kept
-                // under another name for inspection instead of retried.
-                for record in records {
-                    if !matches!(record, Record::End { .. }) {
-                        ops.entry(record.op().to_string()).or_default().push(record);
-                    }
+                damaged.push(journal.clone());
+                records
+            }
+        };
+        for record in records {
+            match record {
+                Record::End { op } => {
+                    ended.insert(op);
                 }
-                report.unreadable += 1;
-                let _ = fs::rename(journal, journal.with_extension("unreadable"));
+                record => ops.entry(record.op().to_string()).or_default().push(record),
             }
         }
     }
@@ -299,8 +302,10 @@ fn recover(dir: &Path, own: Option<&Path>) -> RecoveryReport {
     // crash here loses nothing; a source that cannot be removed only
     // repeats idempotent work next time.
     if !retained.is_empty() {
-        let carried = dir.join(format!("retained-{}.jsonl", unique_suffix()));
-        let written = File::create(&carried).and_then(|mut file| {
+        // Written under a name recovery ignores, then renamed into place.
+        let name = format!("retained-{}", unique_suffix());
+        let staging = dir.join(format!("{name}.partial"));
+        let written = File::create(&staging).and_then(|mut file| {
             for record in &retained {
                 let mut line = serde_json::to_vec(record).map_err(io::Error::other)?;
                 line.push(b'\n');
@@ -308,13 +313,20 @@ fn recover(dir: &Path, own: Option<&Path>) -> RecoveryReport {
             }
             file.sync_all()
         });
-        if written.is_err() {
-            let _ = fs::remove_file(&carried);
+        if written
+            .and_then(|()| fs::rename(&staging, dir.join(format!("{name}.jsonl"))))
+            .is_err()
+        {
+            let _ = fs::remove_file(&staging);
             return report;
         }
     }
     for journal in consumed {
         let _ = fs::remove_file(journal);
+    }
+    for journal in damaged {
+        report.unreadable += 1;
+        let _ = fs::rename(&journal, journal.with_extension("unreadable"));
     }
     sync_dir(dir);
     report
@@ -327,8 +339,9 @@ enum Unreadable {
     Partly(Vec<Record>),
 }
 
-/// Reads a journal. Only a torn final line (a crash mid-append) is
-/// tolerated; damage anywhere else marks the journal unreadable.
+/// Reads a journal. A torn final line (a crash mid-append) is normal; any
+/// other damage marks the journal unreadable, with every parseable record
+/// still returned.
 fn read_journal(journal: &Path) -> Result<Vec<Record>, Unreadable> {
     let file = match File::open(journal) {
         Ok(file) => file,
@@ -336,24 +349,31 @@ fn read_journal(journal: &Path) -> Result<Vec<Record>, Unreadable> {
         Err(_) => return Err(Unreadable::Partly(Vec::new())),
     };
     let mut records = Vec::new();
+    let mut pending_damage = false;
     let mut damaged = false;
-    for line in BufReader::new(file).lines() {
+    for line in BufReader::new(file).split(b'\n') {
         let Ok(line) = line else {
-            return Err(Unreadable::Partly(records));
+            damaged = true;
+            break;
         };
-        if line.trim().is_empty() {
+        if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        if damaged {
-            // A damaged line followed by more lines is not a torn tail.
-            return Err(Unreadable::Partly(records));
-        }
-        match serde_json::from_str::<Record>(&line) {
-            Ok(record) => records.push(record),
-            Err(_) => damaged = true,
+        // A bad line followed by more lines is not a torn tail.
+        damaged |= pending_damage;
+        match serde_json::from_slice::<Record>(&line) {
+            Ok(record) => {
+                records.push(record);
+                pending_damage = false;
+            }
+            Err(_) => pending_damage = true,
         }
     }
-    Ok(records)
+    if damaged {
+        Err(Unreadable::Partly(records))
+    } else {
+        Ok(records)
+    }
 }
 
 /// Resolves one interrupted write. Returns the records to keep for later.
@@ -427,7 +447,10 @@ fn restore_backup(out: &Path, backup: &Path, tmp: Option<&Path>) -> Result<Optio
         return Ok(None);
     }
     if absent(backup)? {
-        return Ok(None);
+        // Done only with positive evidence: the output is there. A missing
+        // backup and a missing output may be an unmounted volume whose
+        // mount point is an empty folder.
+        return if absent(out)? { Err(()) } else { Ok(None) };
     }
     if absent(out)? {
         fs::rename(backup, out).map_err(|_| ())?;
@@ -737,6 +760,10 @@ mod tests {
         let report = recover(&journal, None);
         assert_eq!(report.unreadable, 1);
         assert!(
+            !leftover.exists(),
+            "records after the damage are still recovered"
+        );
+        assert!(
             journal.join("1-1.unreadable").exists(),
             "kept for inspection"
         );
@@ -844,5 +871,103 @@ mod tests {
             RecoveryReport::default(),
             "own journal untouched"
         );
+    }
+
+    #[test]
+    fn an_end_before_the_damage_still_ends_its_write() {
+        let (journal, out) = scratch("damaged-end");
+        let target = out.join("photo.avif");
+        let backup = out.join("imgconvert-backup-1-1-1");
+        fs::write(&target, b"new").unwrap();
+        fs::write(&backup, b"kept on purpose").unwrap();
+        let mut file = File::create(journal.join("1-1.jsonl")).unwrap();
+        for record in [
+            Record::Backup {
+                op: "j:1".into(),
+                out: target.clone(),
+                path: backup.clone(),
+            },
+            Record::End { op: "j:1".into() },
+        ] {
+            writeln!(file, "{}", serde_json::to_string(&record).unwrap()).unwrap();
+        }
+        writeln!(file, "damage").unwrap();
+        writeln!(file, "{{}}").unwrap();
+        drop(file);
+        recover(&journal, None);
+        assert!(backup.exists(), "an ended write is not replayed");
+    }
+
+    #[test]
+    fn a_missing_backup_without_its_output_is_kept() {
+        // An unmounted volume whose mount point stays as an empty folder.
+        let (journal, out) = scratch("mountpoint");
+        journal_with(
+            &journal,
+            &[Record::Backup {
+                op: "j:1".into(),
+                out: out.join("photo.avif"),
+                path: out.join("imgconvert-backup-1-1-1"),
+            }],
+        );
+        assert_eq!(recover(&journal, None).retained, 1);
+        // With the output present the write is known to be done.
+        fs::write(out.join("photo.avif"), b"x").unwrap();
+        assert_eq!(recover(&journal, None).retained, 0);
+        assert_eq!(fs::read_dir(&journal).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn carried_operations_stay_separate_across_recoveries() {
+        let (journal, out) = scratch("carry");
+        let gone = out.join("unmounted");
+        let mut records = Vec::new();
+        for n in 1..=2 {
+            records.push(Record::Backup {
+                op: format!("j:{n}"),
+                out: gone.join(format!("photo{n}.avif")),
+                path: gone.join(format!("imgconvert-backup-1-1-{n}")),
+            });
+        }
+        journal_with(&journal, &records);
+        assert_eq!(recover(&journal, None).retained, 2);
+        assert_eq!(
+            recover(&journal, None).retained,
+            2,
+            "ids survive being carried"
+        );
+        // The volume returns with both previous outputs staged aside.
+        fs::create_dir_all(&gone).unwrap();
+        for n in 1..=2 {
+            fs::write(
+                gone.join(format!("imgconvert-backup-1-1-{n}")),
+                format!("{n}"),
+            )
+            .unwrap();
+        }
+        let report = recover(&journal, None);
+        assert_eq!(report.restored.len(), 2);
+        assert_eq!(fs::read(gone.join("photo2.avif")).unwrap(), b"2");
+    }
+
+    #[test]
+    fn retrying_recovers_other_journals_and_skips_this_runs() {
+        let (journal, out) = scratch("retry-other");
+        let mine = out.join(".imgconvert-1-1-1.tmp");
+        let theirs = out.join(".imgconvert-2-2-2.tmp");
+        fs::write(&mine, b"x").unwrap();
+        fs::write(&theirs, b"x").unwrap();
+        for (name, path) in [("own", &mine), ("old", &theirs)] {
+            let mut file = File::create(journal.join(format!("{name}.jsonl"))).unwrap();
+            let record = Record::Tmp {
+                op: format!("{name}:1"),
+                path: path.clone(),
+            };
+            writeln!(file, "{}", serde_json::to_string(&record).unwrap()).unwrap();
+        }
+        let report = recover(&journal, Some(&journal.join("own.jsonl")));
+        assert_eq!(report.removed, vec![theirs.clone()]);
+        assert!(mine.exists());
+        assert!(journal.join("own.jsonl").exists());
     }
 }

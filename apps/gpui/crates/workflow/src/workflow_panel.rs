@@ -256,6 +256,7 @@ impl WorkflowPanel {
         if self.planning {
             return;
         }
+        retry_interrupted_writes(cx);
         let access = imgconvert_backend::access::runtime_file_access();
         if let Some(dir) = self.output_dir(cx).filter(|dir| {
             output_grant_valid(
@@ -678,14 +679,15 @@ pub fn build_options(
     )
 }
 
-/// A folder grant may make outputs of an earlier run reachable again (the Mac
-/// App Store sandbox keeps no access across launches): retry what startup
-/// recovery had to leave unresolved.
+/// Retries what startup recovery had to leave unresolved: a folder grant
+/// (the Mac App Store sandbox keeps no access across launches) or a volume
+/// mounted again may make it reachable. Runs only while no batch can write,
+/// on this thread, so it never races an output write. It reads the journal
+/// folder and, almost always, finds nothing to do.
 fn retry_interrupted_writes(cx: &App) {
-    tasks::run_blocking("imgconvert-recover", cx, || {
-        imgconvert_backend::write_journal::retry_retained()
-    })
-    .detach();
+    if !progress_bridge::is_busy(cx) {
+        imgconvert_backend::write_journal::retry_retained();
+    }
 }
 
 #[cfg(test)]
@@ -845,4 +847,3 @@ mod tests {
         assert!(!formats.iter().any(|format| format.as_ref() == "pdf"));
     }
 }
-
