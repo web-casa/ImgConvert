@@ -209,8 +209,10 @@ pub fn attach(window: AnyWindowHandle, placement: &Placement, cx: &mut App) {
     if kind == Kind::Windowed && !maximized {
         return;
     }
-    cx.defer(move |cx| {
-        let _ = window.update(cx, |_, window, _| {
+    // After the first frame: zooming a window that is not on screen yet
+    // leaves AppKit without the frame to return to.
+    let _ = window.update(cx, |_, window, _| {
+        window.on_next_frame(move |window, _| {
             if kind == Kind::Fullscreen {
                 window.toggle_fullscreen();
             } else {
