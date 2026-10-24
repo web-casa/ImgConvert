@@ -1317,7 +1317,12 @@ where
         let cleanup = cleanup_partial_note(tmp);
         error.append(&cleanup)
     })?;
-    write_journal::note_backup(out, &backup);
+    if let Err(error) = write_journal::note_backup(out, &backup) {
+        // Never stage the previous output where nothing records it.
+        let cleanup = cleanup_partial_note(tmp);
+        let detail = output_io_error("无法记录写入日志", out, &error);
+        return Err(detail.append(&cleanup));
+    }
     if let Err(error) = rename(out, &backup) {
         if error.kind() == std::io::ErrorKind::NotFound {
             // The destination disappeared after the initial replacement attempt. It is now safe

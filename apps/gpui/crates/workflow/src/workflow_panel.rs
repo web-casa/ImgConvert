@@ -192,6 +192,7 @@ impl WorkflowPanel {
             self.notice = None;
         }
         self.output_session_grant = Some(dir.clone());
+        retry_interrupted_writes(cx);
         let dir = dir.to_string_lossy().into_owned();
         self.settings.update(cx, |settings, cx| {
             settings.update(cx, |settings| settings.out_dir = Some(dir));
@@ -677,6 +678,16 @@ pub fn build_options(
     )
 }
 
+/// A folder grant may make outputs of an earlier run reachable again (the Mac
+/// App Store sandbox keeps no access across launches): retry what startup
+/// recovery had to leave unresolved.
+fn retry_interrupted_writes(cx: &App) {
+    tasks::run_blocking("imgconvert-recover", cx, || {
+        imgconvert_backend::write_journal::retry_retained()
+    })
+    .detach();
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -834,3 +845,4 @@ mod tests {
         assert!(!formats.iter().any(|format| format.as_ref() == "pdf"));
     }
 }
+
