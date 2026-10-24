@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import check
 import prepare
+import verify
 
 
 class CheckerTests(unittest.TestCase):
@@ -25,8 +26,8 @@ class CheckerTests(unittest.TestCase):
         cls.stage = Path(cls.temp.name) / "candidate"
         cargo_home = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
         cache = next(p for p in (cargo_home / "registry/cache").glob("*")
-                     if all((p / f"{name}-0.3.8.crate").is_file()
-                            for name in ["gpui-pre", "gpui-pre-macos"]))
+                     if all((p / f"{name}-{version}.crate").is_file()
+                            for name, version in verify.VERSIONS.items()))
         prepare.prepare(cache, cls.stage)
         metadata = subprocess.run(
             ["cargo", "metadata", "--offline", "--format-version", "1", "--manifest-path",

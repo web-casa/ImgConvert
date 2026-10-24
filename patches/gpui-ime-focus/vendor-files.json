@@ -315,7 +315,7 @@
   "gpui-pre/src/util.rs": "04397f667bf5d890cce690b96441cd5b8f5eb0a5dd2942ce27b0314be38fa636",
   "gpui-pre/src/view.rs": "aa3eab04408fd58e27fb974bd4269bd85d3c39c77968ee559bf44334412dd54c",
   "gpui-pre/src/window.rs": "118c7ba2750470dc5410094c006a1ab73d4575e2f6b880aa581212038ec6ca41",
-  "gpui-pre/src/window/a11y.rs": "e12b674de4f593964c6cc881c7c52d50fbb29a114b508c33385512c849a0a2b5",
+  "gpui-pre/src/window/a11y.rs": "41fc2b84c80fde64a242530ec144dadeb98af0e78c99f570aead2fa2d04ffacb",
   "gpui-pre/src/window/a11y/debug.rs": "2055ed9e63900a601a973191ff82ebbd91557178036826a4d2c04b09f5cf4dc2",
   "gpui-pre/src/window/prompts.rs": "0d58ec14e8139af53b50f4ad67690f01959ed59ffafc4adb2cf522f3f6197164"
 }

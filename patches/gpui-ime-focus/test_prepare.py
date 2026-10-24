@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import prepare
+import verify
 
 
 class PrepareTests(unittest.TestCase):
@@ -22,8 +23,8 @@ class PrepareTests(unittest.TestCase):
         cargo_home = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
         self.cache = next(
             (p for p in (cargo_home / "registry/cache").glob("*")
-             if all((p / f"{name}-0.3.8.crate").is_file()
-                    for name in ["gpui-pre", "gpui-pre-macos"])), None)
+             if all((p / f"{name}-{version}.crate").is_file()
+                    for name, version in verify.VERSIONS.items())), None)
         if self.cache is None:
             self.fail("fetch the locked GPUI dependencies before running staging tests")
         self.product = [prepare.REPO / "apps/gpui" / p for p in ["Cargo.toml", "Cargo.lock"]]

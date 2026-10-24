@@ -4981,7 +4981,7 @@ fn dialogs_close_only_through_their_localized_button(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn dialogs_are_named_after_their_titles_for_assistive_technology(cx: &mut TestAppContext) {
     let _locale = locale_guard();
-    let (handle, _workspace) = open_workspace(cx);
+    let (handle, workspace) = open_workspace(cx);
     let mut dialogs = vec![
         ("plugin-diagnostics", "Plugin diagnostics"),
         ("privacy-open", "Privacy and support"),
@@ -5005,6 +5005,28 @@ fn dialogs_are_named_after_their_titles_for_assistive_technology(cx: &mut TestAp
         })
         .unwrap();
     }
+
+    // An alert dialog (delete a saved preset) is named the same way.
+    let form = cx.update(|cx| {
+        workspace
+            .read(cx)
+            .workflow()
+            .read(cx)
+            .settings_form()
+            .clone()
+    });
+    let id = cx.update(|cx| form.update(cx, |form, cx| form.save_preset("Mine", cx).unwrap()));
+    cx.update_window(handle, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(format!("preset-delete:{id}"), cx);
+        window.render_frame(cx);
+        assert!(window.has_active_dialog(cx));
+        let alerts = window.a11y_nodes_with_role_for_test(gpui_kit::Role::AlertDialog);
+        assert_eq!(alerts.len(), 1, "one alert host");
+        assert_eq!(alerts[0].label(), Some("Delete “Mine”?"));
+        window.close_dialog(cx);
+    })
+    .unwrap();
 }
 
 /// A disabled command is announced as disabled, not only drawn that way:
