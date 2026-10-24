@@ -111,7 +111,9 @@ async function finalizeSavedSubmission(dmg, options, credentials) {
 
 function finalizeAcceptedDmg(dmg, submissionId, credentials, profile, expectedArchitectures) {
   printNotarizationLog(submissionId, credentials);
-  run("xcrun", ["stapler", "staple", dmg], "stapler staple");
+  // The ticket download from Apple's CDN fails transiently ("network
+  // connection was lost", exit 68) even after notarization was accepted.
+  withRetries(() => run("xcrun", ["stapler", "staple", dmg], "stapler staple"));
   run(
     "spctl",
     ["--assess", "--type", "open", "--context", "context:primary-signature", "-v", dmg],
@@ -549,6 +551,27 @@ function collectFiles(dir) {
     }
   }
   return files;
+}
+
+/** Runs `attempt` until it succeeds, waiting between tries; rethrows the last failure. */
+export function withRetries(
+  attempt,
+  { tries = 4, delaysMs = [15_000, 30_000, 60_000], sleep = sleepSync } = {},
+) {
+  for (let tryNumber = 1; ; tryNumber += 1) {
+    try {
+      return attempt(tryNumber);
+    } catch (error) {
+      if (tryNumber >= tries) throw error;
+      const delay = delaysMs[Math.min(tryNumber - 1, delaysMs.length - 1)];
+      console.log(`  retrying in ${delay / 1000} s after: ${error.message}`);
+      sleep(delay);
+    }
+  }
+}
+
+function sleepSync(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
 function run(command, args, label) {

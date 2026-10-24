@@ -12,6 +12,7 @@ const {
   normalizeNotarizationStatus,
   parseOptions,
   validateNotarizationReceipt,
+  withRetries,
 } = notarizationModule;
 
 const submissionId = "7ae6f6bf-774b-45b7-8202-3c44b3b818f0";
@@ -123,3 +124,34 @@ function fixtureDmg(contents: string) {
   writeFileSync(dmg, contents);
   return dmg;
 }
+
+describe("stapling retries", () => {
+  it("retries a transient failure with backoff and returns the success", () => {
+    const delays: number[] = [];
+    let calls = 0;
+    const result = withRetries(
+      () => {
+        calls += 1;
+        if (calls < 3) throw new Error("stapler staple failed with exit code 68");
+        return "stapled";
+      },
+      { sleep: (ms: number) => delays.push(ms) },
+    );
+    expect(result).toBe("stapled");
+    expect(calls).toBe(3);
+    expect(delays).toEqual([15_000, 30_000]);
+  });
+
+  it("rethrows the last failure once the tries are used up", () => {
+    const delays: number[] = [];
+    expect(() =>
+      withRetries(
+        (tryNumber: number) => {
+          throw new Error(`failure ${tryNumber}`);
+        },
+        { sleep: (ms: number) => delays.push(ms) },
+      ),
+    ).toThrow("failure 4");
+    expect(delays).toEqual([15_000, 30_000, 60_000]);
+  });
+});
