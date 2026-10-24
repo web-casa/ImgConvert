@@ -96,6 +96,8 @@ pub struct WorkflowPanel {
     formats: Vec<SharedString>,
     /// Output paths are being planned or confirmed; Start is disabled.
     planning: bool,
+    /// Whether the batch was active at its last change, to see it end.
+    batch_was_active: bool,
     output_session_grant: Option<PathBuf>,
     /// The start waiting for its decisions, owned here so the panel can tear
     /// it down (the dialog callbacks only borrow it).
@@ -124,7 +126,17 @@ impl WorkflowPanel {
                 this.abort_pending_if_stale(window, cx);
                 cx.notify();
             }),
-            cx.observe(models.batch(), |_, _, cx| cx.notify()),
+            cx.observe(models.batch(), |this, batch, cx| {
+                // A notice from an attempt made during the batch (it was
+                // already running) is about that batch; once it ends, its
+                // summary is the newer message.
+                let active = batch.read(cx).is_active();
+                if this.batch_was_active && !active {
+                    this.notice = None;
+                }
+                this.batch_was_active = active;
+                cx.notify();
+            }),
             cx.observe_in(models.settings(), window, |this, _, window, cx| {
                 this.abort_pending_if_stale(window, cx);
                 cx.notify();
@@ -137,6 +149,7 @@ impl WorkflowPanel {
             settings_form,
             formats,
             planning: false,
+            batch_was_active: false,
             output_session_grant: None,
             pending_start: None,
             notice: None,
