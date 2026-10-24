@@ -234,11 +234,11 @@ workflow.custom_settings:
 workflow.save_preset:
   es: Guardar ajustes actuales
 workflow.preset_name:
-  es: Nombre del ajuste
+  es: Nombre del preajuste
 workflow.delete_preset:
-  es: Eliminar ajuste
+  es: Eliminar preajuste
 workflow.delete_preset_named:
-  es: "Eliminar ajuste «%{name}»"
+  es: "Eliminar preajuste «%{name}»"
 workflow.delete_preset_title:
   es: "¿Eliminar «%{name}»?"
 workflow.delete_preset_description:
@@ -246,7 +246,7 @@ workflow.delete_preset_description:
 workflow.delete:
   es: Eliminar
 workflow.preset_limit:
-  es: "Puedes guardar hasta %{count} ajustes personalizados."
+  es: "Puedes guardar hasta %{count} preajustes personalizados."
 workflow.presets.web_sharing:
   es: Compartir en la web
 workflow.presets.web_sharing_description:
@@ -874,7 +874,7 @@ settings.format_hint_webp:
 settings.format_hint_avif:
   es: Archivos más pequeños
 workflow.preset_manage:
-  es: Guardar y gestionar ajustes
+  es: Guardar y gestionar preajustes
 settings.cache_section:
   es: Caché
 status.smaller_percent:

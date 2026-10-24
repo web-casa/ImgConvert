@@ -230,7 +230,7 @@ settings.quality_floor_off:
 workflow.preset:
   pt-BR: Predefinição
 workflow.custom_settings:
-  pt-BR: Personalizado
+  pt-BR: Ajustes atuais
 workflow.save_preset:
   pt-BR: Salvar configurações atuais
 workflow.preset_name:
