@@ -1,6 +1,6 @@
 # GPUI G2 / R11 原生验收
 
-**G2 仍未关闭**：VoiceOver、IME、沙盒三项的原生场景已在最终候选上执行，仍有若干清单项未在该候选上原生记录；性能项缺少合格的裸机基线。见文末“2026-10-24：最终候选集中复验与 G2 收口判断”一节。之前各节保留历次记录。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
+**G2 已关闭（2026-10-24）**：用户批准以虚拟机测量代替裸机基线；遗留清单项已在新候选上补测，见文末“2026-10-24：G2 收口补测”一节。更早的“最终候选集中复验与 G2 收口判断”一节保留当时的开放结论。之前各节保留历次记录。Kit 无头快照、绿色 CI、Tauri 的 macOS Smoke 都不能证明 GPUI 的 VoiceOver 朗读、IME 候选框定位或 App Sandbox 授权正常。本清单只接受 GPUI 实际候选上的原生证据；失败必须记录，不能用“接口存在”替代通过。
 
 ## 候选和隔离环境
 
@@ -78,7 +78,7 @@ osascript scripts/record-gpui-macos-voiceover.applescript "$CANDIDATE_PID" 20 fi
 
 收口所用的最终记录填在文末“2026-10-24：最终候选集中复验与 G2 收口”一节的证据表中，本模板表不再单独填写。
 
-当前记录（2026-10-19）：目标为 `ivmmdexuniji.local` 的 macOS 13.6 / arm64，用户确认 `ivmm` 为专用测试账号并授予辅助功能；此前的 `-25211` 已解除。所有候选、截图助手和日志位于独立 worktree 的 `target/tmp/g2-scope`，不改原有脏检出。钥匙串仍无正式签名身份；本地 ad-hoc 签名仅用于开发沙盒行为检查，不代表 MAS 信任、profile、公证或 TestFlight 验收（参见 [Apple 官方示例的 Debug 与 Distribution 区别](https://github.com/Apple-Actions/Example-macOS)）。
+当前记录（2026-10-19）：目标为专用测试虚拟机上的 macOS 13.6 / arm64，用户确认该账号为专用测试账号并授予辅助功能；此前的 `-25211` 已解除。所有候选、截图助手和日志位于独立 worktree 的 `target/tmp/g2-scope`，不改原有脏检出。钥匙串仍无正式签名身份；本地 ad-hoc 签名仅用于开发沙盒行为检查，不代表 MAS 信任、profile、公证或 TestFlight 验收（参见 [Apple 官方示例的 Debug 与 Distribution 区别](https://github.com/Apple-Actions/Example-macOS)）。
 
 已取得的原生补充证据：
 
@@ -519,7 +519,7 @@ G2 继续开放。
 | --- | --- |
 | 源码 | main `f88e50f4f2264c17f2f77115e737733b045eaeae`（#63 rebase 合并后的结果），测试机独立检出 `~/tools/imgconvert-glass-20261023`，`git status` 干净 |
 | 依赖 | gpui-kit `=0.7.1`；gpui-pre 0.3.8 以 vendor 方式锁定（`apps/gpui/vendor/gpui-pre`，补丁登记见 `patches/gpui-ime-focus/`） |
-| 机器 | `ivmmdexuniji.local`，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用测试账号 `ivmm` |
+| 机器 | 专用测试虚拟机，macOS 13.6（22G120）arm64，Parallels 虚拟机，Retina 3024×1900，专用测试账号 `ivmm` |
 | direct 候选 | `cargo build --release --locked -p imgconvert-gpui`，构建输出 SHA256 `83b057c40b7718dcfb1b53c8f7453f940458bc83eb0828ec96bf4da87afe31c8`（构建日志 `g2-final2-build/direct.log`，`7363a350…`）；ad-hoc 装包为 `~/imgc-glass/ImgConvertGlass.app`，主程序 `1634aa6ba2593479c525e1d46331f58229ec7fe098fa4c132d2b2825f554e89d` |
 | Store 功能候选 | `IMGCONVERT_DISABLE_EXTERNAL_CODECS=1 IMGCONVERT_DISABLE_UPDATER=1 cargo build --release --locked --no-default-features -p imgconvert-gpui`，构建输出 `89d1d27d017df030bc340f22f9197b2e248a84ac9b33801e5ff98f80cfd49325`（日志 `store.log`，`a63141af…`）；装包为 `~/imgc-glass/sandbox/ImgConvertGlassSandbox.app`，只有 `com.apple.security.app-sandbox` 与 `com.apple.security.files.user-selected.read-write` 两项 entitlement；ad-hoc runtime 签名后 `codesign --verify --deep --strict` 通过，签名后主程序 `e52b6cc9ae2e3a48b229e00da1193113119a81d36310bf0fa2667236113ea5b0` |
 | 夹具 | `g2-final-input/`：`a-precision16.png`（16 位 PNG，转换后有精度告警）、`harbor-blue.png`、`motion.gif`、`motion.png`（APNG）、`unverified.png`（填充后动画状态无法在预算内确认）；沙盒用 `sbx-in/a-precision16.png`，SHA256 `8ec201a3a90d37cca5c5c47e4fad89b25f53c7e28d673444c91506abd2a43d32` |
@@ -627,7 +627,7 @@ Tauri 一侧使用的是 `GPUI_BASELINE.md` §6.0 记录的构建（仓库 `03b6
 - **性能**：G2 的所有性能对比（启动、导入、内存、批次，以及本节补测的取消）用的 Tauri 一侧都是 §6.0 那次虚拟机上的 ad-hoc 构建。`GPUI_BASELINE.md` 规定虚拟机只能验证协议、不能产出基线，基线须为已公证的 0.3.x 发布版并在裸机上测量（§5.1、§6.0、§8）。因此目前的性能结论只是方向性的：GPUI 在各项上都不差于这个参照，但它不是合格基线。
 - **结论**：**G2 保持开放**。关闭需要：(1) 用户在裸机 Mac 上按 §5 用已公证的 0.3.x 与 GPUI 候选跑一遍基线，或明确批准“以虚拟机参照代替裸机基线”的例外；(2) 上面列出的遗留清单项在候选上补测，或由用户明确豁免。两者都要记录到本节。在此之前不启动 D1a/C1 与阶段 4/5；不受 G2 限制的工作（例如界面与本地化）继续推进。
 
-## 2026-10-24：G3 收口补测（用户批准以虚拟机测量代替裸机）
+## 2026-10-24：G2 收口补测（用户批准以虚拟机测量代替裸机）
 
 用户在 2026-10-24 明确批准“虚拟机能过就行”：G2 的性能对比与清单项可以用同一台 Parallels 虚拟机（macOS 13.6 arm64）的测量作为通过依据，不再要求裸机基线。本节在新候选上补测上一节“遗留”中的项目。
 
@@ -657,17 +657,17 @@ Store 沙盒候选（`4e1a7299…` 同源构建，`ad-hoc` + App Sandbox）：�
 
 ### 性能（G2 口径，用户批准的虚拟机参照）
 
-G2 的性能对比使用 `GPUI_BASELINE.md` §6.0/§6.1 的虚拟机 Tauri 参照；用户已批准以虚拟机测量代替裸机基线。PoC 与完整候选（§6.1 新增列）在启动、导入、滚动、空闲内存与批次上均不差于该参照，取消路径中位数 283 ms 对 809 ms。
+G2 的性能对比使用 `GPUI_BASELINE.md` §6.0/§6.1 的虚拟机 Tauri 参照；用户已批准以虚拟机测量代替裸机基线。PoC 与完整候选（§6.1 新增列，`6fb4487`）在两侧都有数据的指标（启动、1k 导入与滚动、空闲内存、1k 批次）上均不差于该参照；10k 只有 GPUI 数据。取消路径中位数 283 ms 对 809 ms 来自上一节 `f88e50f` 的补测。
 
-### 未能在虚拟机上验证的项目（按用户例外豁免）
+### 未能在虚拟机上验证的项目（未验证局限）
 
 - 多显示器、不同缩放的多显示器：虚拟机只有一个显示器。
 - 组合中缩放窗口时候选框停在原位：同机 Cocoa `NSTextField` 表现相同，按平台行为记录。
 
 ### 判断（2026-10-24，替代上一节结论）
 
-- 三项原生冒烟：上一节遗留中的对话框标题、键盘焦点可见性、运行中禁用状态、已保存字段上的未确认组合、数字输入与 C6 均已在新候选上补测通过；其中对话框标题朗读经 PR #80 修复后通过。
-- 性能：按用户批准的虚拟机例外，不差于参照，空闲内存降低 64–79%。
+- 三项原生冒烟：上一节遗留中的对话框标题、键盘焦点可见性、运行中禁用状态、已保存字段上的未确认组合、数字输入与 C6 均已在新候选上补测通过；其中对话框标题：PR #80 修复后，对话框以标题作为辅助功能名称暴露，经 VO 打开时 VO 光标落在标题上；AppleScript 读到的最后一句仍是通用的“你当前在‘窗口’中”，没有连续录屏，记为“标题已暴露、光标落在标题”，不是完整的朗读录音证据。
+- 性能：按用户批准的虚拟机例外，两侧都有数据的指标不差于参照，空闲内存降低 63–79%。
 - 六平台探针与私有 API 扫描沿用阶段 2 记录。
-- **结论：G2 关闭**（依据用户 2026-10-24 批准的虚拟机例外）。
+- **结论：G2 关闭**（依据用户 2026-10-24 批准的虚拟机例外；上列未验证局限照实保留）。
 
