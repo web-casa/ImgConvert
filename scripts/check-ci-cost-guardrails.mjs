@@ -20,6 +20,7 @@ const macosRelease = readWorkflow("macos-release.yml");
 const gpuiProbe = readWorkflow("gpui-probe.yml");
 const gpuiMacosDmg = readWorkflow("gpui-macos-dmg.yml");
 const gpuiMacosMas = readWorkflow("gpui-macos-mas.yml");
+const gpuiMacosGuiSmoke = readWorkflow("gpui-macos-gui-smoke.yml");
 const macosMasRelease = readWorkflow("macos-mas-release.yml");
 const macosNotarizationFinalize = readWorkflow("macos-notarization-finalize.yml");
 const windowsSmoke = readWorkflow("windows-smoke.yml");
@@ -38,6 +39,7 @@ const allWorkflows = [
   ["gpui-probe.yml", gpuiProbe],
   ["gpui-macos-dmg.yml", gpuiMacosDmg],
   ["gpui-macos-mas.yml", gpuiMacosMas],
+  ["gpui-macos-gui-smoke.yml", gpuiMacosGuiSmoke],
   ["macos-intel-smoke.yml", macosIntelSmoke],
   ["macos-release.yml", macosRelease],
   ["macos-mas-release.yml", macosMasRelease],
@@ -69,6 +71,7 @@ checkManualWorkflow("macos-smoke.yml", macosSmoke);
 checkManualWorkflow("gpui-probe.yml", gpuiProbe);
 checkManualWorkflow("gpui-macos-dmg.yml", gpuiMacosDmg);
 checkManualWorkflow("gpui-macos-mas.yml", gpuiMacosMas);
+checkManualWorkflow("gpui-macos-gui-smoke.yml", gpuiMacosGuiSmoke);
 checkManualWorkflow("macos-intel-smoke.yml", macosIntelSmoke);
 checkManualWorkflow("macos-release.yml", macosRelease);
 checkManualWorkflow("macos-mas-release.yml", macosMasRelease);
