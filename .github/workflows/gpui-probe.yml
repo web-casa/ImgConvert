@@ -245,7 +245,7 @@ jobs:
           Set-Item -Path Env:CXX -Value $cxx
           Write-Host "Native codec compiler: CC=$cc CXX=$cxx"
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: gpui-probe-${{ matrix.target }}
           workspaces: apps/gpui -> ${{ matrix.cache_target }}
@@ -372,7 +372,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@01ba1edad32c6f80dbcce879d3e0fa5a00b2a84e # 1.96.0
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: updater-sdk-${{ matrix.arch }}
           workspaces: src-tauri -> target
