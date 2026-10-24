@@ -347,6 +347,10 @@ preview.title:
   fr: Aperçu avant/après
 preview.pdf_page:
   fr: "Page PDF %{page}"
+preview.previous_page:
+  fr: Page précédente
+preview.next_page:
+  fr: Page suivante
 preview.before:
   fr: Original
 preview.after:

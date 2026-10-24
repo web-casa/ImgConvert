@@ -521,6 +521,12 @@ preview.title:
 preview.pdf_page:
   en: "PDF page %{page}"
   zh-CN: "PDF 第 %{page} 页"
+preview.previous_page:
+  en: Previous page
+  zh-CN: 上一页
+preview.next_page:
+  en: Next page
+  zh-CN: 下一页
 preview.before:
   en: Original
   zh-CN: 原图

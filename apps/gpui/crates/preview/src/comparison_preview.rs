@@ -10,11 +10,13 @@
 
 use std::sync::Arc;
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::spinner::Spinner;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, IconName, Sizable as _, WindowExt as _, h_flex, v_flex,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Div, Entity, FocusHandle, FontWeight, ImageSource,
@@ -41,6 +43,8 @@ pub const PREVIEW_MAX_EDGE: u32 = 1200;
 #[non_exhaustive]
 pub struct PreviewSummary {
     pub source_page: Option<usize>,
+    /// The one-based pages the PDF selection converts; empty for images.
+    pub pdf_pages: Vec<usize>,
     pub source_width: u32,
     pub source_height: u32,
     pub output_width: u32,
@@ -64,6 +68,8 @@ pub struct ComparisonPreview {
     queue: Entity<QueueModel>,
     batch: Entity<BatchModel>,
     request_id: u64,
+    /// The PDF page asked for; `None` shows the selection's first page.
+    pdf_page: Option<usize>,
     loading: bool,
     stale: bool,
     error: Option<String>,
@@ -132,6 +138,7 @@ impl ComparisonPreview {
             queue: models.queue().clone(),
             batch: models.batch().clone(),
             request_id: 0,
+            pdf_page: None,
             loading: false,
             stale: false,
             error: None,
@@ -174,6 +181,32 @@ impl ComparisonPreview {
 
     pub fn reveal(&self) -> f32 {
         self.reveal
+    }
+
+    /// Shows another page of a PDF's selection: the next (`step` 1) or the
+    /// previous (`step` -1) one, regenerating the preview. Ignored while a
+    /// generation runs or when there is no other page.
+    pub fn step_pdf_page(&mut self, step: isize, cx: &mut Context<Self>) {
+        if self.loading {
+            return;
+        }
+        let Some(summary) = self.summary.as_ref() else {
+            return;
+        };
+        let (Some(current), pages) = (summary.source_page, &summary.pdf_pages) else {
+            return;
+        };
+        let Some(index) = pages.iter().position(|page| *page == current) else {
+            return;
+        };
+        let Some(next) = index
+            .checked_add_signed(step)
+            .and_then(|next| pages.get(next).copied())
+        else {
+            return;
+        };
+        self.pdf_page = Some(next);
+        self.refresh(cx);
     }
 
     /// Generations requested so far (tests observe the loading guard).
@@ -248,6 +281,7 @@ impl ComparisonPreview {
         };
         let settings: Settings = self.settings.read(cx).settings().clone();
         let conversion = options_for_item(&settings, &item, None, None);
+        let pdf_page = self.pdf_page;
         let services = Services::global(cx).clone();
         let registration = match services.preview().begin() {
             Ok(registration) => registration,
@@ -289,6 +323,7 @@ impl ComparisonPreview {
                     PreviewOptions {
                         conversion,
                         max_edge: Some(PREVIEW_MAX_EDGE),
+                        pdf_page,
                     },
                     token,
                 )?;
@@ -300,6 +335,7 @@ impl ComparisonPreview {
                 Ok(Generated {
                     summary: PreviewSummary {
                         source_page: result.source_page,
+                        pdf_pages: result.pdf_pages,
                         source_width: result.source_width,
                         source_height: result.source_height,
                         output_width: result.output_width,
@@ -588,6 +624,55 @@ impl ComparisonPreview {
     }
 }
 
+impl ComparisonPreview {
+    /// Previous / position / next for a PDF whose selection has more than
+    /// one page.
+    fn render_page_controls(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        let summary = self.summary.as_ref()?;
+        let current = summary.source_page?;
+        let pages = &summary.pdf_pages;
+        if pages.len() < 2 {
+            return None;
+        }
+        let index = pages.iter().position(|page| *page == current)?;
+        let first = index == 0;
+        let last = index + 1 == pages.len();
+        Some(
+            h_flex()
+                .id("preview-pages")
+                .test_support()
+                .flex_none()
+                .gap_1()
+                .items_center()
+                .child(
+                    Button::new("preview-page-previous")
+                        .ghost()
+                        .xsmall()
+                        .icon(IconName::ChevronLeft)
+                        .accessibility_label(tr("preview.previous_page"))
+                        .tooltip(tr("preview.previous_page"))
+                        .disabled_for_all(first || self.loading)
+                        .on_click(cx.listener(|this, _, _, cx| this.step_pdf_page(-1, cx))),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .child(format!("{} / {}", index + 1, pages.len())),
+                )
+                .child(
+                    Button::new("preview-page-next")
+                        .ghost()
+                        .xsmall()
+                        .icon(IconName::ChevronRight)
+                        .accessibility_label(tr("preview.next_page"))
+                        .tooltip(tr("preview.next_page"))
+                        .disabled_for_all(last || self.loading)
+                        .on_click(cx.listener(|this, _, _, cx| this.step_pdf_page(1, cx))),
+                ),
+        )
+    }
+}
+
 impl Render for ComparisonPreview {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
@@ -617,7 +702,21 @@ impl Render for ComparisonPreview {
                     .id("comparison-preview")
                     .test_support()
                     .gap_3()
-                    .child(div().text_xs().text_color(muted).truncate().child(subtitle))
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .truncate()
+                                    .child(subtitle),
+                            )
+                            .children(self.render_page_controls(cx)),
+                    )
                     .child(self.render_stage(stage_height, cx))
                     .when(
                         self.stale && !self.loading && self.error.is_none(),

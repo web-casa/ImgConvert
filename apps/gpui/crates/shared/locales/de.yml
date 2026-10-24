@@ -347,6 +347,10 @@ preview.title:
   de: Vorher-Nachher-Vorschau
 preview.pdf_page:
   de: "PDF-Seite %{page}"
+preview.previous_page:
+  de: Vorherige Seite
+preview.next_page:
+  de: Nächste Seite
 preview.before:
   de: Original
 preview.after:

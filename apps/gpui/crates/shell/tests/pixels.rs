@@ -15,3 +15,8 @@ fn headless_renderer_captures_a_solid_red_frame() {
 fn headless_renderer_captures_the_workspace_surface() {
     support::run_workspace_surface();
 }
+
+#[test]
+fn headless_renderer_blends_a_translucent_preview_image() {
+    support::run_translucent_preview_image();
+}

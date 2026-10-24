@@ -347,6 +347,10 @@ preview.title:
   pt-BR: Prévia de antes e depois
 preview.pdf_page:
   pt-BR: "Página %{page} do PDF"
+preview.previous_page:
+  pt-BR: Página anterior
+preview.next_page:
+  pt-BR: Próxima página
 preview.before:
   pt-BR: Original
 preview.after:

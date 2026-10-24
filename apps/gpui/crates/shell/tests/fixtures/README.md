@@ -7,3 +7,5 @@ These project-owned fixtures contain no user data.
 - `precision16.png`: 16 × 16 RGBA16 PNG, filter-0 rows. Samples are big-endian unsigned 16-bit: red `(x*4093+997)%65536`, green `(y*4073+27113)%65536`, blue `61003`, alpha `32767`. IHDR uses bit depth 16 and color type 6. IDAT is zlib-compressed and all chunks include CRC32. Values deliberately require more than 8 bits and alpha is not opaque.
 
 Binary attributes preserve PDF offsets and PNG bytes across checkouts.
+
+- `pages3.pdf`: three 72 × 72 point pages filled red, green and blue, written by a short script with an exact cross-reference table; used to step through a PDF's pages in the comparison preview.
