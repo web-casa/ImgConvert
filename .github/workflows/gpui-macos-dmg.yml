@@ -130,10 +130,13 @@ jobs:
             printf '%s' "$APPLE_DIRECT_CERTIFICATE" | base64 -D > "$p12"
           fi
           test -s "$p12" || { echo "decoded direct certificate is empty"; exit 1; }
-          security list-keychains -d user | tr -d '" ' > "$RUNNER_TEMP/keychains-before"
-          security default-keychain -d user | tr -d '" ' > "$RUNNER_TEMP/default-keychain-before"
+          # One path per line, quotes stripped; restored by the last step.
+          security list-keychains -d user | sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/' > "$RUNNER_TEMP/keychains-before"
+          security default-keychain -d user | sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/' > "$RUNNER_TEMP/default-keychain-before"
           security create-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
-          security list-keychains -d user -s gpui-build.keychain $(cat "$RUNNER_TEMP/keychains-before")
+          keychains=(gpui-build.keychain)
+          while IFS= read -r keychain; do keychains+=("$keychain"); done < "$RUNNER_TEMP/keychains-before"
+          security list-keychains -d user -s "${keychains[@]}"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" gpui-build.keychain
           security set-keychain-settings -t 3600 -u gpui-build.keychain
           security import "$p12" -k gpui-build.keychain \
@@ -185,12 +188,16 @@ jobs:
               --dmg="$GPUI_DMG" \
               --receipt=dist/notarization.json \
               --expected-architectures=${{ matrix.uname_arch }}
+          # The receipt describes the bytes Apple received; stapling then adds
+          # the ticket, so SHA256SUMS below describes the uploaded DMG.
+          echo "GPUI_RESULT=notarized" >> "$GITHUB_ENV"
 
       - name: Verify the signed DMG
         if: ${{ !inputs.notarize }}
         run: |
           node scripts/check-macos-bundle-artifacts.mjs --bundles=dmg --artifact="$GPUI_DMG" \
             --require-signed --expected-architectures=${{ matrix.uname_arch }}
+          echo "GPUI_RESULT=signed" >> "$GITHUB_ENV"
 
       - name: Record checksums
         if: always()
@@ -202,7 +209,8 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: gpui-macos-${{ matrix.uname_arch }}-${{ inputs.notarize && 'notarized' || 'signed' }}-${{ github.run_id }}
+          # Named by the verified result: a failed run uploads as "unverified".
+          name: gpui-macos-${{ matrix.uname_arch }}-${{ env.GPUI_RESULT || 'unverified' }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           retention-days: 14
           path: |
@@ -214,7 +222,9 @@ jobs:
         if: always()
         run: |
           if [ -s "$RUNNER_TEMP/keychains-before" ]; then
-            security list-keychains -d user -s $(cat "$RUNNER_TEMP/keychains-before")
+            keychains=()
+            while IFS= read -r keychain; do keychains+=("$keychain"); done < "$RUNNER_TEMP/keychains-before"
+            security list-keychains -d user -s "${keychains[@]}"
           fi
           if [ -s "$RUNNER_TEMP/default-keychain-before" ]; then
             security default-keychain -d user -s "$(cat "$RUNNER_TEMP/default-keychain-before")"

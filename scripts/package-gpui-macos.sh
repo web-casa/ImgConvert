@@ -31,8 +31,11 @@ cp "$root/src-tauri/PrivacyInfo.xcprivacy" "$app/Contents/Resources/PrivacyInfo.
 for slice in $(lipo -archs "$binary"); do
   minos=$(otool -arch "$slice" -l "$binary" | awk '/LC_BUILD_VERSION/ { found = 1 } found && $1 == "minos" { print $2; exit }')
   [ -n "$minos" ] || { echo "no LC_BUILD_VERSION in the $slice slice" >&2; exit 1; }
-  major=${minos%%.*}
-  [ "$major" -le 12 ] || { echo "the $slice slice requires macOS $minos; build with MACOSX_DEPLOYMENT_TARGET=12.0" >&2; exit 1; }
+  IFS=. read -r major minor _ <<< "$minos"
+  if [ "$major" -gt 12 ] || { [ "$major" -eq 12 ] && [ "${minor:-0}" -gt 0 ]; }; then
+    echo "the $slice slice requires macOS $minos; build with MACOSX_DEPLOYMENT_TARGET=12.0" >&2
+    exit 1
+  fi
 done
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
