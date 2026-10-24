@@ -228,7 +228,7 @@ settings.minimum_quality:
 settings.quality_floor_off:
   ja: オフ
 workflow.preset:
-  ja: シナリオプリセット
+  ja: プリセット
 workflow.custom_settings:
   ja: カスタム設定
 workflow.save_preset:

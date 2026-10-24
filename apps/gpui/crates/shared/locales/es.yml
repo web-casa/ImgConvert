@@ -228,7 +228,7 @@ settings.minimum_quality:
 settings.quality_floor_off:
   es: Desactivada
 workflow.preset:
-  es: Ajuste preestablecido
+  es: Preajuste
 workflow.custom_settings:
   es: Ajustes personalizados
 workflow.save_preset:

@@ -228,9 +228,9 @@ settings.minimum_quality:
 settings.quality_floor_off:
   pt-BR: Desativada
 workflow.preset:
-  pt-BR: Predefinição de cenário
+  pt-BR: Predefinição
 workflow.custom_settings:
-  pt-BR: Configurações personalizadas
+  pt-BR: Personalizado
 workflow.save_preset:
   pt-BR: Salvar configurações atuais
 workflow.preset_name:
