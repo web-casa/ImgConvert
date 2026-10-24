@@ -6,13 +6,13 @@
 
 ## 已接入：macOS owner 焦点、原生会话清理与共享 Tab 排序
 
-差分与可重复准备工具见 [`patches/gpui-ime-focus`](../patches/gpui-ime-focus/README.md)，正式来源目录为 `apps/gpui/vendor/gpui-pre`、`gpui-pre-macos` 与 `gpui-base`（后者见下文“对话框的角色与名称”）；只保留这三个必须修改的 crate 的运行源码、Windows 构建资源、完整 Apache 许可及原始 manifest/README，共 319 个文件。移除上游示例/测试 target 和媒体，清单设为不可发布，两包不成为 workspace 成员；Kit、组件库和其他平台实现继续来自 registry。来源为接入前锁定的 Apache-2.0 `gpui-pre` / `gpui-pre-macos` 0.3.8 原始 crates.io 归档；两包完整 SHA256、补丁及修改后文件校验值保存在候选 manifest。准备工具拒绝旧输出、错误包/锁版本、路径穿越/链接，仅在本检出 `apps/gpui/target/tmp` 新目录生成本地源码与 opt-in config，不下载、不执行 Cargo、不改 registry、产品清单或锁。含 emoji 的路径由真实 Cargo TOML 解析回归覆盖。
+差分与可重复准备工具见 [`patches/gpui-ime-focus`](../patches/gpui-ime-focus/README.md)，正式来源目录为 `apps/gpui/vendor/gpui-pre`、`gpui-pre-macos` 与 `gpui-base`（后者见下文“对话框的角色与名称”）；只保留这三个必须修改的 crate 的运行源码、Windows 构建资源、完整 Apache 许可及原始 manifest/README，共 319 个文件。移除上游示例/测试 target 和媒体，清单设为不可发布，三包不成为 workspace 成员；Kit 其余各包、组件库和其他平台实现继续来自 registry。来源为接入前锁定的 Apache-2.0 `gpui-pre` / `gpui-pre-macos` 0.3.8 与 `gpui-base` 0.7.1 原始 crates.io 归档；三包完整 SHA256、补丁及修改后文件校验值保存在候选 manifest。准备工具拒绝旧输出、错误包/锁版本、路径穿越/链接，仅在本检出 `apps/gpui/target/tmp` 新目录生成本地源码与 opt-in config，不下载、不执行 Cargo、不改 registry、产品清单或锁。含 emoji 的路径由真实 Cargo TOML 解析回归覆盖。
 
 候选在注册时保留 FocusId 与 entity client identity，绘制后依据最终焦点选中真实处理器，覆盖输入→输入/只读区域/无输入、绘制中焦点转移和控件移除。先对旧 owner 清 marked range / 提交 undo transaction，再同步调用该窗口 view 的 `inputContext.discardMarkedText`；当前版本还在该 context 仍属本窗口时停用/重新激活会话，保留 view/context 到回调结束，检查关闭状态、key window / first responder 及其他活动 context，防止抢走别的窗口输入。期间平台 handler 为空且不持 native mutex；全局 context 只用于身份保护，不作取消目标，也不安排延迟清理任务。绘制后的清理在退出绘制阶段后补帧；首次晚到焦点只对缺失目标尝试一次恢复，永久缺失不持续重绘。同帧 A→B→A 未安装过 B 时保留 A 组合。无 entity identity 的 custom handler 退回 FocusId；复用同一 FocusId 的自定义 client 需明确提供不同稳定身份。
 
 验证使用独立 Kit 工程承载显式 macOS 控件与调度回归；工程以产品锁为种子，解析后逐个核对包名/版本/来源，并检查 assets/macros 同样锁在 0.7.1。框架只在既有 test-support context 增加不触发绘制的 frame-wake / handler-exists 观察接口，不暴露底层测试窗口，不编译发布 crate 中缺少外部字体夹具/存在宏错误的无关 unit suite。产品源码和锁不必为无头回归临时变更。原生系统候选必须另验。早期 discard-only 版本的 13 项 macOS 无头回归通过，但真实 AXPress 激活隐私对话框仍有旧系统候选，不能宣称完成修复；加入上下文重置后的版本必须另记原生结果。首轮 owner 误记/消失遗漏、后续候选选择顺序/补帧阶段、首次无旧 handler 的恢复与 Unicode 配置问题都纳入 review 处置。各版实验结论不互相替代，最终结果见 G2 清单和 PR。
 
-接入验证：`verify.py` 核对全部源码清单、修改过的源码文件（现为十一个）、实际 Cargo 来源、固定版本和 workspace 成员；重建 registry 锁条目必须得到接入前完整锁 hash，保证只换来源。独立归档审计逐字节复现全部保留文件，架构护栏与 GPUI CI 运行核验。`check.py --active` 的 13 项回归必须选中正式来源目录，原生验证使用不带额外 config 的正常 `--locked` 构建；结果记在 G2 清单。上游版本包含同等修复后，删除候选并在无补丁版本重跑相同回归与原生场景。当前 G2 未关闭。
+接入验证：`verify.py` 核对全部源码清单、修改过的源码文件（现为十二个）、实际 Cargo 来源、固定版本和 workspace 成员；重建 registry 锁条目必须得到接入前完整锁 hash，保证只换来源。独立归档审计逐字节复现全部保留文件，架构护栏与 GPUI CI 运行核验。`check.py --active` 的 13 项回归必须选中正式来源目录，原生验证使用不带额外 config 的正常 `--locked` 构建；结果记在 G2 清单。上游版本包含同等修复后，删除候选并在无补丁版本重跑相同回归与原生场景。当前 G2 未关闭。
 
 共享焦点排序修复针对 `TabStopMap::insert`：同一 `FocusId` 再次注册时，`by_id` 已指向最后一次注册，但 `order` 仍保留旧节点，反向遍历可能反复回到同一 handle。修复在更新 `by_id` 前删除同 ID 的旧排序项，保持最后一处注册为唯一停靠点。最小复现已获用户明确授权，于 2026-10-20 提交 [longbridge/gpui-kit#3612](https://github.com/longbridge/gpui-kit/issues/3612)，代码与步骤见 [GPUI_TAB_STOP_REPRO.md](GPUI_TAB_STOP_REPRO.md)。产品侧新增 `tests/tab_stop.rs` 三项无头回归（原始共享 handle、缓存重放、Tab stop 状态切换）；前两项在未修源码上失败、在正式接入源码上通过，状态切换项作为不变量在两边均通过；法律弹窗的四控件反向循环 UI 测试在未修源码上失败、接入后通过。这项修复只证明焦点排序，不替代原生键盘/VoiceOver 验收。
 
@@ -74,7 +74,7 @@
 - 问题：G3 收口复验时，用 VoiceOver 打开“关于与开源许可”，只听到“你当前在‘窗口’中”，不读对话框标题。原因有两层：Kit 0.7.1 的 `gpui-base` 用 `FocusTrapContainer` 包住模态宿主，但这个容器没有转发 `a11y_role` / `write_a11y_info` / `a11y_synthetic_children`，宿主的 `Role::Dialog` 被整个丢掉，所有对话框在辅助功能树里都只是一个无名分组；即使角色保留，Kit 的宿主也从不设置名称（标题只是一个元素，不是字符串）。
 - 修改：新接入第三个源码覆盖 `apps/gpui/vendor/gpui-base`（0.7.1，只改 `src/focus_trap.rs`：容器转发上述三个方法）。同一 `gpui-pre` 的 `window/a11y.rs` 在生成树更新前，把没有名称的 `Dialog` / `AlertDialog` 节点按文档顺序命名为其子树中第一个 `Heading` 的名称；测试支持新增 `Window::a11y_nodes_with_role_for_test`，`a11y_node_for_test` 改为返回最终化后的节点。
 - 产品侧：shared 新增 `a11y::dialog_title`（带 `Heading` 角色与名称的标题），隐私、关于与许可、插件诊断、更新、影响分析、对比预览、输出安全确认和删除预设确认八处对话框改用它。
-- 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题；删除预设确认断言 `AlertDialog` 节点同样以标题命名。命名规则跳过无名标题，不跨入嵌套对话框。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生 VoiceOver 复验记录在 `GPUI_G2_ACCEPTANCE.md`。
+- 验证：UI 测试 `dialogs_are_named_after_their_titles_for_assistive_technology` 打开插件诊断、隐私、关于与许可（以及启用 updater 时的更新）对话框，断言树中恰有一个 `Dialog` 节点且名称为标题；删除预设确认断言 `AlertDialog` 节点同样以标题命名。命名规则跳过无名标题，不跨入嵌套对话框。去掉 `gpui-base` 转发时 `Dialog` 节点数为 0；去掉 `gpui-pre` 命名规则时名称为空。原生复验（macOS 13.6 虚拟机）记录在 `GPUI_G2_ACCEPTANCE.md` 末节“G3 收口补测”。
 - 退出条件：上游 Kit 让焦点陷阱保留元素的辅助功能信息并为模态宿主设置名称后删除。尚未向上游提交，需用户授权。
 
 ## 未采纳：macOS FocusLost 只清理系统候选框
