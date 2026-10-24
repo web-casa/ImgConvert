@@ -3,9 +3,10 @@ name: GPUI macOS MAS package
 # Builds the Store-feature GPUI app natively for arm64 and x64, joins them
 # into a universal binary, signs the sandboxed app with the Apple
 # Distribution identity and the embedded provisioning profile, builds the
-# installer package and validates it with App Store Connect. It never
-# uploads a build or submits for review: the package is a workflow artifact
-# (G3-2 of the migration plan).
+# installer package and validates it with App Store Connect. It uploads the
+# validated build only when `upload_build` is set, for TestFlight; it never
+# submits for review. The package is also a workflow artifact (G3-2 of the
+# migration plan).
 
 on:
   workflow_dispatch:
@@ -20,6 +21,11 @@ on:
         required: false
         default: ""
         type: string
+      upload_build:
+        description: Upload the validated package to App Store Connect (TestFlight). Consumes the build number.
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -213,14 +219,21 @@ jobs:
           grep -Eq "Mac Installer Distribution|3rd Party Mac Developer Installer" <<< "$signature" \
             || { echo "the package is not signed with a Mac Installer Distribution certificate"; exit 1; }
 
-      - name: Validate with App Store Connect (no upload)
+      - name: Validate with App Store Connect and optionally upload
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+          GPUI_UPLOAD_BUILD: ${{ inputs.upload_build }}
         run: |
-          node scripts/submit-macos-mas-pkg.mjs --pkg="$GPUI_PKG"
-          echo "GPUI_MAS_RESULT=validated" >> "$GITHUB_ENV"
+          args=(--pkg="$GPUI_PKG")
+          result=validated
+          if [ "$GPUI_UPLOAD_BUILD" = "true" ]; then
+            args+=(--upload)
+            result=uploaded
+          fi
+          node scripts/submit-macos-mas-pkg.mjs "${args[@]}"
+          echo "GPUI_MAS_RESULT=$result" >> "$GITHUB_ENV"
 
       - name: Record checksums
         if: always()
