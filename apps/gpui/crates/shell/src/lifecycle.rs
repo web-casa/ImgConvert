@@ -101,15 +101,17 @@ pub fn request_quit(cx: &mut App) {
         return;
     }
     set_phase(Phase::Confirming, cx);
-    if !open_confirmation(cx) {
-        stop_and_exit(cx);
-    }
+    // The request may come from inside the main window's update (a key
+    // binding, the close button), where that window cannot open a dialog.
+    cx.defer(|cx| {
+        if phase(cx) == Phase::Confirming && !open_confirmation(cx) {
+            stop_and_exit(cx);
+        }
+    });
 }
 
 /// Answers the main or blocked window's close button: closing quits the
-/// application. With a batch running the window stays open and the
-/// confirmation opens once this window update has finished (it cannot open
-/// a dialog in the window that is being updated).
+/// application. With a batch running the window stays open and asks.
 pub fn window_should_close(cx: &mut App) -> bool {
     match phase(cx) {
         Phase::Exiting => true,
@@ -120,7 +122,7 @@ pub fn window_should_close(cx: &mut App) -> bool {
             true
         }
         Phase::Running => {
-            cx.defer(request_quit);
+            request_quit(cx);
             false
         }
     }
