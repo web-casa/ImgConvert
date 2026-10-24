@@ -783,6 +783,8 @@ errors.invalidOutputSuffix:
   fr: Le suffixe du nom de fichier contient des caractères non pris en charge ou est trop long.
 errors.sourceOverwriteConfirmationRequired:
   fr: "Une confirmation explicite est requise avant de remplacer un fichier source : %{path}"
+errors.duplicateOutput:
+  fr: "Un autre fichier de ce lot produit la même sortie ; celui-ci n’a donc pas été converti. Renommez l’un d’eux ou convertissez-les séparément : %{path}"
 errors.outputConflictsWithInput:
   fr: "Pour protéger une source en file, cette sortie n’a pas été écrite car elle correspond à une autre entrée : %{path}"
 errors.outputSafetyCheckFailed:

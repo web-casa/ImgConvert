@@ -783,6 +783,8 @@ errors.invalidOutputSuffix:
   zh-TW: 檔案後綴包含無效字元或過長，請修改後重試。
 errors.sourceOverwriteConfirmationRequired:
   zh-TW: "需要明確確認後才能覆寫原圖：%{path}"
+errors.duplicateOutput:
+  zh-TW: "本批次中另一個檔案會寫入同一個輸出，此檔案未轉換。可重新命名其中一個，或分開轉換：%{path}"
 errors.outputConflictsWithInput:
   zh-TW: "為保護佇列中的原圖，未寫入與其他輸入同名的輸出：%{path}"
 errors.outputSafetyCheckFailed:

@@ -783,6 +783,8 @@ errors.invalidOutputSuffix:
   ko: 파일 이름 접미사에 지원되지 않는 문자가 있거나 너무 깁니다.
 errors.sourceOverwriteConfirmationRequired:
   ko: "원본 파일을 대체하려면 명시적인 확인이 필요합니다: %{path}"
+errors.duplicateOutput:
+  ko: "이 일괄 작업의 다른 파일이 같은 출력에 기록하므로 이 파일은 변환되지 않았습니다. 둘 중 하나의 이름을 바꾸거나 따로 변환하세요: %{path}"
 errors.outputConflictsWithInput:
   ko: "대기열의 원본을 보호하기 위해, 다른 입력과 일치하는 이 출력은 기록되지 않았습니다: %{path}"
 errors.outputSafetyCheckFailed:

@@ -20,6 +20,7 @@ pub enum ErrorCode {
     InvalidOutputSuffix,
     SourceOverwriteConfirmationRequired,
     OutputConflictsWithInput,
+    DuplicateOutput,
     OutputSafetyCheckFailed,
     OutputNotSmaller,
     PdfPasswordProtected,
@@ -123,6 +124,10 @@ impl CommandError {
 
     pub fn conversion_failed(path: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::with_path(ErrorCode::ConversionFailed, path, detail)
+    }
+
+    pub fn duplicate_output(path: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self::with_path(ErrorCode::DuplicateOutput, path, detail)
     }
 
     pub fn batch_failed(detail: impl Into<String>) -> Self {

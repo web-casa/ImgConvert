@@ -783,6 +783,8 @@ errors.invalidOutputSuffix:
   es: El sufijo del nombre de archivo contiene caracteres no admitidos o es demasiado largo.
 errors.sourceOverwriteConfirmationRequired:
   es: "Se requiere una confirmación explícita antes de reemplazar un archivo original: %{path}"
+errors.duplicateOutput:
+  es: "Otro archivo de este lote genera la misma salida, así que este no se convirtió. Cambia el nombre de uno de ellos o conviértelos por separado: %{path}"
 errors.outputConflictsWithInput:
   es: "Para proteger un original en cola, esta salida no se escribió porque coincide con otra entrada: %{path}"
 errors.outputSafetyCheckFailed:
