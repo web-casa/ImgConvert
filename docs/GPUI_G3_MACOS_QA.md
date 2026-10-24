@@ -35,7 +35,7 @@ DMG 工作流对每个架构执行 `file`、`lipo -archs`、`otool -L`、深度�
 
 补充发现：语料中同名不同扩展名的文件（`animated.gif` / `animated.webp`）映射到同一输出，后者原先显示批次级文案“批量转换无法完成”，已由 PR #82 改为专门提示。
 
-x64 的 ImageIO HEIC 路径：虚拟机为 arm64 且未安装 Rosetta。HEIC 解码位于两壳共用的 `imgconvert-platform`，在 `macos-15-intel` 托管 runner 上由 `macos-intel-smoke.yml` 的 HEIC 冒烟覆盖（该冒烟构建的是 Tauri 壳，证明的是共用路径，不是 GPUI x64 包），本轮在 main 上重新运行（run 40088724030，`macOS Intel ImageIO Smoke` 通过，HEIC 导入并转换为 PNG）。
+x64 的 ImageIO HEIC 路径：虚拟机为 arm64 且未安装 Rosetta。HEIC 解码位于两壳共用的 `imgconvert-platform`，在 `macos-15-intel` 托管 runner 上由 `macos-intel-smoke.yml` 的 HEIC 冒烟覆盖（该冒烟构建的是 Tauri 壳，证明的是共用路径，不是 GPUI x64 包），本轮在 main 上重新运行（run 40088724030，`macOS Intel ImageIO Smoke` 通过，HEIC 导入并转换为 PNG）。GPUI 本身的 x64 ImageIO 路径由 PR #85 加入 GPUI GUI 冒烟：run 40091747027 在 arm64 与 `macos-15-intel` 上都把 `sips` 生成的 HEIC 转成了 `still_done.avif`。
 
 ## 安装生命周期（虚拟机 arm64，独立 HOME）
 
@@ -61,7 +61,7 @@ x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 的启�
 
 1. TestFlight：上传通用 PKG，用处理后的构建在 Intel 与 Apple 芯片实机上验收沙盒路径（G3-2 剩余部分）。
 2. `MAS_APP_REVIEW_SUBMISSION.md` 的 App Store Connect 负责人清单：年龄分级问卷、隐私标签、实际 app 截图、元数据准确性、新的 `CFBundleVersion`、干净账号的连续录屏与审核备注。
-3. x64：Intel 硬件上的图片语料与安装/升级/卸载生命周期。x64 目前只有托管 runner 上源码构建 app 的 GUI 冒烟（含 ImageIO HEIC，见下表）和签名 DMG 的工作流校验。
+3. x64：Intel 硬件上的完整图片语料与安装/升级/卸载生命周期。x64 目前有托管 runner 上源码构建 GPUI app 的 GUI 冒烟（含 ImageIO HEIC，run 40091747027）和签名 DMG 的工作流校验。
 
 以上都需要用户的账号、实机或决定，不在本次自动化范围内。
 
@@ -71,4 +71,4 @@ x64 的安装生命周期没有在 Intel 实机或虚拟机上做；x64 的启�
 | --- | --- |
 | 语料脚本与日志 | 测试机 `~/imgc-glass/qa-corpus/`（`run.sh`、`app-avif.log`、`ax-avif.txt`） |
 | 生命周期截图 | 测试机 `~/imgc-glass/lifecycle/tauri-031-seeded.png`、`gpui-upgraded.png` |
-| Intel HEIC 冒烟 | run 40088724030 |
+| Intel HEIC 冒烟 | run 40088724030（Tauri 壳，共用路径）；run 40091747027（GPUI GUI 冒烟，两架构） |
