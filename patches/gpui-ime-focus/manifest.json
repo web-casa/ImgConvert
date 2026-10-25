@@ -1,5 +1,5 @@
 {
-  "workspace_lock_sha256": "1a782c5465bb2404a17ccd02dae2306bdf5b27bbc7aac880d9a723eecb0152f4",
+  "workspace_lock_sha256": "5972d2072368f52ddca158633d8690018b2d0c08b88520fa5356c490b546ce62",
   "crates": {
     "gpui-pre": {
       "version": "0.3.8",
@@ -37,5 +37,5 @@
       }
     }
   },
-  "upstream_lock_sha256": "284b9c961b0bde93495fd99bfa45271a33051dbe0bb9fed5a3bca70a34cda1aa"
+  "upstream_lock_sha256": "2796473ceb719f0c5a72d27081df2a81d8cdd1ef4f1e4b2b4fc1ef672af73875"
 }
