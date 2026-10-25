@@ -147,6 +147,10 @@ struct Tracker {
     /// Bumped on every bounds change; a pending commit only lands if no
     /// change came after it.
     moves: u64,
+    /// Full screen and maximized as of the last bounds change. Quitting from
+    /// a menu or the close button happens inside the window's own update,
+    /// where the window cannot be read again.
+    mode: Option<(bool, bool)>,
 }
 
 impl Global for Tracker {}
@@ -164,6 +168,7 @@ pub fn install(path: PathBuf, cx: &mut App) {
         saved,
         window: None,
         moves: 0,
+        mode: None,
     });
     imgconvert_gpui_shared::lifecycle::on_before_quit(save, cx);
 }
@@ -214,6 +219,14 @@ pub fn open_options(cx: &App) -> Placement {
 pub fn attach(window: AnyWindowHandle, placement: &Placement, cx: &mut App) {
     if let Some(tracker) = tracker(cx) {
         tracker.window = Some(window);
+        // Where the window opened is its place until it moves, so quitting
+        // straight from full screen still has something to return to.
+        tracker.saved.get_or_insert(Saved {
+            kind: Kind::Windowed,
+            maximized: false,
+            restore: Rect::from_bounds(placement.bounds),
+            display_uuid: None,
+        });
     }
     let (kind, maximized) = (placement.kind, placement.maximized);
     if kind == Kind::Windowed && !maximized {
@@ -235,9 +248,11 @@ pub fn attach(window: AnyWindowHandle, placement: &Placement, cx: &mut App) {
 /// Follows a bounds change of the main window: once it has kept still for
 /// [`SETTLE`], its windowed frame becomes the place to restore.
 pub fn track(window: &Window, cx: &mut App) {
+    let mode = (window.is_fullscreen(), window.is_maximized());
     let Some(state) = tracker(cx) else {
         return;
     };
+    state.mode = Some(mode);
     state.moves += 1;
     let moves = state.moves;
     let handle = window.window_handle();
@@ -307,6 +322,7 @@ fn save(cx: &mut App) {
     let Some(tracker) = tracker(cx) else {
         return;
     };
+    let mode = mode.or(tracker.mode);
     let Some(saved) = tracker.saved.as_mut() else {
         return;
     };

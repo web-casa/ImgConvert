@@ -78,3 +78,28 @@ fn a_damaged_file_opens_the_default_window(cx: &mut TestAppContext) {
     assert_eq!((rect.w, rect.h), window_state::DEFAULT_SIZE);
     std::fs::remove_dir_all(path.parent().unwrap()).ok();
 }
+
+#[gpui_kit::test]
+fn closing_from_inside_the_window_keeps_full_screen(cx: &mut TestAppContext) {
+    let path = state_file("close");
+    let handle = open(cx, &path);
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, _| window.toggle_fullscreen())
+        .unwrap();
+    // Entering full screen resizes the window, which is what the state
+    // follows.
+    cx.simulate_window_resize(
+        handle,
+        gpui_kit::size(gpui_kit::px(1_920.), gpui_kit::px(1_080.)),
+    );
+    cx.run_until_parked();
+    // The close button and the menus quit inside the window's own update.
+    cx.update_window(handle, |_, _, cx| {
+        imgconvert_gpui::lifecycle::window_should_close(cx)
+    })
+    .unwrap();
+    cx.run_until_parked();
+    let saved = window_state::load(&path).expect("saved on close");
+    assert_eq!(saved.kind, Kind::Fullscreen);
+    std::fs::remove_dir_all(path.parent().unwrap()).ok();
+}
