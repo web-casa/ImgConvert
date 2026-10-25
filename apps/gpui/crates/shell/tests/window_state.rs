@@ -103,3 +103,32 @@ fn closing_from_inside_the_window_keeps_full_screen(cx: &mut TestAppContext) {
     assert_eq!(saved.kind, Kind::Fullscreen);
     std::fs::remove_dir_all(path.parent().unwrap()).ok();
 }
+
+#[gpui_kit::test]
+fn leaving_full_screen_then_closing_reopens_windowed(cx: &mut TestAppContext) {
+    let path = state_file("exit-fs");
+    let handle = open(cx, &path);
+    cx.run_until_parked();
+    cx.update_window(handle, |_, window, _| window.toggle_fullscreen())
+        .unwrap();
+    cx.simulate_window_resize(
+        handle,
+        gpui_kit::size(gpui_kit::px(1_920.), gpui_kit::px(1_080.)),
+    );
+    // AppKit resizes before it reports the exit: the last resize still
+    // sees full screen.
+    cx.simulate_window_resize(
+        handle,
+        gpui_kit::size(gpui_kit::px(1_080.), gpui_kit::px(720.)),
+    );
+    cx.update_window(handle, |_, window, _| window.toggle_fullscreen())
+        .unwrap();
+    cx.update_window(handle, |_, window, cx| {
+        window_state::note_mode(window, cx);
+        imgconvert_gpui::lifecycle::window_should_close(cx)
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(window_state::load(&path).unwrap().kind, Kind::Windowed);
+    std::fs::remove_dir_all(path.parent().unwrap()).ok();
+}

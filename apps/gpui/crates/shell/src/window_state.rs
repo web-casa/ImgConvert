@@ -248,11 +248,10 @@ pub fn attach(window: AnyWindowHandle, placement: &Placement, cx: &mut App) {
 /// Follows a bounds change of the main window: once it has kept still for
 /// [`SETTLE`], its windowed frame becomes the place to restore.
 pub fn track(window: &Window, cx: &mut App) {
-    let mode = (window.is_fullscreen(), window.is_maximized());
+    note_mode(window, cx);
     let Some(state) = tracker(cx) else {
         return;
     };
-    state.mode = Some(mode);
     state.moves += 1;
     let moves = state.moves;
     let handle = window.window_handle();
@@ -261,11 +260,24 @@ pub fn track(window: &Window, cx: &mut App) {
         timer.await;
         cx.update(|cx| {
             if tracker(cx).is_some_and(|state| state.moves == moves) {
-                let _ = handle.update(cx, |_, window, cx| commit(window, cx));
+                let _ = handle.update(cx, |_, window, cx| {
+                    note_mode(window, cx);
+                    commit(window, cx);
+                });
             }
         });
     })
     .detach();
+}
+
+/// Notes whether `window` is full screen or maximized. AppKit resizes a
+/// window leaving full screen before it reports the exit, so the close
+/// button refreshes this too.
+pub fn note_mode(window: &Window, cx: &mut App) {
+    let mode = (window.is_fullscreen(), window.is_maximized());
+    if let Some(state) = tracker(cx) {
+        state.mode = Some(mode);
+    }
 }
 
 /// Records the window's windowed place; full-screen and maximized frames
