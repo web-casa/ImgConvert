@@ -9,6 +9,7 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use gpui_kit::{
     AnyWindowHandle, App, Bounds, DisplayId, Global, Pixels, Size, Window, point, px, size,
@@ -143,9 +144,17 @@ struct Tracker {
     path: PathBuf,
     saved: Option<Saved>,
     window: Option<AnyWindowHandle>,
+    /// Bumped on every bounds change; a pending commit only lands if no
+    /// change came after it.
+    moves: u64,
 }
 
 impl Global for Tracker {}
+
+/// How long the window must keep still before its frame counts as a place
+/// to come back to. Zooming and entering full screen animate through
+/// windowed frames first; those must not become the restore rectangle.
+const SETTLE: Duration = Duration::from_millis(500);
 
 /// Loads the state from `path` and saves it again when the app quits.
 pub fn install(path: PathBuf, cx: &mut App) {
@@ -154,6 +163,7 @@ pub fn install(path: PathBuf, cx: &mut App) {
         path,
         saved,
         window: None,
+        moves: 0,
     });
     imgconvert_gpui_shared::lifecycle::on_before_quit(save, cx);
 }
@@ -222,9 +232,30 @@ pub fn attach(window: AnyWindowHandle, placement: &Placement, cx: &mut App) {
     });
 }
 
+/// Follows a bounds change of the main window: once it has kept still for
+/// [`SETTLE`], its windowed frame becomes the place to restore.
+pub fn track(window: &Window, cx: &mut App) {
+    let Some(state) = tracker(cx) else {
+        return;
+    };
+    state.moves += 1;
+    let moves = state.moves;
+    let handle = window.window_handle();
+    let timer = cx.background_executor().timer(SETTLE);
+    cx.spawn(async move |cx| {
+        timer.await;
+        cx.update(|cx| {
+            if tracker(cx).is_some_and(|state| state.moves == moves) {
+                let _ = handle.update(cx, |_, window, cx| commit(window, cx));
+            }
+        })
+    })
+    .detach();
+}
+
 /// Records the window's windowed place; full-screen and maximized frames
 /// are not places to come back to.
-pub fn track(window: &Window, cx: &mut App) {
+fn commit(window: &Window, cx: &mut App) {
     if window.is_fullscreen() || window.is_maximized() {
         return;
     }
@@ -269,7 +300,7 @@ fn save(cx: &mut App) {
     };
     let mode = handle
         .update(cx, |_, window, cx| {
-            track(window, cx);
+            commit(window, cx);
             (window.is_fullscreen(), window.is_maximized())
         })
         .ok();
