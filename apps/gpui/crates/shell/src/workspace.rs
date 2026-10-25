@@ -368,7 +368,10 @@ pub fn open_main_window(cx: &mut App) -> gpui_kit::Result<(AnyWindowHandle, Enti
         },
         cx,
         |window, cx| {
-            window.on_window_should_close(cx, |_, cx| lifecycle::window_should_close(cx));
+            window.on_window_should_close(cx, |window, cx| {
+                window_state::note_mode(window, cx);
+                lifecycle::window_should_close(cx)
+            });
             let workspace = cx.new(|cx| Workspace::new(window, cx));
             workspace.update(cx, |_, cx| {
                 cx.observe_window_bounds(window, |_, window, cx| window_state::track(window, cx))
