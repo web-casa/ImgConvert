@@ -263,7 +263,7 @@ pub fn track(window: &Window, cx: &mut App) {
             if tracker(cx).is_some_and(|state| state.moves == moves) {
                 let _ = handle.update(cx, |_, window, cx| commit(window, cx));
             }
-        })
+        });
     })
     .detach();
 }
